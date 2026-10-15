@@ -1,0 +1,469 @@
+{
+ "_meta": {
+  "source_url": "https://us.store.bambulab.com/products/ams-2-pro",
+  "fetched_at": "2026-10-15",
+  "extracted_from": "P0 crawl, read through packages/catalog/src/bambuImport/extract.ts (the closed read list): identity, options, variants and the gallery only",
+  "notes": "Option, variant and gallery structure only, for the §C.4 golden media binding (13 of 15 variants on gallery #0). No price, stock, promotion or description."
+ },
+ "product": {
+  "id": "580876092009701376",
+  "seoCode": "ams-2-pro",
+  "seoUrlHandle": "https://us.store.bambulab.com/products/ams-2-pro",
+  "name": "Bambu Lab AMS 2 Pro - Automatic Material System",
+  "currentAllIdRoute": "552709755391528960>552709755685130240>580875380323446784",
+  "isFilament": false,
+  "productPropertyList": [
+   {
+    "propertyKey": "Select the type of printer you plan to use the AMS 2 Pro",
+    "propertyKeyId": "644350794219778049",
+    "type": 1,
+    "title": "",
+    "position": 1,
+    "productPropertyValueList": [
+     {
+      "id": "644350794219778050",
+      "value": "A1 Series",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "665692645061685249",
+      "value": "X1/P1 Series",
+      "selectedDefault": 1,
+      "colorUrl": null
+     },
+     {
+      "id": "665692645061685250",
+      "value": "P2S",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "665692645061685251",
+      "value": "H2S",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "692955201173307393",
+      "value": "H2D/H2C",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "720832839840628737",
+      "value": "X2D",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "738525024395620353",
+      "value": "A2 Series",
+      "selectedDefault": 0,
+      "colorUrl": null
+     }
+    ]
+   },
+   {
+    "propertyKey": "How many AMS 2 Pro unit(s) do you plan to connect to your printer",
+    "propertyKeyId": "580876092018089985",
+    "type": 1,
+    "title": "",
+    "position": 2,
+    "productPropertyValueList": [
+     {
+      "id": "580876092018089986",
+      "value": "Connect 1 AMS 2 Pro unit",
+      "selectedDefault": 1,
+      "colorUrl": null
+     },
+     {
+      "id": "692955201173307394",
+      "value": "Connect 1 or 2 AMS 2 Pro unit(s)",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "692955201173307395",
+      "value": "Connect 1 or more AMS 2 Pro unit(s)",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "692955201173307396",
+      "value": "Connect 2 or more AMS 2 Pro units",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "692955201173307397",
+      "value": "Connect 3 or more AMS 2 Pro units",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "758126084595167233",
+      "value": "Bundle Deals",
+      "selectedDefault": 0,
+      "colorUrl": null
+     }
+    ]
+   }
+  ],
+  "productSkuList": [
+   {
+    "id": "692955201173307398",
+    "mediaFile": {
+     "resourceFileId": "753811906096222208",
+     "url": "https://store.bblcdn.com/s7/default/fd7c5f5ed88e4bf98c0583b692c7bba9/AMS_2_Pro-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select the type of printer you plan to use the AMS 2 Pro",
+      "propertyKeyId": "644350794219778049",
+      "propertyValue": "A1 Series"
+     },
+     {
+      "propertyKey": "How many AMS 2 Pro unit(s) do you plan to connect to your printer",
+      "propertyKeyId": "580876092018089985",
+      "propertyValue": "Connect 1 or more AMS 2 Pro unit(s)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "692955201173307403",
+    "mediaFile": {
+     "resourceFileId": "753811906096222208",
+     "url": "https://store.bblcdn.com/s7/default/fd7c5f5ed88e4bf98c0583b692c7bba9/AMS_2_Pro-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select the type of printer you plan to use the AMS 2 Pro",
+      "propertyKeyId": "644350794219778049",
+      "propertyValue": "X1/P1 Series"
+     },
+     {
+      "propertyKey": "How many AMS 2 Pro unit(s) do you plan to connect to your printer",
+      "propertyKeyId": "580876092018089985",
+      "propertyValue": "Connect 1 AMS 2 Pro unit"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "692955201173307408",
+    "mediaFile": {
+     "resourceFileId": "753811906096222208",
+     "url": "https://store.bblcdn.com/s7/default/fd7c5f5ed88e4bf98c0583b692c7bba9/AMS_2_Pro-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select the type of printer you plan to use the AMS 2 Pro",
+      "propertyKeyId": "644350794219778049",
+      "propertyValue": "X1/P1 Series"
+     },
+     {
+      "propertyKey": "How many AMS 2 Pro unit(s) do you plan to connect to your printer",
+      "propertyKeyId": "580876092018089985",
+      "propertyValue": "Connect 2 or more AMS 2 Pro units"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "692955201173307413",
+    "mediaFile": {
+     "resourceFileId": "753811906096222208",
+     "url": "https://store.bblcdn.com/s7/default/fd7c5f5ed88e4bf98c0583b692c7bba9/AMS_2_Pro-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select the type of printer you plan to use the AMS 2 Pro",
+      "propertyKeyId": "644350794219778049",
+      "propertyValue": "P2S"
+     },
+     {
+      "propertyKey": "How many AMS 2 Pro unit(s) do you plan to connect to your printer",
+      "propertyKeyId": "580876092018089985",
+      "propertyValue": "Connect 1 or 2 AMS 2 Pro unit(s)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "692955201173307418",
+    "mediaFile": {
+     "resourceFileId": "753811906096222208",
+     "url": "https://store.bblcdn.com/s7/default/fd7c5f5ed88e4bf98c0583b692c7bba9/AMS_2_Pro-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select the type of printer you plan to use the AMS 2 Pro",
+      "propertyKeyId": "644350794219778049",
+      "propertyValue": "P2S"
+     },
+     {
+      "propertyKey": "How many AMS 2 Pro unit(s) do you plan to connect to your printer",
+      "propertyKeyId": "580876092018089985",
+      "propertyValue": "Connect 3 or more AMS 2 Pro units"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "692955201173307423",
+    "mediaFile": {
+     "resourceFileId": "753811906096222208",
+     "url": "https://store.bblcdn.com/s7/default/fd7c5f5ed88e4bf98c0583b692c7bba9/AMS_2_Pro-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select the type of printer you plan to use the AMS 2 Pro",
+      "propertyKeyId": "644350794219778049",
+      "propertyValue": "H2S"
+     },
+     {
+      "propertyKey": "How many AMS 2 Pro unit(s) do you plan to connect to your printer",
+      "propertyKeyId": "580876092018089985",
+      "propertyValue": "Connect 1 AMS 2 Pro unit"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "692955201173307428",
+    "mediaFile": {
+     "resourceFileId": "753811906096222208",
+     "url": "https://store.bblcdn.com/s7/default/fd7c5f5ed88e4bf98c0583b692c7bba9/AMS_2_Pro-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select the type of printer you plan to use the AMS 2 Pro",
+      "propertyKeyId": "644350794219778049",
+      "propertyValue": "H2S"
+     },
+     {
+      "propertyKey": "How many AMS 2 Pro unit(s) do you plan to connect to your printer",
+      "propertyKeyId": "580876092018089985",
+      "propertyValue": "Connect 2 or more AMS 2 Pro units"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "692955201173307433",
+    "mediaFile": {
+     "resourceFileId": "753811906096222208",
+     "url": "https://store.bblcdn.com/s7/default/fd7c5f5ed88e4bf98c0583b692c7bba9/AMS_2_Pro-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select the type of printer you plan to use the AMS 2 Pro",
+      "propertyKeyId": "644350794219778049",
+      "propertyValue": "H2D/H2C"
+     },
+     {
+      "propertyKey": "How many AMS 2 Pro unit(s) do you plan to connect to your printer",
+      "propertyKeyId": "580876092018089985",
+      "propertyValue": "Connect 1 or 2 AMS 2 Pro unit(s)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "692955201173307438",
+    "mediaFile": {
+     "resourceFileId": "753811906096222208",
+     "url": "https://store.bblcdn.com/s7/default/fd7c5f5ed88e4bf98c0583b692c7bba9/AMS_2_Pro-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select the type of printer you plan to use the AMS 2 Pro",
+      "propertyKeyId": "644350794219778049",
+      "propertyValue": "H2D/H2C"
+     },
+     {
+      "propertyKey": "How many AMS 2 Pro unit(s) do you plan to connect to your printer",
+      "propertyKeyId": "580876092018089985",
+      "propertyValue": "Connect 3 or more AMS 2 Pro units"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "720832839840628738",
+    "mediaFile": {
+     "resourceFileId": "753811906096222208",
+     "url": "https://store.bblcdn.com/s7/default/fd7c5f5ed88e4bf98c0583b692c7bba9/AMS_2_Pro-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select the type of printer you plan to use the AMS 2 Pro",
+      "propertyKeyId": "644350794219778049",
+      "propertyValue": "X2D"
+     },
+     {
+      "propertyKey": "How many AMS 2 Pro unit(s) do you plan to connect to your printer",
+      "propertyKeyId": "580876092018089985",
+      "propertyValue": "Connect 1 or 2 AMS 2 Pro unit(s)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "720832839840628743",
+    "mediaFile": {
+     "resourceFileId": "753811906096222208",
+     "url": "https://store.bblcdn.com/s7/default/fd7c5f5ed88e4bf98c0583b692c7bba9/AMS_2_Pro-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select the type of printer you plan to use the AMS 2 Pro",
+      "propertyKeyId": "644350794219778049",
+      "propertyValue": "X2D"
+     },
+     {
+      "propertyKey": "How many AMS 2 Pro unit(s) do you plan to connect to your printer",
+      "propertyKeyId": "580876092018089985",
+      "propertyValue": "Connect 3 or more AMS 2 Pro units"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "738525024395620354",
+    "mediaFile": {
+     "resourceFileId": "753811906096222208",
+     "url": "https://store.bblcdn.com/s7/default/fd7c5f5ed88e4bf98c0583b692c7bba9/AMS_2_Pro-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select the type of printer you plan to use the AMS 2 Pro",
+      "propertyKeyId": "644350794219778049",
+      "propertyValue": "A2 Series"
+     },
+     {
+      "propertyKey": "How many AMS 2 Pro unit(s) do you plan to connect to your printer",
+      "propertyKeyId": "580876092018089985",
+      "propertyValue": "Connect 1 AMS 2 Pro unit"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "738525024399814660",
+    "mediaFile": {
+     "resourceFileId": "753811906096222208",
+     "url": "https://store.bblcdn.com/s7/default/fd7c5f5ed88e4bf98c0583b692c7bba9/AMS_2_Pro-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select the type of printer you plan to use the AMS 2 Pro",
+      "propertyKeyId": "644350794219778049",
+      "propertyValue": "A2 Series"
+     },
+     {
+      "propertyKey": "How many AMS 2 Pro unit(s) do you plan to connect to your printer",
+      "propertyKeyId": "580876092018089985",
+      "propertyValue": "Connect 2 or more AMS 2 Pro units"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "758126084595167234",
+    "mediaFile": {
+     "resourceFileId": "758154829200633856",
+     "url": "https://store.bblcdn.com/s7/default/b2ec7294e0044018a90bf75ca6fbcafd/A1.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select the type of printer you plan to use the AMS 2 Pro",
+      "propertyKeyId": "644350794219778049",
+      "propertyValue": "A1 Series"
+     },
+     {
+      "propertyKey": "How many AMS 2 Pro unit(s) do you plan to connect to your printer",
+      "propertyKeyId": "580876092018089985",
+      "propertyValue": "Bundle Deals"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "758126084595167239",
+    "mediaFile": {
+     "resourceFileId": "758121995077431296",
+     "url": "https://store.bblcdn.com/s7/default/bf6e2895e26f4b4cadd9cc12242c4916/P1_Seriee.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select the type of printer you plan to use the AMS 2 Pro",
+      "propertyKeyId": "644350794219778049",
+      "propertyValue": "X1/P1 Series"
+     },
+     {
+      "propertyKey": "How many AMS 2 Pro unit(s) do you plan to connect to your printer",
+      "propertyKeyId": "580876092018089985",
+      "propertyValue": "Bundle Deals"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   }
+  ],
+  "mediaFiles": [
+   {
+    "resourceFileId": "753811906096222208",
+    "url": "https://store.bblcdn.com/s7/default/fd7c5f5ed88e4bf98c0583b692c7bba9/AMS_2_Pro-compressed.jpg"
+   },
+   {
+    "resourceFileId": "758121995077431296",
+    "url": "https://store.bblcdn.com/s7/default/bf6e2895e26f4b4cadd9cc12242c4916/P1_Seriee.jpg"
+   },
+   {
+    "resourceFileId": "758154829200633856",
+    "url": "https://store.bblcdn.com/s7/default/b2ec7294e0044018a90bf75ca6fbcafd/A1.jpg"
+   },
+   {
+    "resourceFileId": "581277809550905344",
+    "url": "https://store.bblcdn.com/s7/default/88003f58c7254fb3aae2b39597a2e092/ams.jpg"
+   },
+   {
+    "resourceFileId": "581277809550905345",
+    "url": "https://store.bblcdn.com/s7/default/8b7b879210ac48108605504b02d578eb/ams-1.jpg"
+   },
+   {
+    "resourceFileId": "581277809550905346",
+    "url": "https://store.bblcdn.com/s7/default/b68d062318914ae992c16d8d6bae010c/ams-2.jpg"
+   },
+   {
+    "resourceFileId": "580881346700820480",
+    "url": "https://store.bblcdn.com/s7/default/9fb9991a707147789b6af1a74eac763b/ams.jpg"
+   },
+   {
+    "resourceFileId": "580881346700820484",
+    "url": "https://store.bblcdn.com/s7/default/50a5a6e197a6404a88e6c2570d171749/ams-4.jpg"
+   }
+  ]
+ },
+ "description": {
+  "kind": "none"
+ },
+ "jsonld": []
+}

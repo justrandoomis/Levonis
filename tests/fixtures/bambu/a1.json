@@ -1,0 +1,4202 @@
+{
+ "_meta": {
+  "source_url": "https://us.store.bambulab.com/products/a1",
+  "fetched_at": "2026-10-15T09:54:20Z",
+  "extracted_from": "self.__next_f RSC flight data (App Router); product object = props.data of the PDP component, description = separate RSC element (see description.kind)",
+  "removed_keys": [
+   "<money amounts inside text>",
+   "abGroup",
+   "discountOffText",
+   "discountPrice",
+   "flashSaleVO",
+   "gradientDiscountActivityId",
+   "gradientDiscountSkus",
+   "marketingDisplayAbGroup",
+   "maximum",
+   "minimum",
+   "orderInfo",
+   "orderInfoTitle",
+   "pointsInfo",
+   "price",
+   "priceCurrency",
+   "priceDescriptionList",
+   "priceExplanation",
+   "priceSpecification",
+   "productSkuBuyAndGetVO",
+   "productSkuPreSale",
+   "promotionDescription",
+   "qryPromotionFlag",
+   "quantityLimitType",
+   "quantityLimitValue",
+   "serviceGuaranteeList",
+   "skuPromotionPointsSwitch"
+  ],
+  "notes": "Prices, compare-at prices, purchase limits, promotions, points and store-wide shipping/service boilerplate removed; dollar amounts inside text replaced with $[redacted]. Ids are strings (many exceed 2^53)."
+ },
+ "product": {
+  "id": "7706060161160",
+  "name": "Bambu Lab A1 3D Printer",
+  "type": 1,
+  "subTitle": null,
+  "description": null,
+  "seoCode": "a1",
+  "seoTitle": "Buy Bambu Lab A1: Full-Size Multi-Color 3D Printer for Beginners",
+  "seoMetaDescription": "Full-size multi-color 3D printer. Print-ready, no tuning. 2M+ free models. 30-day price protection, 2-year warranty & 30-day returns at official store.",
+  "seoUrlHandle": "https://us.store.bambulab.com/products/a1",
+  "productFeaturesTitle": "Product Features",
+  "productFeatures": "<ul>\n<li><strong>Full-Auto Calibration: </strong>Absolutely no manual tuning.</li>\n<li><strong>Seamless Multi-Color Printing (Combo Version):</strong> Experience limitless creativity with AMS-powered material handling.</li>\n<li><strong>49dB Whisper-Quiet Operation:</strong> Print in peace with a noise level as low as a quiet library.</li>\n<li><strong>Best-In-Class Print Quality: </strong>Pro-grade precision &amp; surfaces that set the industry standard.</li>\n<li><strong>One-Click MakerWorld Integration: </strong>Find your next project and start printing instantly.</li>\n<li>Full-Scale Build Volume: A spacious <strong>256 &times; 256 &times; 256 mm&sup3;</strong> canvas for your big ideas.</li>\n<li>The upgraded heatbed cable features Kevlar reinforcement, thicker insulation, softer copper, optimized wire winding interval, Nylon sleeving and an extended strain relief.</li>\n</ul>\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><strong>*&nbsp; To connect the A1 printer to the AMS/ AMS 2 Pro/ AMS HT, an AMS HUB (SA013) accessory is needed.</strong></div>\n</div>\n<p><span style=\"color: #000000;\">* Cybersecurity compliant with EU RED Article 3.3(d)(e) and ETSI EN 303 645 V2.1.1:2020. <a href=\"https://bambulab.com/en/trust-center/certification\" target=\"_blank\" rel=\"noopener\">Learn more.</a></span></p>",
+  "productFeaturesModuleList": [
+   {
+    "id": "733532513712771075",
+    "title": "Product Features",
+    "content": "<ul>\n<li><strong>Full-Auto Calibration: </strong>Absolutely no manual tuning.</li>\n<li><strong>Seamless Multi-Color Printing (Combo Version):</strong> Experience limitless creativity with AMS-powered material handling.</li>\n<li><strong>49dB Whisper-Quiet Operation:</strong> Print in peace with a noise level as low as a quiet library.</li>\n<li><strong>Best-In-Class Print Quality: </strong>Pro-grade precision &amp; surfaces that set the industry standard.</li>\n<li><strong>One-Click MakerWorld Integration: </strong>Find your next project and start printing instantly.</li>\n<li>Full-Scale Build Volume: A spacious <strong>256 &times; 256 &times; 256 mm&sup3;</strong> canvas for your big ideas.</li>\n<li>The upgraded heatbed cable features Kevlar reinforcement, thicker insulation, softer copper, optimized wire winding interval, Nylon sleeving and an extended strain relief.</li>\n</ul>\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><strong>*&nbsp; To connect the A1 printer to the AMS/ AMS 2 Pro/ AMS HT, an AMS HUB (SA013) accessory is needed.</strong></div>\n</div>\n<p><span style=\"color: #000000;\">* Cybersecurity compliant with EU RED Article 3.3(d)(e) and ETSI EN 303 645 V2.1.1:2020. <a href=\"https://bambulab.com/en/trust-center/certification\" target=\"_blank\" rel=\"noopener\">Learn more.</a></span></p>",
+    "iconUrl": ""
+   }
+  ],
+  "newFlag": 0,
+  "externalVideoTitle": "Explore More About A1",
+  "externalVideoLinkList": [
+   "https://www.youtube.com/embed/fNbAGkoRySI?si=Xxr62eB0jrugxtJN",
+   "https://www.youtube.com/embed/NZJVLw86Vg4?si=oFEnoulvph5UasqF",
+   "https://www.youtube.com/embed/sdu7VBwSDN4?si=v0KUxPuicMK0KaJY",
+   "https://www.youtube.com/embed/w3im2xPieN4?si=8ExfTKngnZTVrovf",
+   "https://www.youtube.com/embed/cbHtZtyXxY4?si=GtKAFYWWEfN7nakj",
+   "https://www.youtube.com/embed/1gtfGubamro?si=Ng_c145M0c7RFk26",
+   "https://www.youtube.com/embed/ZSmR_hL9l1w?si=2f_kZ-Ydvmy-EMMn",
+   "https://www.youtube.com/embed/ydV3PIDuNlQ?si=569t4IGjhON8fAac"
+  ],
+  "mediaFiles": [
+   {
+    "resourceFileId": "753811089383063552",
+    "url": "https://store.bblcdn.com/s7/default/e424062172bd47fb8795a50fcdc941f0/A1-compressed.jpg"
+   },
+   {
+    "resourceFileId": "753811089272295424",
+    "url": "https://store.bblcdn.com/s7/default/ac6b6e7f1cb144178af269e1a01de4a8/A1_C-compressed.jpg"
+   },
+   {
+    "resourceFileId": "775937045750087680",
+    "url": "https://store.bblcdn.com/s7/default/388ac0bad7b546bd9394d3fdbcdb51fa/A1C_Combo-compressed-compressed-compressed.jpg"
+   },
+   {
+    "resourceFileId": "698796116085157888",
+    "url": "https://store.bblcdn.com/s7/default/866e470a983f4d989f81a495a5f5c71c/A1-compressed.jpg"
+   },
+   {
+    "resourceFileId": "698796170866409472",
+    "url": "https://store.bblcdn.com/s7/default/7295f2694b23422290eaba7d4ea66406/A1_C-compressed.jpg"
+   },
+   {
+    "resourceFileId": "33311088935048",
+    "url": "https://store.bblcdn.com/s7/default/114fa74660ed4262b26612ae6b486644/A1_2.png"
+   },
+   {
+    "resourceFileId": "33306543489160",
+    "url": "https://store.bblcdn.com/s7/default/4ba6711c8f9f4029a1e24de021e42b40/A1.png"
+   },
+   {
+    "resourceFileId": "33306543685768",
+    "url": "https://store.bblcdn.com/s7/default/eff829651265454ba8c27432c4967326/A1-1.png"
+   },
+   {
+    "resourceFileId": "33306543653000",
+    "url": "https://store.bblcdn.com/s7/default/8f030439814145a4993383a47d1c2556/A1-2.png"
+   },
+   {
+    "resourceFileId": "35026172641416",
+    "url": "https://store.bblcdn.com/s7/default/7ce3e42d13184dde96f224b297563ba5/A1_4.png"
+   }
+  ],
+  "productSkuList": [
+   {
+    "id": "579550514255634440",
+    "mediaFile": {
+     "resourceFileId": "753811089272295424",
+     "url": "https://store.bblcdn.com/s7/default/ac6b6e7f1cb144178af269e1a01de4a8/A1_C-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Variant",
+      "propertyKeyId": "10140726591624",
+      "propertyValueId": null,
+      "propertyValue": "A1 Combo",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "579550514255634444",
+    "mediaFile": {
+     "resourceFileId": "753811089383063552",
+     "url": "https://store.bblcdn.com/s7/default/e424062172bd47fb8795a50fcdc941f0/A1-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Variant",
+      "propertyKeyId": "10140726591624",
+      "propertyValueId": null,
+      "propertyValue": "A1",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span style=\"color: #000000;\"><span style=\"font-family: MonospacedNumber, LarkHackSafariFont, LarkEmojiFont, LarkChineseQuote, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Tahoma, 'PingFang SC', 'Microsoft Yahei', Arial, 'Hiragino Sans GB', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';\">To connect AMS 2 Pro unit(s) to A1 series printer, an</span></span><span style=\"color: #f54a45;\"><span style=\"font-family: MonospacedNumber, LarkHackSafariFont, LarkEmojiFont, LarkChineseQuote, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Tahoma, 'PingFang SC', 'Microsoft Yahei', Arial, 'Hiragino Sans GB', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';\"> A1 series AMS Hub (SA013) </span></span><span style=\"color: #000000;\"><span style=\"font-family: MonospacedNumber, LarkHackSafariFont, LarkEmojiFont, LarkChineseQuote, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Tahoma, 'PingFang SC', 'Microsoft Yahei', Arial, 'Hiragino Sans GB', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';\">is required. </span></span></div>\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span style=\"color: #000000;\"><span style=\"font-family: MonospacedNumber, LarkHackSafariFont, LarkEmojiFont, LarkChineseQuote, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Tahoma, 'PingFang SC', 'Microsoft Yahei', Arial, 'Hiragino Sans GB', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';\">We recommend to purchase A1 Combo directly for more convenient usage.</span></span></div>\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"1\" data-line=\"true\">&nbsp;</div>\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"2\" data-line=\"true\"><span style=\"color: #000000;\"><span style=\"font-family: MonospacedNumber, LarkHackSafariFont, LarkEmojiFont, LarkChineseQuote, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Tahoma, 'PingFang SC', 'Microsoft Yahei', Arial, 'Hiragino Sans GB', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';\">A1 series printer can connect <strong>up to 4 AMS units</strong>(including AMS HT, AMS, AMS 2 Pro).</span></span></div>\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"3\" data-line=\"true\"><strong><span style=\"color: #000000;\"><span style=\"font-family: MonospacedNumber, LarkHackSafariFont, LarkEmojiFont, LarkChineseQuote, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Tahoma, 'PingFang SC', 'Microsoft Yahei', Arial, 'Hiragino Sans GB', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';\">Note: AMS lite cannot be used in combination with other AMS units.</span></span></strong></div>\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"4\" data-line=\"true\">&nbsp;</div>\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"5\" data-line=\"true\"><span style=\"color: #000000;\"><span style=\"font-family: MonospacedNumber, LarkHackSafariFont, LarkEmojiFont, LarkChineseQuote, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Tahoma, 'PingFang SC', 'Microsoft Yahei', Arial, 'Hiragino Sans GB', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';\"><strong>For drying function: </strong></span></span><span style=\"color: #000000;\"><span style=\"font-family: MonospacedNumber, LarkHackSafariFont, LarkEmojiFont, LarkChineseQuote, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Tahoma, 'PingFang SC', 'Microsoft Yahei', Arial, 'Hiragino Sans GB', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';\">One Switching Adapter is required for each AMS 2 Pro unit.</span></span></div>",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "776210262809161737",
+    "mediaFile": {
+     "resourceFileId": "775937045750087680",
+     "url": "https://store.bblcdn.com/s7/default/388ac0bad7b546bd9394d3fdbcdb51fa/A1C_Combo-compressed-compressed-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Variant",
+      "propertyKeyId": "10140726591624",
+      "propertyValueId": null,
+      "propertyValue": "A1 Combo Print with Care Bundle",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "<p>Add only <span style=\"color: #e03e2d;\"><strong>$[redacted]</strong></span> to the A1 Combo and get<strong><span style=\"color: #e03e2d;\"> 4 extra rolls of PLA Pure filament (2 with spool, 2 refill)</span></strong>, made with fewer ingredients and designed to meet food-contact and toy-safety standards for more thoughtful creations.</p>",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   }
+  ],
+  "productPropertyList": [
+   {
+    "propertyKey": "Variant",
+    "propertyKeyId": "10140726591624",
+    "productPropertyValueList": [
+     {
+      "id": "564681835811729415",
+      "value": "A1 Combo",
+      "newFlag": 0,
+      "selectedDefault": 1,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681835811729416",
+      "value": "A1",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "776210262809161736",
+      "value": "A1 Combo Print with Care Bundle",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": "NEW"
+     }
+    ],
+    "position": 1,
+    "type": 4,
+    "title": "3D Printer",
+    "introduction": "",
+    "explanation": ""
+   }
+  ],
+  "skillLevel": 0,
+  "skillTitle": null,
+  "printerTime": "",
+  "filamentUsed": "",
+  "colorCollectionList": [],
+  "productExtraInfoVO": {
+   "gprsInfoTemplateVO": null,
+   "productVideoVOList": null,
+   "productFileList": null
+  },
+  "productDetailTemplateVO": null,
+  "subProductList": null,
+  "showMwModelIds": [],
+  "showMwModelPosition": 0,
+  "customButtonTitle": null,
+  "customButtonLink": null,
+  "paymentComponentPosition": 0,
+  "isFilament": false,
+  "currentAllIdRoute": "552709755391528960>552709755571884032>552709755651575808",
+  "imageLabels": null
+ },
+ "description": {
+  "kind": "bespoke_shopify_port",
+  "tree": [
+   [
+    "$",
+    "$L250",
+    null,
+    {}
+   ],
+   [
+    "$",
+    "div",
+    null,
+    {
+     "id": "main",
+     "role": "main",
+     "children": [
+      [
+       "$",
+       "$L251",
+       null,
+       {}
+      ],
+      [
+       "$",
+       "div",
+       null,
+       {
+        "id": "shopify-section-template--15773091299464__product_description_nav_anchor_wBQ9qf",
+        "children": [
+         "$",
+         "div",
+         null,
+         {
+          "id": "anchor-navmenu-overview"
+         }
+        ]
+       }
+      ],
+      [
+       "$",
+       "$L252",
+       null,
+       {}
+      ],
+      [
+       [
+        "$",
+        "$Ld0",
+        null,
+        {
+         "width": 1280,
+         "height": 680,
+         "alt": "",
+         "fill": null,
+         "unoptimized": true,
+         "src": "https://store.bblcdn.com/s7/default/efc1516016604f6ab281141a3c9e9370/768.jpg"
+        }
+       ],
+       [
+        "$",
+        "$Ld0",
+        null,
+        {
+         "width": 1280,
+         "height": 680,
+         "alt": "",
+         "fill": null,
+         "unoptimized": true,
+         "src": "https://store.bblcdn.com/s7/default/efc1516016604f6ab281141a3c9e9370/768.jpg"
+        }
+       ],
+       [
+        "$",
+        "$Ld0",
+        null,
+        {
+         "width": 1014,
+         "height": 680,
+         "alt": "",
+         "fill": null,
+         "unoptimized": true,
+         "src": "https://store.bblcdn.com/s7/default/efc1516016604f6ab281141a3c9e9370/768.jpg"
+        }
+       ],
+       [
+        "$",
+        "$Ld0",
+        null,
+        {
+         "width": 1200,
+         "height": 680,
+         "alt": "",
+         "fill": null,
+         "unoptimized": true,
+         "src": "https://store.bblcdn.com/s7/default/7f64153d46a54c1ba351b7f188e88282/1920.jpg"
+        }
+       ]
+      ],
+      [
+       "$",
+       "div",
+       null,
+       {
+        "id": "shopify-section-template--15773091299464__product_description_grip_zwXpf8",
+        "children": [
+         "$",
+         "div",
+         null,
+         {
+          "children": [
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": "Why Choose Bambu Lab A1"
+            }
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": [
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "img",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/b65287201d084ccaa06b271745ee7928.webp",
+                      "alt": "",
+                      "src": "//store.bblcdn.com/b65287201d084ccaa06b271745ee7928.webp"
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": "Multi-color Printing - The most reliable multi-color system"
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "img",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/a551befb812842fca4626fcd6f3ad418.webp",
+                      "alt": "",
+                      "src": "//store.bblcdn.com/a551befb812842fca4626fcd6f3ad418.webp"
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": "Full-auto Calibration - You don't have to do ANY manual tuning"
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "img",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/53c9cada0f8146898a970b1c204525ca.webp",
+                      "alt": "",
+                      "src": "//store.bblcdn.com/53c9cada0f8146898a970b1c204525ca.webp"
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": "Large Print Volume - Print a helmet in 1-piece"
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "img",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/e11faae9aad247c582585a29fe1c16eb.webp",
+                      "alt": "",
+                      "src": "//store.bblcdn.com/e11faae9aad247c582585a29fe1c16eb.webp"
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": "1-click to Print - As easy as your copier"
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "img",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/b3a47f9b2882416f9e6a3b96c9d218f1.webp",
+                      "alt": "",
+                      "src": "//store.bblcdn.com/b3a47f9b2882416f9e6a3b96c9d218f1.webp"
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": "Reliable High Speed - Finish your project on time, every time"
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "img",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/01d653129bbc46d59145e6c793dc4396.webp",
+                      "alt": "",
+                      "src": "//store.bblcdn.com/01d653129bbc46d59145e6c793dc4396.webp"
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": "Active Flow Control - Smooth surfaces, sharp edges"
+                  }
+                 ]
+                ]
+               }
+              ]
+             ]
+            }
+           ]
+          ]
+         }
+        ]
+       }
+      ],
+      [
+       "$",
+       "div",
+       null,
+       {
+        "id": "shopify-section-template--15773091299464__product_description_pic_and_text_R48XYE",
+        "children": [
+         "$",
+         "div",
+         null,
+         {
+          "children": [
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": [
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "1-click printing with MakerWorld"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "Print Like A PRO From Your Very First Use"
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "id": "swiper-wrapper-5e36912fc890cb24",
+                      "aria-live": "polite",
+                      "children": [
+                       [
+                        "$",
+                        "div",
+                        null,
+                        {
+                         "role": "group",
+                         "aria-label": "1 / 2",
+                         "children": [
+                          [
+                           "$",
+                           "div",
+                           null,
+                           {
+                            "children": [
+                             [
+                              "$",
+                              "div",
+                              null,
+                              {}
+                             ],
+                             [
+                              "$",
+                              "video",
+                              null,
+                              {
+                               "data-src": "//store.bblcdn.com/5944b7c3a258475aadd2af58b3899474.mp4",
+                               "data-poster": "//store.bblcdn.com/4e005dd5f49c4c4db9fa21ae2e2c6621.webp",
+                               "data-lazy": "false"
+                              }
+                             ]
+                            ]
+                           }
+                          ],
+                          [
+                           "$",
+                           "div",
+                           null,
+                           {
+                            "children": "Start printing with a few clicks on your phone, no need to worry about the tedious settings."
+                           }
+                          ]
+                         ]
+                        }
+                       ],
+                       [
+                        "$",
+                        "div",
+                        null,
+                        {
+                         "role": "group",
+                         "aria-label": "2 / 2",
+                         "children": [
+                          [
+                           "$",
+                           "div",
+                           null,
+                           {
+                            "children": [
+                             [
+                              "$",
+                              "div",
+                              null,
+                              {}
+                             ],
+                             [
+                              "$",
+                              "img",
+                              null,
+                              {
+                               "data-src": "//store.bblcdn.com/08a55eb8c94146d2967e2c7df2dcb0b4.webp",
+                               "alt": ""
+                              }
+                             ]
+                            ]
+                           }
+                          ],
+                          [
+                           "$",
+                           "div",
+                           null,
+                           {
+                            "children": "Browse endless selections of high-quality models tailored to your printers on MakerWorld!"
+                           }
+                          ]
+                         ]
+                        }
+                       ]
+                      ]
+                     }
+                    ],
+                    [
+                     "$",
+                     "span",
+                     null,
+                     {
+                      "aria-live": "assertive",
+                      "aria-atomic": "true"
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "button",
+                     null,
+                     {
+                      "children": [
+                       "$",
+                       "svg",
+                       null,
+                       {
+                        "role": "presentation",
+                        "viewBox": "0 0 11 21",
+                        "children": [
+                         "$",
+                         "polyline",
+                         null,
+                         {
+                          "fill": "none",
+                          "stroke": "currentColor",
+                          "points": "10.5 0.5 0.5 10.5 10.5 20.5",
+                          "strokeWidth": "1.25"
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ],
+                    [
+                     "$",
+                     "button",
+                     null,
+                     {
+                      "children": [
+                       "$",
+                       "svg",
+                       null,
+                       {
+                        "role": "presentation",
+                        "viewBox": "0 0 11 21",
+                        "children": [
+                         "$",
+                         "polyline",
+                         null,
+                         {
+                          "fill": "none",
+                          "stroke": "currentColor",
+                          "points": "0.5 0.5 10.5 10.5 0.5 20.5",
+                          "strokeWidth": "1.25"
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       [
+                        "$",
+                        "div",
+                        null,
+                        {
+                         "children": "1-click printing with MakerWorld"
+                        }
+                       ],
+                       [
+                        "$",
+                        "div",
+                        null,
+                        {
+                         "children": "Print Like A PRO From Your Very First Use"
+                        }
+                       ]
+                      ]
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       [
+                        "$",
+                        "button",
+                        null,
+                        {
+                         "children": [
+                          [
+                           "$",
+                           "div",
+                           null,
+                           {
+                            "children": "Start printing with a few clicks on your phone, no need to worry about the tedious settings."
+                           }
+                          ],
+                          [
+                           "$",
+                           "div",
+                           null,
+                           {
+                            "children": [
+                             "$",
+                             "svg",
+                             null,
+                             {
+                              "role": "presentation",
+                              "viewBox": "0 0 11 18",
+                              "children": [
+                               "$",
+                               "path",
+                               null,
+                               {
+                                "d": "M1.5 1.5l8 7.5-8 7.5",
+                                "strokeWidth": 2,
+                                "stroke": "currentColor",
+                                "fill": "none",
+                                "fillRule": "evenodd",
+                                "strokeLinecap": "square"
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         ]
+                        }
+                       ],
+                       [
+                        "$",
+                        "button",
+                        null,
+                        {
+                         "children": [
+                          [
+                           "$",
+                           "div",
+                           null,
+                           {
+                            "children": "Browse endless selections of high-quality models tailored to your printers on MakerWorld!"
+                           }
+                          ],
+                          [
+                           "$",
+                           "div",
+                           null,
+                           {
+                            "children": [
+                             "$",
+                             "svg",
+                             null,
+                             {
+                              "role": "presentation",
+                              "viewBox": "0 0 11 18",
+                              "children": [
+                               "$",
+                               "path",
+                               null,
+                               {
+                                "d": "M1.5 1.5l8 7.5-8 7.5",
+                                "strokeWidth": 2,
+                                "stroke": "currentColor",
+                                "fill": "none",
+                                "fillRule": "evenodd",
+                                "strokeLinecap": "square"
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         ]
+                        }
+                       ]
+                      ]
+                     }
+                    ]
+                   ]
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "video",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/8437444c13c842f0b6d56f9e9676547e.mp4",
+                      "data-poster": "//store.bblcdn.com/a2524f0090794d77ab7ece15b1fc9301.webp",
+                      "data-lazy": "false"
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "Full-auto Calibration"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "Absolutely Hassle-free"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": " A1 handles various calibrations all by itself. It meticulously calibrates the Z-offset, bed-level, vibration resonance and nozzle pressure for EVERY print job, automatically."
+                     }
+                    ]
+                   ]
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "video",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/daee45d440704568912668d656d9f169.mp4",
+                      "data-poster": "//store.bblcdn.com/8ee2ad16731a4e7e80216db5acfbb5b6.webp",
+                      "data-lazy": "false"
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "AMS Multi-color Printing"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "The Most Reliable Multi-color System"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "The AMS lite has been recognized as the most reliable multi-color 3D printing solution. It also features RFID-sync to automatically match the best print settings for your Bambu filaments, delivering perfect print quality without manual tuning of the filament profile."
+                     }
+                    ]
+                   ]
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "video",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/c77b8e3b71344fb982047f3b862fa748.mp4",
+                      "data-poster": "//store.bblcdn.com/2b457df1a555433aad09be9f7236ca8d.webp",
+                      "data-lazy": "false"
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "High-speed Precision"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "The High-speed You Can Truly Rely On"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "A1 is equipped with low-drag linear rails, a powerful MCU,accelerometers, a nozzle pressure sensor, and an advanced motion control system that maximizes their potential. Its high-speed performance is built on a solid foundation, ensuring consistent reliability with stable and uniform output for every print."
+                     }
+                    ]
+                   ]
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "video",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/495357e689324e7282b8ba3f9c6b7638.mp4",
+                      "data-poster": "//store.bblcdn.com/170c45536a6c4420b2893992634ec878.webp",
+                      "data-lazy": "false"
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "Intelligent Print Monitoring"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "Put Your Printing On Autopilot"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "3D printing is a complex task where many things can go wrong. The A1 is equipped with a comprehensive print status monitoring system to help keep the print job in check."
+                     }
+                    ]
+                   ]
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "video",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/963b13795bfb4998ab53b1af206b84d8.mp4",
+                      "data-poster": "//store.bblcdn.com/0136ac152672427e8eafa7c79cea2256.webp",
+                      "data-lazy": "false"
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "Full-size Print Volume"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "Generous Space for You to Expand Your Fantasy"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "A1 features 256mm*256mm*256mm build volume, bigger than most of the entry-level printers. Print a helmet in one go, we got you."
+                     }
+                    ]
+                   ]
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "img",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/s7/default/78eb23a0dcb5431f9e52ce4774cf5860/1ff169376035474c810f74c9ae269729.webp",
+                      "alt": ""
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "Active Motor Noise Canceling"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "Print Silently"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "The A1 can calibrate parameters to match tiny individual differences between each drive motor. This compensates for the unwanted harshness of motor noise."
+                     }
+                    ]
+                   ]
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "img",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/7508229b1c5049e28d6aff3fab3ea5dd.webp",
+                      "alt": ""
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "Connected with Privacy in Mind"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "Start & Control on Whatever Device You Prefer"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "Not only can you connect your A1 to any device you prefer through Bambu Cloud Service, but you can also do so through LAN-only mode. We offer fully customizable connection options to match your privacy preferences."
+                     }
+                    ]
+                   ]
+                  }
+                 ]
+                ]
+               }
+              ]
+             ]
+            }
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": [
+              "$",
+              "a",
+              null,
+              {
+               "href": "https://bambulab.com/a1",
+               "target": "_blank",
+               "children": [
+                [
+                 "$",
+                 "span",
+                 null,
+                 {
+                  "children": "Learn More"
+                 }
+                ],
+                [
+                 "$",
+                 "div",
+                 null,
+                 {
+                  "children": [
+                   "$",
+                   "svg",
+                   null,
+                   {
+                    "role": "presentation",
+                    "viewBox": "0 0 11 18",
+                    "children": [
+                     "$",
+                     "path",
+                     null,
+                     {
+                      "d": "M1.5 1.5l8 7.5-8 7.5",
+                      "strokeWidth": 2,
+                      "stroke": "currentColor",
+                      "fill": "none",
+                      "fillRule": "evenodd",
+                      "strokeLinecap": "square"
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               ]
+              }
+             ]
+            }
+           ]
+          ]
+         }
+        ]
+       }
+      ],
+      [
+       "$",
+       "div",
+       null,
+       {
+        "id": "shopify-section-template--15773091299464__product_description_nav_anchor_yWkyp4",
+        "children": [
+         "$",
+         "div",
+         null,
+         {
+          "id": "anchor-navmenu-specs"
+         }
+        ]
+       }
+      ],
+      [
+       "$",
+       "div",
+       null,
+       {
+        "id": "shopify-section-template--15773091299464__product_description_special_DrNNjV",
+        "children": [
+         "$",
+         "div",
+         null,
+         {
+          "children": [
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": "A1 SPECS"
+            }
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {}
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": [
+              "$",
+              "div",
+              null,
+              {
+               "children": [
+                "$",
+                "div",
+                null,
+                {
+                 "children": [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    "$",
+                    "table",
+                    null,
+                    {
+                     "children": [
+                      [
+                       "$",
+                       "thead",
+                       null,
+                       {
+                        "children": [
+                         "$",
+                         "tr",
+                         null,
+                         {
+                          "children": [
+                           [
+                            "$",
+                            "td",
+                            null,
+                            {
+                             "colSpan": 2,
+                             "children": "Item"
+                            }
+                           ],
+                           [
+                            "$",
+                            "td",
+                            null,
+                            {
+                             "children": "A1 Specification"
+                            }
+                           ]
+                          ]
+                         }
+                        ]
+                       }
+                      ],
+                      [
+                       "$",
+                       "tbody",
+                       null,
+                       {
+                        "children": [
+                         [
+                          "$",
+                          "tr",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "rowSpan": 1,
+                              "children": "Body"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "Build Volume(W*D*H)"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "256*256*256 mm³"
+                             }
+                            ]
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "tr",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "rowSpan": 4,
+                              "children": "Toolhead"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "Hot End"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "All-Metal"
+                             }
+                            ]
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "tr",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "Nozzle"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "Stainless Steel"
+                             }
+                            ]
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "tr",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "Max Hot End Temperature"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "300 °C"
+                             }
+                            ]
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "tr",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "Nozzle Diameter"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "dangerouslySetInnerHTML": {
+                               "__html": "0.4 mm (Included) <br />\n                            0.2 mm, 0.6 mm, 0.8 mm"
+                              }
+                             }
+                            ]
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "tr",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "rowSpan": 2,
+                              "children": "Heatbed"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "Build Plate"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "dangerouslySetInnerHTML": {
+                               "__html": "Bambu Textured PEI Plate (Included) <br />\n                            Bambu Smooth PEI Plate <br />\n                            Bambu Dual-Texture PEI Plate\n                            <br />\n                            Bambu High Temperature Plate (Smooth PEI) <br />\n                            Bambu Cool Plate"
+                              }
+                             }
+                            ]
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "tr",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "Max Build Plate Temperature"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "100°C"
+                             }
+                            ]
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "tr",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "rowSpan": 2,
+                              "children": "Speed"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "Max Speed of Tool Head"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "500mm/s"
+                             }
+                            ]
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "tr",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "Max Acceleration of Tool Head"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "10000mm/s²"
+                             }
+                            ]
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "tr",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "rowSpan": 2,
+                              "children": "Supported Filament"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "PLA, PETG, TPU, PVA"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "Ideal"
+                             }
+                            ]
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "tr",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "dangerouslySetInnerHTML": {
+                               "__html": "ABS, ASA, PC, PA, PET, <br />\n                            Carbon/Glass Fiber Reinforced Polymer"
+                              }
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "Not Recommended"
+                             }
+                            ]
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "tr",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "rowSpan": 5,
+                              "children": "Sensors"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "Chamber Monitoring Camera"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "dangerouslySetInnerHTML": {
+                               "__html": "Low Frame Rate Camera (Up to 1080P) <br />\n                            Timelapse Supported"
+                              }
+                             }
+                            ]
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "tr",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "Filament Run Out Sensor"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "Yes"
+                             }
+                            ]
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "tr",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "Filament Odometry"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "Yes"
+                             }
+                            ]
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "tr",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "Power Loss Recover"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "Yes"
+                             }
+                            ]
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "tr",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "Filament Tangle Sensor"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "children": "Yes"
+                             }
+                            ]
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "tr",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "rowSpan": 1,
+                              "children": "Physical Dimensions"
+                             }
+                            ],
+                            [
+                             "$",
+                             "td",
+                             null,
+                             {
+                              "colSpan": 2,
+                              "dangerouslySetInnerHTML": {
+                               "__html": "A1 : 465*410*430 mm³ , Package size : 596*536*325\n                            mm³ , Net weight 8.3 kg , Gross weight 13 kg\n                            <br />\n                            A1 Combo : Package size 560*540*430 mm³ , Gross\n                            weight (AMS lite included) 13.5 kg"
+                              }
+                             }
+                            ]
+                           ]
+                          }
+                         ]
+                        ]
+                       }
+                      ]
+                     ]
+                    }
+                   ]
+                  }
+                 ]
+                }
+               ]
+              }
+             ]
+            }
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {}
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": [
+              "$",
+              "button",
+              null,
+              {
+               "children": [
+                [
+                 "$",
+                 "div",
+                 null,
+                 {
+                  "children": [
+                   "$",
+                   "svg",
+                   null,
+                   {
+                    "width": "1em",
+                    "height": "1em",
+                    "viewBox": "0 0 25 25",
+                    "fill": "none",
+                    "children": [
+                     [
+                      "$",
+                      "path",
+                      null,
+                      {
+                       "d": "M4.5 14.8301V19.8301C4.5 20.3824 4.94772 20.8301 5.5 20.8301H19.5C20.0523 20.8301 20.5 20.3824 20.5 19.8301V14.8301",
+                       "stroke": "currentColor",
+                       "strokeWidth": "1.5",
+                       "strokeLinecap": "round"
+                      }
+                     ],
+                     [
+                      "$",
+                      "path",
+                      null,
+                      {
+                       "d": "M7.5 11.8301L12.5 16.8301M12.5 16.8301L17.5 11.8301M12.5 16.8301V4.83008",
+                       "stroke": "currentColor",
+                       "strokeWidth": "1.5",
+                       "strokeLinecap": "round",
+                       "strokeLinejoin": "round"
+                      }
+                     ]
+                    ]
+                   }
+                  ]
+                 }
+                ],
+                [
+                 "$",
+                 "span",
+                 null,
+                 {
+                  "children": "Download A1 TDS"
+                 }
+                ]
+               ]
+              }
+             ]
+            }
+           ]
+          ]
+         }
+        ]
+       }
+      ],
+      [
+       "$",
+       "div",
+       null,
+       {
+        "id": "shopify-section-template--15773091299464__product_description_nav_anchor_gCpQE9",
+        "children": [
+         "$",
+         "div",
+         null,
+         {
+          "id": "anchor-navmenu-instruction"
+         }
+        ]
+       }
+      ],
+      [
+       "$",
+       "div",
+       null,
+       {
+        "id": "shopify-section-template--15773091299464__product_description_unboxing_kWLMXU",
+        "children": [
+         "$",
+         "div",
+         null,
+         {
+          "children": [
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": "Unboxing Video Highlights"
+            }
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": "This short video guides you through a quick unboxing experience."
+            }
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": [
+              [
+               "$",
+               "div",
+               null,
+               {}
+              ],
+              [
+               "$",
+               "video",
+               null,
+               {
+                "data-src": "//store.bblcdn.com/video/ab9c70875dcb4cbead131cd4b7fa97e8.HD-1080p-2.5Mbps-33303622.mp4",
+                "data-poster": "//store.bblcdn.com/50c03e42d3b941a4a06ea9d0133e5d09.webp",
+                "data-lazy": "false"
+               }
+              ]
+             ]
+            }
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": "*Compliant with the requirements of GB/T 70.1-2008 standard\n              [Equivalent standards: ISO 4762, ASME/ANSI B 18.3.1M - 1986\n              (R1993), DIN EN ISO 12474]"
+            }
+           ]
+          ]
+         }
+        ]
+       }
+      ],
+      [
+       "$",
+       "div",
+       null,
+       {
+        "id": "shopify-section-template--15773091299464__product_description_what_is_in_the_box_eTfkpV",
+        "children": [
+         "$",
+         "div",
+         null,
+         {
+          "children": [
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": "What's in the box"
+            }
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {}
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": [
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "img",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/2ee6d4e97f864c1693fcd792cae92d07.webp",
+                      "alt": ""
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": "Bambu Lab A1"
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "img",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/b22b57a84f504c828a313e4f0486c14a.webp",
+                      "alt": ""
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": "Purge Wiper"
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "img",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/c2fd7a3d635044928a9b3a574c951de0.webp",
+                      "alt": ""
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": "Spool Holder"
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "img",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/a07bbf76355248c09bfb047a052ae8ec.webp",
+                      "alt": ""
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": "Stainless Steel Nozzle（pre-installed）"
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "img",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/94bfdab2e8204e52b103cb4ab4a413b3.webp",
+                      "alt": ""
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": "PTFE Tube*1"
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "img",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/a947ce86fef64f2caaf2c017839e56d5.webp",
+                      "alt": ""
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": "Bambu Filament Samples-20g(Random Color)"
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "img",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/d7a0bd226f044279b6d55b6e93392a02.webp",
+                      "alt": ""
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": "Build Plate"
+                  }
+                 ]
+                ]
+               }
+              ]
+             ]
+            }
+           ]
+          ]
+         }
+        ]
+       }
+      ],
+      [
+       "$",
+       "div",
+       null,
+       {
+        "id": "shopify-section-template--15773091299464__product_description_what_is_in_the_box_KReQHd",
+        "children": [
+         "$",
+         "div",
+         null,
+         {
+          "children": [
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": "A1 Combo Add-ons"
+            }
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {}
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": [
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "img",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/6368fc7a72034a9daf84d490775a5940.webp",
+                      "alt": ""
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": "AMS lite Body"
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "img",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/846b787930f544feb431bf078fa610cf.webp",
+                      "alt": ""
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": "AMS lite Stand"
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "img",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/004f99b1da214fc5bfc163ad0bfd8b62.webp",
+                      "alt": ""
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": "AMS lite Rotary Spool Holder (x4)"
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {}
+                    ],
+                    [
+                     "$",
+                     "img",
+                     null,
+                     {
+                      "data-src": "//store.bblcdn.com/670e25932f474cf79b80d9a58e402fb5.webp",
+                      "alt": ""
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": "PTFE Tubes"
+                  }
+                 ]
+                ]
+               }
+              ]
+             ]
+            }
+           ]
+          ]
+         }
+        ]
+       }
+      ],
+      [
+       "$",
+       "div",
+       null,
+       {
+        "id": "shopify-section-template--15773091299464__product_description_youtubers_eXyEJb",
+        "children": [
+         "$",
+         "div",
+         null,
+         {
+          "children": [
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": "Explore More About A1"
+            }
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {}
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": [
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "id": "swiper-wrapper-1610b862be6bd1b8",
+                   "aria-live": "polite",
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "role": "group",
+                      "aria-label": "1 / 8",
+                      "children": [
+                       [
+                        "$",
+                        "div",
+                        null,
+                        {
+                         "children": [
+                          [
+                           "$",
+                           "div",
+                           null,
+                           {}
+                          ],
+                          [
+                           "$",
+                           "iframe",
+                           null,
+                           {
+                            "src": "https://www.youtube.com/embed/fNbAGkoRySI?enablejsapi=1&origin=https%3A%2F%2Fus.store.bambulab.com",
+                            "frameBorder": 0,
+                            "allow": "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture;fullscreen",
+                            "data-gtm-yt-inspected-13": "true",
+                            "data-gtm-yt-inspected-19": "true",
+                            "data-gtm-yt-inspected-133022682_8": "true",
+                            "id": "340290875",
+                            "title": "The NEW Bambu Lab A1!",
+                            "referrerPolicy": "strict-origin-when-cross-origin",
+                            "allowFullScreen": true
+                           }
+                          ]
+                         ]
+                        }
+                       ],
+                       [
+                        "$",
+                        "div",
+                        null,
+                        {
+                         "children": "The NEW Bambu Lab A1!"
+                        }
+                       ]
+                      ]
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "role": "group",
+                      "aria-label": "2 / 8",
+                      "children": [
+                       [
+                        "$",
+                        "div",
+                        null,
+                        {
+                         "children": [
+                          [
+                           "$",
+                           "div",
+                           null,
+                           {}
+                          ],
+                          [
+                           "$",
+                           "iframe",
+                           null,
+                           {
+                            "src": "https://www.youtube.com/embed/NZJVLw86Vg4?enablejsapi=1&origin=https%3A%2F%2Fus.store.bambulab.com",
+                            "frameBorder": 0,
+                            "allow": "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture;fullscreen",
+                            "data-gtm-yt-inspected-13": "true",
+                            "data-gtm-yt-inspected-19": "true",
+                            "data-gtm-yt-inspected-133022682_8": "true",
+                            "id": "627801789",
+                            "title": "Bambu Lab A1 Review - ARE YOU HAPPY about this?!",
+                            "referrerPolicy": "strict-origin-when-cross-origin",
+                            "allowFullScreen": true
+                           }
+                          ]
+                         ]
+                        }
+                       ],
+                       [
+                        "$",
+                        "div",
+                        null,
+                        {
+                         "children": "Bambu Lab A1 Review - ARE YOU HAPPY about this?!"
+                        }
+                       ]
+                      ]
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "role": "group",
+                      "aria-label": "3 / 8",
+                      "children": [
+                       [
+                        "$",
+                        "div",
+                        null,
+                        {
+                         "children": [
+                          [
+                           "$",
+                           "div",
+                           null,
+                           {}
+                          ],
+                          [
+                           "$",
+                           "iframe",
+                           null,
+                           {
+                            "src": "https://www.youtube.com/embed/sdu7VBwSDN4?enablejsapi=1&origin=https%3A%2F%2Fus.store.bambulab.com",
+                            "frameBorder": 0,
+                            "allow": "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture;fullscreen",
+                            "data-gtm-yt-inspected-13": "true",
+                            "data-gtm-yt-inspected-19": "true",
+                            "data-gtm-yt-inspected-133022682_8": "true",
+                            "id": "610055258",
+                            "title": "Hands-On: Bambu Lab A1 $[redacted] 3D Printer!",
+                            "referrerPolicy": "strict-origin-when-cross-origin",
+                            "allowFullScreen": true
+                           }
+                          ]
+                         ]
+                        }
+                       ],
+                       [
+                        "$",
+                        "div",
+                        null,
+                        {
+                         "children": "Hands-On: Bambu Lab A1 $[redacted] 3D Printer!"
+                        }
+                       ]
+                      ]
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "role": "group",
+                      "aria-label": "4 / 8",
+                      "children": [
+                       [
+                        "$",
+                        "div",
+                        null,
+                        {
+                         "children": [
+                          [
+                           "$",
+                           "div",
+                           null,
+                           {}
+                          ],
+                          [
+                           "$",
+                           "iframe",
+                           null,
+                           {
+                            "src": "https://www.youtube.com/embed/w3im2xPieN4?enablejsapi=1&origin=https%3A%2F%2Fus.store.bambulab.com",
+                            "frameBorder": 0,
+                            "allow": "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture;fullscreen",
+                            "data-gtm-yt-inspected-13": "true",
+                            "data-gtm-yt-inspected-19": "true",
+                            "data-gtm-yt-inspected-133022682_8": "true",
+                            "id": "583038171",
+                            "title": "Bambu Lab A1 detailed test - ‘Just works’ 3D printing for a great price",
+                            "referrerPolicy": "strict-origin-when-cross-origin",
+                            "allowFullScreen": true
+                           }
+                          ]
+                         ]
+                        }
+                       ],
+                       [
+                        "$",
+                        "div",
+                        null,
+                        {
+                         "children": "Bambu Lab A1 detailed test - ‘Just works’ 3D printing for\n                      a great price"
+                        }
+                       ]
+                      ]
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "role": "group",
+                      "aria-label": "5 / 8",
+                      "children": [
+                       [
+                        "$",
+                        "div",
+                        null,
+                        {
+                         "children": [
+                          [
+                           "$",
+                           "div",
+                           null,
+                           {}
+                          ],
+                          [
+                           "$",
+                           "iframe",
+                           null,
+                           {
+                            "src": "https://www.youtube.com/embed/cbHtZtyXxY4?enablejsapi=1&origin=https%3A%2F%2Fus.store.bambulab.com",
+                            "frameBorder": 0,
+                            "allow": "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture;fullscreen",
+                            "data-gtm-yt-inspected-13": "true",
+                            "data-gtm-yt-inspected-19": "true",
+                            "data-gtm-yt-inspected-133022682_8": "true",
+                            "id": "111740242",
+                            "title": "Bambu Lab A1 - First Impressions",
+                            "referrerPolicy": "strict-origin-when-cross-origin",
+                            "allowFullScreen": true
+                           }
+                          ]
+                         ]
+                        }
+                       ],
+                       [
+                        "$",
+                        "div",
+                        null,
+                        {
+                         "children": "Bambu Lab A1 - First Impressions"
+                        }
+                       ]
+                      ]
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "role": "group",
+                      "aria-label": "6 / 8",
+                      "children": [
+                       [
+                        "$",
+                        "div",
+                        null,
+                        {
+                         "children": [
+                          [
+                           "$",
+                           "div",
+                           null,
+                           {}
+                          ],
+                          [
+                           "$",
+                           "iframe",
+                           null,
+                           {
+                            "src": "https://www.youtube.com/embed/1gtfGubamro?enablejsapi=1&origin=https%3A%2F%2Fus.store.bambulab.com",
+                            "frameBorder": 0,
+                            "allow": "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture;fullscreen",
+                            "data-gtm-yt-inspected-13": "true",
+                            "data-gtm-yt-inspected-19": "true",
+                            "data-gtm-yt-inspected-133022682_8": "true",
+                            "id": "331351860",
+                            "title": "Is The A1 Worth It? Diving Into Bambu Labs Newest 3d Printer",
+                            "referrerPolicy": "strict-origin-when-cross-origin",
+                            "allowFullScreen": true
+                           }
+                          ]
+                         ]
+                        }
+                       ],
+                       [
+                        "$",
+                        "div",
+                        null,
+                        {
+                         "children": "Is The A1 Worth It? Diving Into Bambu Labs Newest 3d\n                      Printer"
+                        }
+                       ]
+                      ]
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "role": "group",
+                      "aria-label": "7 / 8",
+                      "children": [
+                       [
+                        "$",
+                        "div",
+                        null,
+                        {
+                         "children": [
+                          [
+                           "$",
+                           "div",
+                           null,
+                           {}
+                          ],
+                          [
+                           "$",
+                           "iframe",
+                           null,
+                           {
+                            "src": "https://www.youtube.com/embed/ZSmR_hL9l1w?enablejsapi=1&origin=https%3A%2F%2Fus.store.bambulab.com",
+                            "frameBorder": 0,
+                            "allow": "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture;fullscreen",
+                            "data-gtm-yt-inspected-13": "true",
+                            "data-gtm-yt-inspected-19": "true",
+                            "data-gtm-yt-inspected-133022682_8": "true",
+                            "id": "583266600",
+                            "title": "NEW 👉 Bambu Lab A1 - DETAILED REVIEW (Full Analysis & Comparison with A1 Mini)",
+                            "referrerPolicy": "strict-origin-when-cross-origin",
+                            "allowFullScreen": true
+                           }
+                          ]
+                         ]
+                        }
+                       ],
+                       [
+                        "$",
+                        "div",
+                        null,
+                        {
+                         "children": "NEW 👉 Bambu Lab A1 - DETAILED REVIEW (Full Analysis &amp;\n                      Comparison with A1 Mini)"
+                        }
+                       ]
+                      ]
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "role": "group",
+                      "aria-label": "8 / 8",
+                      "children": [
+                       [
+                        "$",
+                        "div",
+                        null,
+                        {
+                         "children": [
+                          [
+                           "$",
+                           "div",
+                           null,
+                           {}
+                          ],
+                          [
+                           "$",
+                           "iframe",
+                           null,
+                           {
+                            "src": "https://www.youtube.com/embed/ydV3PIDuNlQ?enablejsapi=1&origin=https%3A%2F%2Fus.store.bambulab.com",
+                            "frameBorder": 0,
+                            "allow": "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture;fullscreen",
+                            "data-gtm-yt-inspected-13": "true",
+                            "data-gtm-yt-inspected-19": "true",
+                            "data-gtm-yt-inspected-133022682_8": "true",
+                            "id": "378923610",
+                            "title": "Bambu Lab A1 - First Looks and Amazing 3D Printing Results!",
+                            "referrerPolicy": "strict-origin-when-cross-origin",
+                            "allowFullScreen": true
+                           }
+                          ]
+                         ]
+                        }
+                       ],
+                       [
+                        "$",
+                        "div",
+                        null,
+                        {
+                         "children": "Bambu Lab A1 - First Looks and Amazing 3D Printing\n                      Results!"
+                        }
+                       ]
+                      ]
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    "$",
+                    "span",
+                    null,
+                    {}
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "span",
+                  null,
+                  {
+                   "aria-live": "assertive",
+                   "aria-atomic": "true"
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 "$",
+                 "svg",
+                 null,
+                 {
+                  "fill": "none",
+                  "viewBox": "0 0 24 24",
+                  "stroke": "currentColor",
+                  "children": [
+                   "$",
+                   "path",
+                   null,
+                   {
+                    "strokeLinecap": "round",
+                    "strokeLinejoin": "round",
+                    "strokeWidth": 2,
+                    "d": "M15 19l-7-7 7-7"
+                   }
+                  ]
+                 }
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 "$",
+                 "svg",
+                 null,
+                 {
+                  "fill": "none",
+                  "viewBox": "0 0 24 24",
+                  "stroke": "currentColor",
+                  "children": [
+                   "$",
+                   "path",
+                   null,
+                   {
+                    "strokeLinecap": "round",
+                    "strokeLinejoin": "round",
+                    "strokeWidth": 2,
+                    "d": "M9 5l7 7-7 7"
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             ]
+            }
+           ]
+          ]
+         }
+        ]
+       }
+      ],
+      [
+       "$",
+       "div",
+       null,
+       {
+        "id": "shopify-section-template--15773091299464__product_description_nav_anchor_GxgnXp",
+        "children": [
+         "$",
+         "div",
+         null,
+         {
+          "id": "anchor-navmenu-FAQ"
+         }
+        ]
+       }
+      ],
+      [
+       "$",
+       "div",
+       null,
+       {
+        "id": "shopify-section-template--15773091299464__product_description_faq_Vxj6eD",
+        "children": [
+         "$",
+         "div",
+         null,
+         {
+          "children": [
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": "Frequently asked questions"
+            }
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": [
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "button",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "1. Do you have an official unboxing guide?"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       "$",
+                       "svg",
+                       null,
+                       {
+                        "role": "presentation",
+                        "viewBox": "0 0 21 11",
+                        "children": [
+                         "$",
+                         "polyline",
+                         null,
+                         {
+                          "fill": "none",
+                          "stroke": "currentColor",
+                          "points": "0.5 0.5 10.5 10.5 20.5 0.5",
+                          "strokeWidth": "1.25"
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    "$",
+                    "div",
+                    null,
+                    {
+                     "dangerouslySetInnerHTML": {
+                      "__html": "<p>\n                      A: Yes, please refer to this\n                      <a\n                        href='https://wiki.bambulab.com/a1/manual/unboxing-a1-combo'\n                        target='_blank'\n                      >\n                        wiki link&nbsp;\n                      </a>\n                      for the unboxing video guide.\n                    </p>"
+                     }
+                    }
+                   ]
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "button",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "2. What is the maximum print size of the A1?"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       "$",
+                       "svg",
+                       null,
+                       {
+                        "role": "presentation",
+                        "viewBox": "0 0 21 11",
+                        "children": [
+                         "$",
+                         "polyline",
+                         null,
+                         {
+                          "fill": "none",
+                          "stroke": "currentColor",
+                          "points": "0.5 0.5 10.5 10.5 20.5 0.5",
+                          "strokeWidth": "1.25"
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    "$",
+                    "div",
+                    null,
+                    {
+                     "dangerouslySetInnerHTML": {
+                      "__html": "<p>\n                      A: 256 * 256 *256 mm³. For more details, please check\n                      \n                      <a\n                        href='https://wiki.bambulab.com/a1/manual/faq'\n                        target='_blank'\n                      >\n                        here.\n                      </a>\n                    </p>"
+                     }
+                    }
+                   ]
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "button",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "3. What Filaments can A1 Print?"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       "$",
+                       "svg",
+                       null,
+                       {
+                        "role": "presentation",
+                        "viewBox": "0 0 21 11",
+                        "children": [
+                         "$",
+                         "polyline",
+                         null,
+                         {
+                          "fill": "none",
+                          "stroke": "currentColor",
+                          "points": "0.5 0.5 10.5 10.5 20.5 0.5",
+                          "strokeWidth": "1.25"
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    "$",
+                    "div",
+                    null,
+                    {
+                     "dangerouslySetInnerHTML": {
+                      "__html": "<p>\n                      A: 1. Low-temperature filaments such as PLA, PETG, TPU,\n                      and support materials for PLA and PETG (Support for PLA,\n                      PVA, HIPS, etc.).\n                      <br />\n                      2. Conventional high-temperature filaments such as ABS,\n                      ASA, PC, PA, PA-CF/GF, PET-CF/GF, PPA-CF/GF, etc.\n                      <br />\n                      Kind Reminder:\n                      <br />\n                      The standard nozzle is made of stainless steel. When\n                      printing filaments containing hard particles (CF, GF,\n                      etc.) such as PLA-CF/GF, PLA Glow-in-the-dark, PETG-CF/GF\n                      and PAHT-CF/GF, it is necessary to replace the nozzle with\n                      hardened steel to prevent excessive wear.\n                      <br />\n                     Due to the A1's open-frame design and lower chamber\n                      temperature, there is a risk of reduced interlayer\n                      strength and increased warping for large-sized models and\n                      models with high filling density when using conventional\n                      high-temperature filaments such as ABS, ASA, PC, PA,\n                      PA-CF/GF, PET-CF/GF, PPA-CF/GF, etc. on the A1. However,\n                      these high-temperature filaments can be used on the A1 to\n                      print small-sized models with low filling density. The\n                      printing results may vary depending on the filaments' dry\n                      and wet state, the characteristics of the model itself,\n                      printing parameters, and the ambient temperature. For more\n                      details, please check \n                      <a\n                        href='https://wiki.bambulab.com/a1/manual/faq'\n                        target='_blank'\n                      >\n                        here.\n                      </a>\n                    </p>"
+                     }
+                    }
+                   ]
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "button",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "4. Is it OK to enclose the A1?"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       "$",
+                       "svg",
+                       null,
+                       {
+                        "role": "presentation",
+                        "viewBox": "0 0 21 11",
+                        "children": [
+                         "$",
+                         "polyline",
+                         null,
+                         {
+                          "fill": "none",
+                          "stroke": "currentColor",
+                          "points": "0.5 0.5 10.5 10.5 20.5 0.5",
+                          "strokeWidth": "1.25"
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    "$",
+                    "div",
+                    null,
+                    {
+                     "dangerouslySetInnerHTML": {
+                      "__html": "<p>\n                      A: We don't recommend enclosing the A1. For more details,\n                        please check \n                      <a\n                        href='https://wiki.bambulab.com/a1/manual/faq'\n                        target='_blank'\n                      >\n                        here.\n                      </a>\n                    </p>"
+                     }
+                    }
+                   ]
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "button",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "5. Can you use multiple AMS lite units with the A1 for up to\n                    16 color prints?"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       "$",
+                       "svg",
+                       null,
+                       {
+                        "role": "presentation",
+                        "viewBox": "0 0 21 11",
+                        "children": [
+                         "$",
+                         "polyline",
+                         null,
+                         {
+                          "fill": "none",
+                          "stroke": "currentColor",
+                          "points": "0.5 0.5 10.5 10.5 20.5 0.5",
+                          "strokeWidth": "1.25"
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    "$",
+                    "div",
+                    null,
+                    {
+                     "dangerouslySetInnerHTML": {
+                      "__html": "<p>\n                      A: The A1 can only support one AMS lite, which means it\n\t\t\t\t\t\t\t\t\t\t\t\tcan print with a maximum of 4 colors. For more details,\n\t\t\t\t\t\t\t\t\t\t\t\tplease check \n                      <a\n                        href='https://wiki.bambulab.com/a1/manual/faq'\n                        target='_blank'\n                      >\n                        here.\n                      </a>\n                    </p>"
+                     }
+                    }
+                   ]
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "button",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "6. Can I use the AMS on the A1?"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       "$",
+                       "svg",
+                       null,
+                       {
+                        "role": "presentation",
+                        "viewBox": "0 0 21 11",
+                        "children": [
+                         "$",
+                         "polyline",
+                         null,
+                         {
+                          "fill": "none",
+                          "stroke": "currentColor",
+                          "points": "0.5 0.5 10.5 10.5 20.5 0.5",
+                          "strokeWidth": "1.25"
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    "$",
+                    "div",
+                    null,
+                    {
+                     "dangerouslySetInnerHTML": {
+                      "__html": "<p>\n                      A: Yes. To connect the printer to the AMS, an AMS HUB (SA013) accessory is needed. The AMS hub accessory is specifically designed for A1-series 3D printers, serving as a standardized hub for seamless connectivity and integrated functionality between the AMS, AMS 2 Pro, and AMS HT.</p>"
+                     }
+                    }
+                   ]
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "button",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "7. Can AMS lite be mounted on the beam of the A1 to reduce\n                    space occupation? If so,how should I proceed with the\n                    operation?"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       "$",
+                       "svg",
+                       null,
+                       {
+                        "role": "presentation",
+                        "viewBox": "0 0 21 11",
+                        "children": [
+                         "$",
+                         "polyline",
+                         null,
+                         {
+                          "fill": "none",
+                          "stroke": "currentColor",
+                          "points": "0.5 0.5 10.5 10.5 20.5 0.5",
+                          "strokeWidth": "1.25"
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    "$",
+                    "div",
+                    null,
+                    {
+                     "dangerouslySetInnerHTML": {
+                      "__html": "<p>\n                      A: Please visit our&nbsp;\n                      <a\n                        href='https://makerworld.com/models/92486'\n                        target='_blank'\n                      >\n                        MakerWorld model website,\n                      </a>\n                      &nbsp;where you will be able to find the model supports,\n                      installation tutorial, and purchase links for accessory\n                      screws. Additionally, you can also refer to our&nbsp;\n                      <a\n                        href='https://wiki.bambulab.com/a1/manual/ams-lite-top-mount-tutorial'\n                        target='_blank'\n                      >\n                        wiki page\n                      </a>\n                      &nbsp;for more related information.\n                    </p>\n                    <br />\n                    <p>\n                      For more details, please check\n                      <a\n                        href='https://wiki.bambulab.com/a1/manual/faq'\n                        target='_blank'\n                      >\n                        here.\n                      </a>\n                    </p>"
+                     }
+                    }
+                   ]
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "button",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": "8. If I install AMS lite on the beam, will the filament\n                    spool slide down, or will it affect the accuracy of\n                    vibration compensation?"
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       "$",
+                       "svg",
+                       null,
+                       {
+                        "role": "presentation",
+                        "viewBox": "0 0 21 11",
+                        "children": [
+                         "$",
+                         "polyline",
+                         null,
+                         {
+                          "fill": "none",
+                          "stroke": "currentColor",
+                          "points": "0.5 0.5 10.5 10.5 20.5 0.5",
+                          "strokeWidth": "1.25"
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    "$",
+                    "div",
+                    null,
+                    {
+                     "dangerouslySetInnerHTML": {
+                      "__html": "<p>\n                      A: As long as the AMS lite is correctly installed, the\n                      filament spool should not slide down, even if the previous\n                      two spools have a certain forward tilt angle.\n                      Additionally, to avoid affecting the accuracy of vibration\n                      compensation, you can add reinforcement to the column. For\n                      more details, please check \n                      <a\n                        href='https://wiki.bambulab.com/a1/manual/faq'\n                        target='_blank'\n                      >\n                        here.\n                      </a>\n                    </p>"
+                     }
+                    }
+                   ]
+                  }
+                 ]
+                ]
+               }
+              ],
+              [
+               [
+                "$",
+                "div",
+                null,
+                {
+                 "children": [
+                  [
+                   "$",
+                   "button",
+                   null,
+                   {
+                    "children": [
+                     [
+                      "$",
+                      "div",
+                      null,
+                      {
+                       "children": "9. Will you sell official refurbished A1 printers?"
+                      }
+                     ],
+                     [
+                      "$",
+                      "div",
+                      null,
+                      {
+                       "children": [
+                        "$",
+                        "svg",
+                        null,
+                        {
+                         "role": "presentation",
+                         "viewBox": "0 0 21 11",
+                         "children": [
+                          "$",
+                          "polyline",
+                          null,
+                          {
+                           "fill": "none",
+                           "stroke": "currentColor",
+                           "points": "0.5 0.5 10.5 10.5 20.5 0.5",
+                           "strokeWidth": "1.25"
+                          }
+                         ]
+                        }
+                       ]
+                      }
+                     ]
+                    ]
+                   }
+                  ],
+                  [
+                   "$",
+                   "div",
+                   null,
+                   {
+                    "children": [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "dangerouslySetInnerHTML": {
+                       "__html": "<p>\n                      A: Currently, Factory Refurbished A1 units are only\n                        available for sale within the Chinese domestic market. There\n                        are no plans for overseas sales of Factory Refurbished units\n                        at this time.\n                      <br />\n                      For your reference, all Refurbished units will have an \"R\"\n                        mark located on the back of the Base Housing, near the power\n                        cord plug.For more details, please check\n                      <a\n                        href='https://wiki.bambulab.com/a1/manual/faq'\n                        target='_blank'\n                      >\n                        here.\n                      </a>\n                    </p>"
+                      }
+                     }
+                    ]
+                   }
+                  ]
+                 ]
+                }
+               ],
+               [
+                "$",
+                "div",
+                null,
+                {
+                 "children": [
+                  [
+                   "$",
+                   "button",
+                   null,
+                   {
+                    "children": [
+                     [
+                      "$",
+                      "div",
+                      null,
+                      {
+                       "children": "10. Are the A1 3D printers currently available for sale from\n                    the same batch that was recalled in January 2024?"
+                      }
+                     ],
+                     [
+                      "$",
+                      "div",
+                      null,
+                      {
+                       "children": [
+                        "$",
+                        "svg",
+                        null,
+                        {
+                         "role": "presentation",
+                         "viewBox": "0 0 21 11",
+                         "children": [
+                          "$",
+                          "polyline",
+                          null,
+                          {
+                           "fill": "none",
+                           "stroke": "currentColor",
+                           "points": "0.5 0.5 10.5 10.5 20.5 0.5",
+                           "strokeWidth": "1.25"
+                          }
+                         ]
+                        }
+                       ]
+                      }
+                     ]
+                    ]
+                   }
+                  ],
+                  [
+                   "$",
+                   "div",
+                   null,
+                   {
+                    "children": [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "dangerouslySetInnerHTML": {
+                       "__html": "<p>A: No,they aren't. A1 3D printers sold after January 30,\n                        2024 are not from the same batch as those recalled\n                        before.They already contain all the necessary fixes to\n                        mitigate the heatbed cable issue which caused the recall.</p>"
+                      }
+                     }
+                    ]
+                   }
+                  ]
+                 ]
+                }
+               ]
+              ]
+             ]
+            }
+           ]
+          ]
+         }
+        ]
+       }
+      ]
+     ]
+    }
+   ]
+  ]
+ },
+ "jsonld": [
+  {
+   "@context": "https://schema.org/",
+   "@type": "ProductGroup",
+   "name": "Bambu Lab A1 3D Printer",
+   "description": "Full-size multi-color 3D printer. Print-ready, no tuning. 2M+ free models. 30-day price protection, 2-year warranty & 30-day returns at official store.",
+   "url": "https://us.store.bambulab.com/products/a1",
+   "brand": {
+    "@type": "Brand",
+    "name": "Bambu Lab"
+   },
+   "productGroupID": "7706060161160",
+   "hasVariant": [
+    {
+     "@type": "Product",
+     "sku": "579550514255634440",
+     "image": "https://store.bblcdn.com/s7/default/ac6b6e7f1cb144178af269e1a01de4a8/A1_C-compressed.jpg",
+     "name": "Bambu Lab A1 3D Printer - A1 Combo",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/a1?id=579550514255634440",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "579550514255634444",
+     "image": "https://store.bblcdn.com/s7/default/e424062172bd47fb8795a50fcdc941f0/A1-compressed.jpg",
+     "name": "Bambu Lab A1 3D Printer - A1",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/a1?id=579550514255634444",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "776210262809161737",
+     "image": "https://store.bblcdn.com/s7/default/388ac0bad7b546bd9394d3fdbcdb51fa/A1C_Combo-compressed-compressed-compressed.jpg",
+     "name": "Bambu Lab A1 3D Printer - A1 Combo Print with Care Bundle",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/a1?id=776210262809161737",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    }
+   ]
+  }
+ ]
+}

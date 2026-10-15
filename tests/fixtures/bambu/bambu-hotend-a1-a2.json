@@ -1,0 +1,1026 @@
+{
+ "_meta": {
+  "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+  "fetched_at": "2026-10-15T09:58:15Z",
+  "extracted_from": "self.__next_f RSC flight data (App Router); product object = props.data of the PDP component, description = separate RSC element (see description.kind)",
+  "removed_keys": [
+   "abGroup",
+   "discountOffText",
+   "discountPrice",
+   "flashSaleVO",
+   "gradientDiscountActivityId",
+   "gradientDiscountSkus",
+   "marketingDisplayAbGroup",
+   "maximum",
+   "minimum",
+   "orderInfo",
+   "orderInfoTitle",
+   "pointsInfo",
+   "price",
+   "priceCurrency",
+   "priceDescriptionList",
+   "priceExplanation",
+   "productSkuBuyAndGetVO",
+   "productSkuPreSale",
+   "promotionDescription",
+   "qryPromotionFlag",
+   "quantityLimitType",
+   "quantityLimitValue",
+   "serviceGuaranteeList",
+   "skuPromotionPointsSwitch"
+  ],
+  "notes": "Prices, compare-at prices, purchase limits, promotions, points and store-wide shipping/service boilerplate removed; dollar amounts inside text replaced with $[redacted]. Ids are strings (many exceed 2^53)."
+ },
+ "product": {
+  "id": "7503970893960",
+  "name": "Bambu Hotend - A1/A2",
+  "type": 1,
+  "subTitle": null,
+  "description": null,
+  "seoCode": "bambu-hotend-a1-a2",
+  "seoTitle": "Bambu Hotend - A1/A2",
+  "seoMetaDescription": null,
+  "seoUrlHandle": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+  "productFeaturesTitle": "Product Features",
+  "productFeatures": "",
+  "productFeaturesModuleList": [
+   {
+    "id": "733532512257347587",
+    "title": "",
+    "content": "<div>Looking to buy multiple hotend sizes? Check out our <span style=\"color: #00ae42;\"><strong><a style=\"color: #00ae42;\" href=\"../../../products/multi-size-hotends-kit\" target=\"_blank\" rel=\"noopener\">Multi-Size Hotends Kit</a></strong></span> for an exclusive bundle discount.</div>",
+    "iconUrl": ""
+   }
+  ],
+  "newFlag": 0,
+  "externalVideoTitle": null,
+  "externalVideoLinkList": [
+   ""
+  ],
+  "mediaFiles": [
+   {
+    "resourceFileId": "32749041811592",
+    "url": "https://store.bblcdn.com/s7/default/0f775f9301174a67b80759d324061e51/0.4.png"
+   },
+   {
+    "resourceFileId": "32749327581320",
+    "url": "https://store.bblcdn.com/s7/default/a5b4893ff8e74ca0b29b181ec1fc5598/cffa97dba17d6336ecf194fc66126bc7.png"
+   },
+   {
+    "resourceFileId": "32883844317320",
+    "url": "https://store.bblcdn.com/s7/default/7ba29915245d451f9f16060e528b1329/0.4_bec92ef9-65f2-476d-a485-643fca415de1.png"
+   },
+   {
+    "resourceFileId": "34052073160840",
+    "url": "https://store.bblcdn.com/s7/default/49000fed3cb940e0b34305c2c7fcf4d3/0.6_50161456-e016-4686-80c9-cb72c2bfe14e.png"
+   },
+   {
+    "resourceFileId": "34052073291912",
+    "url": "https://store.bblcdn.com/s7/default/a876b6ffb1ab4719840ae487dc343c78/0.8_a2efd36d-5912-4e53-9138-4dcfd06eb37d.png"
+   },
+   {
+    "resourceFileId": "34052073226376",
+    "url": "https://store.bblcdn.com/s7/default/e5c8dd6912b5412ab6231ae7e3f1a199/0.2_16a4411f-3198-499c-b837-a89ec5ecffbb.png"
+   },
+   {
+    "resourceFileId": "32883844743304",
+    "url": "https://store.bblcdn.com/s7/default/48ce58de4d604612b681d2421e16e54f/0.4_fdbac548-0595-44cb-b2d4-a37bd2f871aa.png"
+   }
+  ],
+  "productSkuList": [
+   {
+    "id": "737888342695104517",
+    "mediaFile": {
+     "resourceFileId": "32883844317320",
+     "url": "https://store.bblcdn.com/s7/default/7ba29915245d451f9f16060e528b1329/0.4_bec92ef9-65f2-476d-a485-643fca415de1.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "737888342695104513",
+      "propertyValueId": null,
+      "propertyValue": "A1",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "9816521998472",
+      "propertyValueId": null,
+      "propertyValue": "0.4mm Hardened Steel",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "737888342695104522",
+    "mediaFile": {
+     "resourceFileId": "34052073160840",
+     "url": "https://store.bblcdn.com/s7/default/49000fed3cb940e0b34305c2c7fcf4d3/0.6_50161456-e016-4686-80c9-cb72c2bfe14e.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "737888342695104513",
+      "propertyValueId": null,
+      "propertyValue": "A1",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "9816521998472",
+      "propertyValueId": null,
+      "propertyValue": "0.6mm Hardened Steel",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "737888342695104527",
+    "mediaFile": {
+     "resourceFileId": "34052073291912",
+     "url": "https://store.bblcdn.com/s7/default/a876b6ffb1ab4719840ae487dc343c78/0.8_a2efd36d-5912-4e53-9138-4dcfd06eb37d.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "737888342695104513",
+      "propertyValueId": null,
+      "propertyValue": "A1",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "9816521998472",
+      "propertyValueId": null,
+      "propertyValue": "0.8mm Hardened Steel",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "737888342695104532",
+    "mediaFile": {
+     "resourceFileId": "34052073226376",
+     "url": "https://store.bblcdn.com/s7/default/e5c8dd6912b5412ab6231ae7e3f1a199/0.2_16a4411f-3198-499c-b837-a89ec5ecffbb.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "737888342695104513",
+      "propertyValueId": null,
+      "propertyValue": "A1",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "9816521998472",
+      "propertyValueId": null,
+      "propertyValue": "0.2mm Stainless Steel",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "737888342695104537",
+    "mediaFile": {
+     "resourceFileId": "32883844743304",
+     "url": "https://store.bblcdn.com/s7/default/48ce58de4d604612b681d2421e16e54f/0.4_fdbac548-0595-44cb-b2d4-a37bd2f871aa.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "737888342695104513",
+      "propertyValueId": null,
+      "propertyValue": "A1",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "9816521998472",
+      "propertyValueId": null,
+      "propertyValue": "0.4mm Stainless Steel",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "737888342695104542",
+    "mediaFile": {
+     "resourceFileId": "32883844317320",
+     "url": "https://store.bblcdn.com/s7/default/7ba29915245d451f9f16060e528b1329/0.4_bec92ef9-65f2-476d-a485-643fca415de1.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "737888342695104513",
+      "propertyValueId": null,
+      "propertyValue": "A1 mini",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "9816521998472",
+      "propertyValueId": null,
+      "propertyValue": "0.4mm Hardened Steel",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "737888342695104547",
+    "mediaFile": {
+     "resourceFileId": "34052073160840",
+     "url": "https://store.bblcdn.com/s7/default/49000fed3cb940e0b34305c2c7fcf4d3/0.6_50161456-e016-4686-80c9-cb72c2bfe14e.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "737888342695104513",
+      "propertyValueId": null,
+      "propertyValue": "A1 mini",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "9816521998472",
+      "propertyValueId": null,
+      "propertyValue": "0.6mm Hardened Steel",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "737888342695104552",
+    "mediaFile": {
+     "resourceFileId": "34052073291912",
+     "url": "https://store.bblcdn.com/s7/default/a876b6ffb1ab4719840ae487dc343c78/0.8_a2efd36d-5912-4e53-9138-4dcfd06eb37d.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "737888342695104513",
+      "propertyValueId": null,
+      "propertyValue": "A1 mini",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "9816521998472",
+      "propertyValueId": null,
+      "propertyValue": "0.8mm Hardened Steel",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "737888342695104557",
+    "mediaFile": {
+     "resourceFileId": "34052073226376",
+     "url": "https://store.bblcdn.com/s7/default/e5c8dd6912b5412ab6231ae7e3f1a199/0.2_16a4411f-3198-499c-b837-a89ec5ecffbb.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "737888342695104513",
+      "propertyValueId": null,
+      "propertyValue": "A1 mini",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "9816521998472",
+      "propertyValueId": null,
+      "propertyValue": "0.2mm Stainless Steel",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "737888342695104562",
+    "mediaFile": {
+     "resourceFileId": "32883844743304",
+     "url": "https://store.bblcdn.com/s7/default/48ce58de4d604612b681d2421e16e54f/0.4_fdbac548-0595-44cb-b2d4-a37bd2f871aa.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "737888342695104513",
+      "propertyValueId": null,
+      "propertyValue": "A1 mini",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "9816521998472",
+      "propertyValueId": null,
+      "propertyValue": "0.4mm Stainless Steel",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "737888342695104567",
+    "mediaFile": {
+     "resourceFileId": "32883844317320",
+     "url": "https://store.bblcdn.com/s7/default/7ba29915245d451f9f16060e528b1329/0.4_bec92ef9-65f2-476d-a485-643fca415de1.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "737888342695104513",
+      "propertyValueId": null,
+      "propertyValue": "A2L",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "9816521998472",
+      "propertyValueId": null,
+      "propertyValue": "0.4mm Hardened Steel",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "737888342695104572",
+    "mediaFile": {
+     "resourceFileId": "34052073160840",
+     "url": "https://store.bblcdn.com/s7/default/49000fed3cb940e0b34305c2c7fcf4d3/0.6_50161456-e016-4686-80c9-cb72c2bfe14e.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "737888342695104513",
+      "propertyValueId": null,
+      "propertyValue": "A2L",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "9816521998472",
+      "propertyValueId": null,
+      "propertyValue": "0.6mm Hardened Steel",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "737888342695104577",
+    "mediaFile": {
+     "resourceFileId": "34052073291912",
+     "url": "https://store.bblcdn.com/s7/default/a876b6ffb1ab4719840ae487dc343c78/0.8_a2efd36d-5912-4e53-9138-4dcfd06eb37d.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "737888342695104513",
+      "propertyValueId": null,
+      "propertyValue": "A2L",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "9816521998472",
+      "propertyValueId": null,
+      "propertyValue": "0.8mm Hardened Steel",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "737888342695104582",
+    "mediaFile": {
+     "resourceFileId": "34052073226376",
+     "url": "https://store.bblcdn.com/s7/default/e5c8dd6912b5412ab6231ae7e3f1a199/0.2_16a4411f-3198-499c-b837-a89ec5ecffbb.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "737888342695104513",
+      "propertyValueId": null,
+      "propertyValue": "A2L",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "9816521998472",
+      "propertyValueId": null,
+      "propertyValue": "0.2mm Stainless Steel",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "737888342695104587",
+    "mediaFile": {
+     "resourceFileId": "32883844743304",
+     "url": "https://store.bblcdn.com/s7/default/48ce58de4d604612b681d2421e16e54f/0.4_fdbac548-0595-44cb-b2d4-a37bd2f871aa.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "737888342695104513",
+      "propertyValueId": null,
+      "propertyValue": "A2L",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "9816521998472",
+      "propertyValueId": null,
+      "propertyValue": "0.4mm Stainless Steel",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   }
+  ],
+  "productPropertyList": [
+   {
+    "propertyKey": "Printer Model",
+    "propertyKeyId": "737888342695104513",
+    "productPropertyValueList": [
+     {
+      "id": "737888342695104516",
+      "value": "A2L",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "737888342695104514",
+      "value": "A1",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "737888342695104515",
+      "value": "A1 mini",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     }
+    ],
+    "position": 1,
+    "type": 1,
+    "title": "",
+    "introduction": "",
+    "explanation": ""
+   },
+   {
+    "propertyKey": "Size",
+    "propertyKeyId": "9816521998472",
+    "productPropertyValueList": [
+     {
+      "id": "564681835144835082",
+      "value": "0.2mm Stainless Steel",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681835144835079",
+      "value": "0.4mm Hardened Steel",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681835144835080",
+      "value": "0.6mm Hardened Steel",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681835144835081",
+      "value": "0.8mm Hardened Steel",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681835144835083",
+      "value": "0.4mm Stainless Steel",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     }
+    ],
+    "position": 2,
+    "type": 1,
+    "title": "",
+    "introduction": "",
+    "explanation": ""
+   }
+  ],
+  "skillLevel": 0,
+  "skillTitle": null,
+  "printerTime": "",
+  "filamentUsed": "",
+  "colorCollectionList": [],
+  "productExtraInfoVO": {
+   "gprsInfoTemplateVO": null,
+   "productVideoVOList": null,
+   "productFileList": null
+  },
+  "productDetailTemplateVO": null,
+  "subProductList": null,
+  "showMwModelIds": [],
+  "showMwModelPosition": 0,
+  "customButtonTitle": null,
+  "customButtonLink": null,
+  "paymentComponentPosition": 0,
+  "isFilament": false,
+  "currentAllIdRoute": "552709757765505024>552709757979414528>552709758067494912",
+  "imageLabels": null
+ },
+ "description": {
+  "kind": "legacy_html",
+  "source_component_props": {
+   "isOldVersion": true
+  },
+  "html": "<!-- 第一条 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_t-p\">\n<h2 class=\"pct_t\" style=\"text-align: center;\">0.2mm Nozzle - Optimal Print Fineness</h2>\n<p class=\"pct_p\" style=\"text-align: center;\">Smaller diameter extrudes thin filaments<br />High resolution on the horizontal print surface</p>\n</div>\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/6202d2884d7e4617a479cd81a8e12fde/Frame_1123861589_e5086170-c614-44e3-a462-ff82d30d6de6.png\" alt=\"图片加载失败文案\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/6202d2884d7e4617a479cd81a8e12fde/Frame_1123861589_e5086170-c614-44e3-a462-ff82d30d6de6.png\" alt=\"图片加载失败文案\" /></div>\n</div>\n</div>\n<!-- 第二条 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_t-p\"></div>\n</div>\n<h2 class=\"pct_t\" style=\"text-align: center;\">0.6mm and 0.8mm Nozzle - Faster Print Speed</h2>\n<p class=\"pct_p\" style=\"text-align: center;\">Larger diameter extrudes more filaments per second, resulting in faster print speed</p>\n</div>\n<!-- 图片部分 -->\n<div class=\"pct_ic\" style=\"flex: 3;\"><!-- 手机端图片 -->\n<p><video style=\"width: 100%;\" src=\"https://store.bblcdn.com/s1/default/7b14b991ad6946ceba3313b567372d5c/hotend_video_replace.mp4\" controls=\"controls\" width=\"300\" height=\"150\" autoplay=\"autoplay\" loop=\"loop\" muted=\"\" playsinline=\"\" poster=\"https://store.bblcdn.com/s7/default/5196b969aa394ec39d4f27f64e8bf829/20230605-152224.jpg\" data-mce-style=\"width: 100%;\" data-mce-src=\"https://store.bblcdn.com/s1/default/7b14b991ad6946ceba3313b567372d5c/hotend_video_replace.mp4\"></video></p>\n</div>\n<p></p>\n<!-- 第三条 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_t-p\">\n<h2 class=\"pct_t\"></h2>\n</div>\n</div>\n<!-- table布局 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct pct_mc\">\n<div class=\"pct_st-tbc\">\n<h2 class=\"pct_t\" style=\"text-align: center;\">Comparison of Different Nozzle Sizes</h2>\n<div class=\"pct_tbc\">\n<table class=\"pct_tb\"><!-- 表头 -->\n<thead class=\"pct_th\">\n<tr>\n<td class=\"pct_td\"></td>\n<td class=\"pct_td\"><strong>0.2 mm Nozzle</strong></td>\n<td class=\"pct_td\"><strong>0.4 mm Nozzle</strong></td>\n<td class=\"pct_td\"><strong>0.6 mm Nozzle</strong></td>\n<td class=\"pct_td\"><strong>0.8 mm Nozzle</strong></td>\n</tr>\n</thead>\n<tbody><!-- 第一行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>Usage scenario</strong></td>\n<td class=\"pct_td\">Perfect for small and <br />intricate models, with precision <br />that's worth the wait</td>\n<td class=\"pct_td\">Ideal for everyday use <br />with the perfect balance <br />of speed and quality</td>\n<td class=\"pct_td\">Faster speeds and capable <br />of printing high-performance filaments, <br />with some decrease in resolution</td>\n<td class=\"pct_td\">Faster speeds and capable <br />of printing high-performance filaments, <br />with some decrease in resolution</td>\n</tr>\n<!-- 第二行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>Commonly used for</strong></td>\n<td class=\"pct_td\">Miniature models<br />Intricate logos<br />Text<br />Molds</td>\n<td class=\"pct_td\">Toys<br />Mechanical parts<br />Decorative objects</td>\n<td class=\"pct_td\">Large structural parts<br />Functional parts for household<br />Industrial or engineering parts<br />High-strength models</td>\n<td class=\"pct_td\">Large structural parts<br />Functional parts for household<br />Industrial or engineering parts<br />High-strength models</td>\n</tr>\n</tbody>\n</table>\n</div>\n</div>\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/99ff3d053b3b4631bb7ced58ead266b2/Frame_1123861664.png\" alt=\"图片加载失败文案\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/99ff3d053b3b4631bb7ced58ead266b2/Frame_1123861664.png\" alt=\"图片加载失败文案\" /></div>\n</div>\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/184253b3984143c19a3ac869916567e9/Group_47937.png\" alt=\"图片加载失败文案\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/184253b3984143c19a3ac869916567e9/Group_47937.png\" alt=\"图片加载失败文案\" /></div>\n<b>*The final display of 'Model Strength' &amp; 'Model Fineness' depends on the results of the material testing.</b></div>\n</div>\n<p><br /><br /></p>\n<!-- table布局 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct pct_mc\">\n<div class=\"pct_st-tbc\">\n<h2 class=\"pct_t\" style=\"text-align: center;\">Filament Compatibility</h2>\n<div class=\"pct_tbc\">\n<table class=\"pct_tb\"><!-- 表头 -->\n<thead class=\"pct_th\">\n<tr>\n<td class=\"pct_td\" style=\"width: 133.672px;\"><strong>Material</strong></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\"><strong>0.2 mm Nozzle</strong></td>\n<td class=\"pct_td\" style=\"width: 101.621px;\"><strong>0.4 mm Nozzle</strong></td>\n<td class=\"pct_td\" style=\"width: 100.605px;\"><strong>0.6 mm Nozzle</strong></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\"><strong>0.8 mm Nozzle</strong></td>\n<td class=\"pct_td\" style=\"width: 71.875px;\"><strong>Hardened Steel Required?</strong></td>\n</tr>\n</thead>\n<tbody><!-- 第一行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 133.672px;\"><strong>General PLA</strong></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 101.621px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 100.605px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 71.875px;\">Optional</td>\n</tr>\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 133.672px;\"><strong>PLA Sparkle</strong></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\"><span style=\"color: #ff2a00;\"><strong>*①NO</strong></span></td>\n<td class=\"pct_td\" style=\"width: 101.621px;\"><span>YES</span></td>\n<td class=\"pct_td\" style=\"width: 100.605px;\"><span>YES</span></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\"><span>YES</span></td>\n<td class=\"pct_td\" style=\"width: 71.875px;\"><span>Optional</span></td>\n</tr>\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 133.672px;\"><strong>PLA Marble</strong></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\"><span style=\"color: #ff2a00;\"><strong>*①NO</strong></span></td>\n<td class=\"pct_td\" style=\"width: 101.621px;\"><span>YES</span></td>\n<td class=\"pct_td\" style=\"width: 100.605px;\"><span>YES</span></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\"><span>YES</span></td>\n<td class=\"pct_td\" style=\"width: 71.875px;\"><span>Optional</span></td>\n</tr>\n<!-- 第二行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 133.672px;\"><strong>Wood/Rock/Metal-filled PLA</strong></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\"><span style=\"color: #ff2a00;\"><strong>*①NO</strong></span></td>\n<td class=\"pct_td\" style=\"width: 101.621px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 100.605px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 71.875px;\">Optional</td>\n</tr>\n<!-- 第四行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 133.672px;\"><strong>PETG</strong></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 101.621px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 100.605px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 71.875px;\">Optional</td>\n</tr>\n<!-- 第五行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 133.672px;\"><strong>PVA</strong></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 101.621px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 100.605px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 71.875px;\">Optional</td>\n</tr>\n<!-- 第六行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 133.672px;\"><strong>ABS</strong></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 101.621px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 100.605px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 71.875px;\">Optional</td>\n</tr>\n<!-- 第七行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 133.672px;\"><strong>ASA</strong></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 101.621px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 100.605px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 71.875px;\">Optional</td>\n</tr>\n<!-- 第八行 --> <!-- 第九行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 133.672px;\"><strong>PC</strong></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 101.621px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 100.605px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 71.875px;\">Optional</td>\n</tr>\n<!-- 第十行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 133.672px;\"><strong>PA</strong></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\"><span style=\"color: #ff2a00;\"><strong>*①NO</strong></span></td>\n<td class=\"pct_td\" style=\"width: 101.621px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 100.605px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 71.875px;\">Optional</td>\n</tr>\n<!-- 第十一行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 133.672px;\"><strong>TPU</strong></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\"><span style=\"color: #ff2a00;\"><strong>*①NO</strong></span></td>\n<td class=\"pct_td\" style=\"width: 101.621px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 100.605px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 71.875px;\">Optional</td>\n</tr>\n<!-- 第十二行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 133.672px;\"><strong>Bambu PLA-CF</strong></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\"><span style=\"color: #ff2a00;\"><strong>*①NO</strong></span></td>\n<td class=\"pct_td\" style=\"width: 101.621px;\"><strong>*②Recommended</strong></td>\n<td class=\"pct_td\" style=\"width: 100.605px;\"><span>YES</span></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 71.875px;\">Required</td>\n</tr>\n<!-- 第十三行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 133.672px;\"><strong>Bambu PETG-CF</strong></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\"><span style=\"color: #ff2a00;\"><strong>*①NO</strong></span></td>\n<td class=\"pct_td\" style=\"width: 101.621px;\"><strong>*②Recommended</strong></td>\n<td class=\"pct_td\" style=\"width: 100.605px;\"><span>YES</span></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 71.875px;\">Required</td>\n</tr>\n<!-- 第十四行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 133.672px;\"><strong>Bambu PAHT-CF</strong></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\"><span style=\"color: #ff2a00;\"><strong>*①NO</strong></span></td>\n<td class=\"pct_td\" style=\"width: 101.621px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 100.605px;\"><strong>*③Recommended</strong></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 71.875px;\">Required</td>\n</tr>\n<!-- 第十五行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 133.672px;\"><strong>Bambu PET-CF</strong></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\"><span style=\"color: #ff2a00;\"><strong>*①NO</strong></span></td>\n<td class=\"pct_td\" style=\"width: 101.621px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 100.605px;\"><strong>*③Recommended</strong></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 71.875px;\">Required</td>\n</tr>\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 133.672px;\"><strong>CF/GF Filaments from other brands</strong></td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\"><span style=\"color: #ff2a00;\"><strong>*①NO</strong></span></td>\n<td class=\"pct_td\" style=\"width: 101.621px;\"><span>Not Recommended</span></td>\n<td class=\"pct_td\" style=\"width: 100.605px;\">YES</td>\n<td class=\"pct_td\" style=\"width: 48.7695px;\"><span>YES</span></td>\n<td class=\"pct_td\" style=\"width: 71.875px;\">Required</td>\n</tr>\n</tbody>\n</table>\n<br /><strong>[*Note]</strong></div>\n<br />\n<div class=\"pct_tbc\"></div>\n<div class=\"pct_tbc\"></div>\n<div class=\"pct_tbc\"><strong></strong></div>\n<div class=\"pct_tbc\"><span style=\"font-size: 0.875rem;\"></span></div>\n<div class=\"pct_tbc\"><span style=\"font-size: 0.875rem;\"><span style=\"color: #ff2a00;\"><strong>*①</strong></span> Filaments with carbon fiber, glass fiber, metal, or other inorganic particles are prone to clog a </span><strong style=\"font-size: 0.875rem;\">0.2 mm nozzle</strong><span style=\"font-size: 0.875rem;\">.</span></div>\n<br />\n<div class=\"pct_tbc\"></div>\n<div class=\"pct_tbc\"></div>\n<div class=\"pct_tbc\"><span style=\"font-size: 0.875rem;\"><strong style=\"font-size: 0.875rem;\"><span data-mce-fragment=\"1\">*② Bambu PLA-CF </span></strong>and<strong style=\"font-size: 0.875rem;\"><span data-mce-fragment=\"1\">&nbsp;Bambu PETG-CF </span></strong>have been extensively tested and proven to have a low risk of clogging when printed with a <strong style=\"font-size: 0.875rem;\">hardened steel 0.4 mm nozzle</strong>, while also achieving higher print quality.</span></div>\n<br />\n<div class=\"pct_tbc\"></div>\n<div class=\"pct_tbc\"></div>\n<div class=\"pct_tbc\"><span style=\"font-size: 0.875rem;\"><strong>*③</strong> For general carbon fiber or glass fiber filaments such as Bambu PAHT-CF and PET-CF, it is</span><strong style=\"font-size: 0.875rem;\">&nbsp;recommended</strong><span style=\"font-size: 0.875rem;\"> to use a </span><strong style=\"font-size: 0.875rem;\">hardened steel</strong><span style=\"font-size: 0.875rem;\">&nbsp;</span><strong style=\"font-size: 0.875rem;\">0.6 mm nozzle</strong><span style=\"font-size: 0.875rem;\"> to minimize the risk of clogging and abrasion.</span></div>\n</div>\n</div>\n<div class=\"pct pct_mc\"></div>\n<div class=\"pct pct_mc\">Learn more about filament compatibility on <strong><span style=\"color: #00ae42;\"><a style=\"color: #00ae42;\" href=\"https://wiki.bambulab.com/en/general/filament-guide-material-table\" target=\"_blank\" rel=\"noopener\">Bambu Lab Wiki</a></span></strong>.</div>\n<br />\n<div class=\"pct pct_mc\">\n<div class=\"pct_tbc\" style=\"text-align: left;\"><span style=\"font-size: 0.875rem;\">Learn more about replacing the hotend with nozzle on </span><a href=\"https://wiki.bambulab.com/en/a1-mini/maintenance/toolhead\" target=\"_blank\" rel=\"noopener\"><strong><span style=\"color: #00ae42;\"><u>Bambu Lab Wiki</u></span></strong></a><span style=\"font-size: 0.875rem;\">.</span></div>\n</div>\n</div>\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-stpc\">\n<div class=\"pct_st-p\" style=\"margin-top: 30px;\">\n<div class=\"pct pct_mc\">\n<div class=\"pct pct_mc\">\n<div class=\"pct pct_mc\">\n<div class=\"pct_st-p\" style=\"margin-top: 30px;\">\n<h3 class=\"pct_st\" style=\"text-align: left;\">In the Box</h3>\n<p class=\"pct_p\" style=\"text-align: left;\">- Hotend with Nozzle<br /><br /></p>\n</div>\n<!-- 第五条 -->\n<div class=\"pct_st-p\" style=\"margin-top: 30px;\">\n<h3 class=\"pct_st\" style=\"text-align: left;\">Compatibility</h3>\n<p class=\"pct_p\" style=\"text-align: left;\">A1 Series</p>\n</div>\n</div>\n</div>\n</div>\n<br /><!-- table布局 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_st-tbc\">\n<h2 class=\"pct_t\" style=\"text-align: center;\">Product Specifications</h2>\n<div class=\"pct_tbc\">\n<table class=\"pct_tb\" style=\"height: 38px;\"><!-- 表头 -->\n<tbody><!-- 第一行 -->\n<tr class=\"pct_tr\" style=\"height: 19px;\">\n<td class=\"pct_td\" style=\"height: 19px; width: 192.305px;\"><strong>Max. Printing Temp.</strong></td>\n<td class=\"pct_td\" style=\"height: 19px; width: 59.7656px;\">320 ℃</td>\n<td class=\"pct_td\" style=\"height: 19px; width: 141.406px;\"><strong>Length</strong></td>\n<td class=\"pct_td\" style=\"height: 19px; width: 123.32px;\">47.3 mm</td>\n</tr>\n<!-- 第二行 -->\n<tr class=\"pct_tr\" style=\"height: 19px;\">\n<td class=\"pct_td\" style=\"height: 19px; width: 192.305px;\"><strong>Packaging Weight</strong></td>\n<td class=\"pct_td\" style=\"height: 19px; width: 59.7656px;\"><span>30 g</span></td>\n<td class=\"pct_td\" style=\"height: 19px; width: 141.406px;\"><strong>Packaging Size</strong></td>\n<td class=\"pct_td\" style=\"height: 19px; width: 123.32px;\">60*60*30 mm</td>\n</tr>\n<!-- 第三行 --></tbody>\n</table>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>"
+ },
+ "jsonld": [
+  {
+   "@context": "https://schema.org/",
+   "@type": "ProductGroup",
+   "name": "Bambu Hotend - A1/A2",
+   "description": null,
+   "url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+   "brand": {
+    "@type": "Brand",
+    "name": "Bambu Lab"
+   },
+   "productGroupID": "7503970893960",
+   "hasVariant": [
+    {
+     "@type": "Product",
+     "sku": "737888342695104517",
+     "image": "https://store.bblcdn.com/s7/default/7ba29915245d451f9f16060e528b1329/0.4_bec92ef9-65f2-476d-a485-643fca415de1.png",
+     "name": "Bambu Hotend - A1/A2 - A1 / 0.4mm Hardened Steel",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2?id=737888342695104517",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "737888342695104522",
+     "image": "https://store.bblcdn.com/s7/default/49000fed3cb940e0b34305c2c7fcf4d3/0.6_50161456-e016-4686-80c9-cb72c2bfe14e.png",
+     "name": "Bambu Hotend - A1/A2 - A1 / 0.6mm Hardened Steel",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2?id=737888342695104522",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "737888342695104527",
+     "image": "https://store.bblcdn.com/s7/default/a876b6ffb1ab4719840ae487dc343c78/0.8_a2efd36d-5912-4e53-9138-4dcfd06eb37d.png",
+     "name": "Bambu Hotend - A1/A2 - A1 / 0.8mm Hardened Steel",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2?id=737888342695104527",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "737888342695104532",
+     "image": "https://store.bblcdn.com/s7/default/e5c8dd6912b5412ab6231ae7e3f1a199/0.2_16a4411f-3198-499c-b837-a89ec5ecffbb.png",
+     "name": "Bambu Hotend - A1/A2 - A1 / 0.2mm Stainless Steel",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2?id=737888342695104532",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "737888342695104537",
+     "image": "https://store.bblcdn.com/s7/default/48ce58de4d604612b681d2421e16e54f/0.4_fdbac548-0595-44cb-b2d4-a37bd2f871aa.png",
+     "name": "Bambu Hotend - A1/A2 - A1 / 0.4mm Stainless Steel",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2?id=737888342695104537",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "737888342695104542",
+     "image": "https://store.bblcdn.com/s7/default/7ba29915245d451f9f16060e528b1329/0.4_bec92ef9-65f2-476d-a485-643fca415de1.png",
+     "name": "Bambu Hotend - A1/A2 - A1 mini / 0.4mm Hardened Steel",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2?id=737888342695104542",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "737888342695104547",
+     "image": "https://store.bblcdn.com/s7/default/49000fed3cb940e0b34305c2c7fcf4d3/0.6_50161456-e016-4686-80c9-cb72c2bfe14e.png",
+     "name": "Bambu Hotend - A1/A2 - A1 mini / 0.6mm Hardened Steel",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2?id=737888342695104547",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "737888342695104552",
+     "image": "https://store.bblcdn.com/s7/default/a876b6ffb1ab4719840ae487dc343c78/0.8_a2efd36d-5912-4e53-9138-4dcfd06eb37d.png",
+     "name": "Bambu Hotend - A1/A2 - A1 mini / 0.8mm Hardened Steel",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2?id=737888342695104552",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "737888342695104557",
+     "image": "https://store.bblcdn.com/s7/default/e5c8dd6912b5412ab6231ae7e3f1a199/0.2_16a4411f-3198-499c-b837-a89ec5ecffbb.png",
+     "name": "Bambu Hotend - A1/A2 - A1 mini / 0.2mm Stainless Steel",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2?id=737888342695104557",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "737888342695104562",
+     "image": "https://store.bblcdn.com/s7/default/48ce58de4d604612b681d2421e16e54f/0.4_fdbac548-0595-44cb-b2d4-a37bd2f871aa.png",
+     "name": "Bambu Hotend - A1/A2 - A1 mini / 0.4mm Stainless Steel",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2?id=737888342695104562",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "737888342695104567",
+     "image": "https://store.bblcdn.com/s7/default/7ba29915245d451f9f16060e528b1329/0.4_bec92ef9-65f2-476d-a485-643fca415de1.png",
+     "name": "Bambu Hotend - A1/A2 - A2L / 0.4mm Hardened Steel",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2?id=737888342695104567",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "737888342695104572",
+     "image": "https://store.bblcdn.com/s7/default/49000fed3cb940e0b34305c2c7fcf4d3/0.6_50161456-e016-4686-80c9-cb72c2bfe14e.png",
+     "name": "Bambu Hotend - A1/A2 - A2L / 0.6mm Hardened Steel",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2?id=737888342695104572",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "737888342695104577",
+     "image": "https://store.bblcdn.com/s7/default/a876b6ffb1ab4719840ae487dc343c78/0.8_a2efd36d-5912-4e53-9138-4dcfd06eb37d.png",
+     "name": "Bambu Hotend - A1/A2 - A2L / 0.8mm Hardened Steel",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2?id=737888342695104577",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "737888342695104582",
+     "image": "https://store.bblcdn.com/s7/default/e5c8dd6912b5412ab6231ae7e3f1a199/0.2_16a4411f-3198-499c-b837-a89ec5ecffbb.png",
+     "name": "Bambu Hotend - A1/A2 - A2L / 0.2mm Stainless Steel",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2?id=737888342695104582",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "737888342695104587",
+     "image": "https://store.bblcdn.com/s7/default/48ce58de4d604612b681d2421e16e54f/0.4_fdbac548-0595-44cb-b2d4-a37bd2f871aa.png",
+     "name": "Bambu Hotend - A1/A2 - A2L / 0.4mm Stainless Steel",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2?id=737888342695104587",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    }
+   ]
+  }
+ ]
+}

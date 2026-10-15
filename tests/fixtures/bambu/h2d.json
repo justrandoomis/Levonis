@@ -1,0 +1,2773 @@
+{
+ "_meta": {
+  "source_url": "https://us.store.bambulab.com/products/h2d",
+  "fetched_at": "2026-10-15T09:57:52Z",
+  "extracted_from": "self.__next_f RSC flight data (App Router); product object = props.data of the PDP component, description = separate RSC element (see description.kind)",
+  "removed_keys": [
+   "abGroup",
+   "discountOffText",
+   "discountPrice",
+   "flashSaleVO",
+   "gradientDiscountActivityId",
+   "gradientDiscountSkus",
+   "marketingDisplayAbGroup",
+   "maximum",
+   "minimum",
+   "orderInfo",
+   "orderInfoTitle",
+   "pointsInfo",
+   "price",
+   "priceCurrency",
+   "priceDescriptionList",
+   "priceExplanation",
+   "priceSpecification",
+   "productSkuBuyAndGetVO",
+   "productSkuPreSale",
+   "promotionDescription",
+   "qryPromotionFlag",
+   "quantityLimitType",
+   "quantityLimitValue",
+   "serviceGuaranteeList",
+   "skuPromotionPointsSwitch"
+  ],
+  "notes": "Prices, compare-at prices, purchase limits, promotions, points and store-wide shipping/service boilerplate removed; dollar amounts inside text replaced with $[redacted]. Ids are strings (many exceed 2^53)."
+ },
+ "product": {
+  "id": "581025672328126464",
+  "name": "Bambu Lab H2D",
+  "type": 1,
+  "subTitle": "",
+  "description": null,
+  "seoCode": "h2d",
+  "seoTitle": "Buy Bambu Lab H2D: Dual-Nozzle 3D Printer + Laser All-in-One",
+  "seoMetaDescription": "Dual-nozzle + laser all-in-one from the No.1 best-selling brand. 2M+ free models. 30-day price protection, 2-year warranty & 30-day returns at official store.",
+  "seoUrlHandle": "https://us.store.bambulab.com/products/h2d",
+  "productFeaturesTitle": "Product Features",
+  "productFeatures": "<ul>\n<li>Dual-nozzle Multi-material 3D Printing</li>\n<li>Optional 10W/40W Laser and Cutting Module</li>\n<li>350*320*325 mm&sup3; Print Volume</li>\n<li>5&mu;m Resolution Optical Motion Calibration</li>\n<li>Closed-loop Servo Extruder</li>\n<li>350&deg;C Nozzle &amp; 65&deg;C Active Chamber Heating</li>\n<li><span data-eleid=\"5\">Voltage Range: 100-120 V</span></li>\n</ul>\n<p><strong>* To connect more than 2 AMS(including AMS 2 Pro, AMS HT), a 4-in-1 PTFE Adapter (FAZ013-N) is needed.</strong></p>\n<p><span style=\"color: #000000;\">* Cybersecurity compliant with EU RED Article 3.3(d)(e) and ETSI EN 303 645 V2.1.1:2020. <a href=\"https://bambulab.com/en/trust-center/certification\" target=\"_blank\" rel=\"noopener\">Learn more.</a> </span></p>",
+  "productFeaturesModuleList": [
+   {
+    "id": "733532522000715776",
+    "title": "Product Features",
+    "content": "<ul>\n<li>Dual-nozzle Multi-material 3D Printing</li>\n<li>Optional 10W/40W Laser and Cutting Module(Self-installation required)</li>\n<li>350*320*325 mm&sup3; Print Volume</li>\n<li>5&mu;m Resolution Optical Motion Calibration</li>\n<li>Closed-loop Servo Extruder</li>\n<li>350&deg;C Nozzle &amp; 65&deg;C Active Chamber Heating</li>\n<li><span data-eleid=\"5\">Voltage Range: 100-120 V</span></li>\n</ul>\n<p><strong>* To connect more than 2 AMS(including AMS 2 Pro, AMS HT), a 4-in-1 PTFE Adapter (FAZ013-N) is needed.</strong></p>\n<p><span style=\"color: #000000;\">* Cybersecurity compliant with EU RED Article 3.3(d)(e) and ETSI EN 303 645 V2.1.1:2020. <a href=\"https://bambulab.com/en/trust-center/certification\" target=\"_blank\" rel=\"noopener\">Learn more.</a> </span></p>",
+    "iconUrl": ""
+   }
+  ],
+  "newFlag": 0,
+  "externalVideoTitle": "",
+  "externalVideoLinkList": [
+   ""
+  ],
+  "mediaFiles": [
+   {
+    "resourceFileId": "753809543490916352",
+    "url": "https://store.bblcdn.com/s7/default/3119bfccdef5461eb9a0f42d579b9a5c/H2D-compressed.jpg"
+   },
+   {
+    "resourceFileId": "753809543704825856",
+    "url": "https://store.bblcdn.com/s7/default/3c3534f112e64118a51156ad98dd4305/H2DC-compressed.jpg"
+   },
+   {
+    "resourceFileId": "753809543629328384",
+    "url": "https://store.bblcdn.com/s7/default/28382003753b437bb41e9c9fae2d8edb/H2DL-10w-compressed.jpg"
+   },
+   {
+    "resourceFileId": "753809543601684480",
+    "url": "https://store.bblcdn.com/s7/default/aedfa3ff4722447f9dcec0103b252727/H2DUSMS2PRo-compressed.jpg"
+   },
+   {
+    "resourceFileId": "753809543417135104",
+    "url": "https://store.bblcdn.com/s7/default/e5f6ad2d8168485f82574369073ba155/H2DHT-compressed.jpg"
+   },
+   {
+    "resourceFileId": "698796602171437056",
+    "url": "https://store.bblcdn.com/s7/default/9e8cfe4f3ba64730b1443163ef31a990/H2D-compressed.jpg"
+   },
+   {
+    "resourceFileId": "698796666641530880",
+    "url": "https://store.bblcdn.com/s7/default/0cca0dcdfc724c3e87866744643f9c75/H2DC-compressed.jpg"
+   },
+   {
+    "resourceFileId": "698796708945833984",
+    "url": "https://store.bblcdn.com/s7/default/b6d53b7b003242f09da7b323be5a2c4f/H2DL-10w-compressed.jpg"
+   },
+   {
+    "resourceFileId": "622628343488827392",
+    "url": "https://store.bblcdn.com/s7/default/d0d5412ac42c48a38135e6b205da11c0/AMS_2_Pro.jpg"
+   },
+   {
+    "resourceFileId": "622628342119940096",
+    "url": "https://store.bblcdn.com/s7/default/81823c8df90a4a53a6fb85c9329efb9d/AMS_HT.jpg"
+   },
+   {
+    "resourceFileId": "581313685097349120",
+    "url": "https://store.bblcdn.com/s7/default/db5df3cac5bf4ac69b46ad85d3e932a6/1.jpg"
+   },
+   {
+    "resourceFileId": "581025407625302016",
+    "url": "https://store.bblcdn.com/s7/default/7261e16b657f45c884671a9877b8eee5/1.jpg"
+   },
+   {
+    "resourceFileId": "581025408138956800",
+    "url": "https://store.bblcdn.com/s7/default/18d40cad4b904780aa8f9752b5981952/3.jpg"
+   },
+   {
+    "resourceFileId": "581313681238503424",
+    "url": "https://store.bblcdn.com/s7/default/d93f517422fa499f93ade82eb4fb6fe3/2.jpg"
+   },
+   {
+    "resourceFileId": "581313681503965184",
+    "url": "https://store.bblcdn.com/s7/default/4aea0cbb9ebf46c78aacf3c1ba44a152/4.jpg"
+   },
+   {
+    "resourceFileId": "581313683162632192",
+    "url": "https://store.bblcdn.com/s7/default/626a1bb771814318b62a17b869bece8a/3.jpg"
+   },
+   {
+    "resourceFileId": "581314771333062656",
+    "url": "https://store.bblcdn.com/s7/default/11f4bf65d80c4c2d9201d43f3f121bd8/6.jpg"
+   }
+  ],
+  "productSkuList": [
+   {
+    "id": "581025672340709385",
+    "mediaFile": {
+     "resourceFileId": "753809543704825856",
+     "url": "https://store.bblcdn.com/s7/default/3c3534f112e64118a51156ad98dd4305/H2DC-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Variant",
+      "propertyKeyId": "581025672340709376",
+      "propertyValueId": null,
+      "propertyValue": "H2D AMS Combo",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Option",
+      "propertyKeyId": "581025672340709380",
+      "propertyValueId": null,
+      "propertyValue": "Standard",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "581025672340709390",
+    "mediaFile": {
+     "resourceFileId": "753809543629328384",
+     "url": "https://store.bblcdn.com/s7/default/28382003753b437bb41e9c9fae2d8edb/H2DL-10w-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Variant",
+      "propertyKeyId": "581025672340709376",
+      "propertyValueId": null,
+      "propertyValue": "H2D Laser Full Combo",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Option",
+      "propertyKeyId": "581025672340709380",
+      "propertyValueId": null,
+      "propertyValue": "10W",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "<div style=\"font-size: 13px;\">\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span style=\"font-family: MonospacedNumber, LarkHackSafariFont, LarkEmojiFont, LarkChineseQuote, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Tahoma, 'PingFang SC', 'Microsoft Yahei', Arial, 'Hiragino Sans GB', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'; color: #e03e2d;\">Laser module(s) will be shipped in separate boxes.</span></div>\n</div>",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "581025672340709395",
+    "mediaFile": {
+     "resourceFileId": "753809543629328384",
+     "url": "https://store.bblcdn.com/s7/default/28382003753b437bb41e9c9fae2d8edb/H2DL-10w-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Variant",
+      "propertyKeyId": "581025672340709376",
+      "propertyValueId": null,
+      "propertyValue": "H2D Laser Full Combo",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Option",
+      "propertyKeyId": "581025672340709380",
+      "propertyValueId": null,
+      "propertyValue": "40W",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "<div style=\"font-size: 13px;\">\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span style=\"font-family: MonospacedNumber, LarkHackSafariFont, LarkEmojiFont, LarkChineseQuote, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Tahoma, 'PingFang SC', 'Microsoft Yahei', Arial, 'Hiragino Sans GB', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'; color: #e03e2d;\">Laser module(s) will be shipped in separate boxes.</span></div>\n</div>",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "581025672340709400",
+    "mediaFile": {
+     "resourceFileId": "753809543490916352",
+     "url": "https://store.bblcdn.com/s7/default/3119bfccdef5461eb9a0f42d579b9a5c/H2D-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Variant",
+      "propertyKeyId": "581025672340709376",
+      "propertyValueId": null,
+      "propertyValue": "H2D",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Option",
+      "propertyKeyId": "581025672340709380",
+      "propertyValueId": null,
+      "propertyValue": "standard",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "622679274382356483",
+    "mediaFile": {
+     "resourceFileId": "753809543601684480",
+     "url": "https://store.bblcdn.com/s7/default/aedfa3ff4722447f9dcec0103b252727/H2DUSMS2PRo-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Variant",
+      "propertyKeyId": "581025672340709376",
+      "propertyValueId": null,
+      "propertyValue": "H2D AMS Combo",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Option",
+      "propertyKeyId": "581025672340709380",
+      "propertyValueId": null,
+      "propertyValue": "Dual AMS 2 Pro Bundle",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "<div style=\"font-size: 13px;\">\n<ul>\n<li style=\"box-sizing: border-box; -webkit-font-smoothing: antialiased; border: 0px solid #e5e7eb; --tw-border-spacing-x: 0; --tw-border-spacing-y: 0; --tw-translate-x: 0; --tw-translate-y: 0; --tw-rotate: 0; --tw-skew-x: 0; --tw-skew-y: 0; --tw-scale-x: 1; --tw-scale-y: 1; --tw-scroll-snap-strictness: proximity; --tw-ring-offset-width: 0px; --tw-ring-offset-color: #fff; --tw-ring-color: rgba(59,130,246,.5); --tw-ring-offset-shadow: 0 0 #0000; --tw-ring-shadow: 0 0 #0000; --tw-shadow: 0 0 #0000; --tw-shadow-colored: 0 0 #0000; --theme-defult-color: #0e65e9; margin: 0px; padding: 0px; white-space: pre;\" data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><strong><span style=\"box-sizing: border-box; -webkit-font-smoothing: antialiased; border: 0px solid #e5e7eb; --tw-border-spacing-x: 0; --tw-border-spacing-y: 0; --tw-translate-x: 0; --tw-translate-y: 0; --tw-rotate: 0; --tw-skew-x: 0; --tw-skew-y: 0; --tw-scale-x: 1; --tw-scale-y: 1; --tw-scroll-snap-strictness: proximity; --tw-ring-offset-width: 0px; --tw-ring-offset-color: #fff; --tw-ring-color: rgba(59,130,246,.5); --tw-ring-offset-shadow: 0 0 #0000; --tw-ring-shadow: 0 0 #0000; --tw-shadow: 0 0 #0000; --tw-shadow-colored: 0 0 #0000; --theme-defult-color: #0e65e9; margin: 0px; padding: 0px; color: #e03e2d;\"><span style=\"box-sizing: border-box; -webkit-font-smoothing: antialiased; border: 0px solid #e5e7eb; --tw-border-spacing-x: 0; --tw-border-spacing-y: 0; --tw-translate-x: 0; --tw-translate-y: 0; --tw-rotate: 0; --tw-skew-x: 0; --tw-skew-y: 0; --tw-scale-x: 1; --tw-scale-y: 1; --tw-scroll-snap-strictness: proximity; --tw-ring-offset-width: 0px; --tw-ring-offset-color: #fff; --tw-ring-color: rgba(59,130,246,.5); --tw-ring-offset-shadow: 0 0 #0000; --tw-ring-shadow: 0 0 #0000; --tw-shadow: 0 0 #0000; --tw-shadow-colored: 0 0 #0000; --theme-defult-color: #0e65e9; margin: 0px; padding: 0px;\"><span style=\"box-sizing: border-box; -webkit-font-smoothing: antialiased; border: 0px solid #e5e7eb; --tw-border-spacing-x: 0; --tw-border-spacing-y: 0; --tw-translate-x: 0; --tw-translate-y: 0; --tw-rotate: 0; --tw-skew-x: 0; --tw-skew-y: 0; --tw-scale-x: 1; --tw-scale-y: 1; --tw-scroll-snap-strictness: proximity; --tw-ring-offset-width: 0px; --tw-ring-offset-color: #fff; --tw-ring-color: rgba(59,130,246,.5); --tw-ring-offset-shadow: 0 0 #0000; --tw-ring-shadow: 0 0 #0000; --tw-shadow: 0 0 #0000; --tw-shadow-colored: 0 0 #0000; --theme-defult-color: #0e65e9; margin: 0px; padding: 0px; font-family: MonospacedNumber, LarkHackSafariFont, LarkEmojiFont, LarkChineseQuote, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Tahoma, 'PingFang SC', 'Microsoft Yahei', Arial, 'Hiragino Sans GB', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';\">If you plan to run multiple AMS 2 Pro for drying at the same time, you&rsquo;ll need a power adapter</span></span></span></strong></li>\n<li style=\"box-sizing: border-box; -webkit-font-smoothing: antialiased; border: 0px solid #e5e7eb; --tw-border-spacing-x: 0; --tw-border-spacing-y: 0; --tw-translate-x: 0; --tw-translate-y: 0; --tw-rotate: 0; --tw-skew-x: 0; --tw-skew-y: 0; --tw-scale-x: 1; --tw-scale-y: 1; --tw-scroll-snap-strictness: proximity; --tw-ring-offset-width: 0px; --tw-ring-offset-color: #fff; --tw-ring-color: rgba(59,130,246,.5); --tw-ring-offset-shadow: 0 0 #0000; --tw-ring-shadow: 0 0 #0000; --tw-shadow: 0 0 #0000; --tw-shadow-colored: 0 0 #0000; --theme-defult-color: #0e65e9; margin: 0px; padding: 0px; white-space: pre;\" data-zone-id=\"0\" data-line-index=\"1\" data-line=\"true\"><strong><span style=\"box-sizing: border-box; -webkit-font-smoothing: antialiased; border: 0px solid #e5e7eb; --tw-border-spacing-x: 0; --tw-border-spacing-y: 0; --tw-translate-x: 0; --tw-translate-y: 0; --tw-rotate: 0; --tw-skew-x: 0; --tw-skew-y: 0; --tw-scale-x: 1; --tw-scale-y: 1; --tw-scroll-snap-strictness: proximity; --tw-ring-offset-width: 0px; --tw-ring-offset-color: #fff; --tw-ring-color: rgba(59,130,246,.5); --tw-ring-offset-shadow: 0 0 #0000; --tw-ring-shadow: 0 0 #0000; --tw-shadow: 0 0 #0000; --tw-shadow-colored: 0 0 #0000; --theme-defult-color: #0e65e9; margin: 0px; padding: 0px; color: #000000;\"><span style=\"box-sizing: border-box; -webkit-font-smoothing: antialiased; border: 0px solid #e5e7eb; --tw-border-spacing-x: 0; --tw-border-spacing-y: 0; --tw-translate-x: 0; --tw-translate-y: 0; --tw-rotate: 0; --tw-skew-x: 0; --tw-skew-y: 0; --tw-scale-x: 1; --tw-scale-y: 1; --tw-scroll-snap-strictness: proximity; --tw-ring-offset-width: 0px; --tw-ring-offset-color: #fff; --tw-ring-color: rgba(59,130,246,.5); --tw-ring-offset-shadow: 0 0 #0000; --tw-ring-shadow: 0 0 #0000; --tw-shadow: 0 0 #0000; --tw-shadow-colored: 0 0 #0000; --theme-defult-color: #0e65e9; margin: 0px; padding: 0px; font-family: MonospacedNumber, LarkHackSafariFont, LarkEmojiFont, LarkChineseQuote, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Tahoma, 'PingFang SC', 'Microsoft Yahei', Arial, 'Hiragino Sans GB', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';\">Combo includes: H2D Combo and AMS 2 Pro</span></span></strong></li>\n<li style=\"box-sizing: border-box; -webkit-font-smoothing: antialiased; border: 0px solid #e5e7eb; --tw-border-spacing-x: 0; --tw-border-spacing-y: 0; --tw-translate-x: 0; --tw-translate-y: 0; --tw-rotate: 0; --tw-skew-x: 0; --tw-skew-y: 0; --tw-scale-x: 1; --tw-scale-y: 1; --tw-scroll-snap-strictness: proximity; --tw-ring-offset-width: 0px; --tw-ring-offset-color: #fff; --tw-ring-color: rgba(59,130,246,.5); --tw-ring-offset-shadow: 0 0 #0000; --tw-ring-shadow: 0 0 #0000; --tw-shadow: 0 0 #0000; --tw-shadow-colored: 0 0 #0000; --theme-defult-color: #0e65e9; margin: 0px; padding: 0px; white-space: pre;\" data-zone-id=\"0\" data-line-index=\"2\" data-line=\"true\"><strong><span style=\"box-sizing: border-box; -webkit-font-smoothing: antialiased; border: 0px solid #e5e7eb; --tw-border-spacing-x: 0; --tw-border-spacing-y: 0; --tw-translate-x: 0; --tw-translate-y: 0; --tw-rotate: 0; --tw-skew-x: 0; --tw-skew-y: 0; --tw-scale-x: 1; --tw-scale-y: 1; --tw-scroll-snap-strictness: proximity; --tw-ring-offset-width: 0px; --tw-ring-offset-color: #fff; --tw-ring-color: rgba(59,130,246,.5); --tw-ring-offset-shadow: 0 0 #0000; --tw-ring-shadow: 0 0 #0000; --tw-shadow: 0 0 #0000; --tw-shadow-colored: 0 0 #0000; --theme-defult-color: #0e65e9; margin: 0px; padding: 0px; color: #000000;\"><span style=\"box-sizing: border-box; -webkit-font-smoothing: antialiased; border: 0px solid #e5e7eb; --tw-border-spacing-x: 0; --tw-border-spacing-y: 0; --tw-translate-x: 0; --tw-translate-y: 0; --tw-rotate: 0; --tw-skew-x: 0; --tw-skew-y: 0; --tw-scale-x: 1; --tw-scale-y: 1; --tw-scroll-snap-strictness: proximity; --tw-ring-offset-width: 0px; --tw-ring-offset-color: #fff; --tw-ring-color: rgba(59,130,246,.5); --tw-ring-offset-shadow: 0 0 #0000; --tw-ring-shadow: 0 0 #0000; --tw-shadow: 0 0 #0000; --tw-shadow-colored: 0 0 #0000; --theme-defult-color: #0e65e9; margin: 0px; padding: 0px; font-family: MonospacedNumber, LarkHackSafariFont, LarkEmojiFont, LarkChineseQuote, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Tahoma, 'PingFang SC', 'Microsoft Yahei', Arial, 'Hiragino Sans GB', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';\">The H2DC and AMS 2 Pro will be shipped in separate boxes.</span></span></strong></li>\n</ul>\n</div>",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "622679274382356488",
+    "mediaFile": {
+     "resourceFileId": "753809543417135104",
+     "url": "https://store.bblcdn.com/s7/default/e5f6ad2d8168485f82574369073ba155/H2DHT-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Variant",
+      "propertyKeyId": "581025672340709376",
+      "propertyValueId": null,
+      "propertyValue": "H2D AMS Combo",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Option",
+      "propertyKeyId": "581025672340709380",
+      "propertyValueId": null,
+      "propertyValue": "AMS HT bundle",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "<div style=\"font-size: 13px;\">\n<div>\n<ul>\n<li data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><strong><span style=\"font-family: MonospacedNumber, LarkHackSafariFont, LarkEmojiFont, LarkChineseQuote, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Tahoma, 'PingFang SC', 'Microsoft Yahei', Arial, 'Hiragino Sans GB', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';\">Combo includes:&nbsp;<strong style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; white-space: pre;\"><span style=\"box-sizing: border-box; -webkit-font-smoothing: antialiased; border: 0px solid #e5e7eb; --tw-border-spacing-x: 0; --tw-border-spacing-y: 0; --tw-translate-x: 0; --tw-translate-y: 0; --tw-rotate: 0; --tw-skew-x: 0; --tw-skew-y: 0; --tw-scale-x: 1; --tw-scale-y: 1; --tw-scroll-snap-strictness: proximity; --tw-ring-offset-width: 0px; --tw-ring-offset-color: #fff; --tw-ring-color: rgba(59,130,246,.5); --tw-ring-offset-shadow: 0 0 #0000; --tw-ring-shadow: 0 0 #0000; --tw-shadow: 0 0 #0000; --tw-shadow-colored: 0 0 #0000; --theme-defult-color: #0e65e9; margin: 0px; padding: 0px; color: #000000;\"><span style=\"box-sizing: border-box; -webkit-font-smoothing: antialiased; border: 0px solid #e5e7eb; --tw-border-spacing-x: 0; --tw-border-spacing-y: 0; --tw-translate-x: 0; --tw-translate-y: 0; --tw-rotate: 0; --tw-skew-x: 0; --tw-skew-y: 0; --tw-scale-x: 1; --tw-scale-y: 1; --tw-scroll-snap-strictness: proximity; --tw-ring-offset-width: 0px; --tw-ring-offset-color: #fff; --tw-ring-color: rgba(59,130,246,.5); --tw-ring-offset-shadow: 0 0 #0000; --tw-ring-shadow: 0 0 #0000; --tw-shadow: 0 0 #0000; --tw-shadow-colored: 0 0 #0000; --theme-defult-color: #0e65e9; margin: 0px; padding: 0px; font-family: MonospacedNumber, LarkHackSafariFont, LarkEmojiFont, LarkChineseQuote, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Tahoma, 'PingFang SC', 'Microsoft Yahei', Arial, 'Hiragino Sans GB', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';\">H2D Combo</span></span></strong>&nbsp;and AMS HT</span></strong></li>\n<li data-zone-id=\"0\" data-line-index=\"1\" data-line=\"true\"><strong><span style=\"font-family: MonospacedNumber, LarkHackSafariFont, LarkEmojiFont, LarkChineseQuote, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Tahoma, 'PingFang SC', 'Microsoft Yahei', Arial, 'Hiragino Sans GB', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';\">The H2DC and AMS HT will be shipped in separate boxes.</span></strong></li>\n</ul>\n</div>\n</div>",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   }
+  ],
+  "productPropertyList": [
+   {
+    "propertyKey": "Variant",
+    "propertyKeyId": "581025672340709376",
+    "productPropertyValueList": [
+     {
+      "id": "581025672340709377",
+      "value": "H2D AMS Combo",
+      "newFlag": 0,
+      "selectedDefault": 1,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "581025672340709378",
+      "value": "H2D Laser Full Combo",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "581025672340709379",
+      "value": "H2D",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     }
+    ],
+    "position": 1,
+    "type": 4,
+    "title": "3D Printer",
+    "introduction": "",
+    "explanation": ""
+   },
+   {
+    "propertyKey": "Option",
+    "propertyKeyId": "581025672340709380",
+    "productPropertyValueList": [
+     {
+      "id": "581025672340709381",
+      "value": "Standard",
+      "newFlag": 0,
+      "selectedDefault": 1,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "581025672340709382",
+      "value": "10W",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "581025672340709383",
+      "value": "40W",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "581025672340709384",
+      "value": "standard",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "622679274382356481",
+      "value": "Dual AMS 2 Pro Bundle",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "622679274382356482",
+      "value": "AMS HT bundle",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     }
+    ],
+    "position": 2,
+    "type": 1,
+    "title": "",
+    "introduction": "",
+    "explanation": ""
+   }
+  ],
+  "skillLevel": 0,
+  "skillTitle": null,
+  "printerTime": "",
+  "filamentUsed": "",
+  "colorCollectionList": [],
+  "productExtraInfoVO": {
+   "gprsInfoTemplateVO": null,
+   "productVideoVOList": null,
+   "productFileList": null
+  },
+  "productDetailTemplateVO": null,
+  "subProductList": null,
+  "showMwModelIds": [],
+  "showMwModelPosition": 0,
+  "customButtonTitle": null,
+  "customButtonLink": null,
+  "paymentComponentPosition": 0,
+  "isFilament": false,
+  "currentAllIdRoute": "552709755391528960>666870992645718016>580901793339363328",
+  "imageLabels": null
+ },
+ "description": {
+  "kind": "bespoke_new",
+  "nav_sections": [
+   {
+    "id": "overview",
+    "label": "Overview"
+   },
+   {
+    "id": "specs",
+    "label": "Specs"
+   },
+   {
+    "id": "instruction",
+    "label": "Instruction"
+   },
+   {
+    "id": "faq",
+    "label": "FAQ"
+   }
+  ],
+  "tree": [
+   "$",
+   "div",
+   null,
+   {
+    "children": [
+     [
+      "$",
+      "$L3ae",
+      null,
+      {
+       "sections": [
+        {
+         "id": "overview",
+         "label": "Overview"
+        },
+        {
+         "id": "specs",
+         "label": "Specs"
+        },
+        {
+         "id": "instruction",
+         "label": "Instruction"
+        },
+        {
+         "id": "faq",
+         "label": "FAQ"
+        }
+       ]
+      }
+     ],
+     [
+      "$",
+      "$L3af",
+      null,
+      {
+       "id": "overview",
+       "isAnchor": true,
+       "mediaType": "video",
+       "mediaUrl": "https://store.bblcdn.com/4731f4c55a/d22ec9bc9568498b87244d6374b1b64e/MediaText_mediaUrl.mp4",
+       "mediaUrlMobile": "https://store.bblcdn.com/4731f4c55a/c6a0158fa0ab4e2683b930050cbc7984/MediaText_mediaUrlMobile.mp4",
+       "posterUrl": "https://store.bblcdn.com/4731f4c55a/3d16b4b608f84fa08e82f1ec8b0ac6c2/MediaText_posterUrl.jpg",
+       "posterUrlMobile": "https://store.bblcdn.com/4731f4c55a/8abbf315c921407d95b61ce08ecc539f/MediaText_posterUrlMobile.jpg",
+       "title": "Rethink Personal Manufacturing",
+       "titleComp": [
+        [
+         "$",
+         "div",
+         null,
+         {
+          "children": [
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": "Rethink"
+            }
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": "Personal Manufacturing"
+            }
+           ]
+          ]
+         }
+        ],
+        [
+         "$",
+         "div",
+         null,
+         {
+          "children": [
+           "$",
+           "div",
+           null,
+           {
+            "children": "Rethink Personal Manufacturing"
+           }
+          ]
+         }
+        ]
+       ],
+       "subtitle": "Bambu Lab H2D",
+       "button": {
+        "text": "Watch Video",
+        "mediaUrl": "https://store.bblcdn.com/4731f4c55a/6b7af6dfd00f4bf498fe2c38d1dbfcb9/tvc.mp4"
+       }
+      }
+     ],
+     [
+      "$",
+      "div",
+      null,
+      {
+       "children": [
+        [
+         "$",
+         "div",
+         null,
+         {
+          "id": "",
+          "children": [
+           [
+            "$",
+            "h2",
+            null,
+            {
+             "children": "Explore Dual-Nozzle Capabilities"
+            }
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": [
+              "$",
+              "div",
+              null,
+              {
+               "children": [
+                [
+                 "$",
+                 "$L3b0",
+                 null,
+                 {
+                  "position": 0,
+                  "title": "Flexible and rigid, low cost and exotic materials in one print",
+                  "subtitle": "Multi-material Printing",
+                  "image": {
+                   "src": "https://store.bblcdn.com/4731f4c55a/bd41b5bfcbfd427aa1c3db5ba6e3294e/FeatureBlock_1_src.jpg",
+                   "mobileSrc": "https://store.bblcdn.com/4731f4c55a/f3247d97d9a74a548682428d08b01429/FeatureBlock_1_mobileSrc.jpg",
+                   "alt": "",
+                   "height": 440
+                  }
+                 }
+                ],
+                [
+                 "$",
+                 "$L3b0",
+                 null,
+                 {
+                  "position": 1,
+                  "title": "Perfect supports with minimal waste, purging and reloading",
+                  "subtitle": "Dedicated Support Material",
+                  "image": {
+                   "src": "https://store.bblcdn.com/4731f4c55a/cd8069f3c58f433694e7eae305763ad8/FeatureBlock_2_src.jpg",
+                   "mobileSrc": "https://store.bblcdn.com/4731f4c55a/14e699e795df4a0481af1a8a26904777/FeatureBlock_2_mobileSrc.jpg",
+                   "alt": "",
+                   "height": 440
+                  }
+                 }
+                ],
+                [
+                 "$",
+                 "$L3b0",
+                 null,
+                 {
+                  "position": 2,
+                  "title": "Fast and efficient multi-color printing",
+                  "subtitle": "Efficient Multi-color Printing",
+                  "image": {
+                   "src": "https://store.bblcdn.com/4731f4c55a/d899fdef101546398aaa6bf889c93ffa/FeatureBlock_3_src.jpg",
+                   "mobileSrc": "https://store.bblcdn.com/4731f4c55a/9994cc953e164431b5a0d3fc3bea13c5/FeatureBlock_3_mobileSrc.jpg",
+                   "alt": "",
+                   "height": 440
+                  }
+                 }
+                ],
+                [
+                 "$",
+                 "$L3b1",
+                 null,
+                 {
+                  "textSource": [
+                   {
+                    "title": "Flexible and rigid, low cost and exotic materials in one print",
+                    "description": "Combine flexible and rigid materials in a single print to create impressive interlocking structures and innovative designs beyond traditional manufacturing. Pairing high-performance materials with standard ones further reduces costs and boosts material efficiency by using premium materials only where necessary.",
+                    "subtitle": "Multi-material Printing"
+                   },
+                   {
+                    "title": "Perfect supports with minimal waste, purging and reloading",
+                    "description": "Print with support is no longer a headache. With H2D’s dual-nozzle setup, one nozzle can be reserved for dedicated support material, allowing secured print and perfect support interface.",
+                    "subtitle": "Dedicated Support Material"
+                   },
+                   {
+                    "title": "Fast and efficient multi-color printing",
+                    "description": "Dual-nozzle printing reduces purge cycles in multi-color prints. H2D's smart algorithms optimize filament use, maximizing dual-nozzle efficiency to save time and materials.",
+                    "subtitle": "Efficient Multi-color Printing"
+                   }
+                  ],
+                  "source": [
+                   "https://store.bblcdn.com/4731f4c55a/afbc24b023734c14bd13f8b21f6928e7/FeatureBlock_Modal_1_pcSrc.jpg",
+                   "https://store.bblcdn.com/4731f4c55a/dd4772c94add454796ecca28c3447531/FeatureBlock_Modal_1_mobileSrc.jpg",
+                   "https://store.bblcdn.com/4731f4c55a/9281b024699646cab6bb16497a500b43/FeatureBlock_Modal_2_pcSrc.jpg",
+                   "https://store.bblcdn.com/4731f4c55a/618b17ae6cb74dab8d0a3d06b6f64007/FeatureBlock_Modal_2_mobileSrc.jpg",
+                   "https://store.bblcdn.com/4731f4c55a/27f9e4bab2cf4ab5ab9f62d38e249e87/FeatureBlock_Modal_3_pcSrc.jpg",
+                   "https://store.bblcdn.com/4731f4c55a/c38f31e96a5e4b7288cbb80da100fc6c/FeatureBlock_Modal_3_mobileSrc.jpg"
+                  ]
+                 }
+                ]
+               ]
+              }
+             ]
+            }
+           ]
+          ]
+         }
+        ],
+        [
+         "$",
+         "div",
+         null,
+         {
+          "id": "",
+          "children": [
+           [
+            "$",
+            "h2",
+            null,
+            {
+             "children": "All-in-one Solution For Personal Manufacturing"
+            }
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": [
+              "$",
+              "div",
+              null,
+              {
+               "children": [
+                [
+                 "$",
+                 "$L3b2",
+                 null,
+                 {
+                  "id": "image-carousel-1",
+                  "title": "Laser",
+                  "subtitle": "10W and 40W 455nm Laser for engraving & cutting",
+                  "items": [
+                   {
+                    "image": {
+                     "src": "https://store.bblcdn.com/4731f4c55a/8236f127185741849043300c86af4b90/ImageCarousel_1_src_3.jpg",
+                     "mobileSrc": "https://store.bblcdn.com/4731f4c55a/d8acbaec2c3441ecbc7c6fe02e24de2e/ImageCarousel_1_mobileSrc_3.jpg",
+                     "alt": ""
+                    },
+                    "note": "Automata by @Ross McSweeney",
+                    "noteClassName": "text-grey-2"
+                   },
+                   {
+                    "image": {
+                     "src": "https://store.bblcdn.com/4731f4c55a/28365ef9c8b64a6b971b3b734d5e862f/ImageCarousel_1_src_2.jpg",
+                     "mobileSrc": "https://store.bblcdn.com/4731f4c55a/62ec69fd581940a6b269917c395ee52d/ImageCarousel_1_mobileSrc_2.jpg",
+                     "alt": ""
+                    }
+                   },
+                   {
+                    "image": {
+                     "src": "https://store.bblcdn.com/4731f4c55a/d2fea0760e7a4408b6bf1f82f8ebf0c1/ImageCarousel_1_src_1.jpg",
+                     "mobileSrc": "https://store.bblcdn.com/4731f4c55a/c261d01cd1484274af4804d2ea821d6c/ImageCarousel_1_mobileSrc_1.jpg",
+                     "alt": ""
+                    }
+                   }
+                  ]
+                 }
+                ],
+                [
+                 "$",
+                 "$L3b2",
+                 null,
+                 {
+                  "id": "image-carousel-2",
+                  "title": "Digital Cutting",
+                  "subtitle": "Precise cutting on variety of materials",
+                  "items": [
+                   {
+                    "image": {
+                     "src": "https://store.bblcdn.com/4731f4c55a/df7f148f6043440cbe29506d30519f85/ImageCarousel_2_src_4.jpg",
+                     "mobileSrc": "https://store.bblcdn.com/4731f4c55a/74826fe8540d47238496f524d64669e4/ImageCarousel_2_mobileSrc_4.jpg",
+                     "alt": ""
+                    },
+                    "note": "By @popupcardKagisippo",
+                    "noteClassName": "text-grey-2"
+                   },
+                   {
+                    "image": {
+                     "src": "https://store.bblcdn.com/4731f4c55a/45ec7a88b4e943a4a68538bf38619728/ImageCarousel_2_src_3.jpg",
+                     "mobileSrc": "https://store.bblcdn.com/4731f4c55a/7ac258900f9c4c3d91c644ae29c64eb1/ImageCarousel_2_mobileSrc_3.jpg",
+                     "alt": ""
+                    }
+                   },
+                   {
+                    "image": {
+                     "src": "https://store.bblcdn.com/4731f4c55a/fb2aa3990dcb4e31b0ed1ef78e422091/ImageCarousel_2_src_1.jpg",
+                     "mobileSrc": "https://store.bblcdn.com/4731f4c55a/641fe958d759485bbfdfaf504e188516/ImageCarousel_2_mobileSrc_1.jpg",
+                     "alt": ""
+                    }
+                   },
+                   {
+                    "image": {
+                     "src": "https://store.bblcdn.com/4731f4c55a/783d9dcbc9c84899b73c789e27bad284/ImageCarousel_2_src_2.jpg",
+                     "mobileSrc": "https://store.bblcdn.com/4731f4c55a/a2c124b3bb1549019d43dc26365f3d69/ImageCarousel_2_mobileSrc_2.jpg",
+                     "alt": ""
+                    }
+                   }
+                  ]
+                 }
+                ],
+                [
+                 "$",
+                 "$L3b2",
+                 null,
+                 {
+                  "id": "image-carousel-3",
+                  "title": "Pen Drawing",
+                  "subtitle": "Drawing and writing",
+                  "items": [
+                   {
+                    "image": {
+                     "src": "https://store.bblcdn.com/4731f4c55a/4a0255a8ed554dcda478e2378c0cb27e/ImageCarousel_3_src_1.jpg",
+                     "mobileSrc": "https://store.bblcdn.com/4731f4c55a/bdbc6bbffa204cf0982aa3400b690661/ImageCarousel_3_mobileSrc_1.jpg",
+                     "alt": ""
+                    }
+                   },
+                   {
+                    "image": {
+                     "src": "https://store.bblcdn.com/4731f4c55a/7de35bee5f9e4abca5058c7229b25d6e/ImageCarousel_3_src_2.jpg",
+                     "mobileSrc": "https://store.bblcdn.com/4731f4c55a/6cbff90a4b5c4555903bc509fc30d90d/ImageCarousel_3_mobileSrc_2.jpg",
+                     "alt": ""
+                    }
+                   }
+                  ]
+                 }
+                ],
+                [
+                 "$",
+                 "div",
+                 null,
+                 {
+                  "children": [
+                   [
+                    "$",
+                    "div",
+                    null,
+                    {
+                     "children": [
+                      [
+                       "$",
+                       "div",
+                       null,
+                       {
+                        "children": [
+                         [
+                          "$",
+                          "div",
+                          null,
+                          {
+                           "children": [
+                            [
+                             [
+                              "$",
+                              "$L3b3",
+                              null,
+                              {
+                               "src": "https://store.bblcdn.com/4731f4c55a/1ed5d990e3f64386856b9c19e228d573/ImageTextBlock_1_Video_mobileSrc.mp4",
+                               "width": 1200,
+                               "height": 676
+                              }
+                             ],
+                             [
+                              "$",
+                              "$L3b3",
+                              null,
+                              {
+                               "src": "https://store.bblcdn.com/4731f4c55a/8e330017c2ed4044bd125e595ab7c941/ImageTextBlock_1_Video_pcSrc.mp4",
+                               "width": 1200,
+                               "height": 676
+                              }
+                             ]
+                            ],
+                            null
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "div",
+                          null,
+                          {
+                           "children": [
+                            "$",
+                            "div",
+                            null,
+                            {
+                             "children": [
+                              [
+                               "$",
+                               "div",
+                               null,
+                               {
+                                "children": [
+                                 [
+                                  "$",
+                                  "div",
+                                  null,
+                                  {
+                                   "children": "Live Spatial Alignment"
+                                  }
+                                 ],
+                                 [
+                                  "$",
+                                  "div",
+                                  null,
+                                  {
+                                   "children": "What-You-See-Is-What-You-Get"
+                                  }
+                                 ]
+                                ]
+                               }
+                              ],
+                              [
+                               "$",
+                               "div",
+                               null,
+                               {
+                                "children": "The H2D’s BirdsEye camera, combined with computer vision algorithms, delivers top-view alignment accuracy up to 0.3mm. This advanced spatial alignment allows users to place the tool path at the right position on the material – truly \"what-you-see-is-what-you-get.\"*"
+                               }
+                              ]
+                             ]
+                            }
+                           ]
+                          }
+                         ]
+                        ]
+                       }
+                      ],
+                      null
+                     ]
+                    }
+                   ],
+                   [
+                    "$",
+                    "div",
+                    null,
+                    {
+                     "children": [
+                      [
+                       "$",
+                       "div",
+                       null,
+                       {
+                        "children": [
+                         [
+                          "$",
+                          "div",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "$L3b4",
+                             null,
+                             {
+                              "checkText": "Arrange",
+                              "source": [
+                               "https://store.bblcdn.com/4731f4c55a/49359b2398c24b818282ce006ff52463/ImageTextBlock_2_Radio_Image_2_mobileSrc.jpg",
+                               "https://store.bblcdn.com/4731f4c55a/c31475acf1b64b54822c6f62a6ea6d60/ImageTextBlock_2_Radio_Image_2_pcSrc.jpg",
+                               "https://store.bblcdn.com/4731f4c55a/f765ce03818e4402bf9c18ef6ef2fc5d/ImageTextBlock_2_Radio_Image_1_mobileSrc.jpg",
+                               "https://store.bblcdn.com/4731f4c55a/9058732103044fffb1e19b9746de822b/ImageTextBlock_2_Radio_Image_1_pcSrc.jpg"
+                              ]
+                             }
+                            ],
+                            null
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "div",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "span",
+                             null,
+                             {
+                              "children": "Auto Arrangement"
+                             }
+                            ],
+                            [
+                             "$",
+                             "h2",
+                             null,
+                             {
+                              "children": "Maximize material efficiency, minimize waste"
+                             }
+                            ],
+                            [
+                             "$",
+                             "p",
+                             null,
+                             {
+                              "children": "Leveraging real-time images from the BirdsEye camera, Bambu Suite can automatically arrange your project according to the shape of your material, i.e left over plywood from the previous project. This feature helps you to get the most out of every material."
+                             }
+                            ]
+                           ]
+                          }
+                         ]
+                        ]
+                       }
+                      ],
+                      null
+                     ]
+                    }
+                   ],
+                   [
+                    "$",
+                    "div",
+                    null,
+                    {
+                     "id": "",
+                     "children": [
+                      [
+                       "$",
+                       "h2",
+                       null,
+                       {
+                        "children": "Don’t Worry About Safety – We’ve Got You Covered"
+                       }
+                      ],
+                      [
+                       "$",
+                       "div",
+                       null,
+                       {
+                        "children": [
+                         "$",
+                         "div",
+                         null,
+                         {
+                          "children": [
+                           [
+                            "$",
+                            "div",
+                            null,
+                            {
+                             "children": [
+                              [
+                               [
+                                "$",
+                                "$Ld0",
+                                null,
+                                {
+                                 "src": "https://store.bblcdn.com/4731f4c55a/079fcf600b534be1b5ed187b0d630fed/Laser_Protective_mobileSrc.jpg",
+                                 "fill": null,
+                                 "alt": "",
+                                 "width": 1200,
+                                 "height": 870
+                                }
+                               ],
+                               [
+                                "$",
+                                "$Ld0",
+                                null,
+                                {
+                                 "src": "https://store.bblcdn.com/4731f4c55a/4686ccb20f8a4077bfccb342ac18ce62/Laser_Protective_pcSrc.jpg",
+                                 "fill": null,
+                                 "alt": "",
+                                 "width": 1200,
+                                 "height": 870
+                                }
+                               ]
+                              ],
+                              [
+                               "$",
+                               "div",
+                               null,
+                               {
+                                "children": [
+                                 [
+                                  "$",
+                                  "div",
+                                  null,
+                                  {
+                                   "children": "Laser Safety Windows"
+                                  }
+                                 ],
+                                 [
+                                  "$",
+                                  "div",
+                                  null,
+                                  {
+                                   "children": "Operate and monitor laser projects safely without the need for goggles, thanks to our safety windows."
+                                  }
+                                 ]
+                                ]
+                               }
+                              ]
+                             ]
+                            }
+                           ],
+                           [
+                            "$",
+                            "div",
+                            null,
+                            {
+                             "children": [
+                              [
+                               [
+                                "$",
+                                "$Ld0",
+                                null,
+                                {
+                                 "src": "https://store.bblcdn.com/4731f4c55a/4462b13dc5ba49bb8ed328409b727b1a/Air_Purifier_mobileSrc.jpg",
+                                 "fill": null,
+                                 "alt": "",
+                                 "width": 1200,
+                                 "height": 870
+                                }
+                               ],
+                               [
+                                "$",
+                                "$Ld0",
+                                null,
+                                {
+                                 "src": "https://store.bblcdn.com/4731f4c55a/c00a8952def4427784e8e335bf7281dc/Air_Purifier_pcSrc.jpg",
+                                 "fill": null,
+                                 "alt": "",
+                                 "width": 1200,
+                                 "height": 870
+                                }
+                               ]
+                              ],
+                              [
+                               "$",
+                               "div",
+                               null,
+                               {
+                                "children": [
+                                 [
+                                  "$",
+                                  "div",
+                                  null,
+                                  {
+                                   "children": "Air Purifier"
+                                  }
+                                 ],
+                                 [
+                                  "$",
+                                  "div",
+                                  null,
+                                  {
+                                   "children": "An optional air purifier ensures clean air, even during indoor laser operations.*"
+                                  }
+                                 ]
+                                ]
+                               }
+                              ]
+                             ]
+                            }
+                           ]
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     ]
+                    }
+                   ],
+                   [
+                    "$",
+                    "div",
+                    null,
+                    {
+                     "id": "",
+                     "children": [
+                      [
+                       "$",
+                       "h2",
+                       null,
+                       {
+                        "children": "Don’t Worry About the Settings – We’ve Got It Covered"
+                       }
+                      ],
+                      [
+                       "$",
+                       "div",
+                       null,
+                       {
+                        "children": [
+                         "$",
+                         "div",
+                         null,
+                         {
+                          "children": [
+                           [
+                            "$",
+                            "div",
+                            null,
+                            {
+                             "children": [
+                              [
+                               [
+                                "$",
+                                "$Ld0",
+                                null,
+                                {
+                                 "src": "https://store.bblcdn.com/4731f4c55a/1349a7be9ff941669b0d5fd24148d997/Full_Auto_mobileSrc.jpg",
+                                 "fill": null,
+                                 "alt": "",
+                                 "width": 1200,
+                                 "height": 870
+                                }
+                               ],
+                               [
+                                "$",
+                                "$Ld0",
+                                null,
+                                {
+                                 "src": "https://store.bblcdn.com/4731f4c55a/e66adb0c07084260a0abdc6430090265/Full_Auto_pcSrc.jpg",
+                                 "fill": null,
+                                 "alt": "",
+                                 "width": 1200,
+                                 "height": 870
+                                }
+                               ]
+                              ],
+                              [
+                               "$",
+                               "div",
+                               null,
+                               {
+                                "children": [
+                                 [
+                                  "$",
+                                  "div",
+                                  null,
+                                  {
+                                   "children": "Full-auto Calibration"
+                                  }
+                                 ],
+                                 [
+                                  "$",
+                                  "div",
+                                  null,
+                                  {
+                                   "children": "A single tap initiates automated laser focus verification and material measurement, eliminating manual adjustments."
+                                  }
+                                 ]
+                                ]
+                               }
+                              ]
+                             ]
+                            }
+                           ],
+                           [
+                            "$",
+                            "div",
+                            null,
+                            {
+                             "children": [
+                              [
+                               [
+                                "$",
+                                "$Ld0",
+                                null,
+                                {
+                                 "src": "https://store.bblcdn.com/4731f4c55a/113a2bc1deb84589b8ca7f543f4d2114/Material_CodeSync_mobileSrc.jpg",
+                                 "fill": null,
+                                 "alt": "",
+                                 "width": 1200,
+                                 "height": 870
+                                }
+                               ],
+                               [
+                                "$",
+                                "$Ld0",
+                                null,
+                                {
+                                 "src": "https://store.bblcdn.com/4731f4c55a/3deb40723acb44b1b656eb8b629916f8/Material_CodeSync_pcSrc.jpg",
+                                 "fill": null,
+                                 "alt": "",
+                                 "width": 1200,
+                                 "height": 870
+                                }
+                               ]
+                              ],
+                              [
+                               "$",
+                               "div",
+                               null,
+                               {
+                                "children": [
+                                 [
+                                  "$",
+                                  "div",
+                                  null,
+                                  {
+                                   "children": "Material CodeSync"
+                                  }
+                                 ],
+                                 [
+                                  "$",
+                                  "div",
+                                  null,
+                                  {
+                                   "children": "The H2D automatically scans the QR code on your material to load the perfect preset.*"
+                                  }
+                                 ]
+                                ]
+                               }
+                              ]
+                             ]
+                            }
+                           ]
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     ]
+                    }
+                   ],
+                   [
+                    "$",
+                    "div",
+                    null,
+                    {
+                     "id": "",
+                     "children": [
+                      [
+                       "$",
+                       "h2",
+                       null,
+                       {
+                        "children": "A Serious Laser Machine"
+                       }
+                      ],
+                      [
+                       "$",
+                       "div",
+                       null,
+                       {
+                        "children": [
+                         "$",
+                         "div",
+                         null,
+                         {
+                          "children": [
+                           [
+                            "$",
+                            "div",
+                            null,
+                            {
+                             "children": [
+                              [
+                               [
+                                "$",
+                                "$Ld0",
+                                null,
+                                {
+                                 "src": "https://store.bblcdn.com/4731f4c55a/6fb1051b920644f3ab5603aa63823ffb/Air_Assist_mobileSrc.jpg",
+                                 "fill": null,
+                                 "alt": "",
+                                 "width": 1200,
+                                 "height": 870
+                                }
+                               ],
+                               [
+                                "$",
+                                "$Ld0",
+                                null,
+                                {
+                                 "src": "https://store.bblcdn.com/4731f4c55a/9c58b60ebec54a4bba4f3cb7173fbe09/Air_Assist_pcSrc.jpg",
+                                 "fill": null,
+                                 "alt": "",
+                                 "width": 1200,
+                                 "height": 870
+                                }
+                               ]
+                              ],
+                              [
+                               "$",
+                               "div",
+                               null,
+                               {
+                                "children": [
+                                 [
+                                  "$",
+                                  "div",
+                                  null,
+                                  {
+                                   "children": "Air Assist"
+                                  }
+                                 ],
+                                 [
+                                  "$",
+                                  "div",
+                                  null,
+                                  {
+                                   "children": "Improve surface quality by directing high-speed air to cool the laser path, ensuring cleaner and more precise results."
+                                  }
+                                 ]
+                                ]
+                               }
+                              ]
+                             ]
+                            }
+                           ],
+                           [
+                            "$",
+                            "div",
+                            null,
+                            {
+                             "children": [
+                              [
+                               [
+                                "$",
+                                "$Ld0",
+                                null,
+                                {
+                                 "src": "https://store.bblcdn.com/4731f4c55a/b9088371a8df4d75ad1310d6147efce9/Contact_Less_mobileSrc.jpg",
+                                 "fill": null,
+                                 "alt": "",
+                                 "width": 1200,
+                                 "height": 870
+                                }
+                               ],
+                               [
+                                "$",
+                                "$Ld0",
+                                null,
+                                {
+                                 "src": "https://store.bblcdn.com/4731f4c55a/3814c69778ae4f22b9584eedf19089eb/Contact_Less_pcSrc.jpg",
+                                 "fill": null,
+                                 "alt": "",
+                                 "width": 1200,
+                                 "height": 870
+                                }
+                               ]
+                              ],
+                              [
+                               "$",
+                               "div",
+                               null,
+                               {
+                                "children": [
+                                 [
+                                  "$",
+                                  "div",
+                                  null,
+                                  {
+                                   "children": "Contact-less 3D Mesh*"
+                                  }
+                                 ],
+                                 [
+                                  "$",
+                                  "div",
+                                  null,
+                                  {
+                                   "children": "Advanced optical height measurement creates a detailed 3D mesh without physical contact, enabling precise laser work on curved surfaces."
+                                  }
+                                 ]
+                                ]
+                               }
+                              ]
+                             ]
+                            }
+                           ]
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     ]
+                    }
+                   ]
+                  ]
+                 }
+                ]
+               ]
+              }
+             ]
+            }
+           ]
+          ]
+         }
+        ],
+        [
+         "$",
+         "div",
+         null,
+         {
+          "id": "",
+          "children": [
+           [
+            "$",
+            "h2",
+            null,
+            {
+             "children": "Go Big, Go Fast, Go Precise"
+            }
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": [
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       [
+                        [
+                         "$",
+                         "$L3b3",
+                         null,
+                         {
+                          "src": "https://store.bblcdn.com/4731f4c55a/83a6905a33b5471893dd1127351795a5/Vision_Encoder_Video_pcSrc.mp4",
+                          "width": 1200,
+                          "height": 675
+                         }
+                        ],
+                        [
+                         "$",
+                         "$L3b3",
+                         null,
+                         {
+                          "src": "https://store.bblcdn.com/4731f4c55a/c9a1a444d3c4498cbb9aa0f4b02ef9f0/Vision_Encoder_Video_mobileSrc.mp4",
+                          "width": 1200,
+                          "height": 675
+                         }
+                        ]
+                       ],
+                       null
+                      ]
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       "$",
+                       "div",
+                       null,
+                       {
+                        "children": [
+                         [
+                          "$",
+                          "div",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "div",
+                             null,
+                             {
+                              "children": "Our Secret Weapon:Vision Encoder"
+                             }
+                            ],
+                            [
+                             "$",
+                             "div",
+                             null,
+                             {
+                              "children": "50µm ultra-fine motion accuracy*"
+                             }
+                            ]
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "div",
+                          null,
+                          {
+                           "children": "An ultra-accurate vision encoder plate, combined with 5µm resolution optical measurements to track and correct toolhead motion, enables the H2D to achieve consistent and reliable distance-independent 50μm motion accuracy across the entire workspace, one order of magnitude better than its predecessor. (*Vision Encoder sold separately)"
+                          }
+                         ]
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 null
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       [
+                        "$",
+                        "$L3b5",
+                        null,
+                        {
+                         "images": [
+                          {
+                           "mobileSrc": "https://store.bblcdn.com/s7/default/3ab7a0bd031048758e157da5aa9edeff/max-mo.jpg",
+                           "src": "https://store.bblcdn.com/s7/default/94b66c66456443c59c45f0a8c1c705f3/max-pc.jpg",
+                           "width": 588,
+                           "height": 600,
+                           "alt": "",
+                           "title": "Max"
+                          },
+                          {
+                           "mobileSrc": "https://store.bblcdn.com/4731f4c55a/43f84bc45d48472a8cea1451fae8feb7/King_Size_Image_2_mobileSrc.jpg",
+                           "src": "https://store.bblcdn.com/4731f4c55a/244cf93a123e4a76877f6d19548128eb/King_Size_Image_2_pcSrc.jpg",
+                           "width": 588,
+                           "height": 600,
+                           "alt": "",
+                           "title": "Single-nozzle"
+                          },
+                          {
+                           "mobileSrc": "https://store.bblcdn.com/s7/default/1b824af720244b2d9eb138698439eecc/dual-mo.jpg",
+                           "src": "https://store.bblcdn.com/s7/default/4b5595af53ba41e2abe4937b04b28e2f/dual-pc.jpg",
+                           "width": 588,
+                           "height": 600,
+                           "alt": "",
+                           "title": "Dual-nozzle"
+                          },
+                          {
+                           "mobileSrc": "https://store.bblcdn.com/4731f4c55a/36e4132eed2c4f8d8184d168a70f5544/King_Size_Image_4_mobileSrc.jpg",
+                           "src": "https://store.bblcdn.com/4731f4c55a/6ebec3ae229243e2b08fb723947fca5e/King_Size_Image_4_pcSrc.jpg",
+                           "width": 588,
+                           "height": 600,
+                           "alt": "",
+                           "title": "X1C"
+                          }
+                         ]
+                        }
+                       ],
+                       null
+                      ]
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       [
+                        "$",
+                        "span",
+                        null,
+                        {
+                         "children": "King-size Work Zone"
+                        }
+                       ],
+                       [
+                        "$",
+                        "h2",
+                        null,
+                        {
+                         "children": "Break free from size constraints"
+                        }
+                       ],
+                       [
+                        "$",
+                        "p",
+                        null,
+                        {
+                         "children": "With a print volume up to 350mm×320mm×325mm*, creating large-scale projects has never been easier! From laser engraving on sizable objects to printing oversized models, the expanded capacity empowers you to bring even your most ambitious ideas to life."
+                        }
+                       ]
+                      ]
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 null
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       [
+                        "$",
+                        "$L3b6",
+                        null,
+                        {
+                         "images": [
+                          {
+                           "mobileSrc": "https://store.bblcdn.com/4731f4c55a/bca2d299c1b547738518ed9c5dda7cf5/Chamber_Heating_1_mobileSrc.jpg",
+                           "src": "https://store.bblcdn.com/4731f4c55a/549efa60c99d430289ca5e08bebfd07c/Chamber_Heating_1_pcSrc.jpg",
+                           "width": 588,
+                           "height": 638,
+                           "alt": "",
+                           "title": "High-temp Hotend"
+                          },
+                          {
+                           "mobileSrc": "https://store.bblcdn.com/4731f4c55a/59ae4fa6bded48f998932811508b481e/Chamber_Heating_2_mobileSrc.jpg",
+                           "src": "https://store.bblcdn.com/4731f4c55a/717e1436a8444fbd9927be5e8a674815/Chamber_Heating_2_pcSrc.jpg",
+                           "width": 588,
+                           "height": 638,
+                           "alt": "",
+                           "title": "Chamber Heating"
+                          }
+                         ]
+                        }
+                       ],
+                       null
+                      ]
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       [
+                        "$",
+                        "span",
+                        null,
+                        {
+                         "children": "350°C Hotend & 65°C Chamber Heating"
+                        }
+                       ],
+                       [
+                        "$",
+                        "h2",
+                        null,
+                        {
+                         "children": "Unleash the full potential of high-performance materials"
+                        }
+                       ],
+                       [
+                        "$",
+                        "p",
+                        null,
+                        {
+                         "children": "Equipped with 65°C active chamber heating and a high-temperature hotend reaching up to 350°C, the H2D delivers precise closed-loop temperature control. This advanced system effectively eliminates warping and deformation in high-performance materials, ensuring superior layer bonding and maximizing their full potential."
+                        }
+                       ]
+                      ]
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 null
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       [
+                        [
+                         "$",
+                         "$Ld0",
+                         null,
+                         {
+                          "src": "https://store.bblcdn.com/4731f4c55a/8a38bd06fd8f4eb181765393ffa78f72/REAL_High_Flow_Hotend_mobileSrc.jpg",
+                          "fill": null,
+                          "alt": "",
+                          "width": 1200,
+                          "height": 870
+                         }
+                        ],
+                        [
+                         "$",
+                         "$Ld0",
+                         null,
+                         {
+                          "src": "https://store.bblcdn.com/4731f4c55a/200153eb96ec49c3b6e66415159b69c3/REAL_High_Flow_Hotend_pcSrc.jpg",
+                          "fill": null,
+                          "alt": "",
+                          "width": 1200,
+                          "height": 870
+                         }
+                        ]
+                       ],
+                       null
+                      ]
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       "$",
+                       "div",
+                       null,
+                       {
+                        "children": [
+                         [
+                          "$",
+                          "div",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "div",
+                             null,
+                             {
+                              "children": "REAL High-Flow Hotend*"
+                             }
+                            ],
+                            [
+                             "$",
+                             "div",
+                             null,
+                             {
+                              "children": "Consistently print at 600mm/s with ease"
+                             }
+                            ]
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "div",
+                          null,
+                          {
+                           "children": "The H2D’s purpose-built high-flow hotend ensures reliable, high-speed printing at 600mm/s. Designed for consistent performance, it eliminates mid-print flow rate restrictions, enabling uninterrupted high-speed printing regardless of the print size or complexity.*"
+                          }
+                         ]
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 null
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       [
+                        [
+                         "$",
+                         "$L3b3",
+                         null,
+                         {
+                          "src": "https://store.bblcdn.com/4731f4c55a/37c5ea0cbe924abab4060ab99891e69f/DynaSense_Extruder_Video_mobileSrc_PCSrc.mp4",
+                          "width": 1200
+                         }
+                        ],
+                        [
+                         "$",
+                         "$L3b3",
+                         null,
+                         {
+                          "src": "https://store.bblcdn.com/4731f4c55a/37c5ea0cbe924abab4060ab99891e69f/DynaSense_Extruder_Video_mobileSrc_PCSrc.mp4",
+                          "width": 1200,
+                          "height": 675
+                         }
+                        ]
+                       ],
+                       null
+                      ]
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       "$",
+                       "div",
+                       null,
+                       {
+                        "children": [
+                         [
+                          "$",
+                          "div",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "div",
+                             null,
+                             {
+                              "children": "DynaSense Extruder"
+                             }
+                            ],
+                            [
+                             "$",
+                             "div",
+                             null,
+                             {
+                              "children": "Intelligent sensing for precise extrusion control"
+                             }
+                            ]
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "div",
+                          null,
+                          {
+                           "children": "Bambu Lab's proprietary PMSM servo architecture establishes an intelligent extrusion governance system. It executes 20kHz Torque/Resistance and position sampling to dynamically modulate electromagnetic torque vectors. Stabilizing extrusion and detecting filament grinding and clogging. "
+                          }
+                         ]
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 null
+                ]
+               }
+              ]
+             ]
+            }
+           ]
+          ]
+         }
+        ],
+        [
+         "$",
+         "div",
+         null,
+         {
+          "id": "",
+          "children": [
+           [
+            "$",
+            "h2",
+            null,
+            {
+             "children": "A Smarter, Safer Experience"
+            }
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {
+             "children": [
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       [
+                        "$",
+                        "$L3b7",
+                        null,
+                        {
+                         "images": [
+                          {
+                           "hoverSrc": "https://store.bblcdn.com/4731f4c55a/a9d43c1c4c6f42d8a2cfe3a28df1fc3f/Nozzle_Camera_1_pcSrc.jpg",
+                           "hoverMobileSrc": "https://store.bblcdn.com/4731f4c55a/efb3291b6b46417f8c13a22f4ced291a/Nozzle_Camera_1_mobileSrc.jpg",
+                           "alt": "",
+                           "label": "Nozzle Clumping"
+                          },
+                          {
+                           "hoverSrc": "https://store.bblcdn.com/4731f4c55a/b716368ccf3c45938a05829f7da5cca7/Nozzle_Camera_2_pcSrc.jpg",
+                           "hoverMobileSrc": "https://store.bblcdn.com/s1/default/ee834f90c0f04385903b4fabe8c802e8/Nozzle_Camera_2_mobileSrc.jpg",
+                           "alt": "",
+                           "label": "Air Printing"
+                          },
+                          {
+                           "hoverSrc": "https://store.bblcdn.com/4731f4c55a/9598a2deb0fe4183bf94171ff80b6022/Nozzle_Camera_3_pcSrc.jpg",
+                           "hoverMobileSrc": "https://store.bblcdn.com/4731f4c55a/85e9486603e74e4a81a26240b9f9d2ac/Nozzle_Camera_3_mobileSrc.jpg",
+                           "alt": "",
+                           "label": "Spaghetti"
+                          }
+                         ]
+                        }
+                       ],
+                       null
+                      ]
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       "$",
+                       "div",
+                       null,
+                       {
+                        "children": [
+                         [
+                          "$",
+                          "div",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "div",
+                             null,
+                             {
+                              "children": "Nozzle Camera"
+                             }
+                            ],
+                            [
+                             "$",
+                             "div",
+                             null,
+                             {
+                              "children": "Monitor extrusion at the nozzle tip"
+                             }
+                            ]
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "div",
+                          null,
+                          {
+                           "children": "The H2D features an AI-backed nozzle camera with macro lens. This intelligent monitoring system continuously tracks extrusion patterns, immediately detecting material accumulation, filament deviations, and extrusion failures."
+                          }
+                         ]
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 null
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       [
+                        [
+                         "$",
+                         "$Ld0",
+                         null,
+                         {
+                          "src": "https://store.bblcdn.com/4731f4c55a/f3ca3491b546466ca0aab31310b63ef6/Peace_Mind_mobileSrc.jpg",
+                          "fill": null,
+                          "alt": "",
+                          "width": 1200,
+                          "height": 870
+                         }
+                        ],
+                        [
+                         "$",
+                         "$Ld0",
+                         null,
+                         {
+                          "src": "https://store.bblcdn.com/4731f4c55a/0a6eabd1d08e4184a813c545d6d89e47/Peace_Mind_pcSrc.jpg",
+                          "fill": null,
+                          "alt": "",
+                          "width": 1200,
+                          "height": 870
+                         }
+                        ]
+                       ],
+                       null
+                      ]
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       "$",
+                       "div",
+                       null,
+                       {
+                        "children": [
+                         [
+                          "$",
+                          "div",
+                          null,
+                          {
+                           "children": [
+                            [
+                             "$",
+                             "div",
+                             null,
+                             {
+                              "children": "Pre-Flight Checklist by AI"
+                             }
+                            ],
+                            [
+                             "$",
+                             "div",
+                             null,
+                             {
+                              "children": "Peace of mind, every time you print"
+                             }
+                            ]
+                           ]
+                          }
+                         ],
+                         [
+                          "$",
+                          "div",
+                          null,
+                          {
+                           "children": "Prior to each operational cycle, H2D's vision system initiates a comprehensive pre-flight checklist: Chamber Integrity Scan – Detects debris across the entire print surface. Hardware Configuration Audit – Instantly identifies nozzle dimensions and build plate properties. Digital-Physical Alignment – Automatically verifies consistency between detected hardware specifications and active slicer parameters."
+                          }
+                         ]
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 null
+                ]
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       [
+                        [
+                         "$",
+                         "$Ld0",
+                         null,
+                         {
+                          "src": "https://store.bblcdn.com/4731f4c55a/3b9fcff3fed84bdd9ab41a220521aa24/Sensor_mobileSrc.jpg",
+                          "fill": null,
+                          "alt": "",
+                          "loading": "eager",
+                          "width": 588,
+                          "height": 638
+                         }
+                        ],
+                        [
+                         "$",
+                         "$Ld0",
+                         null,
+                         {
+                          "src": "https://store.bblcdn.com/4731f4c55a/f6b6b9d6f1c74e4cb3482994e7b5e2b3/Sensor_pcSrc.jpg",
+                          "fill": null,
+                          "alt": "",
+                          "loading": "eager",
+                          "width": 588,
+                          "height": 638
+                         }
+                        ]
+                       ],
+                       null
+                      ]
+                     }
+                    ],
+                    [
+                     "$",
+                     "div",
+                     null,
+                     {
+                      "children": [
+                       [
+                        "$",
+                        "span",
+                        null,
+                        {
+                         "children": "SOTA Filament Monitoring"
+                        }
+                       ],
+                       [
+                        "$",
+                        "h2",
+                        null,
+                        {
+                         "children": "15 sensors on one filament path"
+                        }
+                       ],
+                       [
+                        "$",
+                        "p",
+                        null,
+                        {
+                         "children": "Unlike legacy systems with single filament run-out detectors, the H2D features comprehensive material flow monitoring. Throughout the AMS-to-nozzle path, 15 strategic sensors form an intelligent network, continuously tracking five key parameters: feeding velocity, tension, filament tip location, extruder thermal environment, and dynamic extrusion pressure. This establishes an industry-leading filament behavior control system."
+                        }
+                       ]
+                      ]
+                     }
+                    ]
+                   ]
+                  }
+                 ],
+                 [
+                  "$",
+                  "div",
+                  null,
+                  {
+                   "children": [
+                    "$",
+                    "a",
+                    null,
+                    {
+                     "href": "https://bambulab.com/h2d",
+                     "target": "_blank",
+                     "children": [
+                      "$",
+                      "button",
+                      null,
+                      {
+                       "children": [
+                        [
+                         "$",
+                         "span",
+                         null,
+                         {
+                          "children": "Learn More"
+                         }
+                        ],
+                        [
+                         "$",
+                         "svg",
+                         null,
+                         {
+                          "xmlns": "http://www.w3.org/2000/svg",
+                          "width": 6,
+                          "height": 16,
+                          "fill": "none",
+                          "children": [
+                           "$",
+                           "path",
+                           null,
+                           {
+                            "stroke": "#F5F5F5",
+                            "strokeLinecap": "round",
+                            "d": "M.5 4.5 4.3 8 .5 11.5"
+                           }
+                          ]
+                         }
+                        ]
+                       ]
+                      }
+                     ]
+                    }
+                   ]
+                  }
+                 ]
+                ]
+               }
+              ]
+             ]
+            }
+           ]
+          ]
+         }
+        ],
+        [
+         "$",
+         "div",
+         null,
+         {
+          "children": [
+           [
+            "$",
+            "div",
+            null,
+            {
+             "id": "specs",
+             "children": [
+              [
+               "$",
+               "h2",
+               null,
+               {
+                "children": "H2D Specs"
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 "$",
+                 "$L3b8",
+                 null,
+                 {
+                  "link": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+                  "collapseTable": "<table>     <thead>         <tr>             <th colspan=\"2\">Item</th>             <th>Specification</th>         </tr>     </thead>     <tbody>         <tr>             <td colspan=\"2\">Printing Technology</td>             <td>Fused Deposition Modeling</td>         </tr>         <tr>             <td rowspan=\"4\">Body</td>             <td>Build Volume (W*D*H)</td>             <td>                 <div>Single Nozzle Printing: 325*320*325 mm³</div>                 <div>Dual Nozzle Printing: 300*320*325 mm³</div>                 <div>Total Volume for Two Nozzles: 350*320*325 mm³</div>             </td>         </tr>         <tr>             <td>Chassis & Shell</td>             <td>Aluminum, Steel, Plastic and Glass</td>         </tr>         <tr>             <td>Laser Safety Windows</td>             <td>Equipped on Laser Edition, normal H2D can upgrade through                 Laser Upgrade Kit</td>         </tr>         <tr>             <td>Air Assist Pump</td>             <td>Equipped on Laser Edition, normal H2D can upgrade through                 Laser Upgrade Kit</td>         </tr>         <tr>             <td rowspan=\"2\">Physical Dimensions</td>             <td>Physical Dimensions</td>             <td>492*514*626 mm³(Package Size: 580*605*750mm)</div><div>700*700*1100 mm³ (Recommended Space for Printer)</div></td>         </tr>         <tr>             <td>Net Weight</td>             <td>31 kg<br>(Gross weight: H2D: 40.6 kg; H2D AMS Combo: 44.2 kg;<br>H2D Laser Full Combo: 48.2 kg)</td>         </tr>         <tr>             <td rowspan=\"8\">Toolhead</td>             <td>Hotend</td>             <td>All Metal</td>         </tr>         <tr>             <td>Extruder Gear</td>             <td>Hardened Steel</td>         </tr>         <tr>             <td>Nozzle</td>             <td>Hardened Steel</td>         </tr>         <tr>             <td>Max Nozzle Temperature</td>             <td>350 °C</td>         </tr>         <tr>             <td>Included Nozzle Diameter</td>             <td>0.4 mm</td>         </tr>         <tr>             <td>Supported Nozzle Diameter</td>             <td>0.2 mm, 0.4 mm, 0.6 mm, 0.8 mm</td>         </tr>         <tr>             <td>Filament Diameter</td>             <td>1.75 mm</td>         </tr>         <tr>             <td>Extruder Motor</td>             <td>Bambu Lab High-precision Permanent Magnet Synchronous Motor</td>         </tr>     </tbody> </table>",
+                  "notCollapseTable": "<table><thead><tr><td colspan=\"2\">Item</td><td>Specification</td></tr></thead><tbody><tr><td colspan=\"2\">Printing Technology</td><td>Fused Deposition Modeling</td></tr><tr><td rowspan=\"4\">Body</td><td>Build Volume (W*D*H)</td><td> Single Nozzle Printing: 325*320*325 mm³<br> Dual Nozzle Printing: 300*320*325 mm³<br> Total Volume for Two Nozzles: 350*320*325 mm³ </td></tr><tr><td>Chassis &amp; Shell</td><td>Aluminum, Steel, Plastic and Glass</td></tr><tr><td>Laser Safety Windows</td><td>Equipped on Laser Edition, normal H2D can upgrade through Laser Upgrade Kit</td></tr><tr><td>Air Assist Pump</td><td>Equipped on Laser Edition, normal H2D can upgrade through Laser Upgrade Kit</td></tr><tr><td rowspan=\"2\">Physical Dimensions</td><td>Physical Dimensions</td><td>492*514*626 mm³(Package Size: 580*605*750mm)</div><div>700*700*1100 mm³ (Recommended Space for Printer)</div></td></tr><tr><td>Net Weight</td><td>31 kg<br>(Gross weight: H2D: 40.6 kg; H2D AMS Combo: 44.2 kg;<br>H2D Laser Full Combo: 48.2 kg)</td></tr><tr><td rowspan=\"8\">Toolhead</td><td>Hotend</td><td>All Metal</td></tr><tr><td>Extruder Gear</td><td>Hardened Steel</td></tr><tr><td>Nozzle</td><td>Hardened Steel</td></tr><tr><td>Max Nozzle Temperature</td><td>350 °C</td></tr><tr><td>Included Nozzle Diameter</td><td>0.4 mm</td></tr><tr><td>Supported Nozzle Diameter</td><td>0.2 mm, 0.4 mm, 0.6 mm, 0.8 mm</td></tr><tr><td>Filament Diameter</td><td>1.75 mm</td></tr><tr><td>Extruder Motor</td><td>Bambu Lab High-precision Permanent Magnet Synchronous Motor</td></tr><tr><td rowspan=\"2\">Heatbed</td><td>Supported Build Plate Type</td><td>Textured PEI plate, Smooth PEI Plate</td></tr><tr><td>Max Heatbed Temperature</td><td>120 ℃</td></tr><tr><td rowspan=\"4\">Speed</td><td>Max Speed of Toolhead</td><td>1000 mm/s</td></tr><tr><td>Max Acceleration of Toolhead</td><td>20,000 mm/s²</td></tr><tr><td> Max Flow for Hotend<br> (Standard Flow Hotend) </td><td> 40 mm³/s(Test parameters: 250 mm round model<br> with a single outer wall;<br> Bambu Lab ABS; 280 °C printing temperature) </td></tr><tr><td> Max Flow for Hotend<br> (Optional High Flow Hotend) </td><td> 65 mm³/s(Test parameters: 250 mm round model<br> with a single outer wall;<br> Bambu Lab ABS; 280 °C printing temperature) </td></tr><tr><td rowspan=\"2\">Chamber Temperatur Control</td><td>Active Chamber Heating</td><td>Supported</td></tr><tr><td>Max Temperature</td><td>65 °C</td></tr><tr><td rowspan=\"3\">Air Purification</td><td>Pre-filter Grade</td><td>G3</td></tr><tr><td>HEPA Filter Grade</td><td>H12</td></tr><tr><td>Activated Carbon Filter Type</td><td>Granulated Coconut Shell</td></tr><tr><td rowspan=\"6\">Cooling</td><td>Part Cooling Fan</td><td>Closed Loop Control</td></tr><tr><td>Auxiliary Part Cooling Fan</td><td>Closed Loop Control</td></tr><tr><td>Chamber Heat Circulation Fan</td><td>Closed Loop Control</td></tr><tr><td>Cooling Fan for Hotend</td><td>Closed Loop Control</td></tr><tr><td>Main Control Board Fan</td><td>Closed Loop Control</td></tr><tr><td>Chamber Exhaust Fan</td><td>Closed Loop Control</td></tr><tr><td>Supported Filament Type</td><td> PLA, PETG, TPU, PVA, BVOH, ABS, ASA, PC, PA, PET, <br> Carbon/Glass Fiber Reinforced PLA,<br> PETG, PA, PET, PC, ABS, ASA, PPA CF/GF, PPS, PPS CF/GF </td><td>Supported</td></tr><tr><td rowspan=\"9\">Sensor</td><td>Live View Camera</td><td>Built-in; 1920*1080</td></tr><tr><td>Nozzle Camera</td><td>Built-in; 1920*1080</td></tr><tr><td>BirdsEye Camera</td><td>Built-in; 3264*2448（Equipped with Laser Edition）</td></tr><tr><td>Toolhead Camera</td><td>Built-in; 1920*1080</td></tr><tr><td>Door Sensor</td><td>Supported</td></tr><tr><td>Filament Run Out Sensor</td><td>Supported</td></tr><tr><td>Filament Tangle Sensor</td><td>Supported</td></tr><tr><td>Filament Odometry</td><td>Supported with AMS</td></tr><tr><td>Power Loss Recovery</td><td>Supported</td></tr><tr><td rowspan=\"3\">Electrical Requirements</td><td>Voltage</td><td>100-120 VAC, 50/60 Hz</td></tr><tr><td>Max Power*</td><td>1320 W@110 V</td></tr><tr><td colspan=\"2\">Please purchase the version corresponding to your region's voltage. Using the Printer in different regions, you may need to purchase a transformer accordingly.</td></tr><tr><td>Working Temperature</td><td colspan=\"2\">10 °C-30 °C</td></tr><tr><td rowspan=\"4\">Electronics</td><td>Touchscreen</td><td>5-inch 720*1280 Touchscreen</td></tr><tr><td>Storage</td><td>Built-in 8 GB EMMC and USB Port</td></tr><tr><td>Control Interface</td><td>Touchscreen, mobile App, PC App</td></tr><tr><td>Neural Processing Unit</td><td>2 TOPS</td></tr><tr><td rowspan=\"2\">Software</td><td>Slicer &amp; Software</td><td> Bambu Studio, Bambu Suite, Bambu Handy<br> Supports third-party slicers which export standard G-code, such as Super Slicer, PrusaSlicer and Cura, but certain advanced features may not be supported. </td></tr><tr><td>Supported Operating System</td><td>MacOS, Windows</td></tr><tr><td rowspan=\"3\">Wi-Fi</td><td>Operating Frequency</td><td> 2412-2472 MHz, 5150-5850 MHz (FCC/CE)<br> 2400-2483.5 MHz, 5150-5850 MHz (SRRC) </td></tr><tr><td>Wi-Fi Transmitter Power (EIRP)</td><td> 2.4 GHz: &lt;23 dBm (FCC); &lt;20 dBm (CE/SRRC/MIC)<br> 5 GHz Band1/2: &lt;23 dBm (FCC/CE/SRRC/MIC)<br> 5 GHz Band3: &lt;30 dBm (CE); &lt;24 dBm (FCC)<br> 5 GHz Band4: &lt;23 dBm (FCC/SRRC); &lt;14 dBm (CE) </td></tr><tr><td>Wi-Fi Protocol</td><td>IEEE 802.11 a/b/g/n</td></tr><tr><td rowspan=\"20\"> 10W &amp; 40W<br> Laser Module </td><td>Laser Type</td><td>Semiconductor Laser</td></tr><tr><td>Laser Wavelength</td><td> Engraving Laser: 455 nm ± 5 nm Blue Light<br> Height Measuring Laser: 850 nm ± 5 nm Infrared Light </td></tr><tr><td>Laser Power</td><td>10 W ± 1 W; 40 W ± 2 W</td></tr><tr><td>Laser Spot Dimension</td><td>10W: 0.03 mm * 0.14 mm; 40W: 0.14 mm * 0.2 mm</td></tr><tr><td>Working Temperature</td><td>0 °C–35 °C</td></tr><tr><td>Max Engraving Speed</td><td>10W: 400 mm/s; 40W: 1000 mm/s</td></tr><tr><td>Max Cutting Thickness</td><td>10W: 5 mm; 40W: 15mm (Basswood Plywood)</td></tr><tr><td>Laser Safety Class for Laser Module</td><td>Class 4</td></tr><tr><td>Overall Laser Safety Class*</td><td>Class 1</td></tr><tr><td>Engraving Area</td><td>10W: 310 mm * 270 mm; 40W: 310 mm * 250 mm</td></tr><tr><td>XY Positioning Accuracy</td><td>&lt; 0.3 mm</td></tr><tr><td>Z Height Measuring Method</td><td>Micro Lidar</td></tr><tr><td>Z Height Measuring Accuracy</td><td>± 0.1 mm</td></tr><tr><td>Flame Detection</td><td>Supported</td></tr><tr><td>Temperature Detection</td><td>Supported</td></tr><tr><td>Door Sensor</td><td>Supported</td></tr><tr><td>Laser Module Installation Detection</td><td>Supported</td></tr><tr><td>Safety Key</td><td>Included</td></tr><tr><td>Ventilation Pipe Adapter Outer Diameter</td><td>100 mm</td></tr><tr><td>Supported Material Type</td><td>Wood, rubber, metal sheet, lether, dark acrylic, stone, and more</td></tr><tr><td rowspan=\"11\">Cutting Module</td><td>Cutting Area</td><td>300*285 mm²</td></tr><tr><td>Drawing Area</td><td>300*255 mm²</td></tr><tr><td>Supported Pen Diameter</td><td>10.5 mm-12.5 mm</td></tr><tr><td>Cutting Mat Type</td><td>LightGrip and StrongGrip Cutting Mats</td></tr><tr><td>Blade Type</td><td>45°*0.35 mm</td></tr><tr><td>Blade Pressure Range</td><td>50 gf-600 gf</td></tr><tr><td>Max Cutting Thickness</td><td>0.5 mm</td></tr><tr><td>Blade and Pen Recognition</td><td>Supported</td></tr><tr><td>Cutting Mat Type Detection</td><td>Supported</td></tr><tr><td>Supported Image Type</td><td>Bitmap and Vector Images</td></tr><tr><td>Supported Material Type</td><td>Paper, vinyl, leather, and more</td></tr></tbody></table>",
+                  "tableNote": "* To ensure the heat bed quickly reaches the needed temperature, the printer will maintain maximum power for no more than 3 minutes . Packaging is now updating, new and old designs may be shipped randomly. Packaging may vary, shipping costs are the same for all orders placed at the same time.",
+                  "collapseText": "Expand table",
+                  "notCollapseText": "Collapse table",
+                  "downloadTDSButtonText": "Download TDS"
+                 }
+                ]
+               }
+              ]
+             ]
+            }
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {
+             "id": "instruction",
+             "children": [
+              [
+               "$",
+               "h2",
+               null,
+               {
+                "children": "Unboxing video"
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 "$",
+                 "$L3bb",
+                 null,
+                 {
+                  "source": [
+                   "https://store.bblcdn.com/4731f4c55a/d343b5f76a064ee18ca9dab61d462642/Unbox_Video.mp4",
+                   "https://store.bblcdn.com/4731f4c55a/78372129ceba4a409a1ab8f4ebe12343/Unbox_Video_pcSrcPoster.jpg",
+                   "https://store.bblcdn.com/4731f4c55a/9fdb198b119b4c6daf2d2673af1333ef/Unbox_Image_mobileSrc.jpg",
+                   "https://store.bblcdn.com/4731f4c55a/d343b5f76a064ee18ca9dab61d462642/Unbox_Video.mp4"
+                  ]
+                 }
+                ]
+               }
+              ]
+             ]
+            }
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {
+             "id": "",
+             "children": [
+              [
+               "$",
+               "h2",
+               null,
+               {
+                "children": "What's in the box"
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 "$",
+                 "$L3bc",
+                 null,
+                 {
+                  "imageSource": [
+                   "https://store.bblcdn.com/4731f4c55a/685e7e4b2e6944ed95502fa7e0ea097f/Inbox_1_Src.jpg",
+                   "https://store.bblcdn.com/4731f4c55a/9a0b75e7f9cf4d29b19885c6e9e4af43/Inbox_2_Src.jpg",
+                   "https://store.bblcdn.com/4731f4c55a/56ecada69d07468286e2dd9cfeb93023/Inbox_3_Src.jpg",
+                   "https://store.bblcdn.com/4731f4c55a/abf65cd4f0764a519be22a1587d2498d/Inbox_4_Src.jpg",
+                   "https://store.bblcdn.com/4731f4c55a/8b1439db4028457ca243ca770182ae2f/Inbox_5_Src.jpg",
+                   "https://store.bblcdn.com/4731f4c55a/a1e52a3f8c6d425f83d0bec265cc38ba/Inbox_6_Src.jpg",
+                   "https://store.bblcdn.com/4731f4c55a/305dbffdccae429b862d18138a6aef99/Inbox_7_Src.jpg",
+                   "https://store.bblcdn.com/4731f4c55a/1c1e39f555fd4992ae37d7ae8446ac4b/Inbox_8_Src.jpg",
+                   "https://store.bblcdn.com/4731f4c55a/4e5d57d61d5b4587b7bf46bfa52be614/Inbox_9_Src.jpg",
+                   "https://store.bblcdn.com/4731f4c55a/f9b728e776d24cc69ad7591b1b32ce5a/Inbox_10_Src.jpg",
+                   "https://store.bblcdn.com/4731f4c55a/a9da481083ba451184433e8e0d7e9c45/Inbox_11_Src.jpg",
+                   "https://store.bblcdn.com/4731f4c55a/d3081a5822cf43dea122f93dce0a7f2b/Inbox_12_Src.jpg",
+                   "https://store.bblcdn.com/s1/default/647949f7229c49039e06666c719c1b9f/13.jpg",
+                   "https://store.bblcdn.com/s1/default/d6c59a36008d416da9a4acca93bbfe92/14.jpg",
+                   "https://store.bblcdn.com/s1/default/6e2a60ceff4049aabc3332b8569f9ef6/15.jpg"
+                  ],
+                  "textList": [
+                   "H2D AMS Combo",
+                   "H2D Laser Full Combo",
+                   "H2D",
+                   "Bambu Lab H2D",
+                   "Bambu Lab H2D",
+                   "Laser Edition",
+                   "Textured PEI Build Plate",
+                   "Spool Holder",
+                   "Accessory Box",
+                   "AMS 2 Pro",
+                   "10W Laser Module",
+                   "Depending on selected combo ",
+                   "40W Laser Module",
+                   "Depending on selected combo ",
+                   "Cutting Module (with Pen Holder)",
+                   "Laser Platform",
+                   "Cutting Platform",
+                   "Emergency",
+                   "Stop Button",
+                   "Safety Key",
+                   "Ventilation Pipe",
+                   "Laser & Cutting Materials"
+                  ]
+                 }
+                ]
+               }
+              ]
+             ]
+            }
+           ],
+           [
+            "$",
+            "div",
+            null,
+            {
+             "id": "faq",
+             "children": [
+              [
+               "$",
+               "h2",
+               null,
+               {
+                "children": "Frequently Asked Questions"
+               }
+              ],
+              [
+               "$",
+               "div",
+               null,
+               {
+                "children": [
+                 "$",
+                 "$L3bd",
+                 null,
+                 {
+                  "faqItems": [
+                   {
+                    "question": "1.Can H2D be upgraded to H2D Laser Edition?",
+                    "answer": "<div>The H2D laser full combo has a built-in air pump and air pipe on the back of the printer, and is pre-installed with a BirdsEye camera. The front door, left and right side Laser Protective Windows, and top cover are all designed with laser protection. The packaging list includes a laser module, a cutting module, a smoke exhaust pipe and its adapter, as well as an emergency stop button.</div> <br /> <div>We plan to launch a laser upgrade kit for the non-laser version of H2D. The upgrade kit is expected to be released in Q3 and will also provide installation instructional videos to help users complete the upgrade smoothly.</div> <br /> <div>It is important to note that the air pump in the upgrade kit is an external air pump, which has a different installation structure from the built-in air pump in the full set. When using it, it can only be installed externally and connected to the machine through an air tube. <div> <br />Upgrading the non-laser H2D to H2D Laser Edition through the laser upgrade kit retains identical product functions and performances as the H2D Laser Edition.</div></div>"
+                   },
+                   {
+                    "question": "2.Are the left and right hotends exactly the same?",
+                    "answer": "<div>Yes, the left and right hotends have identical structures and materials, and can be used interchangeably.</div>"
+                   },
+                   {
+                    "question": "3.What is the maximum number of AMS 2 Pro and AMS HT units that the H2D supports? How many colors can it print at most?",
+                    "answer": "<div>The H2D supports a maximum of 4 AMS 2 Pro and 8 AMS HT connected simultaneously, a total of 12 units with 24 slots. </div> <div>Because H2D is a dual-hotend printer, and in the most extreme scenario, all AMS can be connected to one hotend     while the other hotend uses an external spool holder, it can support up to 25 colors. </div>"
+                   },
+                   {
+                    "question": "4.Is H2D compatible with first generation AMS?",
+                    "answer": "<div>The first-generation AMS has been confirmed to have full plug-and-play compatibility and can be used with the H2D for multi-color printing, but it does not support the AMS drying function.</div> <div>Due to the fundamental differences in the feeding mechanism and buffering structure, the H2D does not support the AMS lite.</div>"
+                   },
+                   {
+                    "question": "5.AMS 2 Pro is directly connected to the printer through the 6-pin ports, so what are the two 4-pin ports on the back of the printer used for?",
+                    "answer": "<div>The two 4-pin ports on the back are reserved for future expansion accessories. For example, to upgrade a non-laser version of the printer to a laser version, one of these ports can be used to connect an external air pump.</div>"
+                   },
+                   {
+                    "question": "6.Can I use the A1 series Hotend on the H2D? Conversely, can H2D hotends be used on A1 series printers?",
+                    "answer": "<div>Although the hotend of the H2D series is similar to the A1 hotend in structure , it is not exactly the same.</div> <br /> <div>The H2D hotends are specifically designed for the H2D printer, offering optimized compatibility. For example, they support a larger maximum volumetric flow rate, lower clogging risk, more precise nozzle offset calibration between the left and right hotends, and automatic hotend type recognition via the live camera.</div> <br /> <div>Therefore , to ensure you get the best print quality, we strongly recommend that you do not use the A1 hotend for H2D printers.</div> <br /> <div>Purchasing additional H2D hotends for use on A1 printers is feasible. However, you will also need to use the H2D hotend silicone sock.</div>"
+                   },
+                   {
+                    "question": "7.What are the differences between the 10W and 40W laser modules? How should I choose?",
+                    "answer": "<div>Both the 10W and 40W laser modules are blue light lasers that support processing a variety of materials, including wood, rubber, metal sheets, leather, dark acrylic, and stone. However, due to differences in power and size, there are the following distinctions:</div> <br /> <div>1.Maximum cutting thickness(For Basswood Plywood): </div> <div>10W laser module: 5mm; </div> <div>40W laser module: 15mm;</div> <br /> <div>2.Maximum engraving speed(For Basswood Plywood): </div> <div>10W laser module: 400mm/s ; </div> <div>40W laser module: 1000mm/s ；</div> <br /> <div>3.Processable Area:</div> <div>10W laser module: Maximum processing area X310mm * Y270mm, maximum processing height 280mm；</div> <div>40W laser module: Maximum processing area X310mm * Y250mm, maximum processing height 265mm；</div>"
+                   },
+                   {
+                    "question": "8.Is a USB included as standard? What functions are affected without a USB? ",
+                    "answer": "<div>The package does not include a standard USB flash drive. You can still initiate printing normally without a USB, as the printer has built-in storage space to run print files.</div> <div>However, without a USB inserted, the following functions will be affected:</div> <br /> <div>1. The recording and time-lapse photography functions can't be turned on;</div> <div>2. Printing cannot be initiated through the LAN;</div> <div>3. Print files cannot be sent to the machine for storage through the studio;</div> <div>4. Log files cannot be exported;</div> <br /> <div><span style=\"font-weight: 700;\">USB requirements: </span>USB2.0 protocol or above (actual minimum write speed needs to be greater than 10M/s), supported file formats are FAT32 and exFAT. And the printer only supports mounting one USB, and cannot connect multiple USB via a USB hub.</div>"
+                   },
+                   {
+                    "question": "9.Why can’t I freely select hotend for printing with the printer’s built-in files?",
+                    "answer": "<div>The hotend to be used for printing has already been determined when the model file is sliced. As for the built-in models, the right hotend has been selected during the slicing process, so it is impossible to change the hotend used for printing on the printer screen.</div> <div>When you slice the file in Bambu Studio and send the print task , you can freely choose to use the left hotend or the right hotend. For some filaments, such as TPU and PPS/PPA-CF, it is recommended to use specific hotends for printing.</div> <br /> <div>For more details on H2D filament printing, please check the <a href=\"https://wiki.bambulab.com/h2/h2d-filament-printing-guide\">wiki</a>.</div>"
+                   },
+                   {
+                    "question": "10. Will the smoke and dust generated by laser operations affect my printer's precision and lifespan?",
+                    "answer": "<div>H2D is equipped with an efficient exhaust system that effectively removes smoke and dust generated by laser operations, significantly reducing contamination. During R&D, we conducted rigorous testing to ensure that with regular machine cleaning, the impact of smoke and dust on performance and precision is negligible. For detailed cleaning instructions, please refer to: <a href=\"https://wiki.bambulab.com/h2/maintenance/period-maintenance\">wiki</a></div>"
+                   },
+                   {
+                    "question": "11. How can I improve the success rate and quality of TPU printing?",
+                    "answer": "<div>Due to the flexible nature of TPU filaments, there are some operational issues that can arise during feeding and printing. To facilitate TPU printing, we have created a dedicated Wiki guide. Simply follow the instructions in the Wiki to successfully print with TPU filaments: <a href=\"https://wiki.bambulab.com/h2/h2d-tpu-printing-guide\">wiki</a></div>"
+                   },
+                   {
+                    "question": "12. Are there any special safety precautions I need to take when using the laser function?",
+                    "answer": "<div>Because laser processing involves using high-energy lasers on potentially flammable materials, we strongly advise users not to leave the machine unattended during laser operations. Please maintain constant vigilance over the machine's operational status and ensure that there are no flammable or explosive materials in the machine's surroundings. For more information please refer to: <a href=\"https://wiki.bambulab.com/h2/laser-safety-document\">wiki</a> <br /> <br /> <div>For more information about H2D, refer to the official <a href=\"https://wiki.bambulab.com/h2d\">wiki</a>.</div></div>"
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             ]
+            }
+           ]
+          ]
+         }
+        ]
+       ]
+      }
+     ],
+     [
+      "$",
+      "div",
+      null,
+      {
+       "children": [
+        "$",
+        "div",
+        null,
+        {
+         "dangerouslySetInnerHTML": {
+          "__html": "<div>Note</div> <ul style=\"margin-left: 14px; list-style: disc;\">     <li>2 servo motors include the one on the AMS 2 Pro.</li>     <li>3D mesh feature will be available shortly after the product release through firmware update. </li>     <li>Rotary Attachment is an optional equipment will be available soon, buy at official store.</li>     <li>Air Purifier is an optional equipment, buy at official store.</li>     <li>BirdsEye camera is only equipped with H2D laser edition, or can be added with laser upgrade kit. </li>     <li>Material CodeSync only works with Bambu official materials.</li>     <li>The optional Vision Encoder is required for Motion Accuracy Enhancement.</li>     <li>Auto Holes-contour Compensation must be enabled in Bambu Studio, and designated Bambu filament must be used.     </li>     <li>350mm×320mm×325mm print volume is enable by using identical filaments in both nozzles and print with both         nozzles.</li>     <li>High-flow Hotends are optional equipments, buy at official store.</li>     <li>The 600mm/s print speed refering is by using Bambu PLA Matte filament. </li>     <li>Auto Fire Extinguisher is an optional equipment, will be available soon after the product release.</li>     <li>Due to safety protocol, Developer mode cannot be enabled when using Laser and Cutting functions.</li>  <li>Creator projects are provided for illustrative purposes only. Bambu Lab does not endorse, and disclaims any representations or warranties regarding creator projects, including, without limitation, the safety, marketability, or usability of any 3D printed works based on such projects. See our Terms of Service for more information.</li> </ul>"
+         }
+        }
+       ]
+      }
+     ]
+    ]
+   }
+  ]
+ },
+ "jsonld": [
+  {
+   "@context": "https://schema.org/",
+   "@type": "ProductGroup",
+   "name": "Bambu Lab H2D",
+   "description": "Dual-nozzle + laser all-in-one from the No.1 best-selling brand. 2M+ free models. 30-day price protection, 2-year warranty & 30-day returns at official store.",
+   "url": "https://us.store.bambulab.com/products/h2d",
+   "brand": {
+    "@type": "Brand",
+    "name": "Bambu Lab"
+   },
+   "productGroupID": "581025672328126464",
+   "hasVariant": [
+    {
+     "@type": "Product",
+     "sku": "581025672340709385",
+     "image": "https://store.bblcdn.com/s7/default/3c3534f112e64118a51156ad98dd4305/H2DC-compressed.jpg",
+     "name": "Bambu Lab H2D - H2D AMS Combo / Standard",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/h2d?id=581025672340709385",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "581025672340709390",
+     "image": "https://store.bblcdn.com/s7/default/28382003753b437bb41e9c9fae2d8edb/H2DL-10w-compressed.jpg",
+     "name": "Bambu Lab H2D - H2D Laser Full Combo / 10W",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/h2d?id=581025672340709390",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "581025672340709395",
+     "image": "https://store.bblcdn.com/s7/default/28382003753b437bb41e9c9fae2d8edb/H2DL-10w-compressed.jpg",
+     "name": "Bambu Lab H2D - H2D Laser Full Combo / 40W",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/h2d?id=581025672340709395",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "581025672340709400",
+     "image": "https://store.bblcdn.com/s7/default/3119bfccdef5461eb9a0f42d579b9a5c/H2D-compressed.jpg",
+     "name": "Bambu Lab H2D - H2D / standard",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/h2d?id=581025672340709400",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "622679274382356483",
+     "image": "https://store.bblcdn.com/s7/default/aedfa3ff4722447f9dcec0103b252727/H2DUSMS2PRo-compressed.jpg",
+     "name": "Bambu Lab H2D - H2D AMS Combo / Dual AMS 2 Pro Bundle",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/h2d?id=622679274382356483",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "622679274382356488",
+     "image": "https://store.bblcdn.com/s7/default/e5f6ad2d8168485f82574369073ba155/H2DHT-compressed.jpg",
+     "name": "Bambu Lab H2D - H2D AMS Combo / AMS HT bundle",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/h2d?id=622679274382356488",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    }
+   ]
+  }
+ ]
+}

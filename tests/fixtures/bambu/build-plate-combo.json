@@ -1,0 +1,644 @@
+{
+ "_meta": {
+  "source_url": "https://us.store.bambulab.com/products/build-plate-combo",
+  "fetched_at": "2026-10-15T09:59:49Z",
+  "extracted_from": "self.__next_f RSC flight data (App Router); product object = props.data of the PDP component, description = separate RSC element (see description.kind)",
+  "removed_keys": [
+   "abGroup",
+   "discountOffText",
+   "discountPrice",
+   "flashSaleVO",
+   "gradientDiscountActivityId",
+   "gradientDiscountSkus",
+   "marketingDisplayAbGroup",
+   "maximum",
+   "minimum",
+   "orderInfo",
+   "orderInfoTitle",
+   "pointsInfo",
+   "price",
+   "priceCurrency",
+   "priceDescriptionList",
+   "priceExplanation",
+   "priceSpecification",
+   "productSkuBuyAndGetVO",
+   "productSkuPreSale",
+   "promotionDescription",
+   "qryPromotionFlag",
+   "quantityLimitType",
+   "quantityLimitValue",
+   "serviceGuaranteeList",
+   "skuPromotionPointsSwitch"
+  ],
+  "notes": "Prices, compare-at prices, purchase limits, promotions, points and store-wide shipping/service boilerplate removed; dollar amounts inside text replaced with $[redacted]. Ids are strings (many exceed 2^53)."
+ },
+ "product": {
+  "id": "769076186868396032",
+  "name": "Build Plate Combo",
+  "type": 1,
+  "subTitle": "",
+  "description": null,
+  "seoCode": "build-plate-combo",
+  "seoTitle": "Build Plate Combo",
+  "seoMetaDescription": "",
+  "seoUrlHandle": "https://us.store.bambulab.com/products/build-plate-combo",
+  "productFeaturesTitle": null,
+  "productFeatures": null,
+  "productFeaturesModuleList": [
+   {
+    "id": "773412795696852992",
+    "title": "Product Features",
+    "content": "<ul>\n<li>For the 2-Pack Combo: Ideal for users who need both easy everyday<strong> PLA/PETG</strong> printing and reliable support for <strong>engineering filaments</strong> like ABS, ASA, PC, and PA.</li>\n<li>For the 3-Pack Combo: Best for users who want the most printing flexibility, with support for <strong>everyday and engineering filaments</strong>, and the choice of <strong>smooth or textured bottom finishes</strong>.</li>\n</ul>",
+    "iconUrl": ""
+   }
+  ],
+  "newFlag": 1,
+  "externalVideoTitle": "",
+  "externalVideoLinkList": [
+   ""
+  ],
+  "mediaFiles": [
+   {
+    "resourceFileId": "773409133230555136",
+    "url": "https://store.bblcdn.com/s7/default/eaea832685404690a3b4e425b186b4f3/256_engineering_cool_plate_texture.jpg"
+   },
+   {
+    "resourceFileId": "773409123361357824",
+    "url": "https://store.bblcdn.com/s7/default/43c742a24c6c447f90386ee932899e71/256_engineering_cool_plate.jpg"
+   },
+   {
+    "resourceFileId": "773407052830609408",
+    "url": "https://store.bblcdn.com/s7/default/e406bdc1e18d49c89fdbd2762d73f2c6/3_packs_350.jpg"
+   },
+   {
+    "resourceFileId": "773406735439237120",
+    "url": "https://store.bblcdn.com/s7/default/d98275b1af3640c09d2acb315749397b/350_engineering_cool_plate.jpg"
+   }
+  ],
+  "productSkuList": [
+   {
+    "id": "773447978110222337",
+    "mediaFile": {
+     "resourceFileId": "773409123361357824",
+     "url": "https://store.bblcdn.com/s7/default/43c742a24c6c447f90386ee932899e71/256_engineering_cool_plate.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Compatibility",
+      "propertyKeyId": "769076186876784640",
+      "propertyValueId": null,
+      "propertyValue": "X1/P1/A1 Series",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Combo Type",
+      "propertyKeyId": "769090749173149703",
+      "propertyValueId": null,
+      "propertyValue": "Cool Plate + Engineering (with Glue Stick)",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "773447978110222342",
+    "mediaFile": {
+     "resourceFileId": "773409133230555136",
+     "url": "https://store.bblcdn.com/s7/default/eaea832685404690a3b4e425b186b4f3/256_engineering_cool_plate_texture.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Compatibility",
+      "propertyKeyId": "769076186876784640",
+      "propertyValueId": null,
+      "propertyValue": "X1/P1/A1 Series",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Combo Type",
+      "propertyKeyId": "769090749173149703",
+      "propertyValueId": null,
+      "propertyValue": "Cool Plate + Engineering (with Glue Stick) + Texture PEl",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "773448289910587393",
+    "mediaFile": {
+     "resourceFileId": "773409123361357824",
+     "url": "https://store.bblcdn.com/s7/default/43c742a24c6c447f90386ee932899e71/256_engineering_cool_plate.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Compatibility",
+      "propertyKeyId": "769076186876784640",
+      "propertyValueId": null,
+      "propertyValue": "X2D/P2S",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Combo Type",
+      "propertyKeyId": "769090749173149703",
+      "propertyValueId": null,
+      "propertyValue": "Cool Plate + Engineering (with Glue Stick)",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "<p><strong><span style=\"color: #e03e2d;\">For X2D and P2S users, please disable the Build Plate Position Detection in 'Settings -&gt;Print Options -&gt; Enable the detection of build plate position' when printing with the Cool Plate SuperTack to avoid error reports.</span></strong></p>",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "773448289910587398",
+    "mediaFile": {
+     "resourceFileId": "773409133230555136",
+     "url": "https://store.bblcdn.com/s7/default/eaea832685404690a3b4e425b186b4f3/256_engineering_cool_plate_texture.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Compatibility",
+      "propertyKeyId": "769076186876784640",
+      "propertyValueId": null,
+      "propertyValue": "X2D/P2S",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Combo Type",
+      "propertyKeyId": "769090749173149703",
+      "propertyValueId": null,
+      "propertyValue": "Cool Plate + Engineering (with Glue Stick) + Texture PEl",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "<p><strong><span style=\"color: #e03e2d;\">For X2D and P2S users, please disable the Build Plate Position Detection in 'Settings -&gt;Print Options -&gt; Enable the detection of build plate position' when printing with the Cool Plate SuperTack to avoid error reports.</span></strong></p>",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "773450084238032897",
+    "mediaFile": {
+     "resourceFileId": "773406735439237120",
+     "url": "https://store.bblcdn.com/s7/default/d98275b1af3640c09d2acb315749397b/350_engineering_cool_plate.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Compatibility",
+      "propertyKeyId": "769076186876784640",
+      "propertyValueId": null,
+      "propertyValue": "H2D",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Combo Type",
+      "propertyKeyId": "769090749173149703",
+      "propertyValueId": null,
+      "propertyValue": "Cool Plate + Engineering (with Glue Stick)",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "773450084238032902",
+    "mediaFile": {
+     "resourceFileId": "773407052830609408",
+     "url": "https://store.bblcdn.com/s7/default/e406bdc1e18d49c89fdbd2762d73f2c6/3_packs_350.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Compatibility",
+      "propertyKeyId": "769076186876784640",
+      "propertyValueId": null,
+      "propertyValue": "H2D",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Combo Type",
+      "propertyKeyId": "769090749173149703",
+      "propertyValueId": null,
+      "propertyValue": "Cool Plate + Engineering (with Glue Stick) + Texture PEl",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "773450084238032907",
+    "mediaFile": {
+     "resourceFileId": "773406735439237120",
+     "url": "https://store.bblcdn.com/s7/default/d98275b1af3640c09d2acb315749397b/350_engineering_cool_plate.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Compatibility",
+      "propertyKeyId": "769076186876784640",
+      "propertyValueId": null,
+      "propertyValue": "H2S",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Combo Type",
+      "propertyKeyId": "769090749173149703",
+      "propertyValueId": null,
+      "propertyValue": "Cool Plate + Engineering (with Glue Stick)",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "773450084238032912",
+    "mediaFile": {
+     "resourceFileId": "773407052830609408",
+     "url": "https://store.bblcdn.com/s7/default/e406bdc1e18d49c89fdbd2762d73f2c6/3_packs_350.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Compatibility",
+      "propertyKeyId": "769076186876784640",
+      "propertyValueId": null,
+      "propertyValue": "H2S",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Combo Type",
+      "propertyKeyId": "769090749173149703",
+      "propertyValueId": null,
+      "propertyValue": "Cool Plate + Engineering (with Glue Stick) + Texture PEl",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   }
+  ],
+  "productPropertyList": [
+   {
+    "propertyKey": "Compatibility",
+    "propertyKeyId": "769076186876784640",
+    "productPropertyValueList": [
+     {
+      "id": "769076186876784641",
+      "value": "X1/P1/A1 Series",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "769090749173149697",
+      "value": "H2D",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "769090749173149698",
+      "value": "H2S",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "773409830743355393",
+      "value": "X2D/P2S",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     }
+    ],
+    "position": 1,
+    "type": 1,
+    "title": "Printer Model",
+    "introduction": "",
+    "explanation": ""
+   },
+   {
+    "propertyKey": "Combo Type",
+    "propertyKeyId": "769090749173149703",
+    "productPropertyValueList": [
+     {
+      "id": "769090749173149704",
+      "value": "Cool Plate + Engineering (with Glue Stick)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "769090749173149707",
+      "value": "Cool Plate + Engineering (with Glue Stick) + Texture PEl",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     }
+    ],
+    "position": 2,
+    "type": 1,
+    "title": "",
+    "introduction": "",
+    "explanation": ""
+   }
+  ],
+  "skillLevel": 0,
+  "skillTitle": null,
+  "printerTime": "",
+  "filamentUsed": "",
+  "colorCollectionList": [],
+  "productExtraInfoVO": {
+   "gprsInfoTemplateVO": null,
+   "productVideoVOList": null,
+   "productFileList": null
+  },
+  "productDetailTemplateVO": null,
+  "subProductList": null,
+  "showMwModelIds": [],
+  "showMwModelPosition": 0,
+  "customButtonTitle": null,
+  "customButtonLink": null,
+  "paymentComponentPosition": 0,
+  "isFilament": false,
+  "currentAllIdRoute": "552709757765505024>552709757794865152",
+  "imageLabels": null
+ },
+ "description": {
+  "kind": "sections_html",
+  "sections": [
+   {
+    "id": "769076186880978948",
+    "name": "Comparison",
+    "html": "<!-- Build Plate Comparison Table -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_st-tbc\">\n<h1 class=\"pct_t\"><span style=\"font-size: 24px;\">Which Build Plate Is Right for You?</span></h1>\n<!-- ✅ 关键：可横向滚动的包裹容器 -->\n<div class=\"pct_tbc\" style=\"width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;\"><!-- ✅ 关键：min-width 让窄屏下不被压缩，而是触发滚动 -->\n<table class=\"pct_tb\" style=\"border-collapse: collapse; width: 100%; min-width: 760px; table-layout: fixed;\">\n<thead class=\"pct_th\">\n<tr>\n<td class=\"pct_td\" style=\"width: 16.7464%; text-align: center; vertical-align: middle; padding: 10px; word-break: break-word; overflow-wrap: break-word; white-space: normal;\"><strong>Build Plate Types</strong></td>\n<td class=\"pct_td\" style=\"width: 44.3136%; text-align: center; vertical-align: middle; padding: 10px; word-break: break-word; overflow-wrap: break-word; white-space: normal;\"><strong>Main Features</strong></td>\n<td class=\"pct_td\" style=\"width: 38.94%; text-align: center; vertical-align: middle; padding: 10px; word-break: break-word; overflow-wrap: break-word; white-space: normal;\"><strong>Filament Precautions</strong></td>\n</tr>\n</thead>\n<tbody><!-- Textured PEI Plate -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 16.7464%; text-align: center; vertical-align: middle; padding: 10px; word-break: break-word; overflow-wrap: break-word; white-space: normal;\"><a href=\"../../../products/bambu-textured-pei-plate\" target=\"_blank\" rel=\"noopener\"><strong>Textured PEI Plate</strong></a></td>\n<td class=\"pct_td\" style=\"width: 44.3136%; text-align: left; vertical-align: middle; padding: 10px; word-break: break-word; overflow-wrap: break-word; white-space: normal;\">\n<ul>\n<li><strong>Special textured surface:</strong> Adds a unique textured finish to the bottom surface of printed parts.</li>\n<li><strong>Strong adhesion:</strong> In most cases, it provides excellent adhesion without the need for adhesive.</li>\n<li><strong>Durable, long-lasting coating:</strong> The PEI surface coating is highly durable and robust.</li>\n</ul>\n</td>\n<td class=\"pct_td\" style=\"width: 38.94%; text-align: left; vertical-align: middle; padding: 10px; word-break: break-word; overflow-wrap: break-word; white-space: normal;\">\n<ul>\n<li>Compatible with Various Filaments: PEI enables printing not only with common materials such as <strong>PLA, TPU, PETG</strong>, but also with materials that require <strong>high temperatures like ABS and Nylon</strong>.</li>\n<li>When printing <strong>PC/PA/ABS/ASA</strong> filaments on a Textured PEI Plate, it may be necessary to apply a layer of <strong>glue stick</strong>.</li>\n</ul>\n</td>\n</tr>\n<!-- Dual-Texture PEI Plate -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 16.7464%; text-align: center; vertical-align: middle; padding: 10px; word-break: break-word; overflow-wrap: break-word; white-space: normal;\"><a href=\"../../../products/bambu-dual-texture-pei-plate\" target=\"_blank\" rel=\"noopener\"><strong>Dual-Texture PEI Plate</strong></a></td>\n<td class=\"pct_td\" style=\"width: 44.3136%; text-align: left; vertical-align: middle; padding: 10px; word-break: break-word; overflow-wrap: break-word; white-space: normal;\">\n<ul>\n<li>The stainless steel plate is equipped with dual-sided coatings, one side featuring <strong>textured PEI</strong> and the other side featuring <strong>smooth PEI</strong>.</li>\n<li>Users can choose between different surface textures, allowing the model's bottom surface to have either <strong>a matte or smooth finish</strong>, providing more printing options.</li>\n</ul>\n</td>\n<td class=\"pct_td\" style=\"width: 38.94%; text-align: left; vertical-align: middle; padding: 10px; word-break: break-word; overflow-wrap: break-word; white-space: normal;\">\n<ul>\n<li><strong>Smooth side:</strong> PEI enables printing not only with common materials such as <strong>PLA, TPU, PETG</strong>, but also with materials that require <strong>high temperatures like ABS and Nylon</strong>. (Note: Please apply <strong>glue</strong> to prevent the sheet from tearing if printing with filaments other than PLA.)</li>\n<li>For the <strong>textured side</strong>, refer to the first row of this table (Textured PEI Plate).</li>\n</ul>\n</td>\n</tr>\n<!-- Engineering Plate -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 16.7464%; text-align: center; vertical-align: middle; padding: 10px; word-break: break-word; overflow-wrap: break-word; white-space: normal;\"><a href=\"../../../products/bambu-engineering-plate\" target=\"_blank\" rel=\"noopener\"><strong>Engineering Plate</strong></a></td>\n<td class=\"pct_td\" style=\"width: 44.3136%; text-align: left; vertical-align: middle; padding: 10px; word-break: break-word; overflow-wrap: break-word; white-space: normal;\">\n<ul>\n<li>The Engineering Plate is manufactured using a corrosion-resistant reinforced coating process, specifically <strong>optimized for printing engineering materials such as ABS, ASA, PC, and PA</strong>.</li>\n<li>Compared with traditional build plates that tend to suffer from coating degradation over time, the new flat build plate significantly <strong>enhances surface corrosion resistance and durability</strong>.</li>\n<li>Its fine and uniform surface texture ensures stable adhesion while providing printed parts with <strong>a smoother, nearly glossy bottom finish</strong>.</li>\n</ul>\n</td>\n<td class=\"pct_td\" style=\"width: 38.94%; text-align: left; vertical-align: middle; padding: 10px; word-break: break-word; overflow-wrap: break-word; white-space: normal;\">\n<ul>\n<li>The Engineering Plate is compatible with the full range of Bambu Lab filaments. Simply apply a thin layer of <strong>glue</strong> before printing.</li>\n<li>When you are unsure which build plate to use, this plate serves as the perfect all-around solution.</li>\n</ul>\n</td>\n</tr>\n<!-- Cool Plate SuperTack -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 16.7464%; text-align: center; vertical-align: middle; padding: 10px; word-break: break-word; overflow-wrap: break-word; white-space: normal;\"><a href=\"../../../products/bambu-cool-plate-supertack\" target=\"_blank\" rel=\"noopener\"><strong>Cool Plate SuperTack Series</strong></a></td>\n<td class=\"pct_td\" style=\"width: 44.3136%; text-align: left; vertical-align: middle; padding: 10px; word-break: break-word; overflow-wrap: break-word; white-space: normal;\">\n<ul>\n<li>The Cool Plate SuperTack features a finely textured surface that approaches a smooth, glossy finish. It is a beginner-friendly build plate, especially suitable for glue-free printing with <strong>PLA and PETG</strong> filaments. The surface is resistant to dirt, provides strong adhesion, and minimizes print detachment.</li>\n<li>In addition, the coating greatly reduces the energy required for bed heating, <strong>lowers the risk of nozzle clogging</strong> when printing PLA and PETG, decreases electricity consumption, and is <strong>more environmentally friendly</strong>.</li>\n</ul>\n</td>\n<td class=\"pct_td\" style=\"width: 38.94%; text-align: left; vertical-align: middle; padding: 10px; word-break: break-word; overflow-wrap: break-word; white-space: normal;\">\n<ul>\n<li>This plate is designed only for printing <strong>PLA and PETG</strong>. Using any other materials may damage the surface coating.</li>\n</ul>\n</td>\n</tr>\n</tbody>\n</table>\n</div>\n<!-- /可横向滚动容器 -->\n<p style=\"margin-top: 12px;\"><em>Learn more about build plates at: <strong><span style=\"color: #00ae42;\"><a style=\"color: #00ae42;\" href=\"https://wiki.bambulab.com/en/filament-acc/acc/plates\" target=\"_blank\" rel=\"noopener\">Bambu Lab Wiki</a></span></strong> </em></p>\n</div>\n</div>"
+   },
+   {
+    "id": "769082627620679680",
+    "name": "Textured PEI",
+    "html": "<div>\n<div style=\"text-align: center;\"><!-- 文案布局 --></div>\n<div style=\"text-align: center;\">\n<div style=\"text-align: center;\"><span style=\"font-size: 24px;\"><strong>Bambu Textured PEI Plate</strong></span></div>\n<div style=\"text-align: center;\"><span style=\"font-size: 24px;\"><strong>&nbsp; &nbsp;</strong></span></div>\n</div>\n<div style=\"text-align: center;\">\n<div class=\"pct pct_mc\">\n<div class=\"pct_head-ic\">\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/6d0a901b776f4967b306fcd62d92a497/FAP007_Banner_5ddf5ef3-29ca-43c1-9c3c-aa6ec6f9afe5.png\" alt=\"Bambu Textured PEI Plate, Excellent first-layer adhesion, Improved durability\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/fffda9f498bd4355b5dfb21e71c5f4e7/FAP007_Banner_6b0290e3-cdb7-44cf-919a-7fb459789649.png\" alt=\"Bambu Textured PEI Plate, Excellent first-layer adhesion, Improved durability\" /></div>\n</div>\n</div>\n</div>\n</div>\n<p style=\"margin-top: 30px;\"><video style=\"width: 100%;\" src=\"https://store.bblcdn.com/s7/default/ff8fdce90ab14a79980e81ed2bfaafa7/ec46684c749b4615ac5b6055679737c7.mp4\" controls=\"controls\" width=\"300\" height=\"150\" autoplay=\"autoplay\" loop=\"loop\" muted=\"\" playsinline=\"\" poster=\"https://store.bblcdn.com/s7/default/b8407d64d2814fb786bc116bacc6b5ce/Group_2313_597185c5-57ac-47f1-875d-ab3f213a4ecc.png\" data-mce-style=\"width: 100%;\" data-mce-src=\"https://store.bblcdn.com/s7/default/ff8fdce90ab14a79980e81ed2bfaafa7/ec46684c749b4615ac5b6055679737c7.mp4\"></video></p>\n<!-- 文案布局 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-stpc\"><!-- 第一条 -->\n<div class=\"pct_st-p\">\n<p class=\"pct_p\">&nbsp;</p>\n</div>\n</div>\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-stpcic\"><!-- 第一条 -->\n<div class=\"pct_stpc-ic\"><!-- 左侧文案部分 -->\n<div class=\"pct_st-p\">\n<h3 class=\"pct_st\"></h3>\n<h3 class=\"pct_st\"></h3>\n<h3 class=\"pct_st\">Excellent First-layer Adhesion and Improved Durability</h3>\n<div data-docx-has-block-data=\"false\" data-page-id=\"BBRnd3ZnMoheF1xBZCMcou9xnR4\">\n<div class=\"ace-line ace-line old-record-id-MwYVdBZPjoDc7mxOh7ucPqgwn6a\">After optimizing the manufacturing process of the Bambu Texture PEI Plate, the durability of the plate is enhanced. Additionally, the adhesion between the prints and the plate is significantly improved, eliminating the need for adhesives.</div>\n<div class=\"ace-line ace-line old-record-id-MwYVdBZPjoDc7mxOh7ucPqgwn6a\"></div>\n<div class=\"ace-line ace-line old-record-id-Vx83du4dvo5ChZxT1OBc8e5onog\">*In some situations, glue is required for very specific filaments</div>\n<div class=\"ace-line ace-line old-record-id-Vx83du4dvo5ChZxT1OBc8e5onog\"></div>\n<div class=\"ace-line ace-line old-record-id-Vx83du4dvo5ChZxT1OBc8e5onog\"></div>\n</div>\n</div>\n<!-- 右侧图片部分 -->\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/d8f55e8e969a4a1085edc13dbe5de492/Group_2307.png\" alt=\"Surface Finish\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/d8f55e8e969a4a1085edc13dbe5de492/Group_2307.png\" alt=\"Surface Finish\" /></div>\n</div>\n<!-- 第二条 -->\n<div class=\"pct_stpc-ic\"><!-- 左侧文案部分 -->\n<div class=\"pct_st-p\" style=\"padding-right: 20px;\">\n<h3 class=\"pct_st\">Self-release when Cooled Down</h3>\n<p class=\"pct_p\">PEI is an excellent material for 3D printing applications due to its ability to withstand the repeated heating and cooling cycles of a printer heatbed. Prints come off easily when the temperature of the heatbed reaches room temperature, and we always recommend waiting until it reaches 35℃ or lower. If the print still adheres to the plate, simply bend the steel plate and the model will fall right into your hands.</p>\n</div>\n<!-- 右侧图片部分 -->\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/8d8cb8b996d84ec68b9225e04515adf6/20230711-145849.gif\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/8d8cb8b996d84ec68b9225e04515adf6/20230711-145849.gif\" /></div>\n</div>\n<!-- 第三条 -->\n<div class=\"pct_stpc-ic\"><!-- 左侧文案部分 -->\n<div class=\"pct_st-p\" style=\"padding-right: 20px;\">\n<h3 class=\"pct_st\">Compatible with Various Filaments</h3>\n<p class=\"pct_p\">PEI enables printing not only with common materials such as PLA, TPU, PETG, but also with materials that require high temperatures like ABS and Nylon.</p>\n</div>\n<!-- 右侧图片部分 -->\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/a8a8cfd1609549ef9f5912a3638cb5aa/20230711-212050.png\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/a8a8cfd1609549ef9f5912a3638cb5aa/20230711-212050.png\" /></div>\n</div>\n<!-- 第四条 -->\n<div class=\"pct_stpc-ic\"><!-- 左侧文案部分 -->\n<div class=\"pct_st-p\" style=\"padding-right: 20px;\">\n<h3 class=\"pct_st\">Reliable Magnetic Adhesion to Prevent Warping</h3>\n<p class=\"pct_p\">The Bambu Texture PEI Plate features a 0.5mm-thick stainless steel plate that enhances magnetic adhesion. This helps to prevent warping and ensure optimal print quality during 3D printing, reducing the likelihood of the first layer detaching due to deformation. It also helps when printing larger models with materials that are prone to warping like ABS, PC and Nylon.</p>\n</div>\n<!-- 右侧图片部分 -->\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/b5fef7a99b6047868942244fac99a07d/Group_2306.png\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/b5fef7a99b6047868942244fac99a07d/Group_2306.png\" /></div>\n</div>\n<!-- 第五条 -->\n<div class=\"pct_stpc-ic\"><!-- 左侧文案部分 -->\n<div class=\"pct_st-p\" style=\"padding-right: 20px;\">\n<h3 class=\"pct_st\">Textured Surface Finish</h3>\n<p class=\"pct_p\">Bambu Texture PEI Plate offers a one-of-a-kind first-layer surface. Through the application of a powder-coating process, this PEI Build Plate creates a rugged texture that adds a texture to your prints.</p>\n</div>\n<!-- 右侧图片部分 -->\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/20ae4295f1bb41d09f48b15d6634a248/Group_2310_4.png\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/20ae4295f1bb41d09f48b15d6634a248/Group_2310_4.png\" /></div>\n</div>\n</div>\n</div>\n<br /><!-- 文案布局 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-stpc\"><!-- 第一条 -->\n<div class=\"pct_st-p\">\n<h3 class=\"pct_st\" style=\"text-align: center;\">Considerations</h3>\n<ul>\n<li>Increasing heatbed temperature enhances adhesion. Users need to adjust the temperature of the heatbed based on their specific requirements in order to achieve the most suitable level of adhesion.</li>\n<li>Before auto-leveling, it is necessary to repeatedly rub the nozzle in the special wiping area of the build plate to completely remove any residual material at the tip of the nozzle. The coating in the special-designed wiping area will gradually become worn over time. This is normal and does not affect print quality or nozzle lifetime, so there is no need to worry about any quality issues.</li>\n<li>Deposition of dust and grease on the build plate decrease adhesion. It is recommended to regularly clean the surface with detergent and water to maintain best adhesion.</li>\n<li>Bambu Lab recommends only using Bambu Lab official glue on the Bambu Lab build plates, and can not be held responsible for any damage caused to plates as a result of using third-party glue on build plates. Do not clean the Textured PEI with Acetone, as it will damage the PEI surface.</li>\n<li>Always wait for a few minutes before removing printed models to allow the plate to cool down for easy print removal. This prevents damage to the plate and ensures a long lifetime of the product.</li>\n<li>Carefully sanding the surface with fine-grit (600 was recommended) sandpaper can help restore adhesion.</li>\n<li>The latest firmware brings significant improvements to the Bambu Textured PEI Plate calibration using the Micro Lidar, and it is now fully compatible with the automatic calibration process.</li>\n<li>The Textured PEI plate is considered a consumable part, which will degrade over time. The warranty will only cover manufacturing defects, not cosmetic damage like scratches, dents, or cracks. Defective sheets upon arrival are the only ones covered by the warranty.</li>\n</ul>\n<p></p>\n</div>\n<!-- 标题加文案加大图部分 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_t-p\">\n<h3 class=\"pct_t\">Recommended Settings</h3>\n<p class=\"pct_p\">Please note that&nbsp;other slicer settings might need to be adjusted based on the printed model and the filament requirements</p>\n</div>\n</div>\n</div>\n<!-- table布局 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_st-tbc\">\n<div class=\"pct_tbc\">\n<table class=\"pct_tb\" style=\"height: 252px;\"><!-- 表头 -->\n<thead class=\"pct_th\">\n<tr style=\"height: 27px;\">\n<td class=\"pct_td\" style=\"height: 27px; width: 277.869px;\">Materials</td>\n<td class=\"pct_td\" style=\"height: 27px; width: 209.176px;\"><strong>Heatbed Temperature</strong></td>\n<td class=\"pct_td\" style=\"height: 27px; width: 195.412px;\"><strong>Glue Stick Required?</strong></td>\n<td class=\"pct_td\" style=\"height: 27px; width: 333.196px;\"><strong>Upper Glass Cover Plate Removed?</strong></td>\n</tr>\n</thead>\n<tbody><!-- 第一行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"height: 25px; width: 277.869px;\"><strong>PLA/PLA-CF/PLA-GF</strong></td>\n<td class=\"pct_td\" style=\"height: 25px; width: 209.176px;\">45~60℃</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 195.412px;\">No</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 333.196px;\">Yes</td>\n</tr>\n<!-- 第二行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"height: 25px; width: 277.869px;\"><strong>ABS (not for A1 mini)</strong></td>\n<td class=\"pct_td\" style=\"height: 25px; width: 209.176px;\">90~100℃</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 195.412px;\">Yes</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 333.196px;\">No</td>\n</tr>\n<!-- 第三行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"height: 25px; width: 277.869px;\"><strong>PETG/PETG-CF</strong></td>\n<td class=\"pct_td\" style=\"height: 25px; width: 209.176px;\">60~80℃</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 195.412px;\">No</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 333.196px;\">No</td>\n</tr>\n<!-- 第四行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"height: 25px; width: 277.869px;\"><strong>PET-CF (not for A1 mini)</strong></td>\n<td class=\"pct_td\" style=\"height: 25px; width: 209.176px;\">80~100℃</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 195.412px;\">No</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 333.196px;\">No</td>\n</tr>\n<!-- 第五行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"height: 25px; width: 277.869px;\"><strong>TPU 85A/90A</strong></td>\n<td class=\"pct_td\" style=\"height: 25px; width: 209.176px;\">35~ 45℃</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 195.412px;\">No</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 333.196px;\">Yes</td>\n</tr>\n<!-- 第五行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"height: 25px; width: 277.869px;\"><strong>TPU 95A for AMS</strong></td>\n<td class=\"pct_td\" style=\"height: 25px; width: 209.176px;\">35~ 45 ℃</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 195.412px;\">No</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 333.196px;\">Yes</td>\n</tr>\n<!-- 第五行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"height: 25px; width: 277.869px;\"><strong>ASA (not for A1 mini)</strong></td>\n<td class=\"pct_td\" style=\"height: 25px; width: 209.176px;\">90~100℃</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 195.412px;\">Yes</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 333.196px;\">No</td>\n</tr>\n<!-- 第六行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"height: 25px; width: 277.869px;\"><strong>PVA</strong></td>\n<td class=\"pct_td\" style=\"height: 25px; width: 209.176px;\">45~60℃</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 195.412px;\">No</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 333.196px;\">Yes</td>\n</tr>\n<!-- 第七行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"height: 25px; width: 277.869px;\"><strong>PC/PC-CF (not for A1 mini)</strong></td>\n<td class=\"pct_td\" style=\"height: 25px; width: 209.176px;\">90~110℃</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 195.412px;\">Yes</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 333.196px;\">No</td>\n</tr>\n<!-- 第八行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"height: 25px; width: 277.869px;\"><strong>PA/PA-CF/PAHT-CF (not for A1 mini)</strong></td>\n<td class=\"pct_td\" style=\"height: 25px; width: 209.176px;\">90~110℃</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 195.412px;\">Yes</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 333.196px;\">No</td>\n</tr>\n</tbody>\n</table>\n</div>\n</div>\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-icpc\">\n<div class=\"pct_icpc pct_grad-2-pc\">\n<div class=\"pct_ic-p\">\n<p class=\"pct_p\"></p>\n</div>\n</div>\n</div>\n<!-- table布局 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_st-tbc\">\n<h3 class=\"pct_t\" style=\"text-align: center;\">Product Specifications</h3>\n<div class=\"pct_tbc\">\n<table class=\"pct_tb\"><!-- 表头 -->\n<tbody><!-- 第一行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>Material</strong></td>\n<td class=\"pct_td\">PEI Powder Coating + Magnetic Stainless Steel Plate</td>\n</tr>\n<!-- 第二行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>Surface Temperature Resistance</strong></td>\n<td class=\"pct_td\"><span>Up to 180℃</span></td>\n</tr>\n<!-- 第三行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>Thickness</strong></td>\n<td class=\"pct_td\"><span>PEI Powder Coating - 0.075mm<br />Stainless Steel Plate - 0.5mm/0.4mm</span></td>\n</tr>\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>Usable Print Size</strong></td>\n<td class=\"pct_td\"><span>350*320mm <br />256*256mm<br />180*180mm</span></td>\n</tr>\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>Packaging Size</strong></td>\n<td class=\"pct_td\"><span>408*388*17mm<br />300*270*17mm<br />220*190*15mm</span></td>\n</tr>\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>Packaging Weight</strong></td>\n<td class=\"pct_td\"><span>0.78kg<br />0.45kg<br />0.23kg</span></td>\n</tr>\n</tbody>\n</table>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>"
+   },
+   {
+    "id": "769082627620679686",
+    "name": "Engineering Plate",
+    "html": "<div class=\"pct pct_mc\">\n<div style=\"text-align: center;\">\n<div style=\"text-align: center;\"><span style=\"font-size: 24px;\"><strong>Bambu Engineering Plate</strong></span></div>\n<div style=\"text-align: center;\"><span style=\"font-size: 24px;\"><strong></strong></span>&nbsp; &nbsp;&nbsp;</div>\n</div>\n<div style=\"text-align: center;\">\n<div class=\"pct pct_mc\">\n<div class=\"pct_head-ic\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s1/default/b59279e93e954edfa72f5cadb12aa802/Engineering_Plate__phone.png\" alt=\"vision encoder\" /> <!-- PC端图片 -->2.1.<img class=\"pct_i\" src=\"https://store.bblcdn.com/s1/default/3950d456da684647ae0da920b475f743/Engineering_Plate_PC.png\" alt=\"vision encoder\" /></div>\n</div>\n<br /><br />\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-stpcic\"><!-- 第一条 -->\n<div class=\"pct_stpc-ic\"><!-- 左侧文案部分 -->\n<div class=\"pct_st-p\">\n<h3 class=\"pct_st\" style=\"text-align: left;\">One Build Plate for All Filaments</h3>\n<p class=\"pct_p\" style=\"text-align: left;\">With a simple layer of glue, the Engineering Plate is compatible with our entire filament lineup, it's the perfect go-to solution when you're not sure which plate to use.</p>\n</div>\n<!-- 右侧图片部分 -->\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s1/default/5185b93f1b1f495990047c93ca22a1e3/1.jpg\" alt=\"smoke Purifier\" /><img class=\"pct_i\" src=\"https://store.bblcdn.com/s1/default/f701dd0e69594e6bb8e4cf8283345ca0/PC1.png\" alt=\"smoke Purifier\" />&nbsp;</div>\n</div>\n<div class=\"pct_stpc-ic\"><!-- 左侧文案部分 -->\n<div class=\"pct_st-p\">\n<h3 class=\"pct_st\" style=\"text-align: left;\">Durable Smooth Surface Coating</h3>\n<p class=\"pct_p\" style=\"text-align: left;\">The refreshed coating significantly improves the plate's temperature, scratch, and corrosion resistance. Built to withstand prolonged high-temperature printing and hundreds of washes and peels, its smooth, dependable surface guarantees stable adhesion every single time.</p>\n</div>\n<!-- 右侧图片部分 -->\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s1/default/1fb047d852164bd3b4b32d59891e546b/Engineering_Plate__2_phone.png\" alt=\"smoke Purifier\" /><img class=\"pct_i\" src=\"https://store.bblcdn.com/s1/default/66ffde9cfda3411988b5b7902b6a5fbb/Engineering_Plate_3.png\" /></div>\n</div>\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-stpcic\"><!-- 第一条 -->\n<div class=\"pct_stpc-ic\"><!-- 左侧文案部分 -->\n<div class=\"pct_st-p\">\n<h3 class=\"pct_st\" style=\"text-align: left;\">Smooth &amp; Natural Surface Finish</h3>\n<p class=\"pct_p\" style=\"text-align: left;\">The smooth base coating can impart a smooth &amp; flat texture to the bottom surface of the printed object, better blend in with other surfaces.</p>\n</div>\n<!-- 右侧图片部分 -->\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s1/default/b097b2c237ac44bab8b4484b6af5eee7/MO2.jpg\" alt=\"smoke Purifier\" /><img class=\"pct_i\" src=\"https://store.bblcdn.com/s1/default/c6c8193480524a8c85c91aa30f4066da/PC2.jpg\" alt=\"smoke Purifier\" />&nbsp;</div>\n</div>\n<p></p>\n<!-- 文案布局 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-stpc\"><!-- 第一条 -->\n<div class=\"pct_st-p\"></div>\n</div>\n</div>\n<h3 class=\"pct_t\" style=\"text-align: center;\"><strong><span style=\"font-size: 34px;\">Considerations</span></strong></h3>\n<p></p>\n<ol>\n<li>1. Before printing with any filament, it is recommended to apply glue on the <strong>Engineering Plate</strong>. Applying <strong>solid glue</strong> can make part removal easier, but since solid glue has a certain thickness and is difficult to apply evenly, the <strong>printing stability and first-layer quality</strong> are usually not as good as when using <strong>liquid glue</strong>. On the other hand, <strong>liquid glue</strong> may make part removal more difficult. You should choose the appropriate glue type based on the <strong>filament</strong>, <strong>printing environment</strong>, and other practical conditions. For more details, please refer to the official wiki: <a href=\"https://wiki.bambulab.com/en/general/how-to-use-bbl-liquid-glue\" target=\"_blank\" rel=\"noopener\">Bambu Lab Wiki</a>.</li>\n<li>2. When using a scraper to remove prints, make sure to use the correct technique. If the model adheres too tightly to the build plate, apply alcohol to the interface between the model and the plate to reduce adhesion and make removal easier. This helps prevent damage to the model, the build plate, or potential injury to the user caused by excessive force.</li>\n<li>3. Increasing heatbed temperature enhances adhesion. Users need to adjust the temperature of the heatbed based on their specific requirements in order to achieve the most suitable level of adhesion.</li>\n<li>4. For X1 series, P1 series, and A1 printers, before auto-leveling, it is necessary to repeatedly rub the nozzle in the wiping area of the build plate to thoroughly remove any residual material at the tip of the nozzle. The coating in the wiping area will gradually wear over time, which is normal and does not affect print quality or nozzle lifespan, so there is no need to worry about quality issues.</li>\n<li>5. Dust and grease deposits on the build plate can reduce adhesion. It is recommended to regularly clean the build plate with warm water and dish soap to maintain optimal adhesion. Do not use other unapproved cleaning agents.</li>\n<li>6. Bambu Lab recommends only using Bambu Lab official glue on the Bambu Lab build plates, and cannot be held responsible for any damage caused to plates as a result of using third-party glue on build plates. Do not clean the Engineering Plate with Acetone, as it will damage the Engineering Plate surface.</li>\n<li>7. Always wait for a few minutes before removing printed models to allow the plate to cool down for easy print removal. This prevents damage to the plate and ensures a long lifetime of the product.</li>\n<li>8. The latest firmware brings significant improvements to the Bambu Engineering Plate calibration using the Micro Lidar, and it is now fully compatible with the automatic calibration process.</li>\n<li>9. The Engineering Plate plate is considered a consumable part, which will degrade over time. The warranty will only cover manufacturing defects, not cosmetic damage like scratches, dents, or cracks. Defective sheets upon arrival are the only ones covered by the warranty.</li>\n</ol>\n<p></p>\n<p></p>\n<!-- 标题加文案加大图部分 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_t-p\">\n<h3 class=\"pct_t\"></h3>\n<h3 class=\"pct_t\">Recommended Settings</h3>\n<p class=\"pct_p\">Please note that&nbsp;other slicer settings might need to be adjusted based on the printed model and the filament requirements</p>\n</div>\n</div>\n</div>\n<!-- table布局 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_st-tbc\">\n<div class=\"pct_tbc\">\n<table class=\"pct_tb\"><!-- 表头 -->\n<thead class=\"pct_th\">\n<tr>\n<td class=\"pct_td\"><strong>Materials</strong></td>\n<td class=\"pct_td\"><strong>Heatbed Temperature</strong></td>\n<td class=\"pct_td\"><strong>Glue Stick Required?</strong></td>\n</tr>\n</thead>\n<tbody><!-- 第一行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>PLA/PLA-CF/PLA-GF</strong></td>\n<td class=\"pct_td\">45~60℃</td>\n<td class=\"pct_td\">Glue Stick/Liquid Glue</td>\n</tr>\n<!-- 第二行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>PETG/PETG-CF</strong></td>\n<td class=\"pct_td\">60~80℃</td>\n<td class=\"pct_td\">Glue Stick/Liquid Glue</td>\n</tr>\n<!-- 第三行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>ABS (not for A1 mini)</strong></td>\n<td class=\"pct_td\">90~100℃</td>\n<td class=\"pct_td\">Glue Stick/Liquid Glue</td>\n</tr>\n<!-- 第四行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>ASA (not for A1 mini)</strong></td>\n<td class=\"pct_td\">90~100℃</td>\n<td class=\"pct_td\">Glue Stick/Liquid Glue</td>\n</tr>\n<!-- 第5行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>TPU</strong></td>\n<td class=\"pct_td\">35~45℃</td>\n<td class=\"pct_td\">Glue Stick/Liquid Glue</td>\n</tr>\n<!-- 第6行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>PVA</strong></td>\n<td class=\"pct_td\">45~60℃</td>\n<td class=\"pct_td\">Glue Stick/Liquid Glue</td>\n</tr>\n<!-- 第7行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>PC/PC-CF (not for A1 mini)</strong></td>\n<td class=\"pct_td\">90~110℃</td>\n<td class=\"pct_td\">Glue Stick/Liquid Glue</td>\n</tr>\n<!-- 第8行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>PA/PA-CF/PAHT-CF (not for A1 mini)</strong></td>\n<td class=\"pct_td\">90~110℃</td>\n<td class=\"pct_td\">Glue Stick/Liquid Glue</td>\n</tr>\n<!-- 第9行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>PET-CF (not for A1 mini)</strong></td>\n<td class=\"pct_td\">80~100℃</td>\n<td class=\"pct_td\">Glue Stick/Liquid Glue</td>\n</tr>\n</tbody>\n</table>\n</div>\n</div>\n</div>\n<!-- table布局 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_st-tbc\">\n<h3 class=\"pct_t\" style=\"text-align: center;\"></h3>\n<h3 class=\"pct_t\" style=\"text-align: center;\"></h3>\n<h3 class=\"pct_t\" style=\"text-align: center;\">Product Specifications</h3>\n<p></p>\n<div class=\"pct_tbc\">\n<table class=\"pct_tb\" style=\"height: 254px;\"><!-- 表头 -->\n<tbody><!-- 第一行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"text-align: center; height: 25px; width: 533.652px;\"><strong>Material</strong></td>\n<td class=\"pct_td\" style=\"text-align: center; height: 25px; width: 582.598px;\">Polyester powder + manganese steel</td>\n</tr>\n<!-- 第二行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"text-align: center; height: 25px; width: 533.652px;\"><strong>Surface Temperature Resistance</strong></td>\n<td class=\"pct_td\" style=\"text-align: center; height: 25px; width: 582.598px;\"><span>Up to 120℃</span></td>\n</tr>\n<!-- 第三行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"text-align: center; height: 25px; width: 533.652px;\"><strong>Thickness</strong></td>\n<td class=\"pct_td\" style=\"text-align: center; height: 25px; width: 582.598px;\"><span>0.5mm</span></td>\n</tr>\n<tr class=\"pct_tr\" style=\"height: 77px;\">\n<td class=\"pct_td\" style=\"text-align: center; height: 77px; width: 533.652px;\"><strong>Usable Print Size</strong></td>\n<td class=\"pct_td\" style=\"text-align: center; height: 77px; width: 582.598px;\">\n<p><span style=\"font-size: 15px;\"><span>X1C/P1P/P1S/A1/P2S/X2D - 256*256mm<br />H2D/H2S - 350*320mm <br />H2C/A2L - 330*320mm</span> </span></p>\n</td>\n</tr>\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"text-align: center; height: 25px; width: 533.652px;\"><strong>Packaging Size</strong></td>\n<td class=\"pct_td\" style=\"text-align: center; height: 25px; width: 582.598px;\">\n<p><span style=\"font-size: 15px;\"><span>X1C/P1P/P1S/A1/P2S/X2D - 315*295*15mm</span> </span></p>\n<p><span style=\"font-size: 15px;\"><span>H2D/H2S - </span> 393mm*380mm*15mm</span></p>\n<p><span style=\"font-size: 15px;\"><span>H2C/A2L - </span> 393mm*380mm*15mm</span></p>\n</td>\n</tr>\n<tr class=\"pct_tr\" style=\"height: 77px;\">\n<td class=\"pct_td\" style=\"text-align: center; height: 77px; width: 533.652px;\"><strong>Packaging Weight</strong></td>\n<td class=\"pct_td\" style=\"text-align: center; height: 77px; width: 582.598px;\">\n<p><span style=\"font-size: 15px;\"><span>X1C/P1P/P1S/A1/P2S/X2D - </span> 0.50kg</span></p>\n<p><span style=\"font-size: 15px;\"><span>H2D/H2S - </span> 0.78kg<br /><span>H2C/A2L - </span> 0.78kg</span></p>\n</td>\n</tr>\n</tbody>\n</table>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>"
+   },
+   {
+    "id": "769082627620679689",
+    "name": "Cool Plate SuperTack",
+    "html": "<div class=\"pct pct_mc\">\n<div style=\"text-align: center;\">\n<div style=\"text-align: center;\"><span style=\"font-size: 24px;\"><strong>Bambu Cool Plate SuperTack Series</strong></span></div>\n<div style=\"text-align: center;\"><span style=\"font-size: 24px;\"><strong></strong></span>&nbsp; &nbsp;&nbsp;</div>\n</div>\n<div style=\"text-align: center;\">\n<div class=\"pct pct_mc\">\n<div class=\"pct_head-ic\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/6c088af241d3479c93d34ca9db2c06b4/cool_plate_banner_48c7e96a-4aa5-4229-bc83-a6b52ea85512.png\" alt=\"silk filament\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/6c088af241d3479c93d34ca9db2c06b4/cool_plate_banner_48c7e96a-4aa5-4229-bc83-a6b52ea85512.png\" alt=\"silk filament\" /></div>\n</div>\n<br /><br /><br /><!-- 标题加文案加大图部分 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_t-p\">\n<h2 class=\"pct_t\">Say Goodbye to Print Failures</h2>\n<p>&nbsp;</p>\n<p class=\"pct_p\" style=\"text-align: left;\">SuperTack coating provides ultra-strong adhesion to PLA and PETG filaments, even at lower heatbed temperatures. It enhances printing success by <strong>eliminating adhesion issues</strong>, <strong>reduces warping when printing large objects</strong> and works well with surfaces that are in bad shape.</p>\n</div>\n<div class=\"pct_divider\"></div>\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_t-p\">\n<h3 class=\"pct_st pct_st\">Eliminating Adhesion Issues</h3>\n<p class=\"pct_p\"></p>\n</div>\n</div>\n</div>\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-icpc\" style=\"padding: 0;\"><!-- 不同分辨率分栏数量 pct_grad-分栏数量-设备 --> <!-- 替换下一行 -->\n<div class=\"pct_icpc pct_grad-2-pc pct_grad-1-mobile\"><!-- 第一条 -->\n<div class=\"pct_ic-p\">\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/427dd355da0144ebaf17c5ddd78bf129/82ab8f441b226406c4182d8b6d47cd69.png\" alt=\"silk filament\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/427dd355da0144ebaf17c5ddd78bf129/82ab8f441b226406c4182d8b6d47cd69.png\" alt=\"silk filament\" /></div>\n</div>\n<!-- 第二条 -->\n<div class=\"pct_ic-p\">\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/ed71ef94f5d54bcdbd2d48f82678e5d8/origin_img_v2_db31adb4-1790-4785-b9b8-c2110c23d71g_1_f2f4b3cc-9765-49f4-b642-788d6c5f3ebe.png\" alt=\"silk filament\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/ed71ef94f5d54bcdbd2d48f82678e5d8/origin_img_v2_db31adb4-1790-4785-b9b8-c2110c23d71g_1_f2f4b3cc-9765-49f4-b642-788d6c5f3ebe.png\" alt=\"silk filament\" /></div>\n</div>\n</div>\n</div>\n</div>\n</div>\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_t-p\"></div>\n</div>\n</div>\n<br /><br /><!-- 标题加文案加大图部分 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_t-p\">\n<h2 class=\"pct_st\">Reduces Warping when Printing Large Objects</h2>\n<p class=\"pct_p\"></p>\n</div>\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/842f09f3d83c46aebc3460f1a275e2e8/c98b64bfd6501c53e6a560158d11a4ff.jpg\" alt=\"图片加载失败文案\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/842f09f3d83c46aebc3460f1a275e2e8/c98b64bfd6501c53e6a560158d11a4ff.jpg\" alt=\"图片加载失败文案\" /></div>\n</div>\n</div>\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-icpc\" style=\"padding: 0;\">\n<div class=\"pct_divider\"></div>\n<!-- 标题加文案加大图部分 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_t-p\">\n<h3 class=\"pct_st pct_st\" style=\"margin-top: 30px;\">The Surface is in Bad Shape? No Problem!</h3>\n</div>\n<br />\n<div class=\"pct_t-p\"></div>\n<p><video style=\"width: 100%; heigth: 100%;\" src=\"https://store.bblcdn.com/s7/default/aa0f8fd95b334c2db5a147cc2ecb2ded/25d141bf0b7e4dd595ee24464d633062.mp4\" controls=\"controls\" width=\"300\" height=\"150\" autoplay=\"autoplay\" loop=\"loop\" muted=\"\" playsinline=\"\" poster=\"https://store.bblcdn.com/s7/default/2a8cdb5eab504c6180ae7e2354662056/screenshot-20241023-152441.png\" data-mce-src=\"https://store.bblcdn.com/s7/default/aa0f8fd95b334c2db5a147cc2ecb2ded/25d141bf0b7e4dd595ee24464d633062.mp4\" data-mce-style=\"width: 100%; heigth:100%\"></video></p>\n</div>\n</div>\n<br /><br /><!-- 标题加文案加大图部分 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_t-p\">\n<h2 class=\"pct_t\">Long Lasting Performance</h2>\n<p class=\"pct_p\" style=\"text-align: left;\">The SuperTack coating is durable, retaining its sticky properties even after extensive use. This results in a longer lifespan for the printing plate, reducing printing costs <strong>(less than 20% adhesion loss after 300 prints)</strong> and lowering carbon emissions.</p>\n</div>\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/48d65cfdf1e644038a564a8fbe3d8a70/643ab9c00bbccb209e95bddd9c550ec3_498a8556-817a-4eff-afeb-08d8cf47d9dc.png\" alt=\"图片加载失败文案\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/48d65cfdf1e644038a564a8fbe3d8a70/643ab9c00bbccb209e95bddd9c550ec3_498a8556-817a-4eff-afeb-08d8cf47d9dc.png\" alt=\"图片加载失败文案\" /><em></em></div>\n</div>\n*The test data was produced using PLA Basic filament and completed on the A1 3D Printer.</div>\n</div>\n<br /><br />\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-stpcic\"><!-- 第一条 -->\n<div class=\"pct_stpc-ic\"><!-- 左侧文案部分 -->\n<div class=\"pct_st-p\">\n<h3 class=\"pct_st\"></h3>\n<h3 class=\"pct_st\">Smooth &amp; Natural Surface Finish</h3>\n<p class=\"pct_p\">The SuperTack coating can impart a smooth and matte texture to the bottom surface of the printed object, better blend-in with other surfaces.</p>\n</div>\n<!-- 右侧图片部分 -->\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/87aae368682f4126ab64a8e4b7ad7d4e/e87f31ec9593353ec3d24c75761c8416.png\" alt=\"图片加载失败文案\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/87aae368682f4126ab64a8e4b7ad7d4e/e87f31ec9593353ec3d24c75761c8416.png\" alt=\"图片加载失败文案\" /></div>\n</div>\n<!-- 第二条 -->\n<div class=\"pct_stpc-ic\"><!-- 左侧文案部分 -->\n<div class=\"pct_st-p\">\n<h3 class=\"pct_st\">Energy Saving</h3>\n<p class=\"pct_p\">The SuperTack coating requires only an extremely low heatbed temperature to ensure that printed objects adhere securely. This means you can save a significant amount of energy during heating, leading to lower power bills and, more importantly, helping to protect our planet.</p>\n</div>\n<!-- 右侧图片部分 -->\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/5af79996650f4f8baf981805a60fadc2/3db4fa25ffaf9337df3e65cc362b8ac0.png\" alt=\"图片加载失败文案\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/5af79996650f4f8baf981805a60fadc2/3db4fa25ffaf9337df3e65cc362b8ac0.png\" alt=\"图片加载失败文案\" /></div>\n</div>\n<br /><br />\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_t-p\">\n<h2 class=\"pct_t\">Comparison of Heatbed Temperatures for Different Build Plates</h2>\n<!-- table布局 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_st-tbc\">\n<div class=\"pct_tbc\">\n<table class=\"pct_tb\"><!-- 表头 -->\n<thead class=\"pct_th\">\n<tr>\n<td class=\"pct_td\" style=\"text-align: center;\"><strong>Materials</strong></td>\n<td class=\"pct_td\"><strong>Heatbed Temperature with Textured PEI</strong></td>\n<td class=\"pct_td\"><strong>Heatbed temperature with SuperTack</strong></td>\n</tr>\n</thead>\n<tbody>\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"text-align: center;\"><strong>PLA</strong></td>\n<td class=\"pct_td\">65℃</td>\n<td class=\"pct_td\">45℃</td>\n</tr>\n</tbody>\n</table>\n</div>\n</div>\n<!-- 第三条 -->\n<div class=\"pct_stpc-ic\"><!-- 左侧文案部分 --></div>\n<!-- 如需添加在此处添加 --></div>\n</div>\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\"></div>\n</div>\n</div>\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_t-p\">\n<h3 class=\"pct_t pct_t\" style=\"margin-top: 30px;\">How to remove prints from SuperTack</h3>\n</div>\n<br />(The instruction below shows you how to remove the prints without damaging the coating)<br /><br />Use the scraper included with your printer to gently lift the print, then pry it off carefully. If the print is sticking too tightly, heat the plate on the heatbed to <strong>50&deg;C</strong> to assist with removal.\n<div class=\"pct_t-p\"></div>\n<p><video style=\"width: 100%; heigth: 100%;\" src=\"https://store.bblcdn.com/s7/default/e66748c75a314bcd80da62b4fa01817a/supertack.mp4\" controls=\"controls\" width=\"300\" height=\"150\" autoplay=\"autoplay\" loop=\"loop\" muted=\"\" playsinline=\"\" poster=\"https://store.bblcdn.com/s7/default/59e343e16fd742e0b96933270c854cf3/screenshot-20241120-162633.png\" data-mce-src=\"https://store.bblcdn.com/s7/default/e66748c75a314bcd80da62b4fa01817a/supertack.mp4\" data-mce-style=\"width: 100%; heigth:100%\"></video></p>\n</div>\n</div>\n</div>\n</div>\n</div>\n<!-- 文案布局 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-stpc\"><!-- 第一条 -->\n<div class=\"pct_st-p\">\n<h3 class=\"pct_t\"></h3>\n<h3 class=\"pct_t\" style=\"text-align: center;\">Considerations</h3>\n<ul style=\"text-align: left;\">\n<li>The surface is soft. Be careful when using a scraper to remove printed parts.&nbsp;</li>\n<li>Do <strong>NOT</strong> print with TPU filament, as it will damage the build plate.</li>\n<li>Increasing heatbed temperature enhances adhesion. Users need to adjust the temperature of the heatbed based on their specific requirements in order to achieve the most suitable level of adhesion.</li>\n<li>Before auto-leveling, it is necessary to repeatedly rub the nozzle in the special wiping area of the build plate to completely remove any residual material at the tip of the nozzle. The coating in the special-designed wiping area will gradually become worn over time. This is normal and does not affect print quality or nozzle lifetime, so there is no need to worry about any quality issues.</li>\n<li>Bambu Cool Plate SuperTack is considered a consumable part, which will degrade over time. The warranty will only cover manufacturing defects, not cosmetic damage like scratches, dents, or cracks. Defective sheets upon arrival are the only ones covered by the warranty.</li>\n<li>SuperTack provides good adhesion <strong>without</strong> adhesive or frequent cleaning. You can clean the surface with water and detergent if heavy dirt appears. Do <strong>NOT</strong> use organic solvents (especially acetone) to clean the build plate, as it will damage the SuperTack surface.</li>\n<li>Bambu PLA Silk material exhibits strong adhesion on the SuperTack build plate, which may damage printed models. Therefore, we do not recommend using Bambu PLA Silk material on the SuperTack build plate. For users printing with third-party PLA Silk materials, please select the Generic PLA Silk preset in Bambu Studio and evaluate material compatibility based on the specific conditions.</li>\n</ul>\n</div>\n</div>\n<div class=\"pct pct_mc\">\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-icpc\">\n<div class=\"pct_icpc pct_grad-2-pc\">\n<div class=\"pct_ic-p\">\n<p class=\"pct_p\"></p>\n</div>\n</div>\n</div>\n</div>\n<br /><br /><!-- table布局 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_st-tbc\">\n<h3 class=\"pct_t\" style=\"text-align: center;\">Product Specifications</h3>\n<div class=\"pct_tbc\">\n<table class=\"pct_tb\" style=\"width: 100%;\"><!-- 表头 -->\n<tbody>\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"text-align: center;\"><strong>Material</strong></td>\n<td class=\"pct_td\" style=\"width: 60.038%;\">Specially Designed Coating<br />Spring Steel Plate</td>\n</tr>\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"text-align: center;\"><strong>Thickness</strong></td>\n<td class=\"pct_td\" style=\"width: 60.038%;\">Coating - 0.05mm<br />Steel Plate - 0.4mm</td>\n</tr>\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"text-align: center;\"><strong>Surface Temperature Resistance</strong></td>\n<td class=\"pct_td\" style=\"width: 60.038%;\">Up to 120℃</td>\n</tr>\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"text-align: center;\"><strong>Usable Print Size</strong></td>\n<td class=\"pct_td\" style=\"width: 60.038%;\"><span>X1C/P1P/P1S/A1/P2S/X2D - 256*256mm<br />H2D/H2S - 350*320mm <br />H2C/A2L - 330*320mm</span></td>\n</tr>\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"text-align: center;\"><strong>Packaging Size</strong></td>\n<td class=\"pct_td\" style=\"width: 60.038%;\">\n<p><span style=\"font-size: 15px;\"><span>X1C/P1P/P1S/A1/P2S/X2D - 315*295*15mm</span> </span></p>\n<p><span style=\"font-size: 15px;\"><span>H2D/H2S - </span> 393mm*380mm*15mm</span></p>\n<p><span style=\"font-size: 15px;\"><span>H2C/A2L - </span> 393mm*380mm*15mm</span></p>\n</td>\n</tr>\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"text-align: center;\"><strong>Packaging Weight</strong></td>\n<td class=\"pct_td\" style=\"width: 60.038%;\"><span><span style=\"font-size: 15px;\">X1C/P1P/P1S/A1/P2S/X2D - </span> 0.22 kg<br /><span style=\"font-size: 15px;\">H2D/H2S - </span> 0.48 kg<br /><span style=\"font-size: 15px;\">H2C/A2L - </span> 0.46 kg</span></td>\n</tr>\n</tbody>\n</table>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>"
+   }
+  ]
+ },
+ "jsonld": [
+  {
+   "@context": "https://schema.org/",
+   "@type": "ProductGroup",
+   "name": "Build Plate Combo",
+   "description": "",
+   "url": "https://us.store.bambulab.com/products/build-plate-combo",
+   "brand": {
+    "@type": "Brand",
+    "name": "Bambu Lab"
+   },
+   "productGroupID": "769076186868396032",
+   "hasVariant": [
+    {
+     "@type": "Product",
+     "sku": "773447978110222337",
+     "image": "https://store.bblcdn.com/s7/default/43c742a24c6c447f90386ee932899e71/256_engineering_cool_plate.jpg",
+     "name": "Build Plate Combo - X1/P1/A1 Series / Cool Plate + Engineering (with Glue Stick)",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/build-plate-combo?id=773447978110222337",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "773447978110222342",
+     "image": "https://store.bblcdn.com/s7/default/eaea832685404690a3b4e425b186b4f3/256_engineering_cool_plate_texture.jpg",
+     "name": "Build Plate Combo - X1/P1/A1 Series / Cool Plate + Engineering (with Glue Stick) + Texture PEl",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/build-plate-combo?id=773447978110222342",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "773448289910587393",
+     "image": "https://store.bblcdn.com/s7/default/43c742a24c6c447f90386ee932899e71/256_engineering_cool_plate.jpg",
+     "name": "Build Plate Combo - X2D/P2S / Cool Plate + Engineering (with Glue Stick)",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/build-plate-combo?id=773448289910587393",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "773448289910587398",
+     "image": "https://store.bblcdn.com/s7/default/eaea832685404690a3b4e425b186b4f3/256_engineering_cool_plate_texture.jpg",
+     "name": "Build Plate Combo - X2D/P2S / Cool Plate + Engineering (with Glue Stick) + Texture PEl",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/build-plate-combo?id=773448289910587398",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "773450084238032897",
+     "image": "https://store.bblcdn.com/s7/default/d98275b1af3640c09d2acb315749397b/350_engineering_cool_plate.jpg",
+     "name": "Build Plate Combo - H2D / Cool Plate + Engineering (with Glue Stick)",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/build-plate-combo?id=773450084238032897",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "773450084238032902",
+     "image": "https://store.bblcdn.com/s7/default/e406bdc1e18d49c89fdbd2762d73f2c6/3_packs_350.jpg",
+     "name": "Build Plate Combo - H2D / Cool Plate + Engineering (with Glue Stick) + Texture PEl",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/build-plate-combo?id=773450084238032902",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "773450084238032907",
+     "image": "https://store.bblcdn.com/s7/default/d98275b1af3640c09d2acb315749397b/350_engineering_cool_plate.jpg",
+     "name": "Build Plate Combo - H2S / Cool Plate + Engineering (with Glue Stick)",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/build-plate-combo?id=773450084238032907",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "773450084238032912",
+     "image": "https://store.bblcdn.com/s7/default/e406bdc1e18d49c89fdbd2762d73f2c6/3_packs_350.jpg",
+     "name": "Build Plate Combo - H2S / Cool Plate + Engineering (with Glue Stick) + Texture PEl",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/build-plate-combo?id=773450084238032912",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    }
+   ]
+  }
+ ]
+}

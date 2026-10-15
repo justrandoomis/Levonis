@@ -1,0 +1,4244 @@
+{
+ "_meta": {
+  "source_url": "https://us.store.bambulab.com/products/pla-basic-filament",
+  "fetched_at": "2026-10-15T09:54:09Z",
+  "extracted_from": "self.__next_f RSC flight data (App Router); product object = props.data of the PDP component, description = separate RSC element (see description.kind)",
+  "removed_keys": [
+   "abGroup",
+   "discountOffText",
+   "discountPrice",
+   "flashSaleVO",
+   "gradientDiscountActivityId",
+   "gradientDiscountSkus",
+   "marketingDisplayAbGroup",
+   "maximum",
+   "minimum",
+   "orderInfo",
+   "orderInfoTitle",
+   "pointsInfo",
+   "price",
+   "priceCurrency",
+   "priceDescriptionList",
+   "priceExplanation",
+   "productSkuBuyAndGetVO",
+   "productSkuPreSale",
+   "promotionDescription",
+   "qryPromotionFlag",
+   "quantityLimitType",
+   "quantityLimitValue",
+   "serviceGuaranteeList",
+   "skuPromotionPointsSwitch"
+  ],
+  "notes": "Prices, compare-at prices, purchase limits, promotions, points and store-wide shipping/service boilerplate removed; dollar amounts inside text replaced with $[redacted]. Ids are strings (many exceed 2^53)."
+ },
+ "product": {
+  "id": "6945419460744",
+  "name": "PLA Basic",
+  "type": 1,
+  "subTitle": null,
+  "description": null,
+  "seoCode": "pla-basic-filament",
+  "seoTitle": "PLA Basic",
+  "seoMetaDescription": "PLA is the most common material in 3D printing as it's easy to print and inexpensive. Meanwhile, its stiffness and strength can meet most printing needs. It is worth mentioning that it can biodegrade in some artificial composting conditions. Bambu PLA Basic is designed for high-speed printing. Compared to general PLA, it can easily achieve printing speeds up to 250-300 mm/s and has excellent toughness and Z-layer strength.",
+  "seoUrlHandle": "https://us.store.bambulab.com/products/pla-basic-filament",
+  "productFeaturesTitle": "Product Features",
+  "productFeatures": "<div style=\"text-align: left; box-sizing: border-box;\">\n<div data-page-id=\"XQp2da9ZDoBR0fx29PGcd0Z7nNc\" data-lark-html-role=\"root\" data-docx-has-block-data=\"false\">\n<div data-page-id=\"XQp2da9ZDoBR0fx29PGcd0Z7nNc\" data-lark-html-role=\"root\" data-docx-has-block-data=\"false\">\n<ul style=\"margin: 0px; padding: 0px; list-style-position: inside; text-align: left; white-space: normal; box-sizing: border-box;\">\n<li style=\"box-sizing: border-box;\">Easy to Print &amp; Beginner Friendly</li>\n<li style=\"box-sizing: border-box;\">Smooth Surface Finish</li>\n<li style=\"box-sizing: border-box;\">Biodegradable</li>\n<li style=\"box-sizing: border-box;\">Diameter: 1.75mm +/- 0.03mm</li>\n</ul>\n</div>\n</div>\n</div>\n<p>&nbsp;</p>\n<div class=\"bbl-title-4 text-bbl-grey-13 font-bold\">Cautions for Use</div>\n<ul style=\"margin: 0px; padding: 0px; margin-top: 8px; list-style-position: inside; text-align: left; white-space: normal; box-sizing: border-box;\">\n<li style=\"box-sizing: border-box;\">All AMS Series Compatible</li>\n</ul>\n<p>&nbsp;</p>\n<p style=\"margin-top: 0px; font-size: inherit; font-weight: inherit; margin-bottom: 0px; color: red; box-sizing: border-box;\">Note: The refill needs to be used with a spool.</p>",
+  "productFeaturesModuleList": [
+   {
+    "id": "733532510432825350",
+    "title": "Product Features",
+    "content": "<div style=\"text-align: left; box-sizing: border-box;\">\n<div data-page-id=\"XQp2da9ZDoBR0fx29PGcd0Z7nNc\" data-lark-html-role=\"root\" data-docx-has-block-data=\"false\">\n<div data-page-id=\"XQp2da9ZDoBR0fx29PGcd0Z7nNc\" data-lark-html-role=\"root\" data-docx-has-block-data=\"false\">\n<ul style=\"margin: 0px; padding: 0px; list-style-position: inside; text-align: left; white-space: normal; box-sizing: border-box;\">\n<li style=\"box-sizing: border-box;\">Easy to Print &amp; Beginner Friendly</li>\n<li style=\"box-sizing: border-box;\">Smooth Surface Finish</li>\n<li style=\"box-sizing: border-box;\">Biodegradable</li>\n<li style=\"box-sizing: border-box;\">Low indoor printing emissions, <strong>certified to UL GREENGUARD 2904</strong></li>\n<li style=\"box-sizing: border-box;\">Diameter: 1.75mm +/- 0.03mm</li>\n</ul>\n</div>\n</div>\n</div>\n<p>&nbsp;</p>\n<div class=\"bbl-title-4 text-bbl-grey-13 font-bold\">Cautions for Use</div>\n<ul style=\"margin: 0px; padding: 0px; margin-top: 8px; list-style-position: inside; text-align: left; white-space: normal; box-sizing: border-box;\">\n<li style=\"box-sizing: border-box;\">All AMS Series Compatible</li>\n</ul>\n<p>&nbsp;</p>\n<p style=\"margin-top: 0px; font-size: inherit; font-weight: inherit; margin-bottom: 0px; color: red; box-sizing: border-box;\">Note: The refill needs to be used with a spool.</p>",
+    "iconUrl": ""
+   }
+  ],
+  "newFlag": 0,
+  "externalVideoTitle": null,
+  "externalVideoLinkList": [
+   ""
+  ],
+  "mediaFiles": [
+   {
+    "resourceFileId": "756356718673268736",
+    "url": "https://store.bblcdn.com/s7/default/18de47bcc5d9405596014400afd8a661/PLA_Basic_White.jpg"
+   },
+   {
+    "resourceFileId": "35963327348872",
+    "url": "https://store.bblcdn.com/s7/default/8b4f6ec791ab4cf3815cb2ddd3473d43/PLABasic.jpg"
+   },
+   {
+    "resourceFileId": "762170226073677824",
+    "url": "https://store.bblcdn.com/s7/default/d9169957dc2f414dbbf555a00afa7ac8/In_the_Box_3.jpg"
+   },
+   {
+    "resourceFileId": "43275350835336",
+    "url": "https://store.bblcdn.com/s7/default/976faf2e1ea24428aaacd7ec37e2a170/Beige.jpg"
+   },
+   {
+    "resourceFileId": "40962210627720",
+    "url": "https://store.bblcdn.com/s7/default/d9b993d99ef54581968a5711269f2be2/light_gray_25c0c41d-107b-4d05-96d1-3de1efb728d9.jpg"
+   },
+   {
+    "resourceFileId": "43275351097480",
+    "url": "https://store.bblcdn.com/s7/default/5728a39780844f06a9dc4bf3c3907a15/Yellow.jpg"
+   },
+   {
+    "resourceFileId": "40958881366152",
+    "url": "https://store.bblcdn.com/s7/default/dcc368a07e73489da62a8cceb29e31a2/SunflowerYellow.jpg"
+   },
+   {
+    "resourceFileId": "43275350900872",
+    "url": "https://store.bblcdn.com/s7/default/b8f76cac43b94ef18c4d3801f2bd3856/Gold.jpg"
+   },
+   {
+    "resourceFileId": "40958881202312",
+    "url": "https://store.bblcdn.com/s7/default/d5ba9b091d33481fa397bab61034f031/PumpkinOrange.jpg"
+   },
+   {
+    "resourceFileId": "43275350966408",
+    "url": "https://store.bblcdn.com/s7/default/9be8ee6d2e094072ab781d45ae24c2e8/Orange.jpg"
+   },
+   {
+    "resourceFileId": "40958880678024",
+    "url": "https://store.bblcdn.com/s7/default/20fb60d009c8414f95caed07a4705de4/BrightGreen.jpg"
+   },
+   {
+    "resourceFileId": "43628385042568",
+    "url": "https://store.bblcdn.com/s7/default/dd18e1115a7e444396617a3a884aa091/Bambu_Green.jpg"
+   },
+   {
+    "resourceFileId": "33297931468936",
+    "url": "https://store.bblcdn.com/s7/default/2483d6189ae94ee9971c38363bbce6e5/063c3c25cb6510ea2566af540e5e3c99_287359af-ac7d-4683-ad97-25e7a1f420f3.png"
+   },
+   {
+    "resourceFileId": "43275350999176",
+    "url": "https://store.bblcdn.com/s7/default/e0b16d45e5d64df88f8bca8609f9a0d2/Pink.jpg"
+   },
+   {
+    "resourceFileId": "40958880874632",
+    "url": "https://store.bblcdn.com/s7/default/cda8ef4f247943c6934ff1d3a9eef195/HotPink.jpg"
+   },
+   {
+    "resourceFileId": "43275350933640",
+    "url": "https://store.bblcdn.com/s7/default/9b179992f52643b2b91c213d86a0c5e1/Magenta.jpg"
+   },
+   {
+    "resourceFileId": "43275351031944",
+    "url": "https://store.bblcdn.com/s7/default/c93d0a825f094387a61ba3d5ae0499c7/Red.jpg"
+   },
+   {
+    "resourceFileId": "40958881038472",
+    "url": "https://store.bblcdn.com/s7/default/ee52b43861ef45849965b6dcdd87b617/MaroonRed.jpg"
+   },
+   {
+    "resourceFileId": "32512300449928",
+    "url": "https://store.bblcdn.com/s7/default/b4c16fb72f544e998b098ce854772e81/PLAPurple.jpg"
+   },
+   {
+    "resourceFileId": "40958880972936",
+    "url": "https://store.bblcdn.com/s7/default/db7a279375f049dfab2036d8bd8fcac7/IndigoPurple.jpg"
+   },
+   {
+    "resourceFileId": "40958881464456",
+    "url": "https://store.bblcdn.com/s7/default/0301553043e245e1b4f280abaf00fcfd/Turquoise.jpg"
+   },
+   {
+    "resourceFileId": "40958880743560",
+    "url": "https://store.bblcdn.com/s7/default/b4ed2e8a24f344538d73ce44069dc17c/CobaltBlue.jpg"
+   },
+   {
+    "resourceFileId": "32748910772360",
+    "url": "https://store.bblcdn.com/s7/default/beb1e91ec6f44fa7a12e0793337d7c52/CMYK-Cyan-1.png"
+   },
+   {
+    "resourceFileId": "32349100245128",
+    "url": "https://store.bblcdn.com/s7/default/d9f20007e8074789926e6d09db4a98fa/PLABasicBlue.jpg"
+   },
+   {
+    "resourceFileId": "32186497007752",
+    "url": "https://store.bblcdn.com/s7/default/67403fbe583b4c2888272b874789ba57/PLA-Basic_Brown.png"
+   },
+   {
+    "resourceFileId": "40958880809096",
+    "url": "https://store.bblcdn.com/s7/default/ac639216989444d4b065ae5017ab8c80/CocoaBrown.jpg"
+   },
+   {
+    "resourceFileId": "43275350868104",
+    "url": "https://store.bblcdn.com/s7/default/ff1f58a232db4b8ba8ed85da1698d1bb/Bronze.jpg"
+   },
+   {
+    "resourceFileId": "32186497073288",
+    "url": "https://store.bblcdn.com/s7/default/87769b450c3741df8c6ea30506aca96f/PLA-Basic_Gray.png"
+   },
+   {
+    "resourceFileId": "43628385337480",
+    "url": "https://store.bblcdn.com/s7/default/04c182e9baf840be8573ec644e309479/Sliver.jpg"
+   },
+   {
+    "resourceFileId": "32186496974984",
+    "url": "https://store.bblcdn.com/s7/default/3ca4bd461d744e84bf7432439236edf9/PLA-Basic_Blue-Gray.png"
+   },
+   {
+    "resourceFileId": "629084155266060288",
+    "url": "https://store.bblcdn.com/s7/default/f19847c3b512400588d34b27434a01ad/pla_basic_dark_gray.jpg"
+   },
+   {
+    "resourceFileId": "32186496942216",
+    "url": "https://store.bblcdn.com/s7/default/d9f087ffd3ae4283893f8a07d6b7e42a/PLA-Basic_Black_e33768fd-c87a-4b2d-a3f7-0b3afc81f13f.png"
+   }
+  ],
+  "productSkuList": [
+   {
+    "id": "40475106640008",
+    "mediaFile": {
+     "resourceFileId": "756356718673268736",
+     "url": "https://store.bblcdn.com/s7/default/18de47bcc5d9405596014400afd8a661/PLA_Basic_White.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Jade White (10100)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/825eebc0e105490dbbc7a9abb287db1f/Rectangle_1279.jpg",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "40475106672776",
+    "mediaFile": {
+     "resourceFileId": "43275350966408",
+     "url": "https://store.bblcdn.com/s7/default/9be8ee6d2e094072ab781d45ae24c2e8/Orange.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Orange (10300)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/145d5d616c334260a8f4f6a3a54cf87c/3b7d85f463734924842171fab890a603.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "40475106705544",
+    "mediaFile": {
+     "resourceFileId": "32349100245128",
+     "url": "https://store.bblcdn.com/s7/default/d9f20007e8074789926e6d09db4a98fa/PLABasicBlue.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Blue (10601)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/54670201f19c4a079a23de8251c4b829/0cbb7037758240b4873f9a90ab4dbe10.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "40475106738312",
+    "mediaFile": {
+     "resourceFileId": "32186497073288",
+     "url": "https://store.bblcdn.com/s7/default/87769b450c3741df8c6ea30506aca96f/PLA-Basic_Gray.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Gray (10103)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/3ad1b7f0aa4a4ea6af2a2e7121553bbf/d870efeaced648c6a3f390db1f55f725.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "40475106771080",
+    "mediaFile": {
+     "resourceFileId": "43275350835336",
+     "url": "https://store.bblcdn.com/s7/default/976faf2e1ea24428aaacd7ec37e2a170/Beige.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Beige (10201)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/eaee9c70ea5f4c74bfd4f1eb63c34a67/fa231273753d477b9d99afa19761f820.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": true,
+    "eta": null,
+    "outOfStockMsg": "Sold Out",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "40475106803848",
+    "mediaFile": {
+     "resourceFileId": "43628385337480",
+     "url": "https://store.bblcdn.com/s7/default/04c182e9baf840be8573ec644e309479/Sliver.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Silver (10102)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/68ca516ec31046738cf567505471be03/8b789e9f61b14b54a248f813ea523191.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "40475106836616",
+    "mediaFile": {
+     "resourceFileId": "43275351097480",
+     "url": "https://store.bblcdn.com/s7/default/5728a39780844f06a9dc4bf3c3907a15/Yellow.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Yellow (10400)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/c58234d6b11340788c0c03548222b8bd/3b0e7a2600f44088b06cb185a3f87e04.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "40475106869384",
+    "mediaFile": {
+     "resourceFileId": "32186496974984",
+     "url": "https://store.bblcdn.com/s7/default/3ca4bd461d744e84bf7432439236edf9/PLA-Basic_Blue-Gray.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Blue Grey (10602)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/4aab90399fe34105a3af69098a6e7d50/4e3637d99a73483bab1ce84fd7628a36.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "40475106902152",
+    "mediaFile": {
+     "resourceFileId": "43275350999176",
+     "url": "https://store.bblcdn.com/s7/default/e0b16d45e5d64df88f8bca8609f9a0d2/Pink.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Pink (10203)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/2d7c287e96f548998468abd5292e6a5c/16d81c82e3ac470c9abccfdda3e98ded.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "40475106967688",
+    "mediaFile": {
+     "resourceFileId": "32186497007752",
+     "url": "https://store.bblcdn.com/s7/default/67403fbe583b4c2888272b874789ba57/PLA-Basic_Brown.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Brown (10800)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/4262bd833add4a43a5bd60dde61a13fc/ae017fb32657451aaa0eecec9ad1b748.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "40475107000456",
+    "mediaFile": {
+     "resourceFileId": "43275351031944",
+     "url": "https://store.bblcdn.com/s7/default/c93d0a825f094387a61ba3d5ae0499c7/Red.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Red (10200)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/c095828cb46044269274717bfbab0566/377d91b1263f40968ca1973b0d2839e4.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "40988815556744",
+    "mediaFile": {
+     "resourceFileId": "32186496942216",
+     "url": "https://store.bblcdn.com/s7/default/d9f087ffd3ae4283893f8a07d6b7e42a/PLA-Basic_Black_e33768fd-c87a-4b2d-a3f7-0b3afc81f13f.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Black (10101)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/c087aa5167c94817b0795fd821ac4116/352e8e214fb4462ba7e6b1381c32fe9f.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "41078274621576",
+    "mediaFile": {
+     "resourceFileId": "43275351031944",
+     "url": "https://store.bblcdn.com/s7/default/c93d0a825f094387a61ba3d5ae0499c7/Red.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Red (10200)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/c095828cb46044269274717bfbab0566/377d91b1263f40968ca1973b0d2839e4.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Filament with spool",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "41078274654344",
+    "mediaFile": {
+     "resourceFileId": "32186496942216",
+     "url": "https://store.bblcdn.com/s7/default/d9f087ffd3ae4283893f8a07d6b7e42a/PLA-Basic_Black_e33768fd-c87a-4b2d-a3f7-0b3afc81f13f.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Black (10101)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/c087aa5167c94817b0795fd821ac4116/352e8e214fb4462ba7e6b1381c32fe9f.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Filament with spool",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "41078274687112",
+    "mediaFile": {
+     "resourceFileId": "756356718673268736",
+     "url": "https://store.bblcdn.com/s7/default/18de47bcc5d9405596014400afd8a661/PLA_Basic_White.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Jade White (10100)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/825eebc0e105490dbbc7a9abb287db1f/Rectangle_1279.jpg",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Filament with spool",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "41135419228296",
+    "mediaFile": {
+     "resourceFileId": "43628385042568",
+     "url": "https://store.bblcdn.com/s7/default/dd18e1115a7e444396617a3a884aa091/Bambu_Green.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Bambu Green (10501)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/210e37dd99f24949b9be3270effb3be0/7044786b85d44df9bbe872c6e5d87518.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Filament with spool",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "41142110093448",
+    "mediaFile": {
+     "resourceFileId": "32349100245128",
+     "url": "https://store.bblcdn.com/s7/default/d9f20007e8074789926e6d09db4a98fa/PLABasicBlue.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Blue (10601)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/54670201f19c4a079a23de8251c4b829/0cbb7037758240b4873f9a90ab4dbe10.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Filament with spool",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "41211562819720",
+    "mediaFile": {
+     "resourceFileId": "32186497073288",
+     "url": "https://store.bblcdn.com/s7/default/87769b450c3741df8c6ea30506aca96f/PLA-Basic_Gray.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Gray (10103)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/3ad1b7f0aa4a4ea6af2a2e7121553bbf/d870efeaced648c6a3f390db1f55f725.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Filament with spool",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "41884190146696",
+    "mediaFile": {
+     "resourceFileId": "43628385042568",
+     "url": "https://store.bblcdn.com/s7/default/dd18e1115a7e444396617a3a884aa091/Bambu_Green.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Bambu Green (10501)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/210e37dd99f24949b9be3270effb3be0/7044786b85d44df9bbe872c6e5d87518.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "41884190703752",
+    "mediaFile": {
+     "resourceFileId": "43275350868104",
+     "url": "https://store.bblcdn.com/s7/default/ff1f58a232db4b8ba8ed85da1698d1bb/Bronze.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Bronze (10801)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/375701952d3440f690199d26ffb7661f/8b75222ce246480184025993a40b948b.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "41884191195272",
+    "mediaFile": {
+     "resourceFileId": "43275350900872",
+     "url": "https://store.bblcdn.com/s7/default/b8f76cac43b94ef18c4d3801f2bd3856/Gold.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Gold (10401)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/d37bc626a6a54850868919dde038b48b/969f0c8921214ece8dbced65341fcbce.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "41884191752328",
+    "mediaFile": {
+     "resourceFileId": "32512300449928",
+     "url": "https://store.bblcdn.com/s7/default/b4c16fb72f544e998b098ce854772e81/PLAPurple.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Purple (10700)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/3feef4907f88467fa6db5f075d043ad7/8324030333a34c54b8472e5682d19f3f.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "41884192211080",
+    "mediaFile": {
+     "resourceFileId": "43275350933640",
+     "url": "https://store.bblcdn.com/s7/default/9b179992f52643b2b91c213d86a0c5e1/Magenta.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Magenta (10202)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/32faf71cc7ef49078d00e066f26a0af1/e09bc62c304443d8b33302b42f8ef2ca.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "41884192571528",
+    "mediaFile": {
+     "resourceFileId": "32748910772360",
+     "url": "https://store.bblcdn.com/s7/default/beb1e91ec6f44fa7a12e0793337d7c52/CMYK-Cyan-1.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Cyan (10603)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/af1ce799941a407bbc3964e00dc3191a/d665a3540d334035abc278b0b80e4898.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "41884193030280",
+    "mediaFile": {
+     "resourceFileId": "33297931468936",
+     "url": "https://store.bblcdn.com/s7/default/2483d6189ae94ee9971c38363bbce6e5/063c3c25cb6510ea2566af540e5e3c99_287359af-ac7d-4683-ad97-25e7a1f420f3.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Mistletoe Green (10502)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/5a9e1fca8bba4dfca7579ae39f0c6a07/21f4f3191dfd4fd58f68fdb8b2be4ec4.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "42844628975752",
+    "mediaFile": {
+     "resourceFileId": "40962210627720",
+     "url": "https://store.bblcdn.com/s7/default/d9b993d99ef54581968a5711269f2be2/light_gray_25c0c41d-107b-4d05-96d1-3de1efb728d9.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Light Gray (10104)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/c323ac060ebe4bcdb046c06f5d09f346/b7c9db2942374e2793d9865461076ac4.png",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "42844629008520",
+    "mediaFile": {
+     "resourceFileId": "629084155266060288",
+     "url": "https://store.bblcdn.com/s7/default/f19847c3b512400588d34b27434a01ad/pla_basic_dark_gray.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Dark Gray (10105)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/a08055776b464878bb311a88e1518931/03aedbaaff8943f892b58438f98cac89.png",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "43045591679112",
+    "mediaFile": {
+     "resourceFileId": "40958881038472",
+     "url": "https://store.bblcdn.com/s7/default/ee52b43861ef45849965b6dcdd87b617/MaroonRed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Maroon Red (10205)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/9a16426731d04493bfbc93d671b8286f/6ddd230906194a7fa5403e2cc1d7ae77.png",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "43045596233864",
+    "mediaFile": {
+     "resourceFileId": "40958881366152",
+     "url": "https://store.bblcdn.com/s7/default/dcc368a07e73489da62a8cceb29e31a2/SunflowerYellow.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Sunflower Yellow (10402)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/949b1bda3c134a23b3634dec8c851221/f84eee46ecb848e69c2e6a5c197a9958.png",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "43045596921992",
+    "mediaFile": {
+     "resourceFileId": "40958881464456",
+     "url": "https://store.bblcdn.com/s7/default/0301553043e245e1b4f280abaf00fcfd/Turquoise.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Turquoise (10605)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/8a6f3f028f5a4b5782fc5c0730d127ec/9f0327d603c345ac99fcb795cc783dff.png",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "43045597446280",
+    "mediaFile": {
+     "resourceFileId": "40958880972936",
+     "url": "https://store.bblcdn.com/s7/default/db7a279375f049dfab2036d8bd8fcac7/IndigoPurple.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Indigo Purple (10701)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/9964ecd589c8470fb6fac72d2ce8c251/d65aebf923b840af881f23286fb7d9b3.png",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "43045598167176",
+    "mediaFile": {
+     "resourceFileId": "40958880678024",
+     "url": "https://store.bblcdn.com/s7/default/20fb60d009c8414f95caed07a4705de4/BrightGreen.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Bright Green (10503)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/187c939db99748169d23888c93982f8a/5578164bff51480a9c550ef390348ec1.png",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "43045598724232",
+    "mediaFile": {
+     "resourceFileId": "40958880809096",
+     "url": "https://store.bblcdn.com/s7/default/ac639216989444d4b065ae5017ab8c80/CocoaBrown.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Cocoa Brown (10802)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/4bbaa998c8f34ab89cb0ce632fbf632f/91d13e7d3dd54a89948200e82353998f.png",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "43045599019144",
+    "mediaFile": {
+     "resourceFileId": "40958880874632",
+     "url": "https://store.bblcdn.com/s7/default/cda8ef4f247943c6934ff1d3a9eef195/HotPink.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Hot Pink (10204)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/ff8fe218b8494acdb6762c3b61b20174/ed844344991348f79a91dfe9aeba362e.png",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "43045599215752",
+    "mediaFile": {
+     "resourceFileId": "40958880743560",
+     "url": "https://store.bblcdn.com/s7/default/b4ed2e8a24f344538d73ce44069dc17c/CobaltBlue.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Cobalt Blue (10604)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/9148bcf8138d4223892988d4b850079f/abd43099726847d6b189bec773ef1833.png",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "43045599543432",
+    "mediaFile": {
+     "resourceFileId": "40958881202312",
+     "url": "https://store.bblcdn.com/s7/default/d5ba9b091d33481fa397bab61034f031/PumpkinOrange.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Pumpkin Orange (10301)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/6feea19ab1c64d4ba10aeb1b33285a07/ff733c26d9be457fb44ee270f2720827.png",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Refill",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "43257238290568",
+    "mediaFile": {
+     "resourceFileId": "33297931468936",
+     "url": "https://store.bblcdn.com/s7/default/2483d6189ae94ee9971c38363bbce6e5/063c3c25cb6510ea2566af540e5e3c99_287359af-ac7d-4683-ad97-25e7a1f420f3.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Mistletoe Green (10502)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/5a9e1fca8bba4dfca7579ae39f0c6a07/21f4f3191dfd4fd58f68fdb8b2be4ec4.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Filament with spool",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "43257238749320",
+    "mediaFile": {
+     "resourceFileId": "32748910772360",
+     "url": "https://store.bblcdn.com/s7/default/beb1e91ec6f44fa7a12e0793337d7c52/CMYK-Cyan-1.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Cyan (10603)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/af1ce799941a407bbc3964e00dc3191a/d665a3540d334035abc278b0b80e4898.media",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Filament with spool",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "565815336288092161",
+    "mediaFile": {
+     "resourceFileId": "40958881366152",
+     "url": "https://store.bblcdn.com/s7/default/dcc368a07e73489da62a8cceb29e31a2/SunflowerYellow.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Sunflower Yellow (10402)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/949b1bda3c134a23b3634dec8c851221/f84eee46ecb848e69c2e6a5c197a9958.png",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Filament with spool",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "565815336288092167",
+    "mediaFile": {
+     "resourceFileId": "40958881202312",
+     "url": "https://store.bblcdn.com/s7/default/d5ba9b091d33481fa397bab61034f031/PumpkinOrange.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Pumpkin Orange (10301)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/6feea19ab1c64d4ba10aeb1b33285a07/ff733c26d9be457fb44ee270f2720827.png",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Filament with spool",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "565815336288092173",
+    "mediaFile": {
+     "resourceFileId": "40958880874632",
+     "url": "https://store.bblcdn.com/s7/default/cda8ef4f247943c6934ff1d3a9eef195/HotPink.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Hot Pink (10204)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/ff8fe218b8494acdb6762c3b61b20174/ed844344991348f79a91dfe9aeba362e.png",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Filament with spool",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "565815336288092179",
+    "mediaFile": {
+     "resourceFileId": "40958880972936",
+     "url": "https://store.bblcdn.com/s7/default/db7a279375f049dfab2036d8bd8fcac7/IndigoPurple.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Indigo Purple (10701)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/9964ecd589c8470fb6fac72d2ce8c251/d65aebf923b840af881f23286fb7d9b3.png",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Filament with spool",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "565815336288092185",
+    "mediaFile": {
+     "resourceFileId": "40958880809096",
+     "url": "https://store.bblcdn.com/s7/default/ac639216989444d4b065ae5017ab8c80/CocoaBrown.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Color",
+      "propertyKeyId": "9000351531144",
+      "propertyValueId": null,
+      "propertyValue": "Cocoa Brown (10802)",
+      "position": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/4bbaa998c8f34ab89cb0ce632fbf632f/91d13e7d3dd54a89948200e82353998f.png",
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Type",
+      "propertyKeyId": "8956767928456",
+      "propertyValueId": null,
+      "propertyValue": "Filament with spool",
+      "position": 2,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     },
+     {
+      "propertyKey": "Size",
+      "propertyKeyId": "8931265839240",
+      "propertyValueId": null,
+      "propertyValue": "1kg",
+      "position": 3,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   }
+  ],
+  "productPropertyList": [
+   {
+    "propertyKey": "Color",
+    "propertyKeyId": "9000351531144",
+    "productPropertyValueList": [
+     {
+      "id": "564681938135969792",
+      "value": "Jade White (10100)",
+      "newFlag": 0,
+      "selectedDefault": 1,
+      "colorUrl": "https://store.bblcdn.com/s7/default/825eebc0e105490dbbc7a9abb287db1f/Rectangle_1279.jpg",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969793",
+      "value": "Beige (10201)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/eaee9c70ea5f4c74bfd4f1eb63c34a67/fa231273753d477b9d99afa19761f820.media",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969794",
+      "value": "Light Gray (10104)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/c323ac060ebe4bcdb046c06f5d09f346/b7c9db2942374e2793d9865461076ac4.png",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969795",
+      "value": "Yellow (10400)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/c58234d6b11340788c0c03548222b8bd/3b0e7a2600f44088b06cb185a3f87e04.media",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969813",
+      "value": "Sunflower Yellow (10402)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/949b1bda3c134a23b3634dec8c851221/f84eee46ecb848e69c2e6a5c197a9958.png",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969814",
+      "value": "Pumpkin Orange (10301)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/6feea19ab1c64d4ba10aeb1b33285a07/ff733c26d9be457fb44ee270f2720827.png",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969796",
+      "value": "Orange (10300)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/145d5d616c334260a8f4f6a3a54cf87c/3b7d85f463734924842171fab890a603.media",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969797",
+      "value": "Gold (10401)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/d37bc626a6a54850868919dde038b48b/969f0c8921214ece8dbced65341fcbce.media",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969815",
+      "value": "Bright Green (10503)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/187c939db99748169d23888c93982f8a/5578164bff51480a9c550ef390348ec1.png",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969798",
+      "value": "Bambu Green (10501)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/210e37dd99f24949b9be3270effb3be0/7044786b85d44df9bbe872c6e5d87518.media",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969799",
+      "value": "Mistletoe Green (10502)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/5a9e1fca8bba4dfca7579ae39f0c6a07/21f4f3191dfd4fd58f68fdb8b2be4ec4.media",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969800",
+      "value": "Pink (10203)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/2d7c287e96f548998468abd5292e6a5c/16d81c82e3ac470c9abccfdda3e98ded.media",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969818",
+      "value": "Hot Pink (10204)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/ff8fe218b8494acdb6762c3b61b20174/ed844344991348f79a91dfe9aeba362e.png",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969801",
+      "value": "Magenta (10202)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/32faf71cc7ef49078d00e066f26a0af1/e09bc62c304443d8b33302b42f8ef2ca.media",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969802",
+      "value": "Red (10200)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/c095828cb46044269274717bfbab0566/377d91b1263f40968ca1973b0d2839e4.media",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969819",
+      "value": "Maroon Red (10205)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/9a16426731d04493bfbc93d671b8286f/6ddd230906194a7fa5403e2cc1d7ae77.png",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969803",
+      "value": "Purple (10700)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/3feef4907f88467fa6db5f075d043ad7/8324030333a34c54b8472e5682d19f3f.media",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969820",
+      "value": "Indigo Purple (10701)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/9964ecd589c8470fb6fac72d2ce8c251/d65aebf923b840af881f23286fb7d9b3.png",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969816",
+      "value": "Turquoise (10605)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/8a6f3f028f5a4b5782fc5c0730d127ec/9f0327d603c345ac99fcb795cc783dff.png",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969804",
+      "value": "Cyan (10603)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/af1ce799941a407bbc3964e00dc3191a/d665a3540d334035abc278b0b80e4898.media",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969817",
+      "value": "Cobalt Blue (10604)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/9148bcf8138d4223892988d4b850079f/abd43099726847d6b189bec773ef1833.png",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969805",
+      "value": "Blue (10601)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/54670201f19c4a079a23de8251c4b829/0cbb7037758240b4873f9a90ab4dbe10.media",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969806",
+      "value": "Brown (10800)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/4262bd833add4a43a5bd60dde61a13fc/ae017fb32657451aaa0eecec9ad1b748.media",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969821",
+      "value": "Cocoa Brown (10802)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/4bbaa998c8f34ab89cb0ce632fbf632f/91d13e7d3dd54a89948200e82353998f.png",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969807",
+      "value": "Bronze (10801)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/375701952d3440f690199d26ffb7661f/8b75222ce246480184025993a40b948b.media",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969808",
+      "value": "Gray (10103)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/3ad1b7f0aa4a4ea6af2a2e7121553bbf/d870efeaced648c6a3f390db1f55f725.media",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969809",
+      "value": "Silver (10102)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/68ca516ec31046738cf567505471be03/8b789e9f61b14b54a248f813ea523191.media",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969810",
+      "value": "Blue Grey (10602)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/4aab90399fe34105a3af69098a6e7d50/4e3637d99a73483bab1ce84fd7628a36.media",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969811",
+      "value": "Dark Gray (10105)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/a08055776b464878bb311a88e1518931/03aedbaaff8943f892b58438f98cac89.png",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969812",
+      "value": "Black (10101)",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": "https://store.bblcdn.com/s7/default/c087aa5167c94817b0795fd821ac4116/352e8e214fb4462ba7e6b1381c32fe9f.media",
+      "propertyValueMediaFile": null,
+      "tag": ""
+     }
+    ],
+    "position": 1,
+    "type": 1,
+    "title": "",
+    "introduction": "",
+    "explanation": ""
+   },
+   {
+    "propertyKey": "Type",
+    "propertyKeyId": "8956767928456",
+    "productPropertyValueList": [
+     {
+      "id": "564681938135969822",
+      "value": "Refill",
+      "newFlag": 0,
+      "selectedDefault": 1,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681938135969823",
+      "value": "Filament with spool",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     }
+    ],
+    "position": 2,
+    "type": 1,
+    "title": "",
+    "introduction": "",
+    "explanation": ""
+   },
+   {
+    "propertyKey": "Size",
+    "propertyKeyId": "8931265839240",
+    "productPropertyValueList": [
+     {
+      "id": "564681938135969824",
+      "value": "1kg",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     }
+    ],
+    "position": 3,
+    "type": 1,
+    "title": "",
+    "introduction": "",
+    "explanation": ""
+   }
+  ],
+  "skillLevel": 0,
+  "skillTitle": null,
+  "printerTime": "",
+  "filamentUsed": "",
+  "colorCollectionList": [
+   1
+  ],
+  "productExtraInfoVO": {
+   "gprsInfoTemplateVO": null,
+   "productVideoVOList": null,
+   "productFileList": null
+  },
+  "productDetailTemplateVO": null,
+  "subProductList": null,
+  "showMwModelIds": [
+   "230355",
+   "792207",
+   "556943",
+   "491333",
+   "172044",
+   "704475",
+   "951268",
+   "139300",
+   "12989",
+   "130246"
+  ],
+  "showMwModelPosition": 0,
+  "customButtonTitle": null,
+  "customButtonLink": null,
+  "paymentComponentPosition": 0,
+  "isFilament": true,
+  "currentAllIdRoute": "552709755819347968>552709755857096704>552709755890651136",
+  "imageLabels": null
+ },
+ "description": {
+  "kind": "page_builder",
+  "config": {
+   "schemaVersion": "1.0",
+   "templateId": "tpl-1776935009448",
+   "templateName": "PLA Basic",
+   "colorTheme": "light",
+   "globalColors": {
+    "title": {
+     "mode": "solid",
+     "value": "--bbl-grey-13"
+    },
+    "subtitle": {
+     "mode": "solid",
+     "value": "--bbl-grey-11"
+    },
+    "subtitle2": {
+     "mode": "solid",
+     "value": "--bbl-grey-11"
+    },
+    "description": {
+     "mode": "solid",
+     "value": "--bbl-grey-9"
+    },
+    "highlight": {
+     "mode": "solid",
+     "value": "--bbl-brand-green"
+    },
+    "buttonBackground": {
+     "mode": "solid",
+     "value": "--bbl-brand-green"
+    },
+    "buttonText": {
+     "mode": "solid",
+     "value": "--bbl-white"
+    }
+   },
+   "globalBackground": {
+    "type": "color",
+    "color": "",
+    "media": {
+     "type": "image",
+     "src": "",
+     "fitMode": "cover"
+    }
+   },
+   "defaultSpacing": {
+    "level1": "--section-gap-5",
+    "level2": "--section-gap-4",
+    "level3": "--section-gap-1"
+   },
+   "enforcePageConsistency": true,
+   "footnote": {
+    "enabled": false,
+    "content": ""
+   },
+   "components": [
+    {
+     "id": "banner_1776859885795_imdr8wmzy",
+     "type": "banner",
+     "variant": "banner_1",
+     "name": "Banner",
+     "anchor": {
+      "enabled": true,
+      "name": "Overview",
+      "id": "banner_1776859885795_imdr8wmzy"
+     },
+     "modules": {
+      "spacingMode": "standard",
+      "backgroundMediaDisplayMode": "adaptive",
+      "media": {
+       "pc": {
+        "type": "image",
+        "src": "https://store.bblcdn.com/s7/default/40fadd432fe642a99769384bb573833f/Banner_Media-1.jpg",
+        "displayMode": "default",
+        "fitMode": "cover",
+        "naturalWidth": 5120,
+        "naturalHeight": 1280
+       },
+       "mo": {
+        "type": "image",
+        "src": "https://store.bblcdn.com/s7/default/cc22b7d39419421788339f3d4750078d/banner.jpg",
+        "fitMode": "cover",
+        "displayMode": "default",
+        "naturalWidth": 2048,
+        "naturalHeight": 960,
+        "compressionDisabled": true
+       }
+      },
+      "typeStyles": {
+       "ref": "banner_typestyles_1",
+       "content": {
+        "title": "PLA Basic",
+        "description": "Stand Out, Never Dull",
+        "videoButton": {
+         "type": "popup",
+         "text": ""
+        }
+       },
+       "colors": {
+        "title": {
+         "mode": "solid",
+         "value": "--bbl-grey-13"
+        },
+        "description": {
+         "mode": "solid",
+         "value": "--bbl-grey-13"
+        }
+       }
+      }
+     }
+    },
+    {
+     "id": "chapter_1776860120943_tabnn7pvy",
+     "type": "chapter",
+     "variant": "chapter_1",
+     "name": "卖点",
+     "anchor": {
+      "enabled": false,
+      "name": "Chapter-9",
+      "id": "chapter_1776860120943_tabnn7pvy"
+     },
+     "modules": {
+      "spacingMode": "standard",
+      "typeStyles": {
+       "ref": "chapter_typestyles_1",
+       "content": {
+        "title": "",
+        "description": "",
+        "descriptionHighlights": []
+       }
+      },
+      "spacing": {
+       "level2": "--section-gap-5",
+       "level3": "--section-gap-5"
+      },
+      "layout": {
+       "paddingTop": "--section-gap-5",
+       "paddingBottom": "",
+       "marginBottom": ""
+      },
+      "enableThemeOverride": true,
+      "colorTheme": "light",
+      "themeColors": {
+       "title": {
+        "mode": "solid",
+        "value": "--bbl-grey-13"
+       },
+       "subtitle": {
+        "mode": "solid",
+        "value": "--bbl-grey-11"
+       },
+       "subtitle2": {
+        "mode": "solid",
+        "value": "--bbl-grey-11"
+       },
+       "description": {
+        "mode": "solid",
+        "value": "--bbl-grey-9"
+       },
+       "highlight": {
+        "mode": "solid",
+        "value": "--bbl-brand-green"
+       },
+       "buttonBackground": {
+        "mode": "solid",
+        "value": "--bbl-brand-green"
+       },
+       "buttonText": {
+        "mode": "solid",
+        "value": "--bbl-white"
+       },
+       "link": {
+        "mode": "solid",
+        "value": "--bbl-brand-green"
+       },
+       "linkHover": {
+        "mode": "solid",
+        "value": "--bbl-brand-green-hover"
+       }
+      }
+     },
+     "children": [
+      {
+       "id": "content_block_1776860161046_c2ynsoh65",
+       "type": "content_block",
+       "variant": "content-block-6",
+       "name": "卖点 1",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-1",
+        "id": "content_block_1776860161046_c2ynsoh65"
+       },
+       "modules": {
+        "spacingMode": "standard",
+        "hLevel": "",
+        "typeStyles": {
+         "ref": "title_typestyles_5",
+         "content": {
+          "title": "Find the Perfect Color",
+          "description": "With a palette of up to 30 colors, Bambu PLA Basic lets you find the perfect shade to bring flair to your projects. The colors remain consistent across prints, ensuring a stunning and uniform finish every time."
+         }
+        },
+        "featureConfig": {
+         "popupEnabled": false,
+         "popupType": "popup-1",
+         "cards": [
+          {
+           "cardType": "cardType-1",
+           "cardStyle": "cardStyle-1",
+           "textAlign": "left",
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "descriptionHighlights": [],
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/9878a79d455a45ac973c064cba11e1bb/PC04-compressed.jpg",
+             "displayMode": "default",
+             "fitMode": "cover",
+             "naturalWidth": 2400,
+             "naturalHeight": 1080
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/bf6b1b85b6b24cb6aeacd7772c788cd4/MO03-compressed.jpg",
+             "fitMode": "cover",
+             "displayMode": "default",
+             "naturalWidth": 1344,
+             "naturalHeight": 700,
+             "compressionDisabled": true
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "popupConfig": {},
+           "id": "comp_1784702097135_bb0e7k3de"
+          },
+          {
+           "cardType": "cardType-2",
+           "cardStyle": "cardStyle-1",
+           "textAlign": "left",
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "descriptionHighlights": [],
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/812fe90f47be4a2c96499483bad827ca/PC03-compressed.jpg",
+             "displayMode": "default",
+             "fitMode": "cover",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/8261fdce11874f1782f76629a2279716/MO02-compressed.jpg",
+             "fitMode": "cover",
+             "displayMode": "default",
+             "naturalWidth": 1344,
+             "naturalHeight": 700,
+             "compressionDisabled": true
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "popupConfig": {},
+           "id": "comp_1784702097135_61tezwujy"
+          },
+          {
+           "cardType": "cardType-2",
+           "cardStyle": "cardStyle-1",
+           "textAlign": "left",
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "descriptionHighlights": [],
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/f9b914679123443e85ee257c208997af/PC01-compressed.jpg",
+             "displayMode": "default",
+             "fitMode": "cover",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/d62163f8f5814d638c3dac4d6701a0ac/MO01-tuya.jpg",
+             "fitMode": "cover",
+             "displayMode": "default",
+             "naturalWidth": 1344,
+             "naturalHeight": 700,
+             "compressionDisabled": true
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "popupConfig": {},
+           "id": "comp_1784702097135_a625w6asp"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "content_block_1776860162526_2x88208di",
+       "type": "content_block",
+       "variant": "content-block-8",
+       "name": "卖点 2",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-2",
+        "id": "content_block_1776860162526_2x88208di"
+       },
+       "modules": {
+        "spacingMode": "standard",
+        "hLevel": "",
+        "typeStyles": {
+         "ref": "title_typestyles_5",
+         "content": {
+          "title": "Your Worry-Free Start",
+          "description": "Bambu PLA Basic, the easiest-to-use filament, delivers smooth printing right from the start. No complicated setups or calibrations needed. Ideal for both hobbyists and professionals seeking reliable, hassle-free results."
+         }
+        },
+        "featureConfig": {
+         "cards": [
+          {
+           "cardType": "cardType-2",
+           "cardStyle": "cardStyle-3",
+           "textAlign": "center",
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "descriptionHighlights": [],
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/dbadbe4fcd744e90846569f9a8e05a3f/PC02-compressed.jpg",
+             "displayMode": "default",
+             "fitMode": "cover",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/2917e2d5c18a4c259d09018db664fa64/MO05-compressed.jpg",
+             "fitMode": "cover",
+             "displayMode": "default",
+             "naturalWidth": 1344,
+             "naturalHeight": 700,
+             "compressionDisabled": true
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "popupConfig": {},
+           "id": "comp_1784702097135_0i05i9uvn"
+          },
+          {
+           "cardType": "cardType-2",
+           "cardStyle": "cardStyle-3",
+           "textAlign": "center",
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "descriptionHighlights": [],
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/08a40083502e4bf6b23c0ead24ed186b/PC05-compressed.jpg",
+             "displayMode": "default",
+             "fitMode": "cover",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/0926b2370f8b47c78044880af1c4c95d/MO04-compressed.jpg",
+             "fitMode": "cover",
+             "displayMode": "default",
+             "naturalWidth": 1344,
+             "naturalHeight": 700,
+             "compressionDisabled": true
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "popupConfig": {},
+           "id": "comp_1784702097135_n3ab82k2h"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "content_block_1776860163846_rda8jgx7m",
+       "type": "content_block",
+       "variant": "content-block-8",
+       "name": "卖点 3",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-3",
+        "id": "content_block_1776860163846_rda8jgx7m"
+       },
+       "modules": {
+        "spacingMode": "standard",
+        "hLevel": "",
+        "typeStyles": {
+         "ref": "title_typestyles_5",
+         "content": {
+          "title": "Built Stronger, Faster and to Last Longer",
+          "description": "With Bambu's exclusive fine-turned formulation based on 3D printing expertise and fine-turned settings, Bambu PLA Basic delivers stronger layer adhesion, enhanced impact resistance, and long-lasting durability compared to other standard PLA filaments on the market. Additionally, it reaches a print speed up to 258mm/s*, cutting your printing time without compromising quality.\n\n* 0.4mm nozzle, 0.4mm line width, 0.2mm layer height"
+         }
+        },
+        "featureConfig": {
+         "cards": [
+          {
+           "cardType": "cardType-1",
+           "cardStyle": "cardStyle-3",
+           "textAlign": "center",
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "descriptionHighlights": [],
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/a17ae18b948249719d51cb3c7efcce15/PC06-tuya.jpg",
+             "fitMode": "cover",
+             "displayMode": "default",
+             "naturalWidth": 2400,
+             "naturalHeight": 1080
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/5aef3f3b98024758ab517ddb88de38b6/MO06-tuya.jpg",
+             "displayMode": "default",
+             "fitMode": "cover",
+             "naturalWidth": 1344,
+             "naturalHeight": 800,
+             "compressionDisabled": true
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "popupConfig": {},
+           "id": "comp_1784702097135_kyqvw93hf"
+          }
+         ]
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "content_block_1776744592796_vv35dwp6b",
+     "type": "content_block",
+     "variant": "content-block-1",
+     "name": "RFID",
+     "anchor": {
+      "enabled": false,
+      "name": "Content Block-6",
+      "id": "content_block_1776744592796_vv35dwp6b"
+     },
+     "modules": {
+      "spacingMode": "standard",
+      "hLevel": "",
+      "typeStyles": {
+       "ref": "title_typestyles_5",
+       "content": {
+        "title": "RFID for Intelligent Printing",
+        "description": "All printing parameters are embedded in RFID, which can be read through our AMS (Automatic Material System).",
+        "descriptionHighlights": [
+         {
+          "id": "hl_1784701980425_p4lpu593s",
+          "text": "AMS"
+         }
+        ]
+       }
+      },
+      "featureConfig": {
+       "tabs": [
+        {
+         "name": "Tab 1",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/7582b13ce2604750968dafbc244de91a/RFID_for_Intelligent_Printing-compressed.jpg",
+           "fitMode": "cover",
+           "displayMode": "default",
+           "naturalWidth": 2400,
+           "naturalHeight": 918
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/06c6251453c340aeab1c0117f97fec75/RFID_for_Intelligent_PrintingMO-compressed.jpg",
+           "displayMode": "proportional",
+           "fitMode": "cover",
+           "naturalWidth": 1344,
+           "naturalHeight": 840
+          }
+         },
+         "id": "comp_1784702097135_l116gpx34"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "id": "content_block_1784701992972_5ojixrmrz",
+     "type": "content_block",
+     "variant": "content-block-1",
+     "name": "UL",
+     "anchor": {
+      "enabled": false,
+      "name": "Content Block-6",
+      "id": "content_block_1784701992972_5ojixrmrz"
+     },
+     "modules": {
+      "spacingMode": "standard",
+      "hLevel": "",
+      "typeStyles": {
+       "ref": "title_typestyles_5",
+       "content": {
+        "title": "UL GREENGUARD certified. Cleaner air for indoor printing.",
+        "description": "PLA Basic is certified to UL GREENGUARD (UL 2904), the recognized standard for 3D printer emissions. The particles and VOCs released measure below the levels of an average kitchen, living room, or office—cleaner than the air you're already breathing."
+       }
+      },
+      "featureConfig": {
+       "tabs": [
+        {
+         "name": "Tab 1",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/c70ddb6c2aad46ba937de9eab0c7e646/PLA_Basic.jpg",
+           "displayMode": "default",
+           "fitMode": "cover",
+           "naturalWidth": 2400,
+           "naturalHeight": 1080
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/16b54ec21a3945da8e18fade5012f025/PLA_Basic-mo.jpg",
+           "fitMode": "cover",
+           "displayMode": "proportional",
+           "naturalWidth": 1344,
+           "naturalHeight": 1344
+          }
+         },
+         "id": "comp_1784702097135_fjrmhyltg"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "id": "content_block_1776744650085_nu31krt23",
+     "type": "content_block",
+     "variant": "content-block-17",
+     "name": "Download",
+     "anchor": {
+      "enabled": true,
+      "name": "Download",
+      "id": "content_block_1776744650085_nu31krt23"
+     },
+     "modules": {
+      "spacingMode": "standard",
+      "hLevel": "",
+      "typeStyles": {
+       "ref": "title_typestyles_5",
+       "content": {
+        "title": "Download"
+       }
+      },
+      "featureConfig": {
+       "items": [
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/44b88c2274b2430397da892f1de79f70/Downloads-compressed.jpg",
+          "fitMode": "cover",
+          "displayMode": "default",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament TDS",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/7a2896066b2f4308b780cb9d101040a9/Downloads-compressed.jpg",
+           "displayMode": "default",
+           "fitMode": "cover",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/7abf592a7bc44468bb2d86e22fde3d24/Download_mo.jpg",
+           "fitMode": "cover",
+           "displayMode": "default",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/s1/default/58b85d0f3db94878854a28fdb8a0006e/Bambu_PLA_Basic_Technical_Data_Sheet.pdf",
+         "id": "comp_1784702097135_a3iyl1g5q"
+        },
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/5575e961df094c9591a7faa849ca9b77/Downloads-compressed.jpg",
+          "fitMode": "cover",
+          "displayMode": "default",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament MSDS",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/531bad4351164f0a9c0391e0a33f2190/Downloads-compressed.jpg",
+           "displayMode": "default",
+           "fitMode": "cover",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/9b45266304a64648b14fcbecc220d043/Download_mo.jpg",
+           "fitMode": "cover",
+           "displayMode": "default",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/s7/default/6e47ce4e48b54b20b3afd3be7539ac27/SDS20250724A00_Bambu_PLA_Basic.pdf",
+         "id": "comp_1784702097135_xi38sp6bo"
+        },
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/bf5dbaee598d46e9bd8170e43facfa96/Downloads-compressed.jpg",
+          "fitMode": "cover",
+          "displayMode": "default",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament RoHS",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/7a31a894dab64da9bf1df9f1f2b620db/Downloads-compressed.jpg",
+           "displayMode": "default",
+           "fitMode": "cover",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/f1d23869da8f41bab3454ccb28728347/Download_mo.jpg",
+           "fitMode": "cover",
+           "displayMode": "default",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://cdn.shopify.com/s/files/1/0573/5320/7868/files/Bambu_PLA_Basic_RoHS.pdf",
+         "id": "comp_1784702097135_qw5io2rew"
+        },
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/fdec58d7e8cd4820bb93af5ef7582247/Downloads-compressed.jpg",
+          "fitMode": "cover",
+          "displayMode": "default",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Hex Code",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/ce375e36d3db48b19db9ff0603549fc9/Downloads-compressed.jpg",
+           "displayMode": "default",
+           "fitMode": "cover",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/d8e728852e1d44b58088c7892cc9be49/Download_mo.jpg",
+           "fitMode": "cover",
+           "displayMode": "default",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/s7/default/1084369ef84345bbaa5d704a492954e0/Bambu_PLA_Basic_Hex_Code.pdf",
+         "id": "comp_1784702097135_7j7equknc"
+        },
+        {
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/d5be494e1bc144ccae3176f513b6f83d/Downloads-compressed.jpg",
+           "displayMode": "default",
+           "fitMode": "cover",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/87eb8e914bbc42c0b722dfd19521770d/Download_mo.jpg",
+           "fitMode": "cover",
+           "displayMode": "default",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "description": "Filament POPs",
+         "link": "https://store.bblcdn.com/s1/default/d3a3d8d0a6ff44ad8c2098062569c460/2501A89116A_PLA_Basic-POPS.pdf",
+         "id": "comp_1784702097135_wpopsauey"
+        },
+        {
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/9a19c07aa34a40cfa353ef5b3031080d/Downloads-compressed.jpg",
+           "displayMode": "default",
+           "fitMode": "cover",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/a85afec4d3214c03997591a0d3e204c8/Download_mo.jpg",
+           "fitMode": "cover",
+           "displayMode": "default",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "description": "Filament CP65",
+         "link": "https://store.bblcdn.com/s1/default/0f1d708b89414a568035f05a99d45974/2501A89118A_PLA_Basic_-CP65.pdf",
+         "id": "comp_1784702097135_ddg8vmptf"
+        },
+        {
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/6484a7acd377424a81a4b54e9c70e08a/Downloads-compressed.jpg",
+           "fitMode": "cover",
+           "displayMode": "default",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/f66d7aacccfc46b0af00de8e3619f02f/Download_mo.jpg",
+           "displayMode": "default",
+           "fitMode": "cover",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "description": "Filament TSCA",
+         "link": "https://store.bblcdn.com/s1/default/b2dcc30798af47b79595b00d2600b8f4/2501A89117A_PLA_Basic-TSCA.pdf",
+         "id": "comp_1784702097135_2m927jbr9"
+        },
+        {
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/6c23c27b680d4c32bad80a31e1f76158/Downloads-compressed.jpg",
+           "displayMode": "default",
+           "fitMode": "cover",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/83ed97b964ab4db6abba9cfad9654509/Download_mo.jpg",
+           "fitMode": "cover",
+           "displayMode": "default",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "description": "Filament SVHC",
+         "link": "https://store.bblcdn.com/s1/default/000b9da1b4fd468c8122319ed8371fe4/2501A89114A_PLA_Basic-SVHC.pdf",
+         "id": "comp_1784702097135_c2zroszq3"
+        },
+        {
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/ec1aa5c53a354e809efad38b2740b35e/Downloads-compressed.jpg",
+           "displayMode": "default",
+           "fitMode": "cover",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/8904f5259e974860a6851e3e33c88950/Download_mo.jpg",
+           "fitMode": "cover",
+           "displayMode": "default",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "description": "Filament PAHs",
+         "link": "https://store.bblcdn.com/s1/default/cb6529eb16a642759314f3ebd58e510b/2501A89115A_PLA_Basic__PAHS.pdf",
+         "id": "comp_1784702097135_juq8q9m9k"
+        },
+        {
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/8a34eebe548147b1952fae1542bd7977/Downloads-compressed.jpg",
+           "displayMode": "default",
+           "fitMode": "cover",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/9c6f73b7375744c6a47f33a552c6bd5f/Download_mo.jpg",
+           "fitMode": "cover",
+           "displayMode": "default",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "description": "EN71-3",
+         "link": "https://store.bblcdn.com/s1/default/ab385dbf28074b54a181f802f7643164/EN71-3.pdf",
+         "id": "comp_1784702097135_uwqyejwg6"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "id": "content_block_1776744740718_dwoqb1p7t",
+     "type": "content_block",
+     "variant": "content-block-21-pro",
+     "name": "FAQ",
+     "anchor": {
+      "enabled": true,
+      "name": "Printing Tips",
+      "id": "content_block_1776744740718_dwoqb1p7t"
+     },
+     "modules": {
+      "spacingMode": "standard",
+      "hLevel": "",
+      "typeStyles": {
+       "ref": "title_typestyles_5",
+       "content": {
+        "title": "Printing Tips"
+       }
+      },
+      "featureConfig": {
+       "faqs": [
+        {
+         "question": "1.Accessory Compatibility",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>Compatible with all printers, AMS, build plate, and nozzles.</div>",
+           "id": "comp_1784702097135_xast78vyl"
+          }
+         ],
+         "id": "comp_1784702097135_drdb754ua"
+        },
+        {
+         "question": "2.Drying Recommendations",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>Dry before use to ensure the best print quality and consistent finish. Store in a dry environment after use. For more details, please refer to: <a href=\"https://wiki.bambulab.com/en/filament-acc/filament/dry-filament\" target=\"_blank\" rel=\"noopener\"><span style=\"text-decoration: underline;\"><span style=\"color: #00ae42; text-decoration: underline;\">Filament drying instructions</span></span></a> on WIKI.</div>",
+           "id": "comp_1784702097135_qdeh8y8hi"
+          }
+         ],
+         "id": "comp_1784702097135_xqpe1boka"
+        },
+        {
+         "question": "3.Refill Guidelines",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>The refill filament needs to be used with a spool. For detailed instructions on how to swap in the new filament using the Bambu Reusable Spool, please refer to the <a href=\"https://wiki.bambulab.com/en/general/swaping-new-filament-with-bambu-reusable-spool\" target=\"_blank\" rel=\"noopener\"><span style=\"text-decoration: underline;\"><span style=\"color: #00ae42; text-decoration: underline;\">guide</span></span></a> on WIKI.</div>",
+           "id": "comp_1784702097135_mkvopw7c9"
+          }
+         ],
+         "id": "comp_1784702097135_ygqdm0bsg"
+        },
+        {
+         "question": "4.Safety Tips",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<ul>\n<li>Please store the filament in a cool, dark, and dry environment away from direct sunlight and high temperatures.</li>\n<li>Please keep filament and any broken fragments out of reach of infants, children, and pets to prevent swallowing or choking.</li>\n<li>For opened filament, we recommend drying before use according to the wiki&rsquo;s recommended temperature and time settings.</li>\n<li>Please print this filament in a well-ventilated area, or install an effective air filtration or exhaust system.</li>\n<li>As this filament is not food-grade, please avoid using finished prints for food storage or contact.&nbsp;</li>\n</ul>",
+           "id": "comp_1789644979360_7prsuytfu"
+          }
+         ],
+         "id": "comp_1789644979360_6fikwes62"
+        }
+       ],
+       "faqAccordionExpandMode": "expandAll"
+      }
+     }
+    }
+   ]
+  }
+ },
+ "jsonld": [
+  {
+   "@context": "https://schema.org/",
+   "@type": "ProductGroup",
+   "name": "PLA Basic",
+   "description": "PLA is the most common material in 3D printing as it's easy to print and inexpensive. Meanwhile, its stiffness and strength can meet most printing needs. It is worth mentioning that it can biodegrade in some artificial composting conditions. Bambu PLA Basic is designed for high-speed printing. Compared to general PLA, it can easily achieve printing speeds up to 250-300 mm/s and has excellent toughness and Z-layer strength.",
+   "url": "https://us.store.bambulab.com/products/pla-basic-filament",
+   "brand": {
+    "@type": "Brand",
+    "name": "Bambu Lab"
+   },
+   "productGroupID": "6945419460744",
+   "hasVariant": [
+    {
+     "@type": "Product",
+     "sku": "40475106640008",
+     "image": "https://store.bblcdn.com/s7/default/18de47bcc5d9405596014400afd8a661/PLA_Basic_White.jpg",
+     "name": "PLA Basic - Jade White (10100) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=40475106640008",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "40475106672776",
+     "image": "https://store.bblcdn.com/s7/default/9be8ee6d2e094072ab781d45ae24c2e8/Orange.jpg",
+     "name": "PLA Basic - Orange (10300) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=40475106672776",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "40475106705544",
+     "image": "https://store.bblcdn.com/s7/default/d9f20007e8074789926e6d09db4a98fa/PLABasicBlue.jpg",
+     "name": "PLA Basic - Blue (10601) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=40475106705544",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "40475106738312",
+     "image": "https://store.bblcdn.com/s7/default/87769b450c3741df8c6ea30506aca96f/PLA-Basic_Gray.png",
+     "name": "PLA Basic - Gray (10103) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=40475106738312",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "40475106771080",
+     "image": "https://store.bblcdn.com/s7/default/976faf2e1ea24428aaacd7ec37e2a170/Beige.jpg",
+     "name": "PLA Basic - Beige (10201) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=40475106771080",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/OutOfStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "40475106803848",
+     "image": "https://store.bblcdn.com/s7/default/04c182e9baf840be8573ec644e309479/Sliver.jpg",
+     "name": "PLA Basic - Silver (10102) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=40475106803848",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "40475106836616",
+     "image": "https://store.bblcdn.com/s7/default/5728a39780844f06a9dc4bf3c3907a15/Yellow.jpg",
+     "name": "PLA Basic - Yellow (10400) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=40475106836616",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "40475106869384",
+     "image": "https://store.bblcdn.com/s7/default/3ca4bd461d744e84bf7432439236edf9/PLA-Basic_Blue-Gray.png",
+     "name": "PLA Basic - Blue Grey (10602) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=40475106869384",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "40475106902152",
+     "image": "https://store.bblcdn.com/s7/default/e0b16d45e5d64df88f8bca8609f9a0d2/Pink.jpg",
+     "name": "PLA Basic - Pink (10203) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=40475106902152",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "40475106967688",
+     "image": "https://store.bblcdn.com/s7/default/67403fbe583b4c2888272b874789ba57/PLA-Basic_Brown.png",
+     "name": "PLA Basic - Brown (10800) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=40475106967688",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "40475107000456",
+     "image": "https://store.bblcdn.com/s7/default/c93d0a825f094387a61ba3d5ae0499c7/Red.jpg",
+     "name": "PLA Basic - Red (10200) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=40475107000456",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "40988815556744",
+     "image": "https://store.bblcdn.com/s7/default/d9f087ffd3ae4283893f8a07d6b7e42a/PLA-Basic_Black_e33768fd-c87a-4b2d-a3f7-0b3afc81f13f.png",
+     "name": "PLA Basic - Black (10101) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=40988815556744",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "41078274621576",
+     "image": "https://store.bblcdn.com/s7/default/c93d0a825f094387a61ba3d5ae0499c7/Red.jpg",
+     "name": "PLA Basic - Red (10200) / Filament with spool / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=41078274621576",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "41078274654344",
+     "image": "https://store.bblcdn.com/s7/default/d9f087ffd3ae4283893f8a07d6b7e42a/PLA-Basic_Black_e33768fd-c87a-4b2d-a3f7-0b3afc81f13f.png",
+     "name": "PLA Basic - Black (10101) / Filament with spool / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=41078274654344",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "41078274687112",
+     "image": "https://store.bblcdn.com/s7/default/18de47bcc5d9405596014400afd8a661/PLA_Basic_White.jpg",
+     "name": "PLA Basic - Jade White (10100) / Filament with spool / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=41078274687112",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "41135419228296",
+     "image": "https://store.bblcdn.com/s7/default/dd18e1115a7e444396617a3a884aa091/Bambu_Green.jpg",
+     "name": "PLA Basic - Bambu Green (10501) / Filament with spool / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=41135419228296",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "41142110093448",
+     "image": "https://store.bblcdn.com/s7/default/d9f20007e8074789926e6d09db4a98fa/PLABasicBlue.jpg",
+     "name": "PLA Basic - Blue (10601) / Filament with spool / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=41142110093448",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "41211562819720",
+     "image": "https://store.bblcdn.com/s7/default/87769b450c3741df8c6ea30506aca96f/PLA-Basic_Gray.png",
+     "name": "PLA Basic - Gray (10103) / Filament with spool / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=41211562819720",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "41884190146696",
+     "image": "https://store.bblcdn.com/s7/default/dd18e1115a7e444396617a3a884aa091/Bambu_Green.jpg",
+     "name": "PLA Basic - Bambu Green (10501) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=41884190146696",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "41884190703752",
+     "image": "https://store.bblcdn.com/s7/default/ff1f58a232db4b8ba8ed85da1698d1bb/Bronze.jpg",
+     "name": "PLA Basic - Bronze (10801) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=41884190703752",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "41884191195272",
+     "image": "https://store.bblcdn.com/s7/default/b8f76cac43b94ef18c4d3801f2bd3856/Gold.jpg",
+     "name": "PLA Basic - Gold (10401) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=41884191195272",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "41884191752328",
+     "image": "https://store.bblcdn.com/s7/default/b4c16fb72f544e998b098ce854772e81/PLAPurple.jpg",
+     "name": "PLA Basic - Purple (10700) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=41884191752328",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "41884192211080",
+     "image": "https://store.bblcdn.com/s7/default/9b179992f52643b2b91c213d86a0c5e1/Magenta.jpg",
+     "name": "PLA Basic - Magenta (10202) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=41884192211080",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "41884192571528",
+     "image": "https://store.bblcdn.com/s7/default/beb1e91ec6f44fa7a12e0793337d7c52/CMYK-Cyan-1.png",
+     "name": "PLA Basic - Cyan (10603) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=41884192571528",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "41884193030280",
+     "image": "https://store.bblcdn.com/s7/default/2483d6189ae94ee9971c38363bbce6e5/063c3c25cb6510ea2566af540e5e3c99_287359af-ac7d-4683-ad97-25e7a1f420f3.png",
+     "name": "PLA Basic - Mistletoe Green (10502) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=41884193030280",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "42844628975752",
+     "image": "https://store.bblcdn.com/s7/default/d9b993d99ef54581968a5711269f2be2/light_gray_25c0c41d-107b-4d05-96d1-3de1efb728d9.jpg",
+     "name": "PLA Basic - Light Gray (10104) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=42844628975752",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "42844629008520",
+     "image": "https://store.bblcdn.com/s7/default/f19847c3b512400588d34b27434a01ad/pla_basic_dark_gray.jpg",
+     "name": "PLA Basic - Dark Gray (10105) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=42844629008520",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "43045591679112",
+     "image": "https://store.bblcdn.com/s7/default/ee52b43861ef45849965b6dcdd87b617/MaroonRed.jpg",
+     "name": "PLA Basic - Maroon Red (10205) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=43045591679112",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "43045596233864",
+     "image": "https://store.bblcdn.com/s7/default/dcc368a07e73489da62a8cceb29e31a2/SunflowerYellow.jpg",
+     "name": "PLA Basic - Sunflower Yellow (10402) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=43045596233864",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "43045596921992",
+     "image": "https://store.bblcdn.com/s7/default/0301553043e245e1b4f280abaf00fcfd/Turquoise.jpg",
+     "name": "PLA Basic - Turquoise (10605) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=43045596921992",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "43045597446280",
+     "image": "https://store.bblcdn.com/s7/default/db7a279375f049dfab2036d8bd8fcac7/IndigoPurple.jpg",
+     "name": "PLA Basic - Indigo Purple (10701) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=43045597446280",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "43045598167176",
+     "image": "https://store.bblcdn.com/s7/default/20fb60d009c8414f95caed07a4705de4/BrightGreen.jpg",
+     "name": "PLA Basic - Bright Green (10503) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=43045598167176",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "43045598724232",
+     "image": "https://store.bblcdn.com/s7/default/ac639216989444d4b065ae5017ab8c80/CocoaBrown.jpg",
+     "name": "PLA Basic - Cocoa Brown (10802) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=43045598724232",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "43045599019144",
+     "image": "https://store.bblcdn.com/s7/default/cda8ef4f247943c6934ff1d3a9eef195/HotPink.jpg",
+     "name": "PLA Basic - Hot Pink (10204) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=43045599019144",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "43045599215752",
+     "image": "https://store.bblcdn.com/s7/default/b4ed2e8a24f344538d73ce44069dc17c/CobaltBlue.jpg",
+     "name": "PLA Basic - Cobalt Blue (10604) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=43045599215752",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "43045599543432",
+     "image": "https://store.bblcdn.com/s7/default/d5ba9b091d33481fa397bab61034f031/PumpkinOrange.jpg",
+     "name": "PLA Basic - Pumpkin Orange (10301) / Refill / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=43045599543432",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "43257238290568",
+     "image": "https://store.bblcdn.com/s7/default/2483d6189ae94ee9971c38363bbce6e5/063c3c25cb6510ea2566af540e5e3c99_287359af-ac7d-4683-ad97-25e7a1f420f3.png",
+     "name": "PLA Basic - Mistletoe Green (10502) / Filament with spool / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=43257238290568",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "43257238749320",
+     "image": "https://store.bblcdn.com/s7/default/beb1e91ec6f44fa7a12e0793337d7c52/CMYK-Cyan-1.png",
+     "name": "PLA Basic - Cyan (10603) / Filament with spool / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=43257238749320",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "565815336288092161",
+     "image": "https://store.bblcdn.com/s7/default/dcc368a07e73489da62a8cceb29e31a2/SunflowerYellow.jpg",
+     "name": "PLA Basic - Sunflower Yellow (10402) / Filament with spool / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=565815336288092161",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "565815336288092167",
+     "image": "https://store.bblcdn.com/s7/default/d5ba9b091d33481fa397bab61034f031/PumpkinOrange.jpg",
+     "name": "PLA Basic - Pumpkin Orange (10301) / Filament with spool / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=565815336288092167",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "565815336288092173",
+     "image": "https://store.bblcdn.com/s7/default/cda8ef4f247943c6934ff1d3a9eef195/HotPink.jpg",
+     "name": "PLA Basic - Hot Pink (10204) / Filament with spool / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=565815336288092173",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "565815336288092179",
+     "image": "https://store.bblcdn.com/s7/default/db7a279375f049dfab2036d8bd8fcac7/IndigoPurple.jpg",
+     "name": "PLA Basic - Indigo Purple (10701) / Filament with spool / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=565815336288092179",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "565815336288092185",
+     "image": "https://store.bblcdn.com/s7/default/ac639216989444d4b065ae5017ab8c80/CocoaBrown.jpg",
+     "name": "PLA Basic - Cocoa Brown (10802) / Filament with spool / 1kg",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/pla-basic-filament?id=565815336288092185",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    }
+   ]
+  }
+ ]
+}

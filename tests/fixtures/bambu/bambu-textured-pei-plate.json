@@ -1,0 +1,650 @@
+{
+ "_meta": {
+  "source_url": "https://us.store.bambulab.com/products/bambu-textured-pei-plate",
+  "fetched_at": "2026-10-15T09:59:02Z",
+  "extracted_from": "self.__next_f RSC flight data (App Router); product object = props.data of the PDP component, description = separate RSC element (see description.kind)",
+  "removed_keys": [
+   "abGroup",
+   "discountOffText",
+   "discountPrice",
+   "flashSaleVO",
+   "gradientDiscountActivityId",
+   "gradientDiscountSkus",
+   "marketingDisplayAbGroup",
+   "maximum",
+   "minimum",
+   "orderInfo",
+   "orderInfoTitle",
+   "pointsInfo",
+   "price",
+   "priceCurrency",
+   "priceDescriptionList",
+   "priceExplanation",
+   "productSkuBuyAndGetVO",
+   "productSkuPreSale",
+   "promotionDescription",
+   "qryPromotionFlag",
+   "quantityLimitType",
+   "quantityLimitValue",
+   "serviceGuaranteeList",
+   "skuPromotionPointsSwitch"
+  ],
+  "notes": "Prices, compare-at prices, purchase limits, promotions, points and store-wide shipping/service boilerplate removed; dollar amounts inside text replaced with $[redacted]. Ids are strings (many exceed 2^53)."
+ },
+ "product": {
+  "id": "7441242259592",
+  "name": "Bambu Textured PEI Plate",
+  "type": 1,
+  "subTitle": null,
+  "description": null,
+  "seoCode": "bambu-textured-pei-plate",
+  "seoTitle": "Bambu Textured PEI Plate",
+  "seoMetaDescription": "The Bambu Textured PEI Plate is suitable for PLA, TPU, and PETG, as well as materials that require high temperatures like ABS and Nylon. It's a flexible magnetic build plate with sprayed dual-sided PEI coating. During printing, the plate will provide excellent adhesion and easy print removal after cooling. ",
+  "seoUrlHandle": "https://us.store.bambulab.com/products/bambu-textured-pei-plate",
+  "productFeaturesTitle": "Product Features",
+  "productFeatures": "",
+  "productFeaturesModuleList": [
+   {
+    "id": "733532511686922241",
+    "title": "Product Features",
+    "content": "",
+    "iconUrl": ""
+   }
+  ],
+  "newFlag": 0,
+  "externalVideoTitle": null,
+  "externalVideoLinkList": [
+   ""
+  ],
+  "mediaFiles": [
+   {
+    "resourceFileId": "746608697947750400",
+    "url": "https://store.bblcdn.com/s7/default/2050f40e3b8941849f174438d3818242/FAP033.jpg"
+   },
+   {
+    "resourceFileId": "39515922366600",
+    "url": "https://store.bblcdn.com/s7/default/ebde5bf801dd4cdaade9fd4ad64f58c5/Textured_Surface_1600.png"
+   },
+   {
+    "resourceFileId": "746608697890779136",
+    "url": "https://store.bblcdn.com/s7/default/2fecca1d19ec455ea11a991eea9d54bc/FAP035.jpg"
+   },
+   {
+    "resourceFileId": "746608699677782016",
+    "url": "https://store.bblcdn.com/s7/default/78a01b4047094d93b1f4c40686f5eb94/FAP025.jpg"
+   },
+   {
+    "resourceFileId": "746608682401443840",
+    "url": "https://store.bblcdn.com/s7/default/51f8056761214eb4a629132acc8738f9/FAP009.jpg"
+   }
+  ],
+  "productSkuList": [
+   {
+    "id": "746609042228801541",
+    "mediaFile": {
+     "resourceFileId": "746608697890779136",
+     "url": "https://store.bblcdn.com/s7/default/2fecca1d19ec455ea11a991eea9d54bc/FAP035.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "9701511921800",
+      "propertyValueId": null,
+      "propertyValue": "A2L",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "746609042228801545",
+    "mediaFile": {
+     "resourceFileId": "746608697947750400",
+     "url": "https://store.bblcdn.com/s7/default/2050f40e3b8941849f174438d3818242/FAP033.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "9701511921800",
+      "propertyValueId": null,
+      "propertyValue": "X2D",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "746609042228801549",
+    "mediaFile": {
+     "resourceFileId": "746608697947750400",
+     "url": "https://store.bblcdn.com/s7/default/2050f40e3b8941849f174438d3818242/FAP033.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "9701511921800",
+      "propertyValueId": null,
+      "propertyValue": "P2S",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "746609042228801553",
+    "mediaFile": {
+     "resourceFileId": "746608697890779136",
+     "url": "https://store.bblcdn.com/s7/default/2fecca1d19ec455ea11a991eea9d54bc/FAP035.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "9701511921800",
+      "propertyValueId": null,
+      "propertyValue": "H2C",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "746609042228801557",
+    "mediaFile": {
+     "resourceFileId": "746608699677782016",
+     "url": "https://store.bblcdn.com/s7/default/78a01b4047094d93b1f4c40686f5eb94/FAP025.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "9701511921800",
+      "propertyValueId": null,
+      "propertyValue": "H2S",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "746609042228801561",
+    "mediaFile": {
+     "resourceFileId": "746608699677782016",
+     "url": "https://store.bblcdn.com/s7/default/78a01b4047094d93b1f4c40686f5eb94/FAP025.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "9701511921800",
+      "propertyValueId": null,
+      "propertyValue": "H2D",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "746609042228801565",
+    "mediaFile": {
+     "resourceFileId": "746608697947750400",
+     "url": "https://store.bblcdn.com/s7/default/2050f40e3b8941849f174438d3818242/FAP033.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "9701511921800",
+      "propertyValueId": null,
+      "propertyValue": "A1",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "746609042228801569",
+    "mediaFile": {
+     "resourceFileId": "746608682401443840",
+     "url": "https://store.bblcdn.com/s7/default/51f8056761214eb4a629132acc8738f9/FAP009.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "9701511921800",
+      "propertyValueId": null,
+      "propertyValue": "A1 mini",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "746609042228801573",
+    "mediaFile": {
+     "resourceFileId": "746608697947750400",
+     "url": "https://store.bblcdn.com/s7/default/2050f40e3b8941849f174438d3818242/FAP033.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "9701511921800",
+      "propertyValueId": null,
+      "propertyValue": "P1 Series",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   },
+   {
+    "id": "746609042228801577",
+    "mediaFile": {
+     "resourceFileId": "746608697947750400",
+     "url": "https://store.bblcdn.com/s7/default/2050f40e3b8941849f174438d3818242/FAP033.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Printer Model",
+      "propertyKeyId": "9701511921800",
+      "propertyValueId": null,
+      "propertyValue": "X1 Series",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": "",
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   }
+  ],
+  "productPropertyList": [
+   {
+    "propertyKey": "Printer Model",
+    "propertyKeyId": "9701511921800",
+    "productPropertyValueList": [
+     {
+      "id": "737888340796665857",
+      "value": "A2L",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "654581737346600961",
+      "value": "X2D",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "667511502641102849",
+      "value": "P2S",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "581073343537422336",
+      "value": "H2C",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681826642980865",
+      "value": "H2S",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "564681826642980864",
+      "value": "H2D",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "746609042228801537",
+      "value": "A1",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "746609042228801538",
+      "value": "A1 mini",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "746609042228801539",
+      "value": "P1 Series",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     },
+     {
+      "id": "746609042228801540",
+      "value": "X1 Series",
+      "newFlag": 0,
+      "selectedDefault": 0,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     }
+    ],
+    "position": 1,
+    "type": 1,
+    "title": "",
+    "introduction": "",
+    "explanation": ""
+   }
+  ],
+  "skillLevel": 0,
+  "skillTitle": null,
+  "printerTime": "",
+  "filamentUsed": "",
+  "colorCollectionList": [],
+  "productExtraInfoVO": {
+   "gprsInfoTemplateVO": null,
+   "productVideoVOList": null,
+   "productFileList": null
+  },
+  "productDetailTemplateVO": null,
+  "subProductList": null,
+  "showMwModelIds": [],
+  "showMwModelPosition": 0,
+  "customButtonTitle": null,
+  "customButtonLink": null,
+  "paymentComponentPosition": 0,
+  "isFilament": false,
+  "currentAllIdRoute": "552709757765505024>552709757794865152>552709757887139840",
+  "imageLabels": null
+ },
+ "description": {
+  "kind": "legacy_html",
+  "source_component_props": {
+   "isOldVersion": true
+  },
+  "html": "<div>\n<div><!-- 文案布局 -->\n<div class=\"pct pct_mc\"><!-- 顶部图片部分 -->\n<div class=\"pct_head-ic\">\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/6d0a901b776f4967b306fcd62d92a497/FAP007_Banner_5ddf5ef3-29ca-43c1-9c3c-aa6ec6f9afe5.png\" alt=\"Bambu Textured PEI Plate, Excellent first-layer adhesion, Improved durability\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/fffda9f498bd4355b5dfb21e71c5f4e7/FAP007_Banner_6b0290e3-cdb7-44cf-919a-7fb459789649.png\" alt=\"Bambu Textured PEI Plate, Excellent first-layer adhesion, Improved durability\" /></div>\n</div>\n</div>\n</div>\n</div>\n<p style=\"margin-top: 30px;\"><video style=\"width: 100%;\" src=\"https://store.bblcdn.com/s7/default/ff8fdce90ab14a79980e81ed2bfaafa7/ec46684c749b4615ac5b6055679737c7.mp4\" controls=\"controls\" width=\"300\" height=\"150\" autoplay=\"autoplay\" loop=\"loop\" muted=\"\" playsinline=\"\" poster=\"https://store.bblcdn.com/s7/default/b8407d64d2814fb786bc116bacc6b5ce/Group_2313_597185c5-57ac-47f1-875d-ab3f213a4ecc.png\" data-mce-style=\"width: 100%;\" data-mce-src=\"https://store.bblcdn.com/s7/default/ff8fdce90ab14a79980e81ed2bfaafa7/ec46684c749b4615ac5b6055679737c7.mp4\"></video></p>\n<!-- 文案布局 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-stpc\"><!-- 第一条 -->\n<div class=\"pct_st-p\">\n<p class=\"pct_p\">&nbsp;</p>\n</div>\n</div>\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-stpcic\"><!-- 第一条 -->\n<div class=\"pct_stpc-ic\"><!-- 左侧文案部分 -->\n<div class=\"pct_st-p\">\n<h3 class=\"pct_st\"></h3>\n<h3 class=\"pct_st\"></h3>\n<h3 class=\"pct_st\">Excellent First-layer Adhesion and Improved Durability</h3>\n<div data-docx-has-block-data=\"false\" data-page-id=\"BBRnd3ZnMoheF1xBZCMcou9xnR4\">\n<div class=\"ace-line ace-line old-record-id-MwYVdBZPjoDc7mxOh7ucPqgwn6a\">After optimizing the manufacturing process of the Bambu Texture PEI Plate, the durability of the plate is enhanced. Additionally, the adhesion between the prints and the plate is significantly improved, eliminating the need for adhesives.</div>\n<div class=\"ace-line ace-line old-record-id-MwYVdBZPjoDc7mxOh7ucPqgwn6a\"></div>\n<div class=\"ace-line ace-line old-record-id-Vx83du4dvo5ChZxT1OBc8e5onog\">*In some situations, glue is required for very specific filaments</div>\n<div class=\"ace-line ace-line old-record-id-Vx83du4dvo5ChZxT1OBc8e5onog\"></div>\n<div class=\"ace-line ace-line old-record-id-Vx83du4dvo5ChZxT1OBc8e5onog\"></div>\n</div>\n</div>\n<!-- 右侧图片部分 -->\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/d8f55e8e969a4a1085edc13dbe5de492/Group_2307.png\" alt=\"Surface Finish\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/d8f55e8e969a4a1085edc13dbe5de492/Group_2307.png\" alt=\"Surface Finish\" /></div>\n</div>\n<!-- 第二条 -->\n<div class=\"pct_stpc-ic\"><!-- 左侧文案部分 -->\n<div class=\"pct_st-p\" style=\"padding-right: 20px;\">\n<h3 class=\"pct_st\">Self-release when Cooled Down</h3>\n<p class=\"pct_p\">PEI is an excellent material for 3D printing applications due to its ability to withstand the repeated heating and cooling cycles of a printer heatbed. Prints come off easily when the temperature of the heatbed reaches room temperature, and we always recommend waiting until it reaches 35℃ or lower. If the print still adheres to the plate, simply bend the steel plate and the model will fall right into your hands.</p>\n</div>\n<!-- 右侧图片部分 -->\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/8d8cb8b996d84ec68b9225e04515adf6/20230711-145849.gif\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/8d8cb8b996d84ec68b9225e04515adf6/20230711-145849.gif\" /></div>\n</div>\n<!-- 第三条 -->\n<div class=\"pct_stpc-ic\"><!-- 左侧文案部分 -->\n<div class=\"pct_st-p\" style=\"padding-right: 20px;\">\n<h3 class=\"pct_st\">Compatible with Various Filaments</h3>\n<p class=\"pct_p\">PEI enables printing not only with common materials such as PLA, TPU, PETG, but also with materials that require high temperatures like ABS and Nylon.</p>\n</div>\n<!-- 右侧图片部分 -->\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/a8a8cfd1609549ef9f5912a3638cb5aa/20230711-212050.png\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/a8a8cfd1609549ef9f5912a3638cb5aa/20230711-212050.png\" /></div>\n</div>\n<!-- 第四条 -->\n<div class=\"pct_stpc-ic\"><!-- 左侧文案部分 -->\n<div class=\"pct_st-p\" style=\"padding-right: 20px;\">\n<h3 class=\"pct_st\">Reliable Magnetic Adhesion to Prevent Warping</h3>\n<p class=\"pct_p\">The Bambu Texture PEI Plate features a 0.5mm-thick stainless steel plate that enhances magnetic adhesion. This helps to prevent warping and ensure optimal print quality during 3D printing, reducing the likelihood of the first layer detaching due to deformation. It also helps when printing larger models with materials that are prone to warping like ABS, PC and Nylon.</p>\n</div>\n<!-- 右侧图片部分 -->\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/b5fef7a99b6047868942244fac99a07d/Group_2306.png\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/b5fef7a99b6047868942244fac99a07d/Group_2306.png\" /></div>\n</div>\n<!-- 第五条 -->\n<div class=\"pct_stpc-ic\"><!-- 左侧文案部分 -->\n<div class=\"pct_st-p\" style=\"padding-right: 20px;\">\n<h3 class=\"pct_st\">Textured Surface Finish</h3>\n<p class=\"pct_p\">Bambu Texture PEI Plate offers a one-of-a-kind first-layer surface. Through the application of a powder-coating process, this PEI Build Plate creates a rugged texture that adds a texture to your prints.</p>\n</div>\n<!-- 右侧图片部分 -->\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/20ae4295f1bb41d09f48b15d6634a248/Group_2310_4.png\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/20ae4295f1bb41d09f48b15d6634a248/Group_2310_4.png\" /></div>\n</div>\n</div>\n</div>\n<br /><!-- 文案布局 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-stpc\"><!-- 第一条 -->\n<div class=\"pct_st-p\">\n<h3 class=\"pct_st\" style=\"text-align: center;\">Considerations</h3>\n<ul>\n<li>Increasing heatbed temperature enhances adhesion. Users need to adjust the temperature of the heatbed based on their specific requirements in order to achieve the most suitable level of adhesion.</li>\n<li>Before auto-leveling, it is necessary to repeatedly rub the nozzle in the special wiping area of the build plate to completely remove any residual material at the tip of the nozzle. The coating in the special-designed wiping area will gradually become worn over time. This is normal and does not affect print quality or nozzle lifetime, so there is no need to worry about any quality issues.</li>\n<li>Deposition of dust and grease on the build plate decrease adhesion. It is recommended to regularly clean the surface with detergent and water to maintain best adhesion.</li>\n<li>Bambu Lab recommends only using Bambu Lab official glue on the Bambu Lab build plates, and can not be held responsible for any damage caused to plates as a result of using third-party glue on build plates. Do not clean the Textured PEI with Acetone, as it will damage the PEI surface.</li>\n<li>Always wait for a few minutes before removing printed models to allow the plate to cool down for easy print removal. This prevents damage to the plate and ensures a long lifetime of the product.</li>\n<li>Carefully sanding the surface with fine-grit (600 was recommended) sandpaper can help restore adhesion.</li>\n<li>The latest firmware brings significant improvements to the Bambu Textured PEI Plate calibration using the Micro Lidar, and it is now fully compatible with the automatic calibration process.</li>\n<li>The Textured PEI plate is considered a consumable part, which will degrade over time. The warranty will only cover manufacturing defects, not cosmetic damage like scratches, dents, or cracks. Defective sheets upon arrival are the only ones covered by the warranty.</li>\n</ul>\n<p></p>\n</div>\n<!-- 标题加文案加大图部分 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_t-p\">\n<h3 class=\"pct_t\">Recommended Settings</h3>\n<p class=\"pct_p\">Please note that&nbsp;other slicer settings might need to be adjusted based on the printed model and the filament requirements</p>\n</div>\n</div>\n</div>\n<!-- table布局 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_st-tbc\">\n<div class=\"pct_tbc\">\n<table class=\"pct_tb\" style=\"height: 252px;\"><!-- 表头 -->\n<thead class=\"pct_th\">\n<tr style=\"height: 27px;\">\n<td class=\"pct_td\" style=\"height: 27px; width: 277.869px;\">Materials</td>\n<td class=\"pct_td\" style=\"height: 27px; width: 209.176px;\"><strong>Heatbed Temperature</strong></td>\n<td class=\"pct_td\" style=\"height: 27px; width: 195.412px;\"><strong>Glue Stick Required?</strong></td>\n<td class=\"pct_td\" style=\"height: 27px; width: 333.196px;\"><strong>Upper Glass Cover Plate Removed?</strong></td>\n</tr>\n</thead>\n<tbody><!-- 第一行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"height: 25px; width: 277.869px;\"><strong>PLA/PLA-CF/PLA-GF</strong></td>\n<td class=\"pct_td\" style=\"height: 25px; width: 209.176px;\">45~60℃</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 195.412px;\">No</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 333.196px;\">Yes</td>\n</tr>\n<!-- 第二行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"height: 25px; width: 277.869px;\"><strong>ABS (not for A1 mini)</strong></td>\n<td class=\"pct_td\" style=\"height: 25px; width: 209.176px;\">90~100℃</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 195.412px;\">Yes</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 333.196px;\">No</td>\n</tr>\n<!-- 第三行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"height: 25px; width: 277.869px;\"><strong>PETG/PETG-CF</strong></td>\n<td class=\"pct_td\" style=\"height: 25px; width: 209.176px;\">60~80℃</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 195.412px;\">No</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 333.196px;\">No</td>\n</tr>\n<!-- 第四行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"height: 25px; width: 277.869px;\"><strong>PET-CF (not for A1 mini)</strong></td>\n<td class=\"pct_td\" style=\"height: 25px; width: 209.176px;\">80~100℃</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 195.412px;\">No</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 333.196px;\">No</td>\n</tr>\n<!-- 第五行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"height: 25px; width: 277.869px;\"><strong>TPU 85A/90A</strong></td>\n<td class=\"pct_td\" style=\"height: 25px; width: 209.176px;\">35~ 45℃</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 195.412px;\">No</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 333.196px;\">Yes</td>\n</tr>\n<!-- 第五行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"height: 25px; width: 277.869px;\"><strong>TPU 95A for AMS</strong></td>\n<td class=\"pct_td\" style=\"height: 25px; width: 209.176px;\">35~ 45 ℃</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 195.412px;\">No</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 333.196px;\">Yes</td>\n</tr>\n<!-- 第五行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"height: 25px; width: 277.869px;\"><strong>ASA (not for A1 mini)</strong></td>\n<td class=\"pct_td\" style=\"height: 25px; width: 209.176px;\">90~100℃</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 195.412px;\">Yes</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 333.196px;\">No</td>\n</tr>\n<!-- 第六行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"height: 25px; width: 277.869px;\"><strong>PVA</strong></td>\n<td class=\"pct_td\" style=\"height: 25px; width: 209.176px;\">45~60℃</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 195.412px;\">No</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 333.196px;\">Yes</td>\n</tr>\n<!-- 第七行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"height: 25px; width: 277.869px;\"><strong>PC/PC-CF (not for A1 mini)</strong></td>\n<td class=\"pct_td\" style=\"height: 25px; width: 209.176px;\">90~110℃</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 195.412px;\">Yes</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 333.196px;\">No</td>\n</tr>\n<!-- 第八行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"height: 25px; width: 277.869px;\"><strong>PA/PA-CF/PAHT-CF (not for A1 mini)</strong></td>\n<td class=\"pct_td\" style=\"height: 25px; width: 209.176px;\">90~110℃</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 195.412px;\">Yes</td>\n<td class=\"pct_td\" style=\"height: 25px; width: 333.196px;\">No</td>\n</tr>\n</tbody>\n</table>\n</div>\n</div>\n<br />\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-icpc\">\n<h3 class=\"pct_t\">Installation Steps for X1 Series/P1 Series/A1/P2S/X2D</h3>\n<!-- 不同分辨率分栏数量 pct_grad-分栏数量-设备 --> <!-- <div class=\"pct_icpc pct_grad-1-mobile\"> --> <!-- <div class=\"pct_icpc pct_grad-2-pc\"> --> <!-- 替换下一行 -->\n<div class=\"pct_icpc pct_grad-2-pc\"><!-- 第一条 -->\n<div class=\"pct_ic-p\">\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/248239de87474dea9b2cfa2deec9c171/Group_2316.png\" alt=\"Step 1: Align the plate with the fixed points of the platform with the name of the plate facing you\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/248239de87474dea9b2cfa2deec9c171/Group_2316.png\" alt=\"Step 1: Align the plate with the fixed points of the platform with the name of the plate facing you\" /></div>\n<p class=\"pct_p\"><strong>Step 1:</strong> Align the plate with the fixed points of the platform with the name of the plate facing you</p>\n</div>\n<!-- 第二条 -->\n<div class=\"pct_ic-p\">\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/affc0790c5914ea8a35010fb5d5053db/origin_img_v2_db31adb4-1790-4785-b9b8-c2110c23d71g_1_2.png\" alt=\"Step 2: Lower the plate and secure to the magnetic platform\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/affc0790c5914ea8a35010fb5d5053db/origin_img_v2_db31adb4-1790-4785-b9b8-c2110c23d71g_1_2.png\" alt=\"Step 2: Lower the plate and secure to the magnetic platform\" /></div>\n<p class=\"pct_p\"><strong>Step 2:</strong> Lower the plate and secure to the magnetic platform</p>\n</div>\n</div>\n</div>\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-icpc\">\n<h3 class=\"pct_t\">Installation Steps for A1 mini</h3>\n<!-- 不同分辨率分栏数量 pct_grad-分栏数量-设备 --> <!-- 替换下一行 -->\n<div class=\"pct_icpc pct_grad-2-pc\"><!-- 第一条 -->\n<div class=\"pct_ic-p\">\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/4682e59f3d284b5191ae816718c7fd76/Group_47911.png\" alt=\"Step 1: Align the plate with the fixed points of the platform with the name of the plate facing you\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/4682e59f3d284b5191ae816718c7fd76/Group_47911.png\" alt=\"Step 1: Align the plate with the fixed points of the platform with the name of the plate facing you\" /></div>\n<p class=\"pct_p\"><strong>Step 1:</strong> Align the plate with the fixed points of the platform with the name of the plate facing you</p>\n</div>\n<!-- 第二条 -->\n<div class=\"pct_ic-p\">\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/503049bde2c9425cac0f327e13320613/Group_47910.png\" alt=\"Step 2: Lower the plate and secure to the magnetic platform\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/503049bde2c9425cac0f327e13320613/Group_47910.png\" alt=\"Step 2: Lower the plate and secure to the magnetic platform\" /></div>\n<p class=\"pct_p\"><strong>Step 2:</strong> Lower the plate and secure to the magnetic platform</p>\n</div>\n</div>\n</div>\n</div>\n<!-- table布局 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_st-tbc\">\n<h3 class=\"pct_t\" style=\"text-align: center;\">Product Specifications</h3>\n<div class=\"pct_tbc\">\n<table class=\"pct_tb\"><!-- 表头 -->\n<tbody><!-- 第一行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>Material</strong></td>\n<td class=\"pct_td\">PEI Powder Coating + Magnetic Stainless Steel Plate</td>\n</tr>\n<!-- 第二行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>Surface Temperature Resistance</strong></td>\n<td class=\"pct_td\"><span>Up to 180℃</span></td>\n</tr>\n<!-- 第三行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>Thickness</strong></td>\n<td class=\"pct_td\"><span>PEI Powder Coating - 0.075mm<br />Stainless Steel Plate - 0.5mm/0.4mm</span></td>\n</tr>\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>Usable Print Size</strong></td>\n<td class=\"pct_td\"><span>350*320mm <br />256*256mm<br />180*180mm</span></td>\n</tr>\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>Packaging Size</strong></td>\n<td class=\"pct_td\"><span>408*388*17mm<br />300*270*17mm<br />220*190*15mm</span></td>\n</tr>\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>Packaging Weight</strong></td>\n<td class=\"pct_td\"><span>0.78kg<br />0.45kg<br />0.23kg</span></td>\n</tr>\n</tbody>\n</table>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>"
+ },
+ "jsonld": [
+  {
+   "@context": "https://schema.org/",
+   "@type": "ProductGroup",
+   "name": "Bambu Textured PEI Plate",
+   "description": "The Bambu Textured PEI Plate is suitable for PLA, TPU, and PETG, as well as materials that require high temperatures like ABS and Nylon. It's a flexible magnetic build plate with sprayed dual-sided PEI coating. During printing, the plate will provide excellent adhesion and easy print removal after cooling. ",
+   "url": "https://us.store.bambulab.com/products/bambu-textured-pei-plate",
+   "brand": {
+    "@type": "Brand",
+    "name": "Bambu Lab"
+   },
+   "productGroupID": "7441242259592",
+   "hasVariant": [
+    {
+     "@type": "Product",
+     "sku": "746609042228801541",
+     "image": "https://store.bblcdn.com/s7/default/2fecca1d19ec455ea11a991eea9d54bc/FAP035.jpg",
+     "name": "Bambu Textured PEI Plate - A2L",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-textured-pei-plate?id=746609042228801541",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "746609042228801545",
+     "image": "https://store.bblcdn.com/s7/default/2050f40e3b8941849f174438d3818242/FAP033.jpg",
+     "name": "Bambu Textured PEI Plate - X2D",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-textured-pei-plate?id=746609042228801545",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "746609042228801549",
+     "image": "https://store.bblcdn.com/s7/default/2050f40e3b8941849f174438d3818242/FAP033.jpg",
+     "name": "Bambu Textured PEI Plate - P2S",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-textured-pei-plate?id=746609042228801549",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "746609042228801553",
+     "image": "https://store.bblcdn.com/s7/default/2fecca1d19ec455ea11a991eea9d54bc/FAP035.jpg",
+     "name": "Bambu Textured PEI Plate - H2C",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-textured-pei-plate?id=746609042228801553",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "746609042228801557",
+     "image": "https://store.bblcdn.com/s7/default/78a01b4047094d93b1f4c40686f5eb94/FAP025.jpg",
+     "name": "Bambu Textured PEI Plate - H2S",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-textured-pei-plate?id=746609042228801557",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "746609042228801561",
+     "image": "https://store.bblcdn.com/s7/default/78a01b4047094d93b1f4c40686f5eb94/FAP025.jpg",
+     "name": "Bambu Textured PEI Plate - H2D",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-textured-pei-plate?id=746609042228801561",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "746609042228801565",
+     "image": "https://store.bblcdn.com/s7/default/2050f40e3b8941849f174438d3818242/FAP033.jpg",
+     "name": "Bambu Textured PEI Plate - A1",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-textured-pei-plate?id=746609042228801565",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "746609042228801569",
+     "image": "https://store.bblcdn.com/s7/default/51f8056761214eb4a629132acc8738f9/FAP009.jpg",
+     "name": "Bambu Textured PEI Plate - A1 mini",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-textured-pei-plate?id=746609042228801569",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "746609042228801573",
+     "image": "https://store.bblcdn.com/s7/default/2050f40e3b8941849f174438d3818242/FAP033.jpg",
+     "name": "Bambu Textured PEI Plate - P1 Series",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-textured-pei-plate?id=746609042228801573",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    },
+    {
+     "@type": "Product",
+     "sku": "746609042228801577",
+     "image": "https://store.bblcdn.com/s7/default/2050f40e3b8941849f174438d3818242/FAP033.jpg",
+     "name": "Bambu Textured PEI Plate - X1 Series",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/bambu-textured-pei-plate?id=746609042228801577",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    }
+   ]
+  }
+ ]
+}

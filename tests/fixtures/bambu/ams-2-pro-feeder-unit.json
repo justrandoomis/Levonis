@@ -1,0 +1,195 @@
+{
+ "_meta": {
+  "source_url": "https://us.store.bambulab.com/products/ams-2-pro-feeder-unit",
+  "fetched_at": "2026-10-15T09:58:50Z",
+  "extracted_from": "self.__next_f RSC flight data (App Router); product object = props.data of the PDP component, description = separate RSC element (see description.kind)",
+  "removed_keys": [
+   "abGroup",
+   "discountOffText",
+   "discountPrice",
+   "flashSaleVO",
+   "gradientDiscountActivityId",
+   "gradientDiscountSkus",
+   "marketingDisplayAbGroup",
+   "maximum",
+   "minimum",
+   "orderInfo",
+   "orderInfoTitle",
+   "pointsInfo",
+   "price",
+   "priceCurrency",
+   "priceDescriptionList",
+   "priceExplanation",
+   "productSkuBuyAndGetVO",
+   "productSkuPreSale",
+   "promotionDescription",
+   "qryPromotionFlag",
+   "quantityLimitType",
+   "quantityLimitValue",
+   "serviceGuaranteeList",
+   "skuPromotionPointsSwitch"
+  ],
+  "notes": "Prices, compare-at prices, purchase limits, promotions, points and store-wide shipping/service boilerplate removed; dollar amounts inside text replaced with $[redacted]. Ids are strings (many exceed 2^53)."
+ },
+ "product": {
+  "id": "576603267526975488",
+  "name": "AMS 2 Pro Feeder Unit",
+  "type": 1,
+  "subTitle": "",
+  "description": null,
+  "seoCode": "ams-2-pro-feeder-unit",
+  "seoTitle": "AMS 2 Pro Feeder Unit",
+  "seoMetaDescription": "",
+  "seoUrlHandle": "https://us.store.bambulab.com/products/ams-2-pro-feeder-unit",
+  "productFeaturesTitle": "Product Features",
+  "productFeatures": "",
+  "productFeaturesModuleList": [
+   {
+    "id": "733532521056997382",
+    "title": "Product Features",
+    "content": "",
+    "iconUrl": null
+   }
+  ],
+  "newFlag": 0,
+  "externalVideoTitle": "",
+  "externalVideoLinkList": [
+   ""
+  ],
+  "mediaFiles": [
+   {
+    "resourceFileId": "576603265777950720",
+    "url": "https://store.bblcdn.com/s7/default/08a6edbcbf4b4507bc3270f3180b0534/SAA035_(1).png"
+   },
+   {
+    "resourceFileId": "576603267510198272",
+    "url": "https://store.bblcdn.com/s7/default/9d7ba9e30e124bc1b302ad15e58a70be/SAA035_(11).png"
+   },
+   {
+    "resourceFileId": "576603264830038016",
+    "url": "https://store.bblcdn.com/s7/default/431f3912032245eda3f009e366dcc11c/SAA035_(8).png"
+   },
+   {
+    "resourceFileId": "576603263869542400",
+    "url": "https://store.bblcdn.com/s7/default/0398fbd395974772a6309381d8ed31f1/SAA035_(10).png"
+   },
+   {
+    "resourceFileId": "576603266658754560",
+    "url": "https://store.bblcdn.com/s7/default/9e6d1b32276b454d99fd43d58e658f09/SAA035_(9).png"
+   },
+   {
+    "resourceFileId": "576603263101984768",
+    "url": "https://store.bblcdn.com/s7/default/a1e6f2f87a74498ca16b0dac6a510784/SAA035_(7).png"
+   }
+  ],
+  "productSkuList": [
+   {
+    "id": "576603267531169795",
+    "mediaFile": {
+     "resourceFileId": "576603265777950720",
+     "url": "https://store.bblcdn.com/s7/default/08a6edbcbf4b4507bc3270f3180b0534/SAA035_(1).png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Compatibility",
+      "propertyKeyId": "576603267531169793",
+      "propertyValueId": null,
+      "propertyValue": "AMS 2 Pro",
+      "position": 1,
+      "colorUrl": null,
+      "title": null,
+      "introduction": null,
+      "explanation": null
+     }
+    ],
+    "isSoldOut": false,
+    "eta": null,
+    "outOfStockMsg": "",
+    "requiresNotify": 1,
+    "saleTime": "0",
+    "addFlag": true,
+    "description": null,
+    "subProductSkuSimpleList": null,
+    "skuCode": null,
+    "imageLabels": null
+   }
+  ],
+  "productPropertyList": [
+   {
+    "propertyKey": "Compatibility",
+    "propertyKeyId": "576603267531169793",
+    "productPropertyValueList": [
+     {
+      "id": "576603267531169794",
+      "value": "AMS 2 Pro",
+      "newFlag": 0,
+      "selectedDefault": 1,
+      "colorUrl": null,
+      "propertyValueMediaFile": null,
+      "tag": ""
+     }
+    ],
+    "position": 1,
+    "type": 1,
+    "title": "",
+    "introduction": "",
+    "explanation": ""
+   }
+  ],
+  "skillLevel": 0,
+  "skillTitle": null,
+  "printerTime": "",
+  "filamentUsed": "",
+  "colorCollectionList": [],
+  "productExtraInfoVO": {
+   "gprsInfoTemplateVO": null,
+   "productVideoVOList": null,
+   "productFileList": null
+  },
+  "productDetailTemplateVO": null,
+  "subProductList": null,
+  "showMwModelIds": [],
+  "showMwModelPosition": 0,
+  "customButtonTitle": null,
+  "customButtonLink": null,
+  "paymentComponentPosition": 0,
+  "isFilament": false,
+  "currentAllIdRoute": "552709758222684160>581730574607491072",
+  "imageLabels": null
+ },
+ "description": {
+  "kind": "legacy_html",
+  "source_component_props": {
+   "isOldVersion": true
+  },
+  "html": "<!-- Îİ¸²¼¾Ö -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-stpc\"><!-- µÚһÌõ -->\n<div class=\"pct_st-p\">\n<h3 class=\"pct_st\">Overview</h3>\n<p class=\"pct_p\">The AMS 2 Pro Feeder Unit is specially designed to support the AMS 2 Pro for printing multiple colors and materials. Ceramic-reinforced antiwear bushings are embedded in each feeder inlet to better protect the inlet from being worn by the filament after prolonged use. Each AMS 2 Pro has 4 feeder units, and each feeder unit has its own motor and gears to actively push the filament forward or wind it back to the spool.The AMS 2 Pro Feeder Unit has a sensor to detect filament. When a filament is inserted, the feeder unit will feed the filament automatically. When a filament needs to be wound back, the feeder unit will drive the AMS 2 Pro active support shaft to rotate the spool for filament winding.</p>\n<p class=\"pct_p\">&nbsp;</p>\n</div>\n<!-- µÚÈýÌõ -->\n<div class=\"pct_st-p\">\n<h3 class=\"pct_st\">Installation</h3>\n<p class=\"pct_p\">Learn more about the AMS 2 Pro Feeder Unit on <a href=\"https://e.bambulab.com/t?c=KmIPXAm57Frt6xli\" target=\"_blank\" rel=\"noopener\">Bambu Lab Wiki</a>.</p>\n<p class=\"pct_p\">&nbsp;</p>\n</div>\n<!-- µÚËÄÌõ -->\n<div class=\"pct_st-p\">\n<h3 class=\"pct_st\">In the Box</h3>\n<p class=\"pct_p\"><span>- AMS 2 Pro Feeder Unit *1</span></p>\n<p class=\"pct_p\"><span>- BT2-8 Screw *2</span></p>\n<p class=\"pct_p\">&nbsp;</p>\n</div>\n<!-- µÚÎåÌõ -->\n<div class=\"pct_st-p\">\n<h3 class=\"pct_st\">Compatibility</h3>\n<p class=\"pct_p\">AMS 2 Pro</p>\n<p class=\"pct_p\">&nbsp;</p>\n</div>\n<div class=\"pct pct_mc\"><!-- table²¼¾Ö -->\n<div class=\"pct pct_mc\">\n<h3 class=\"pct_t\" style=\"text-align: center;\">Product Specifications</h3>\n<div class=\"pct_t-tb\">\n<table class=\"pct_tb\"><!-- ±íͷ -->\n<tbody><!-- µÚһÐÐ --><!-- µڶþÐÐ -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><b>Materials</b></td>\n<td class=\"pct_td\">Plastic, Metal</td>\n<td class=\"pct_td\"><b>Packaging Size</b></td>\n<td class=\"pct_td\">100*135*45 mm</td>\n</tr>\n<!-- µÚÈýÐÐ -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><b>Color</b></td>\n<td class=\"pct_td\">Grey</td>\n<td class=\"pct_td\"><b>Packaging Weight</b></td>\n<td class=\"pct_td\">0.147 kg</td>\n</tr>\n</tbody>\n</table>\n</div>\n</div>\n</div>\n</div>\n</div>\n<p><button id=\"paste-helper-id\" style=\"width: 0px; height: 0px; padding: 0px; margin: 0px; border: 0px; display: none;\"></button><button id=\"paste-helper-id\" style=\"width: 0px; height: 0px; padding: 0px; margin: 0px; border: 0px; display: none;\"></button></p>"
+ },
+ "jsonld": [
+  {
+   "@context": "https://schema.org/",
+   "@type": "ProductGroup",
+   "name": "AMS 2 Pro Feeder Unit",
+   "description": "",
+   "url": "https://us.store.bambulab.com/products/ams-2-pro-feeder-unit",
+   "brand": {
+    "@type": "Brand",
+    "name": "Bambu Lab"
+   },
+   "productGroupID": "576603267526975488",
+   "hasVariant": [
+    {
+     "@type": "Product",
+     "sku": "576603267531169795",
+     "image": "https://store.bblcdn.com/s7/default/08a6edbcbf4b4507bc3270f3180b0534/SAA035_(1).png",
+     "name": "AMS 2 Pro Feeder Unit - AMS 2 Pro",
+     "offers": {
+      "@type": "Offer",
+      "url": "https://us.store.bambulab.com/products/ams-2-pro-feeder-unit?id=576603267531169795",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock"
+     }
+    }
+   ]
+  }
+ ]
+}
