@@ -36,9 +36,10 @@ import { runFxScheduler } from './lib/fx/scheduler';
 import { quarterHourSweepBudget, sweepStaleEnginePrices } from './lib/fx/reprice';
 import { statementBudget } from './lib/fx/budget';
 import { countingD1 } from './lib/d1Count';
-import { QUARTER_HOUR_TICK_LIMIT, STAFF_RECONCILIATION_TICK, quarterHourCompletenessBudget, quarterHourSearchBudget, quarterHourServicesBudget } from './lib/quarterHourBudget';
+import { QUARTER_HOUR_TICK_LIMIT, STAFF_RECONCILIATION_TICK, quarterHourCompletenessBudget, quarterHourPriceRequestBudget, quarterHourSearchBudget, quarterHourServicesBudget } from './lib/quarterHourBudget';
 import { runServicesSweep } from './lib/tradeInSweep';
 import { sweepCompleteness } from './lib/productCompleteness';
+import { digestPriceRequests, sweepPriceRequests } from './lib/priceRequests';
 import { authRoutes } from './routes/auth';
 import { productRoutes, homeRoutes } from './routes/products';
 import { cartRoutes } from './routes/cart';
@@ -1300,9 +1301,20 @@ export default {
         .catch((error) => {
           console.error('scheduled completeness sweep rejected:', error instanceof Error ? error.name : 'unknown');
         })
+        // Then (DECISIONS row 240): price requests whose product or selection is now priced — the
+        // customer told in the same batch as the state flip — then the admin digest (at most hourly),
+        // within one shared budget of 40 cut to what the completeness catch-up left. Never throws.
+        .then(async () => {
+          const budget = statementBudget(quarterHourPriceRequestBudget(used()));
+          await sweepPriceRequests(tickEnv, budget);
+          await digestPriceRequests(tickEnv, budget);
+        })
+        .catch((error) => {
+          console.error('scheduled price-request sweep rejected:', error instanceof Error ? error.name : 'unknown');
+        })
         // LAST (Services S-P2): trade-in offers and credits that ended, the cut-over
         // stamp, completions the delivered hook missed, credits given back — its own
-        // 120 statements, cut to what the completeness catch-up left. Never throws.
+        // 120 statements, cut to what the price-request sweep left. Never throws.
         .then(() => runServicesSweep(tickEnv, statementBudget(quarterHourServicesBudget(used()))))
         .catch((error) => {
           console.error('scheduled services sweep rejected:', error instanceof Error ? error.name : 'unknown');

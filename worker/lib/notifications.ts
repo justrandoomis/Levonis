@@ -60,6 +60,12 @@ export type NotificationKind =
    */
   | 'stock_back'
   /**
+   * «صار السعر متوفراً» — the price-request sweep (0193, worker/lib/priceRequests.ts)
+   * telling a signed-in customer who asked for a price that the product, or the
+   * selection they asked about, is priced and can be bought (DECISIONS row 240).
+   */
+  | 'price_available'
+  /**
    * «رد من الدعم» — staff answered a support ticket
    * (worker/lib/engagementNotify.ts). Added because the ticket conversation had
    * NO notification of any kind: a customer learned that support had replied
