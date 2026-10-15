@@ -57,6 +57,7 @@ import { loadPricingRates, type PricingRates } from '../rates';
 import { loadProductsPricing, type InputWrite, type ProductPricingData, type RuleWrite } from '../store';
 import { isFenceMiss } from '../../operations';
 import { engineCoreInstalled } from '../../engineInstalled';
+import { importStockRefusal, isImportStockMiss, refuseImportStockNotConfigured } from '../../importStock';
 import { loadEngineControl, priceImageOf, withRuleIds, type EngineControl } from '../engineWrite';
 import { effectiveWrites, FORM_INPUT_FIELDS, formOptionIds, parseProductInputs } from '../productInputs';
 import { parseRuleWrites } from '../ownerRules';
@@ -598,6 +599,10 @@ export async function gateV2(g: GateInput): Promise<V2Verdict> {
     return 'data';
   }
   if (g.prices_only && !ev.needs_write) return 'noop';
+  // A complete write publishes (its results make the product SELLABLE): a product the catalogue import created is
+  // refused until the owner chose its stock mode (Bambu import spec §B.10) — here, before any preview or review
+  // sheet, and again by the batch's own fence (v2/write.ts step 0), which stays the authority.
+  await refuseImportStockNotConfigured(c.env.DB, ev.product_id);
   if (!g.priceChange) return 'write';
   if (!isHash(g.hash)) throw refusal(409, 'PRICING_PREVIEW_REQUIRED', { preview: await g.preview() });
   if (g.hash !== ev.hash) throw refusal(409, 'PRICING_PREVIEW_STALE', { preview: await g.preview() });
@@ -612,6 +617,8 @@ export async function gateV2(g: GateInput): Promise<V2Verdict> {
 export function v2BatchOutcome(e: unknown): 'already' | HttpError | null {
   const msg = e instanceof Error ? e.message : String(e);
   if (/UNIQUE constraint failed: pricing_audit\.idempotency_key/i.test(msg)) return 'already';
+  // The import stock gate's own fence (v2/write.ts step 0): the reason, not "look again".
+  if (isImportStockMiss(e)) return importStockRefusal();
   if (isFenceMiss(e) || /UNIQUE constraint failed: ops_guards/i.test(msg)) return refusal(409, 'PRICING_CHANGED');
   return null;
 }

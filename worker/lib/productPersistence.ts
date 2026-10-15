@@ -78,6 +78,7 @@ import { productsHaveColumn, productsHaveConditionDoc } from './conditionProject
 import { withClassificationPlacements } from './catalogMembership';
 import { planSearchIndex, searchIndexInstalled } from './search/store';
 import { toSearchDoc } from './search/document';
+import { loadSearchAliases } from './search/aliases';
 import {
   isValidHex,
   normalizeHex,
@@ -2382,6 +2383,16 @@ export interface ProductWriteIntent {
    * rather than repeated (docs/TXT_IMPORT_PARITY.md §5.1).
    */
   allowComposition?: boolean;
+  /**
+   * THE PRODUCT'S SEARCH ALIASES (worker/lib/search/aliases.ts, migration
+   * 0194): its searchable external ids and its identity model and series,
+   * indexed beside the option names. Undefined — every ordinary writer — means
+   * "read the stored rows" (`loadSearchAliases`), so the first owner edit of
+   * an imported product keeps the colour code, part code and model a shopper
+   * finds it by. The catalogue import passes the aliases explicitly: its own
+   * batch writes those rows, and this planner reads before that batch commits.
+   */
+  searchAliases?: string[];
 }
 
 export interface ProductSavePlan {
@@ -3192,6 +3203,9 @@ export async function planProductSave(
       ...(doc.options ?? []).flatMap((o) => [o.name_en, o.name_ar, o.name_ckb]),
       ...(doc.colors ?? []).flatMap((c) => [c.name_en, c.name_ar, c.name_ckb]),
     ].filter((n): n is string => typeof n === 'string' && n.trim() !== '');
+    // The aliases the backfill writes too (one loader, both writers): what the
+    // caller is about to write, or what is stored. None without migration 0194.
+    const aliases = intent.searchAliases ?? (await loadSearchAliases(db, [productId])).get(productId) ?? [];
     const indexStmts = planSearchIndex(
       db,
       toSearchDoc({
@@ -3205,6 +3219,7 @@ export async function planProductSave(
         brandName: nameRows?.brand ?? null,
         categoryNames: [nameRows?.main ?? '', nameRows?.sub ?? ''].filter(Boolean),
         variantNames,
+        aliases,
       })
     );
     statements.push(...indexStmts);

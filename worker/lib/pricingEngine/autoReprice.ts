@@ -517,6 +517,11 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
     for (const f of failing) await block(f.p, f.code);
 
     // 5. Deficit first: one atomic, fenced, idempotent, audited batch per product, while the budget lasts.
+    // No import stock gate here (v2/write.ts step 0; Bambu import spec §B.10): the stale list is made of V2 RESULTS
+    // (`staleReasonsV2` reads only stored result rows), so every product this run writes is already V2-published,
+    // and an imported product gets its first results only through a publish the gate refused until its stock mode
+    // was chosen — a choice that is never undone. Nothing is probed or charged for it.
+    const stockGate = false;
     const slugs: string[] = [];
     for (let i = 0; i < ready.length; i++) {
       const item = ready[i]!;
@@ -531,7 +536,7 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
         idempotencyKey: `auto:${pid}:${'v2' in item ? item.v2.hash : item.ev.hash}`,
         auto: { priceSource: priceSourceOf(p.reasons), pricesUnchanged: unchanged, trigger: opts.trigger, reasons: p.reasons },
       };
-      const statements = 'v2' in item ? await v2WriteStatements(db, item.v2, write) : await engineWriteStatements(db, item.ev, [], [], write);
+      const statements = 'v2' in item ? await v2WriteStatements(db, item.v2, { ...write, stockGate }) : await engineWriteStatements(db, item.ev, [], [], write);
       if (statements.length > AUTO_REPRICE_STATEMENT_CAP) {
         await block(p, 'PRICING_SET_TOO_LARGE');
         continue;

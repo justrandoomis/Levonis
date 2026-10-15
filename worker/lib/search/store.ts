@@ -28,6 +28,8 @@
 
 import { normalizeText } from './normalize';
 import { toSearchDoc, variantNamesFrom } from './document';
+import { aliasReadCount, loadSearchAliases } from './aliases';
+import { catalogKnowledgeInstalled, catalogKnowledgeKnown } from '../catalogKnowledge';
 import {
   buildIndexRows,
   candidatePrefixes,
@@ -85,7 +87,7 @@ const MAX_POSTINGS = 4000;
  * search_tokens WHERE product_id = ?` above takes it with the rest of the
  * product's rows, so it is never stale.
  */
-export const INDEX_STAMP = '#doc:4';
+export const INDEX_STAMP = '#doc:5';
 
 /*
  * THE STAMP'S HISTORY, because each bump rewrote the whole catalogue and the
@@ -108,6 +110,11 @@ export const INDEX_STAMP = '#doc:4';
  *          for "elegoo"), where only an Arabic-letter query looks: without it
  *          «اليجو», «سونلو» and every brand outside the synonym dictionary
  *          stopped reaching their Latin names.
+ *   #doc:5 — the document started carrying external-id and model aliases
+ *          (./aliases.ts, migration 0194; Bambu import spec §C.1): a colour
+ *          code, a part code, a SKU code and the identity model and series of
+ *          a product, read by one loader that both writers use. On a database
+ *          without 0194 the rewritten rows are the #doc:4 rows exactly.
  */
 
 /**
@@ -230,9 +237,11 @@ function nameIdsOf(rows: Record<string, unknown>[]): { brands: string[]; catalog
 }
 
 /**
- * The statements `searchDocsForRows(db, rows)` executes, counted before it
+ * The NAME reads `searchDocsForRows(db, rows)` executes, counted before it
  * runs: one read per `NAME_IN_CHUNK` slice of brand ids and of section ids.
- * A pass with a statement budget charges them before it sends them.
+ * A pass with a statement budget charges them before it sends them. The alias
+ * reads beside them are counted by `aliasReadCount` (./aliases.ts): one per
+ * 90 products once migration 0194 is known present, none without it.
  */
 export function searchDocReadCount(rows: Record<string, unknown>[]): number {
   if (rows.length === 0) return 0;
@@ -273,7 +282,13 @@ export function searchDocReadCount(rows: Record<string, unknown>[]): number {
  */
 export async function searchDocsForRows(
   db: D1Database,
-  rows: Record<string, unknown>[]
+  rows: Record<string, unknown>[],
+  /**
+   * `aliasesInstalled`: migration 0194's presence, when the caller already
+   * asked (a budgeted pass charges the probe itself and passes the answer, so
+   * nothing is sent that it did not pay for). Absent: the loader asks.
+   */
+  opts: { aliasesInstalled?: boolean } = {}
 ): Promise<SearchDoc[]> {
   if (rows.length === 0) return [];
   const names = new Map<string, string>();
@@ -290,6 +305,13 @@ export async function searchDocsForRows(
   const ids = nameIdsOf(rows);
   await collect('brands', ids.brands);
   await collect('catalogs', ids.catalogs);
+  // THE SAME ALIASES THE SAVE PATH WRITES (./aliases.ts): a backfilled product
+  // keeps its colour code, part code and model, exactly as its last save did.
+  const aliases = await loadSearchAliases(
+    db,
+    rows.map((r) => String(r.id)),
+    opts.aliasesInstalled === undefined ? {} : { installed: opts.aliasesInstalled }
+  );
   return rows.map((r) =>
     toSearchDoc({
       id: String(r.id),
@@ -304,6 +326,7 @@ export async function searchDocsForRows(
         Boolean
       ),
       variantNames: variantNamesFrom(r.options, r.colors),
+      aliases: aliases.get(String(r.id)) ?? [],
     })
   );
 }
@@ -586,7 +609,9 @@ const BACKFILL_GROUP = 10;
  * 1,000 statements per invocation and a product costs two plus one per index
  * row, so fifty products can cost more than a whole tick. Every statement is
  * charged BEFORE it is sent — the selection, the name reads
- * (`searchDocReadCount`), each group's batch, each retry and each mark — and
+ * (`searchDocReadCount`), the alias reads and their presence probe
+ * (`aliasReadCount`, worker/lib/catalogKnowledge.ts), each group's batch,
+ * each retry and each mark — and
  * a product whose rows the budget cannot cover is not sent: it keeps its old
  * rows and its stale stamp, so the next pass selects it again (`deferred`).
  * A batch is sent only when the budget also covers its failure (the retries
@@ -623,7 +648,19 @@ export async function backfillSearchIndex(
     .all<Record<string, unknown>>();
   const rows = results ?? [];
   if (rows.length === 0) return out;
-  if (budget && !budget.spend(searchDocReadCount(rows))) {
+  // THE ALIAS READ (migration 0194, ./aliases.ts): its presence is asked once
+  // per binding — charged when, and only when, the probe is sent — and then it
+  // costs one statement per 90 products, none on a database without 0194.
+  let aliasesInstalled = catalogKnowledgeKnown(db);
+  if (aliasesInstalled === null) {
+    if (budget && !budget.spend(1)) {
+      out.deferred = rows.length;
+      return out;
+    }
+    aliasesInstalled = await catalogKnowledgeInstalled(db);
+  }
+  const reads = searchDocReadCount(rows) + (aliasesInstalled ? aliasReadCount(rows.map((r) => r.id)) : 0);
+  if (budget && !budget.spend(reads)) {
     out.deferred = rows.length;
     return out;
   }
@@ -631,7 +668,7 @@ export async function backfillSearchIndex(
   // THE SAME DOCUMENT THE SAVE PATH WRITES, from the same builder. The cron
   // once composed its own and dropped the option names; two writers of one
   // index must not be two documents.
-  const docs = await searchDocsForRows(db, rows);
+  const docs = await searchDocsForRows(db, rows, { aliasesInstalled });
   const spend = (n: number) => !budget || budget.spend(n);
   // WITH A BUDGET, A BATCH IS SENT ONLY WHEN ITS FAILURE IS PAID FOR TOO:
   // a group of k products and S statements may need S more to retry each

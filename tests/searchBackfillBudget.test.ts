@@ -15,6 +15,9 @@
  *     not selected first and skipped on every tick;
  *   - a group that fails is retried one by one within the same budget;
  *   - an empty budget executes nothing — the catch-up's probe included;
+ *   - the search-alias read (migration 0194, worker/lib/search/aliases.ts) is
+ *     charged like every other read: its presence probe once per binding, when
+ *     it is sent, and one statement per 90 products — none without 0194;
  *   - without a budget the pass is what it was (`deferred` stays 0).
  *
  * Run: node --import tsx --test tests/searchBackfillBudget.test.ts
@@ -22,7 +25,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { asD1, freshDb } from './fixtures/app';
+import { asD1, dbThrough, freshDb } from './fixtures/app';
 import { SqliteD1, type SqliteStatement } from './fixtures/d1';
 import { countingD1 } from '../worker/lib/d1Count';
 import { statementBudget } from '../worker/lib/fx/budget';
@@ -39,6 +42,8 @@ import {
   searchProducts,
 } from '../worker/lib/search/store';
 import type { Env } from '../worker/lib/types';
+import { aliasReadCount } from '../worker/lib/search/aliases';
+import { catalogKnowledgeInstalled, catalogKnowledgeKnown } from '../worker/lib/catalogKnowledge';
 
 /** A word per index: distinct Latin words the tokeniser keeps (letters only, four or more). */
 const word = (i: number) => {
@@ -131,7 +136,11 @@ test('a product that does not fit THIS pass waits stale and untouched — its ol
   const size = (await planSizes(raw)).get('p_big')!;
 
   const counted = countingD1(db);
-  const small = statementBudget(size + 1); // the selection takes one: the batch fits, the mark its failure would need does not
+  // Migration 0194's presence is asked once per binding (worker/lib/catalogKnowledge.ts) — asked here, so
+  // each pass below pays only for its own reads: the selection and the alias read (worker/lib/search/aliases.ts).
+  assert.equal(await catalogKnowledgeInstalled(counted.db), true);
+  const reads = 1 + aliasReadCount(['p_big']);
+  const small = statementBudget(reads + size); // the reads, then the batch fits; the mark its failure would need does not
   const before = counted.executed;
   const first = await backfillSearchIndex(counted.db, { limit: 50, budget: small, ceiling: 950 });
   assert.equal(counted.executed - before, small.used);
@@ -139,8 +148,8 @@ test('a product that does not fit THIS pass waits stale and untouched — its ol
   assert.deepEqual(tokens(raw), old, 'untouched: not one row written or removed');
   assert.deepEqual((await searchProducts(db, 'quaaa')).ids, ['p_big'], 'still findable by what it was findable by');
 
-  // The selection, the batch and the mark its failure would need.
-  const second = await backfillSearchIndex(counted.db, { limit: 50, budget: statementBudget(1 + size + 1), ceiling: 950 });
+  // The reads, the batch and the mark its failure would need.
+  const second = await backfillSearchIndex(counted.db, { limit: 50, budget: statementBudget(reads + size + 1), ceiling: 950 });
   assert.deepEqual({ indexed: second.indexed, deferred: second.deferred }, { indexed: 1, deferred: 0 });
   assert.equal(staleIndex(raw), 0);
   assert.deepEqual((await searchProducts(db, word(512))).ids, ['p_big'], 'the description, indexed whole');
@@ -230,4 +239,40 @@ test('an empty budget executes nothing, the catch-up’s probe included; the pro
   const run = await catchUpSearchIndex(env, { budget: full, ceiling: 950 });
   assert.equal(run.indexed, 30);
   assert.equal(counted.executed - before, full.used, 'the probe, the selection and every batch statement, charged first');
+});
+
+test('the alias read is charged like every other read: its 0194 probe once per binding and only when sent, one read per 90 products — and nothing of it on a database without 0194', async () => {
+  for (const through of [null, '0193'] as const) {
+    const label = through === null ? 'with 0194' : 'without 0194';
+    const raw = through === null ? freshDb() : dbThrough(through);
+    seedCatalogue(raw);
+    const total = [...(await planSizes(raw)).values()].reduce((a, b) => a + b, 0);
+    const counted = countingD1(asD1(raw));
+    assert.equal(catalogKnowledgeKnown(counted.db), null, `${label}: a fresh binding has not asked`);
+
+    // The selection is paid for, the probe is not: it is not sent, and the pass defers everything it selected.
+    let before = counted.executed;
+    const starved = await backfillSearchIndex(counted.db, { limit: 50, budget: statementBudget(1), ceiling: 950 });
+    assert.equal(counted.executed - before, 1, `${label}: the selection, and not the probe it could not pay for`);
+    assert.deepEqual({ indexed: starved.indexed, deferred: starved.deferred }, { indexed: 0, deferred: 30 });
+    assert.equal(catalogKnowledgeKnown(counted.db), null, `${label}: still unknown — nothing was asked`);
+
+    // The next pass pays the probe once, then the alias read where 0194 is present (30 products: one statement).
+    before = counted.executed;
+    const budget = statementBudget(950);
+    const run = await backfillSearchIndex(counted.db, { limit: 50, budget, ceiling: 950 });
+    assert.equal(run.indexed, 30);
+    assert.equal(counted.executed - before, budget.used, `${label}: executed what it charged`);
+    const aliasRead = through === null ? 1 : 0;
+    assert.equal(budget.used, 1 + 1 + aliasRead + total, `${label}: the selection, the probe, ${aliasRead} alias read(s), the batches`);
+    assert.equal(catalogKnowledgeKnown(counted.db), through === null, `${label}: the answer is remembered`);
+
+    // Stale again (a stamp bump): the probe is not asked again on this binding.
+    raw.prepare('DELETE FROM search_tokens WHERE token = ?').run(INDEX_STAMP);
+    const again = statementBudget(950);
+    before = counted.executed;
+    await backfillSearchIndex(counted.db, { limit: 50, budget: again, ceiling: 950 });
+    assert.equal(counted.executed - before, again.used);
+    assert.equal(again.used, 1 + aliasRead + total, `${label}: no second probe`);
+  }
 });

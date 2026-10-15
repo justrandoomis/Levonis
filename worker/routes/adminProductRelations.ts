@@ -3,7 +3,8 @@ import { productV2Flag } from '../lib/engineInstalled';
 import { Hono } from 'hono';
 import { completenessAfterWrite } from '../lib/completenessHooks';
 import type { AppContext } from '../lib/types';
-import { requireAdmin, badRequest, notFound, str, int, HttpError } from '../lib/http';
+import { requireAdmin, badRequest, notFound, str, int, HttpError, jsonObject } from '../lib/http';
+import { decideImportStock, isImportStockChoice } from '../lib/importStock';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { parseProductRow } from '../lib/productModel';
@@ -861,4 +862,27 @@ adminProductRelationsRoutes.post('/:id/stock/adjust', async (c) => {
           rows_short: verified.short,
         }),
   });
+});
+
+/**
+ * «إعداد المخزون للمنتج المستورد» — THE STOCK CHOICE FOR A PRODUCT THE
+ * CATALOGUE IMPORT CREATED (Bambu import spec §B.10; DECISIONS row 241; owner
+ * decision L-16). `{ decision: 'tracked' | 'untracked' }`:
+ *   - «تتبّع الكمية» (tracked): the product's authoritative stock level must
+ *     carry a number on every row a sale can reach, else 400
+ *     IMPORT_STOCK_TRACKED_EMPTY;
+ *   - «بلا تتبّع (حسب الطلب)» (untracked): to order, no limit.
+ * Until one is chosen the Pricing V2 write refuses to publish the product (409
+ * IMPORT_STOCK_NOT_CONFIGURED, worker/lib/importStock.ts). Behind the same
+ * door as the stock itself: this router's `requireAdmin`, the one that guards
+ * the form's stock fields and `/stock/adjust` above — every admin edits stock.
+ * The answer is the decision and its time, never a quantity or a provenance.
+ */
+adminProductRelationsRoutes.put('/:id/import-stock-decision', async (c) => {
+  const admin = c.get('user')!;
+  const productId = c.req.param('id');
+  const body = await jsonObject(c);
+  if (!isImportStockChoice(body.decision)) throw badRequest('decision: must be "tracked" or "untracked"', 'VALIDATION');
+  const decided = await decideImportStock(c.env.DB, productId, body.decision, admin.id);
+  return c.json({ success: true, ...decided });
 });

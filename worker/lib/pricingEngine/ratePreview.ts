@@ -232,6 +232,9 @@ export async function previewRateAct(db: D1Database, move: RateMove, rates: Pric
   const blocked: RatePreviewBlocked[] = [];
   const evaluated: Array<{ pid: string; hash: string | null; code: string | null }> = [];
   const ready: Array<{ ev: { product_id: string; rows: Array<{ old_iqd: number | null; new_iqd: number | null }> }; deficit: number; cost: number }> = [];
+  // No import stock gate in the preview: it counts the batches of the stale list, which are V2-published products
+  // only (autoReprice.ts step 5) — the gate is laid where a product is published for the first time.
+  const stockGate = false;
   if (ids.length) {
     const control = await loadEngineControl(db);
     const images = await priceImagesOf(db, ids);
@@ -273,6 +276,7 @@ export async function previewRateAct(db: D1Database, move: RateMove, rates: Pric
           source: AUTO_REPRICE_SOURCE,
           idempotencyKey: `preview:${pid}`,
           auto: { priceSource: priceSourceOf(p.reasons), pricesUnchanged: pricesUnchangedV2(v2), trigger: 'owner_rate', reasons: p.reasons },
+          stockGate,
         });
         ready.push({ ev: { product_id: pid, rows: v2.rows }, deficit: deficitOfV2(v2), cost: batch.length });
         for (const r of v2.rows) {

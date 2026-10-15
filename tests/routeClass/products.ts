@@ -127,6 +127,12 @@ export default {
           },
         },
         'POST /:id/stock/adjust': { cls: 'op', body: { scope: 'base', delta: 1, reason: 'role matrix count' } },
+        // «إعداد المخزون للمنتج المستورد» (Bambu import spec §B.10): the same door as the stock itself.
+        'PUT /:id/import-stock-decision': {
+          cls: 'op',
+          noBody:
+            'the matrix catalogue has no product the catalogue import created: every admin gets 404 and nothing is written; tests/importStockDecision.test.ts walks the real decision',
+        },
       },
     },
     {
