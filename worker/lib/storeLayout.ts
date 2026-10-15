@@ -774,6 +774,9 @@ export const NOT_LIBRARY_HOLDERS: Readonly<Record<string, string>> = {
       'products.colors', 'products.content_blocks', 'products.usage_guide', 'products.how_to_use', 'products.how_to_use_ar',
       'products.how_to_use_ckb', 'products.specifications', 'products.condition_doc', 'products.stores',
       'product_imports.payload', 'product_imports.report', 'bundles.image', 'investment_items.image', 'admin_settings.value',
+      // 0194/0195: the catalogue import's swatches, in-the-box pictures and staged media (products/import/…).
+      'product_option_value_swatches.url', 'product_option_value_swatches.r2_key', 'product_spec_values.value_list',
+      'catalog_import_media.r2_key',
     ].map((k) => [k, ADMIN_SHOP])
   ),
   ...Object.fromEntries(

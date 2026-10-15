@@ -46,6 +46,17 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // 0148 — which printer a maintenance part fits. Two catalogue products and
     // the link between them, written on the product form beside the sections.
     'product_printer_fits',
+    // 0194 — the product knowledge model (Bambu import spec §B.2): typed specs
+    // with provenance, documents, external ids, relations, source identity and
+    // swatches. Each row describes one catalogue product and is written in the
+    // same batch as the product.
+    'product_source_refs', 'product_option_source_refs', 'product_spec_values', 'product_documents',
+    'product_external_ids', 'product_relations', 'product_option_value_swatches',
+    // 0195 — the one-time import run and its ledger (§B.3): the checkpoint
+    // commits in the same batch as the product rows it says were written,
+    // the product_import_items precedent above.
+    'catalog_import_runs', 'catalog_import_items', 'catalog_import_events', 'catalog_import_media',
+    'catalog_import_conflicts', 'catalog_import_protected',
     /**
      * 0098 — THE COST LAYERS UNDER THE STOCK COUNTERS.
      *

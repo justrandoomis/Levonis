@@ -117,6 +117,23 @@ export const OWNED_TABLES: OwnedTable[] = [
   // enforce the declared ON DELETE CASCADE).
   { table: 'product_price_requests', by: { column: 'product_id' } },
   { table: 'product_price_request_stats', by: { column: 'product_id' } },
+  // ---- the product knowledge model (0194, Bambu import spec §B.9) ----------
+  // Each row describes this product and nothing else: where it came from and
+  // its stock decision, the source ↔ Levonis id map of its options and images,
+  // its typed specs, documents, external ids and colour swatches. The swatch
+  // names an option value (no foreign key), so it goes before the values.
+  { table: 'product_option_value_swatches', by: { column: 'product_id' } },
+  { table: 'product_option_source_refs', by: { column: 'product_id' } },
+  { table: 'product_spec_values', by: { column: 'product_id' } },
+  { table: 'product_documents', by: { column: 'product_id' } },
+  { table: 'product_external_ids', by: { column: 'product_id' } },
+  { table: 'product_source_refs', by: { column: 'product_id' } },
+  // A relation names a product at BOTH ends, for the reason product_printer_fits
+  // gives below: a part deleted stops claiming compatibility, and a printer
+  // deleted stops being claimed. It never BLOCKS the delete — a resolved target
+  // that disappears is simply no longer a link (an unresolved row has no
+  // target_product_id and is untouched by the other end's delete).
+  { table: 'product_relations', by: { sql: 'product_id = ?1 OR target_product_id = ?1' } },
   { table: 'product_images', by: { column: 'product_id' } },
   { table: 'product_variants', by: { column: 'product_id' } },
   // The fulfilment/transport cells (migration 0073) hang off an option row and
@@ -363,6 +380,22 @@ export const FROZEN_HISTORY: FrozenTable[] = [
       '0099. A terminal per-item import checkpoint that carries its own key, name, action and reason; it lives ' +
       'and dies with the import report, and must remain available for idempotent replay after catalogue deletion.',
   },
+  /**
+   * 0195 — THE CATALOGUE IMPORT LEDGER IS EXEMPT. It keeps the history of a
+   * deleted product by id: a rolled-back item (spec §A.10) is re-queued at the
+   * end of the run and its conflicts stay readable in the coverage report.
+   * `catalog_import_conflicts.product_id` is the only product-shaped column of
+   * the ledger; `catalog_import_items.levonis_product_id` is cleared by the
+   * rollback transition itself, and `catalog_import_media.source_product_id`
+   * is a SOURCE id, not ours.
+   */
+  {
+    table: 'catalog_import_conflicts',
+    columns: ['product_id'],
+    why:
+      '0195. The import ledger keeps the history of a deleted product by id: a conflict row is part of the run report, ' +
+      'NOT NULL DEFAULT \'\', and outlives the product it was raised on.',
+  },
   {
     table: 'order_items',
     columns: ['option_id', 'color_id'],
@@ -559,6 +592,10 @@ export const MEDIA_COLUMNS: Array<{ table: string; column: string; by: string }>
   { table: 'product_images', column: 'url', by: 'product_id' },
   { table: 'product_option_values', column: 'image', by: 'product_id' },
   { table: 'product_colors', column: 'image', by: 'product_id' },
+  // 0194: an option value's official colour swatch (its source_url, like
+  // product_images.source_url, is the vendor's and stays out).
+  { table: 'product_option_value_swatches', column: 'r2_key', by: 'product_id' },
+  { table: 'product_option_value_swatches', column: 'url', by: 'product_id' },
 ];
 
 /**

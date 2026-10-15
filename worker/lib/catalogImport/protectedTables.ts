@@ -1,0 +1,171 @@
+/**
+ * THE ONE LIST OF WHAT A CATALOGUE IMPORT MAY NEVER WRITE (Bambu import spec
+ * §B.4, §C.10 layer 3; docs/DECISIONS.md rows 239 and 241).
+ *
+ * The import writes products through the app's own save path, inside ONE D1
+ * batch that starts by inserting the guard row
+ * `ops_guards(id = 'catalog-import-batch')` and ends by deleting it. While that
+ * row exists — which is only inside an import batch, because D1 serialises
+ * batches — the triggers migration 0195 creates from this file abort any write
+ * that would put a price, a cost, a stock figure, a package measure, a
+ * stock decision or any pricing / order / wallet / ledger row in the database.
+ *
+ * The triggers are GENERATED, never hand-written: `scripts/gen-import-guard-triggers.mjs`
+ * reads these constants and rewrites the delimited block of 0195;
+ * `tests/catalogImportGuards.test.ts` fails when the committed block differs
+ * from what the generator prints, and when any table or column named here is
+ * missing from the schema every migration builds.
+ *
+ * Plain data only: the generator imports this file with Node's own type
+ * stripping, so it imports nothing and uses no TypeScript-only runtime syntax.
+ */
+
+/** The `ops_guards.id` that arms every guard trigger below. */
+export const IMPORT_GUARD_ID = 'catalog-import-batch';
+
+/** The RAISE(ABORT) message every guard trigger uses (§C.11). */
+export const IMPORT_GUARD_REFUSAL = 'IMPORT_FINANCIAL_WRITE_REFUSED';
+
+export interface ProtectedTable {
+  table: string;
+  /**
+   * The migration file that creates the table, when it is NEWER than the base
+   * this branch was cut from. The generator emits triggers only for tables the
+   * schema before 0195 actually has, and the guard test refuses to accept a
+   * missing table unless its `since` file is itself absent from migrations/.
+   * Once that file lands, the table must be guarded: the generated block goes
+   * stale and the test names the command that regenerates it.
+   */
+  since?: string;
+}
+
+/**
+ * Tables an import batch may not INSERT into, UPDATE or DELETE from, at all.
+ * Pricing, its inputs and results, price history, stock and its cost layers,
+ * order and wallet records, the ledger, procurement cost defaults, and the
+ * price-request tables (so the import can never create demand).
+ */
+export const PROTECTED_TABLES: readonly ProtectedTable[] = [
+  { table: 'product_pricing_state' },
+  { table: 'product_sku_prices' },
+  { table: 'pricing_v2_sku_results' },
+  { table: 'pricing_price_points' },
+  { table: 'pricing_preorder_discounts' },
+  { table: 'pricing_legacy_snapshots' },
+  { table: 'pricing_inputs' },
+  { table: 'pricing_rules' },
+  { table: 'price_history' },
+  { table: 'inventory_lots' },
+  { table: 'inventory_ledger' },
+  { table: 'product_option_fulfillment' },
+  { table: 'product_option_transports' },
+  { table: 'orders' },
+  { table: 'order_items' },
+  { table: 'wallet_transactions' },
+  { table: 'accounting_entries' },
+  { table: 'procurement_selection_cost_defaults' },
+  { table: 'product_price_requests', since: '0193_price_requests.sql' },
+  { table: 'product_price_request_stats', since: '0193_price_requests.sql' },
+];
+
+/**
+ * How a guarded column's value reads when an import-created row leaves it
+ * alone: the column's schema default.
+ *   null         — must be NULL
+ *   zero         — must be 0 (a NOT NULL DEFAULT 0 counter or price)
+ *   zero_or_null — NULL or 0
+ *   empty_object — the JSON default '{}'
+ */
+export type GuardedDefault = 'null' | 'zero' | 'zero_or_null' | 'empty_object';
+
+export interface GuardedColumn {
+  name: string;
+  insertDefault: GuardedDefault;
+}
+
+export interface GuardedRowTable {
+  table: string;
+  /** Money: prices, costs, adjustments, membership prices, surcharges. */
+  money: readonly GuardedColumn[];
+  /** Stock: quantity, reservations, alert threshold. */
+  stock: readonly GuardedColumn[];
+  /** Package and product measures (0099): Pricing V2 freight inputs. */
+  package: readonly GuardedColumn[];
+}
+
+const DIMENSIONS: readonly GuardedColumn[] = [
+  { name: 'net_weight_g', insertDefault: 'null' },
+  { name: 'width_mm', insertDefault: 'null' },
+  { name: 'depth_mm', insertDefault: 'null' },
+  { name: 'height_mm', insertDefault: 'null' },
+  { name: 'package_weight_g', insertDefault: 'null' },
+  { name: 'package_width_mm', insertDefault: 'null' },
+  { name: 'package_depth_mm', insertDefault: 'null' },
+  { name: 'package_height_mm', insertDefault: 'null' },
+];
+
+const ROW_PRICES: readonly GuardedColumn[] = [
+  { name: 'regular_price_iqd', insertDefault: 'null' },
+  { name: 'prime_price_iqd', insertDefault: 'null' },
+  { name: 'pro_price_iqd', insertDefault: 'null' },
+  { name: 'cost_iqd', insertDefault: 'null' },
+];
+
+const ROW_ADJUSTMENTS: readonly GuardedColumn[] = [
+  { name: 'regular_adjust_iqd', insertDefault: 'null' },
+  { name: 'prime_adjust_iqd', insertDefault: 'null' },
+  { name: 'pro_adjust_iqd', insertDefault: 'null' },
+  { name: 'cost_adjust_iqd', insertDefault: 'null' },
+];
+
+const ROW_STOCK: readonly GuardedColumn[] = [
+  { name: 'stock', insertDefault: 'null' },
+  { name: 'reserved', insertDefault: 'zero' },
+  { name: 'low_stock_threshold', insertDefault: 'null' },
+];
+
+/**
+ * Catalogue rows the import DOES write, whose money, stock and package columns
+ * it may not set. An INSERT of a new row must leave every one at its default;
+ * an INSERT that resolves to an existing row (an upsert, or a REPLACE) must not
+ * differ from the stored value; an UPDATE must not change any of them.
+ *
+ * `product_colors` is guarded although the spec names three tables: a create
+ * sends no colours, but a merge re-upserts an existing product's colour rows
+ * through the same save path, and they carry the same price and stock columns
+ * as option values.
+ */
+export const GUARDED_ROW_TABLES: readonly GuardedRowTable[] = [
+  {
+    table: 'products',
+    money: [
+      { name: 'price_iqd', insertDefault: 'zero' },
+      { name: 'original_price_iqd', insertDefault: 'null' },
+      { name: 'product_cost_iqd', insertDefault: 'null' },
+      { name: 'prime_price_iqd', insertDefault: 'null' },
+      { name: 'pro_price_iqd', insertDefault: 'null' },
+      { name: 'direct_surcharge_iqd', insertDefault: 'zero_or_null' },
+      { name: 'membership_prices', insertDefault: 'empty_object' },
+    ],
+    stock: [
+      { name: 'stock', insertDefault: 'null' },
+      { name: 'stock_reserved', insertDefault: 'zero' },
+      { name: 'low_stock_threshold', insertDefault: 'null' },
+    ],
+    package: DIMENSIONS,
+  },
+  { table: 'product_option_values', money: [...ROW_PRICES, ...ROW_ADJUSTMENTS], stock: ROW_STOCK, package: DIMENSIONS },
+  { table: 'product_variants', money: ROW_PRICES, stock: ROW_STOCK, package: DIMENSIONS },
+  { table: 'product_colors', money: [...ROW_PRICES, ...ROW_ADJUSTMENTS], stock: ROW_STOCK, package: DIMENSIONS },
+];
+
+/**
+ * The stock decision (§B.10). An import may record `not_configured` (and a
+ * merge `not_required`); it may never write `tracked` or `untracked`, nor
+ * change a decision once recorded.
+ */
+export const STOCK_DECISION_GUARD = {
+  table: 'product_source_refs',
+  refusedOnInsert: ['tracked', 'untracked'] as readonly string[],
+  frozenColumns: ['stock_decision', 'stock_decided_by', 'stock_decided_at'] as readonly string[],
+};

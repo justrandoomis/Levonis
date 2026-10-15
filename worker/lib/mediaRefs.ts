@@ -272,6 +272,19 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
       "(apply_token <> '' AND apply_lease_until > strftime('%Y-%m-%dT%H:%M:%fZ','now')))",
     whereColumns: ['state', 'media_stage_until', 'apply_token', 'apply_lease_until'],
   },
+  // ---- the product knowledge model and the catalogue import (0194/0195, Bambu import spec §B.9)
+  /** The official colour swatch of an option value: a converted 128-px object, never a gallery row. */
+  { table: 'product_option_value_swatches', column: 'url', kind: 'text', why: "an option value's official colour swatch, served as /files/<key> (0194)" },
+  { table: 'product_option_value_swatches', column: 'r2_key', kind: 'text', why: 'the same swatch object by key (0194)' },
+  /** In-the-box items `{text, qty, media_key}`: the item picture lives inside the JSON list. */
+  { table: 'product_spec_values', column: 'value_list', kind: 'json', why: "an in-the-box item's picture (media_key inside the list spec, 0194)" },
+  /**
+   * STAGED IMPORT MEDIA. An item can sit BLOCKED for days between /media and
+   * /write; its ingested objects are named here and nowhere else until the
+   * product row is written. After the run closes, a cleanup commit may move
+   * this column to NON_MEDIA_COLUMNS (spec L-15).
+   */
+  { table: 'catalog_import_media', column: 'r2_key', kind: 'text', why: 'media an import run has ingested but not yet written to a product (0195)' },
   { table: 'bundles', column: 'image', kind: 'text', why: 'bundle cover art' },
   { table: 'investment_items', column: 'image', kind: 'text', why: 'investment listing art' },
 
@@ -920,6 +933,32 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'serial_brand_rules.lengths': 'exact serial lengths of a format rule (integers 6–40); never a path',
   'serial_brand_rules.prefixes': 'serial prefixes and the model names they stand for; never a path',
   'serial_brand_rules.positions': 'fixed character classes at serial positions; never a path',
+
+  // 0194/0195 (Bambu import spec §B.9): exactly the wide net's catches on the new
+  // DDL, from the node:sqlite scan, each decided. None holds one of our objects.
+  'product_source_refs.canonical_url': "the source store's page address (owner-only provenance), never one of our objects",
+  'product_source_refs.source_collections_json': 'source collection handles, plain words',
+  'product_spec_values.canonical_key': 'a spec registry key (printing.build_volume, x.<slug>), vocabulary not a path',
+  'product_spec_values.group_key': 'a spec registry group name',
+  'product_spec_values.checked_sources': 'the external documents parsed for a key: [{kind, url, title}], off-site addresses',
+  'product_documents.url': "an external document address (manufacturer's CDN, wiki, YouTube); documents are links, never re-hosted (L-3)",
+  'product_relations.evidence_kind': 'an enum naming where a relation came from',
+  'product_relations.evidence_text': "a short excerpt of the source's own words",
+  'product_option_value_swatches.source_url': "the manufacturer's swatch address the object was ingested from (owner-only provenance)",
+  'catalog_import_items.canonical_url': "the source store's page address",
+  'catalog_import_items.live_url': 'the public page address of the imported product',
+  'catalog_import_items.source_collections': 'source collection handles',
+  'catalog_import_items.discovery_sources': 'where the item was discovered (sitemap, collection handles)',
+  'catalog_import_items.discovered_at': 'a timestamp ("cover" inside "discovered")',
+  'catalog_import_items.payload_sha256': 'a hash of the staged payload',
+  'catalog_import_items.stage_data': 'stage counts, plan estimates and the description kind; counts and booleans, no keys',
+  'catalog_import_items.quality': 'coverage counts (§H.3), never values',
+  'catalog_import_items.d1_checks': "the Worker's recomputed checks: counts and booleans",
+  'catalog_import_items.edge_evidence': "the runner's public-site evidence: HTTP statuses, counts and public URLs",
+  'catalog_import_items.withdrawn_evidence': 'two fetch statuses and dates, and a sitemap-absence flag',
+  'catalog_import_events.detail': 'event counts and ids',
+  'catalog_import_media.source_media_id': 'a source id string (resourceFileId, swatch:<id>, desc:<sha1>)',
+  'catalog_import_media.source_url': "the manufacturer's image address the object was ingested from",
 };
 
 /**

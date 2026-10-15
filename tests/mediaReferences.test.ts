@@ -657,3 +657,88 @@ test('every media source is either read by the library\'s MEDIA_IN_USE door or l
   assert.deepEqual(stale, [], 'a decision about a column the manifest no longer lists');
   assert.ok(LIBRARY_HOLDERS.includes('community_post_media.media_key'));
 });
+
+/**
+ * 0194/0195 (Bambu import spec §B.9). The wide net's catches on the knowledge
+ * model and the import ledger are EXACTLY the spec's list — four sources (the
+ * swatch object, the in-the-box pictures inside a list spec, the staged import
+ * media) and twenty-three exclusions — so moving a source into the exclusion
+ * list, or a new column slipping in unclassified, fails here by name.
+ */
+test('the knowledge model and the import ledger are classified exactly as the spec lists them', () => {
+  const db = freshSchema();
+  const schema = new Map(
+    (db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`).all() as Array<{ name: string }>)
+      .map((t) => [
+        String(t.name),
+        (db.prepare(`SELECT name, type, dflt_value FROM pragma_table_info('${t.name}')`).all() as Array<{
+          name: string;
+          type: string | null;
+          dflt_value: string | null;
+        }>).map((c) => ({ name: String(c.name), type: c.type ?? null, dflt: c.dflt_value ?? null })),
+      ])
+  );
+  const NEW_TABLES = /^(product_source_refs|product_option_source_refs|product_spec_values|product_documents|product_external_ids|product_relations|product_option_value_swatches|catalog_import_\w+)\./;
+  const caught = mediaColumnCandidates(schema).filter((id) => NEW_TABLES.test(id));
+  const sources = [
+    'catalog_import_media.r2_key',
+    'product_option_value_swatches.r2_key',
+    'product_option_value_swatches.url',
+    'product_spec_values.value_list',
+  ];
+  const exclusions = [
+    'catalog_import_events.detail',
+    'catalog_import_items.canonical_url',
+    'catalog_import_items.d1_checks',
+    'catalog_import_items.discovered_at',
+    'catalog_import_items.discovery_sources',
+    'catalog_import_items.edge_evidence',
+    'catalog_import_items.live_url',
+    'catalog_import_items.payload_sha256',
+    'catalog_import_items.quality',
+    'catalog_import_items.source_collections',
+    'catalog_import_items.stage_data',
+    'catalog_import_items.withdrawn_evidence',
+    'catalog_import_media.source_media_id',
+    'catalog_import_media.source_url',
+    'product_documents.url',
+    'product_option_value_swatches.source_url',
+    'product_relations.evidence_kind',
+    'product_relations.evidence_text',
+    'product_source_refs.canonical_url',
+    'product_source_refs.source_collections_json',
+    'product_spec_values.canonical_key',
+    'product_spec_values.checked_sources',
+    'product_spec_values.group_key',
+  ];
+  assert.deepEqual(caught, [...sources, ...exclusions].sort(), 'the scan of the 0194/0195 DDL changed: classify the difference');
+  const registered = new Set(MEDIA_REFERENCE_SOURCES.map((s) => `${s.table}.${s.column}`));
+  for (const id of sources) {
+    assert.ok(registered.has(id), `${id} holds one of our objects and must be a source`);
+    assert.ok(!(id in NON_MEDIA_COLUMNS), `${id} must never be excluded`);
+  }
+  for (const id of exclusions) {
+    assert.ok(id in NON_MEDIA_COLUMNS && NON_MEDIA_COLUMNS[id].length > 10, `${id} must carry a written reason`);
+    assert.ok(!registered.has(id), `${id} is decided twice`);
+  }
+});
+
+test('a swatch, an in-the-box picture and a staged import object are referenced, not orphans', async () => {
+  const db = freshSchema();
+  insert(db, 'products', { id: 'p1', slug: 'p1', name: 'P1' });
+  insert(db, 'product_option_value_swatches', { option_value_id: 'ov1', product_id: 'p1', url: '/files/products/import/gallery/aa11.webp', r2_key: 'products/import/gallery/aa11.webp' });
+  insert(db, 'product_spec_values', {
+    id: 'sv1', product_id: 'p1', canonical_key: 'package.contents', group_key: 'contents', data_type: 'list',
+    status: 'unverified', confidence: 'official_page', source_kind: 'store_page',
+    value_list: JSON.stringify([{ text: 'Purge Wiper', qty: 1, media_key: 'products/import/gallery/bb22.webp' }]),
+  });
+  insert(db, 'catalog_import_runs', { id: 'cir_0123456789abcdef01234567', source: 'bambu_us', state: 'running' });
+  insert(db, 'catalog_import_media', {
+    run_id: 'cir_0123456789abcdef01234567', source_product_id: '1', source_media_id: '7', role: 'gallery',
+    source_url: 'https://store.bblcdn.com/s7/default/x/a.jpg', status: 'stored', r2_key: 'products/import/gallery/cc33.webp',
+  });
+  const scan = await collectMediaReferences(d1(db), await readLiveSchema(d1(db)));
+  for (const key of ['products/import/gallery/aa11.webp', 'products/import/gallery/bb22.webp', 'products/import/gallery/cc33.webp']) {
+    assert.ok(scan.keys.has(key), `${key} must be protected from the sweep`);
+  }
+});
