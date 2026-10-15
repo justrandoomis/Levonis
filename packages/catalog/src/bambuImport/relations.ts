@@ -202,8 +202,12 @@ export function buildRelations(inp: RelationInputs): RelationResult {
   const compatKeys = new Map<string, unknown>([...labels, ...compounds, ...reviewed] as Array<[string, unknown]>);
   const requireKeys = new Map<string, unknown>([...reqTargets, ...reqReviewed] as Array<[string, unknown]>);
 
-  const push = (r: Omit<RelationRow, 'id'>) => {
-    const row: RelationRow = { ...r, evidenceText: cut(r.evidenceText), id: relationRowId(inp.productId, r) };
+  /**
+   * One row. Its id is keyed by the SOURCE label (`idLabel`, default the shown one): a reviewed display label
+   * (manifest value_labels) changes what the row shows, never which row it is.
+   */
+  const push = (r: Omit<RelationRow, 'id'>, idLabel = r.targetLabel) => {
+    const row: RelationRow = { ...r, evidenceText: cut(r.evidenceText), id: relationRowId(inp.productId, { ...r, targetLabel: idLabel }) };
     if (seen.has(row.id)) return;
     seen.add(row.id);
     out.rows.push(row);
@@ -212,20 +216,21 @@ export function buildRelations(inp: RelationInputs): RelationResult {
   type Scope = { scopeKind: RelationRow['scopeKind']; scopeId: string };
 
   /** Rows for one resolved label entry. */
-  const fromEntry = (label: string, entry: CompatEntry, relation: RelationKind, scope: Scope, ev: EvidenceKind, evText: string, table: Map<string, [string, CompatEntry]>, depth = 0): void => {
+  const fromEntry = (label: string, entry: CompatEntry, relation: RelationKind, scope: Scope, ev: EvidenceKind, evText: string, table: Map<string, [string, CompatEntry]>, depth = 0, shown = ''): void => {
     if (entry.alias_of && depth < 4) {
       const target = table.get(labelKey(entry.alias_of)) ?? labels.get(labelKey(entry.alias_of));
-      if (target) return fromEntry(label, target[1], relation, scope, ev, evText, table, depth + 1);
+      if (target) return fromEntry(label, target[1], relation, scope, ev, evText, table, depth + 1, shown);
     }
-    const base = { ...scope, relation, targetSource: '' as const, targetSourceHandle: '', targetFamily: '', targetLabel: label, evidenceKind: ev, evidenceText: evText };
+    // The row shows the reviewed display label when the value has one: the file's key is the source's wording.
+    const base = { ...scope, relation, targetSource: '' as const, targetSourceHandle: '', targetFamily: '', targetLabel: shown || label, evidenceKind: ev, evidenceText: evText };
     const one = (ref: TargetRef, kind: TargetKind, family: string): boolean => {
       if (ref.levonis_product_id) {
-        push({ ...base, targetKind: kind, targetProductId: ref.levonis_product_id, targetFamily: family, state: 'resolved' });
+        push({ ...base, targetKind: kind, targetProductId: ref.levonis_product_id, targetFamily: family, state: 'resolved' }, label);
         return true;
       }
       if (ref.source_handle) {
         if (ref.source_handle === selfHandle) return true; // a product is not related to itself
-        push({ ...base, targetKind: kind, targetProductId: null, targetSource: 'bambu_us', targetSourceHandle: ref.source_handle, targetFamily: family, state: 'pending' });
+        push({ ...base, targetKind: kind, targetProductId: null, targetSource: 'bambu_us', targetSourceHandle: ref.source_handle, targetFamily: family, state: 'pending' }, label);
         return true;
       }
       return false;
@@ -242,11 +247,14 @@ export function buildRelations(inp: RelationInputs): RelationResult {
       }
       if (any) return;
     }
-    unresolvable(label, relation, scope, ev, evText, entry.kind);
+    unresolvable(label, relation, scope, ev, evText, entry.kind, shown);
   };
 
-  const unresolvable = (label: string, relation: RelationKind, scope: Scope, ev: EvidenceKind, evText: string, kind?: string) => {
-    push({ ...scope, relation, targetKind: asTargetKind(kind), targetProductId: null, targetSource: '', targetSourceHandle: '', targetFamily: '', targetLabel: label, state: 'unresolvable', evidenceKind: ev, evidenceText: evText });
+  const unresolvable = (label: string, relation: RelationKind, scope: Scope, ev: EvidenceKind, evText: string, kind?: string, shown = '') => {
+    push(
+      { ...scope, relation, targetKind: asTargetKind(kind), targetProductId: null, targetSource: '', targetSourceHandle: '', targetFamily: '', targetLabel: shown || label, state: 'unresolvable', evidenceKind: ev, evidenceText: evText },
+      label
+    );
     out.notes.push({ kind: 'relation_unresolvable', field: relation, detail: `label not in compat-targets.json (${ev})` });
   };
 
@@ -268,7 +276,7 @@ export function buildRelations(inp: RelationInputs): RelationResult {
       return;
     }
     const hit = labels.get(key);
-    if (hit) return fromEntry(hit[0], hit[1], relation, scope, ev, evText, labels);
+    if (hit) return fromEntry(hit[0], hit[1], relation, scope, ev, evText, labels, 0, shown);
     if (reviewed.has(key)) {
       out.reviewedSkipped.push(reviewed.get(key)![0]);
       return;
@@ -281,7 +289,7 @@ export function buildRelations(inp: RelationInputs): RelationResult {
         return;
       }
     }
-    unresolvable(shown || label, relation, scope, ev, evText);
+    unresolvable(label, relation, scope, ev, evText, undefined, shown);
   };
 
   // 1. Option values naming a target: looked up by the source's own words (compat-targets.json is keyed by

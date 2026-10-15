@@ -162,3 +162,25 @@ test('relations look a labelled value up by its source words; a label kept as un
   const a2l = r.rows.filter((row) => row.scopeId === model.groups[0].values.find((v) => v.sourceId === idOf('A2L'))!.id);
   assert.deepEqual(a2l.map((row) => [row.state, row.targetLabel]), [['unresolvable', 'A2L printer']]);
 });
+
+/**
+ * A BOX SECTION TITLED IN THE SOURCE'S WORDS (review 5, finding 6): the
+ * "<value> Add-ons" rule scopes a section to the value its title names, and
+ * that title is the very wording the reviewed label replaces. The row's label
+ * and locator carry it only as the classifier keeps it, so the payload passes.
+ */
+test('a value-scoped box section titled in the refused source words: scoped, and no row keeps the wording', () => {
+  const base = pageOf('ams-2-pro').extraction;
+  const x: Extraction = {
+    ...base,
+    description: { kind: 'sections_html', sections: [{ id: '1', name: 'Bundle Deals Add-ons', html: '<ul><li>AMS 2 Pro Hub x1</li><li>PTFE Tube x2</li></ul>' }] },
+  };
+  const res = build(x, { manifestRow: row });
+  assert.deepEqual(res.report.errors, []);
+  const vId = res.payload.groups.flatMap((g) => g.values).find((v) => v.source_id === VALUE)!.id;
+  const box = res.payload.specs.find((s) => s.key === 'package.contents' && s.scope_id === vId);
+  assert.ok(box, 'the section is scoped to the labelled value');
+  assert.equal(box!.original_label, 'In the box');
+  assert.equal(refusal(res.payload), null);
+  assert.ok(!strings(res.payload).some((s) => /Bundle Deals/i.test(s)), 'no payload string keeps the refused wording');
+});

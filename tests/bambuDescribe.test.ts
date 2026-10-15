@@ -76,6 +76,10 @@ test('E (component list): sections by component, version-scoped in-the-box items
           items: [
             { column1: { text: 'Printer', image: [{ url: 'https://store.bblcdn.com/s7/p.jpg' }] }, column2: { showCheckIcon: true }, column3: { showCheckIcon: true } },
             { column1: { text: 'AMS 2 Pro' }, column2: { showCheckIcon: true }, column3: { showCheckIcon: false } },
+            // Marked under no listed version (review 5): an answer too, never "every version".
+            { column1: { text: 'AMS HT' }, column2: { text: '' }, column3: { text: '' } },
+            // A cell that is neither a count nor a tick: shipped for some choices of that version.
+            { column1: { text: '10W Laser Module' }, column2: { text: '' }, column3: { text: 'depending on option' } },
           ],
         },
       },
@@ -103,8 +107,13 @@ test('E (component list): sections by component, version-scoped in-the-box items
   assert.deepEqual(d.documents.map((x) => x.url), ['https://store.bblcdn.com/s7/x.pdf']);
   const box = d.sections.find((s) => s.kind === 'in_the_box')!.blocks.filter((b) => b.t === 'box_item');
   assert.deepEqual(
-    box.map((b) => (b.t === 'box_item' ? [b.text, b.scopes ?? null, !!b.image] : null)),
-    [['Printer', null, true], ['AMS 2 Pro', ['X AMS Combo'], false]]
+    box.map((b) => (b.t === 'box_item' ? [b.text, b.scopes ?? null, !!b.image, b.conditional ?? null] : null)),
+    [
+      ['Printer', ['X AMS Combo', 'X'], true, null],
+      ['AMS 2 Pro', ['X AMS Combo'], false, null],
+      ['AMS HT', [], false, null],
+      ['10W Laser Module', ['X'], false, 'depending on option'],
+    ]
   );
   assert.equal(blocks(d, 'faq', 'faq').length, 1);
   assert.ok(!d.sections.some((s) => /Models/.test(s.title)), 'the MakerWorld showcase is not a description');
@@ -136,15 +145,29 @@ test('E (real H2C): spec table, version-scoped box items, FAQ with its wiki link
   assert.ok(spec[0].t === 'table' && spec[0].grid.rows.length >= 20, 'the H2C spec table');
   const box = d.sections.filter((s) => s.kind === 'in_the_box').flatMap((s) => s.blocks.filter((b) => b.t === 'box_item'));
   assert.equal(box.length, 20);
-  const scoped = box.filter((b) => b.t === 'box_item' && b.scopes);
-  assert.ok(scoped.length > 0 && scoped.every((b) => b.t === 'box_item' && b.scopes!.every((sc) => ['H2C AMS Combo', 'H2C Laser Full Combo'].includes(sc))), 'per-version columns name the versions');
+  // Every row of a version table says which listed versions ship it — exactly as the page marks them (review 5).
+  const row = (text: string) => {
+    const b = box.find((x) => x.t === 'box_item' && x.text === text);
+    return b && b.t === 'box_item' ? { scopes: b.scopes, conditional: b.conditional ?? null } : null;
+  };
+  assert.deepEqual(row('H2C'), { scopes: ['H2C AMS Combo'], conditional: null });
+  assert.deepEqual(row('Build Plate'), { scopes: ['H2C AMS Combo', 'H2C Laser Full Combo'], conditional: null });
+  for (const none of ['AMS HT', '0.2mm Stainless Steel Hotend', '0.6mm Hardened Steel Hotend']) assert.deepEqual(row(none), { scopes: [], conditional: null }, none);
+  assert.deepEqual(row('10W Laser Module'), { scopes: ['H2C Laser Full Combo'], conditional: 'depending on option' });
+  assert.ok(box.every((b) => b.t === 'box_item' && Array.isArray(b.scopes)), 'no row of a version table is left without its answer');
   assert.equal(blocks(d, 'faq', 'faq').length, 8);
   assert.deepEqual(
     d.wikiLinks.map((l) => l.url).sort(),
     ['https://wiki.bambulab.com/en/h2/h2d-tpu-printing-guide', 'https://wiki.bambulab.com/en/h2c/h2c-filament-printing-guide', 'https://wiki.bambulab.com/en/h2c/manual/h2c-faq']
   );
   for (const t of ['Vortek Hotend Change System', 'Why Vortek?']) assert.ok(d.sections.some((s) => s.title === t), t);
-  assert.ok(d.sections.every((s) => s.title), 'every section has a title (its own or its anchor)');
+  // Every section is titled by its own title or its anchor — but a foot note borrows no anchor (the H2C's sits
+  // under "FAQ" and read as a second FAQ block, review 5).
+  assert.ok(d.sections.every((s) => s.title || s.path.startsWith('e:FootNote')), 'every section has a title (its own or its anchor)');
+  assert.ok(!d.sections.some((s) => s.path.startsWith('e:FootNote') && s.title === 'FAQ'), 'the foot note is not a second FAQ');
+  // A FAQ answer's table stays a table: one row per line (the package table of question 7, removed later as policy).
+  const q7 = blocks(d, 'faq', 'faq').find((b) => b.t === 'faq' && b.question.startsWith('7.'));
+  assert.ok(q7 && q7.t === 'faq' && q7.answer.split('\n').some((l) => /^H2C AMS Combo \| 1 \| H2C AMS Combo$/.test(l)), 'a table row per line');
   const media = d.sections.flatMap((s) => s.blocks).filter((b) => b.t === 'image' || b.t === 'video');
   assert.ok(media.length > 20);
   assert.ok(media.every((b) => (b.t === 'image' || b.t === 'video') && /^https:\/\/store\.bblcdn\.com\//.test(b.url)), 'every picture and video on the production CDN');

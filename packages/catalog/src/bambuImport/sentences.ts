@@ -32,6 +32,10 @@
  * Maker's Supply") and "Enjoy 14 days returns". Claims about what a product
  * saves in USE stay: "reducing printing costs", "lower power bills", "save
  * time and materials" are the product's performance, not its price.
+ *
+ * Review 5 (the format E pages) added buying advice ("we recommend purchasing
+ * extra AMS and Hotends"), the store's terms of service and availability dates
+ * ("expected to be available in early 2026"): the store's to say.
  */
 
 export type SentenceClass = 'money' | 'promotion' | 'shipping_policy' | 'warranty' | 'region' | 'keep';
@@ -92,6 +96,9 @@ const PROMOTION: readonly RegExp[] = [
   // The store's own calls to buy.
   /\b(?:buy|shop|order) now\b/i,
   /\blooking to buy\b/i,
+  // Buying advice (review 5, the H2C FAQ): "we recommend purchasing extra AMS and Hotends", "users … are
+  // recommended to purchase H2C directly" — what to buy, and where, is the store's to say, not a product fact.
+  /\b(?:recommend(?:s|ed)?|suggest(?:s|ed)?|advis(?:e|es|ed))\s+(?:you\s+|that\s+you\s+)?(?:to\s+)?(?:purchas|buy)\w*\b/i,
 ];
 
 const SHIPPING_POLICY: readonly RegExp[] = [
@@ -115,6 +122,11 @@ const SHIPPING_POLICY: readonly RegExp[] = [
   /\borders?\s+(?:can|may|will|must|could)\s+be\s+placed\b/i,
   /\bshopping cart\b|\b(?:your|the) cart\b/i,
   /\b(?:buy|purchase|order)\w*\b[^.!?]{0,30}\b(?:at|from)\s+(?:the\s+|our\s+)?(?:bambu lab\s+)?official (?:store|website|shop)\b/i,
+  // The store's own terms (review 5: "See our Terms of Service for more information." — "our" would be Levonis).
+  /\bterms of (?:service|sale|use)\b/i,
+  // Availability dates are the store's stock calendar ("expected to be available in early 2026").
+  /\b(?:expected|scheduled|planned|estimated)\s+to\s+(?:be\s+)?(?:available|ship|release|launch)\w*\b/i,
+  /\bavailable\s+(?:in|from|by|starting)\s+(?:early|mid|late|the\s+end\s+of\s+)?\s*(?:q[1-4]\b|(?:19|20)\d{2}\b|january|february|march|april|may|june|july|august|september|october|november|december)/i,
   // Stock and purchase limits.
   /\blimited stock\b/i,
   /\bwhile (?:supplies|stocks?) last\b/i,

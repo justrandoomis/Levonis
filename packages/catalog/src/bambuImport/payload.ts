@@ -869,6 +869,8 @@ export function buildImportPayload(inp: BuildInputs): BuildResult {
       .map((p) => p.replace(/\b(?:series|printers?)\b/g, ' ').replace(/\s+/g, ' ').trim())
       .filter(Boolean);
   const allValues = model.groups.flatMap((g) => g.values);
+  /** The words of a name ("10W Laser Module" → 10w, laser, module), for matching a value inside an item's name. */
+  const wordsOf = (n: string) => new Set(normName(n).split(/[^a-z0-9.]+/).filter(Boolean));
   const valuesNamedBy = (named: string): string[] => {
     const want = normName(named);
     if (!want) return [];
@@ -903,23 +905,53 @@ export function buildImportPayload(inp: BuildInputs): BuildResult {
   for (const sec of described.sections) {
     if (sec.kind !== 'in_the_box') continue;
     const sectionScope = valueNamed(sec.title);
+    // The section title is source wording ("Bundle Deals Add-ons" names a value whose words the classifier refuses):
+    // the row's label and locator carry it only as the classifier keeps it.
+    const boxTitle = collapseWs(scrub(sec.title)) || 'In the box';
+    // A format-B path carries the section's name too: read through the classifier (not counted twice).
+    const boxPath = collapseWs(scrubProse(sec.path).kept);
     const slotOf = (scope: string) => {
-      const slot = boxByScope.get(scope) ?? { items: [], locator: `${sec.title || 'In the box'} › ${sec.path}`, label: sec.title || 'In the box' };
+      const slot = boxByScope.get(scope) ?? { items: [], locator: boxPath ? `${boxTitle} › ${boxPath}` : boxTitle, label: boxTitle };
       boxByScope.set(scope, slot);
       return slot;
     };
     let headerScopes: string[] | null = null;
     let heading = '';
-    const take = (text: string, qty: number | null, image: string | null, itemScopes?: string[]) => {
-      const header = itemScopes?.length ? null : headerOf(text, qty, image);
+    const take = (text: string, qty: number | null, image: string | null, itemScopes?: string[], conditional = '') => {
+      const header = itemScopes ? null : headerOf(text, qty, image);
       if (header) {
         headerScopes = header.scopes.length ? header.scopes : null;
         heading = header.title;
         return;
       }
-      const named = itemScopes?.length ? itemScopes.map((n) => valueByName.get(n.trim().toLowerCase()) ?? '') : headerScopes ?? [sectionScope];
-      const targets = named.includes('') ? [sectionScope] : named;
-      const t = collapseWs(scrub(text));
+      let targets: string[];
+      let qualifier = '';
+      if (itemScopes) {
+        // A version table (format E): the item ships with the listed versions it is marked under — never "every
+        // version", because the columns need not cover them all (H2C has no column for its Vortek bundle).
+        if (!itemScopes.length) {
+          // Marked under no listed version: what it ships with is not published, so it is in no box (reviewed).
+          notes.push({ kind: 'spec_sources_disagree', field: 'package.contents' });
+          return;
+        }
+        const named = itemScopes.map((n) => valueByName.get(n.trim().toLowerCase()) ?? '').filter(Boolean);
+        // Columns that name no value of this product: the table cannot scope, the section's own scope stands.
+        targets = named.length ? [...new Set(named)] : [sectionScope];
+        if (conditional) {
+          // "depending on option": the value of another group the item names ("10W Laser Module" → "10W Laser");
+          // else the versions it is marked under, with the source's own condition kept on the item.
+          const own = wordsOf(text);
+          const hits = allValues.filter((v) => {
+            if (targets.includes(v.id)) return false;
+            const words = wordsOf(sourceTextOf(v));
+            return words.size > 0 && [...words].every((w) => own.has(w));
+          });
+          if (hits.length === 1) targets = [hits[0].id];
+          else qualifier = collapseWs(scrub(conditional)).slice(0, 80);
+        }
+      } else targets = headerScopes ?? [sectionScope];
+      const scrubbed = collapseWs(scrub(text));
+      const t = scrubbed && qualifier ? `${scrubbed} (${qualifier})` : scrubbed;
       // A bare value name is a label, not an item; with a count it is the item itself
       // ("For LightGrip Cutting Mat:" then "LightGrip Cutting Mat*3", cutting-mat-combo-3-pcs).
       if (!t || (qty === null && versionWords.has(t.toLowerCase())) || /depending on (the )?selected/i.test(t)) return;
@@ -933,7 +965,7 @@ export function buildImportPayload(inp: BuildInputs): BuildResult {
       for (const scope of targets) slotOf(scope).items.push({ text: t.slice(0, 300), qty, source_media_id: mid, source_url: src, section: heading.slice(0, 200) });
     };
     for (const b of sec.blocks) {
-      if (b.t === 'box_item') take(b.text, b.qty, b.image, b.scopes);
+      if (b.t === 'box_item') take(b.text, b.qty, b.image, b.scopes, b.conditional);
       else if (b.t === 'list') for (const i of b.items) {
         const p = parseBoxItem(i);
         take(p.text, p.qty, null);
@@ -1005,7 +1037,21 @@ export function buildImportPayload(inp: BuildInputs): BuildResult {
     }
     if (sec.kind === 'faq') {
       const qa = sec.blocks.filter((b): b is Extract<typeof b, { t: 'faq' }> => b.t === 'faq');
-      const body = qa.map((q) => `${scrub(q.question)}\n${scrub(q.answer)}`.trim()).filter(Boolean).join('\n\n');
+      // A pair whose QUESTION the classifier refuses goes whole: its subject is store policy, and the answer kept
+      // under a removed question (the store's "How will my order be shipped…" package table) is that policy
+      // without its heading. An answer is otherwise classified sentence by sentence, like all prose (the H2C's
+      // AMS wiring stays; "we recommend purchasing extra AMS" goes).
+      const body = qa
+        .map((q) => {
+          if (Object.values(scrubProse(q.question).counts).some((n) => n > 0)) {
+            scrub(q.question);
+            scrub(q.answer);
+            return '';
+          }
+          return `${scrub(q.question)}\n${scrub(q.answer)}`.trim();
+        })
+        .filter(Boolean)
+        .join('\n\n');
       if (body) block({ kind: 'text', section_kind: 'faq', section_path: sec.path, title_en: BLOCK_TITLES.faq.en, body_en: body.slice(0, 20000) });
       continue;
     }

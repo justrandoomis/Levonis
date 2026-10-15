@@ -312,3 +312,18 @@ test('a section titled "Parameter" (R1 accessories) is a specification section',
   assert.equal(sectionKindOf('Parameter'), 'specs');
   assert.equal(sectionKindOf('Parameters'), 'specs');
 });
+
+/** "Slicer & Software" is prose on the printers (review 5, finding 3): one string, never sentence fragments. */
+test('the printers\' Software cell stays one string', () => {
+  let seen = 0;
+  for (const handle of ['h2d', 'h2c'] as const) {
+    const sw = specsOf(handle).r.rows.find((x) => x.key === 'connectivity.software');
+    if (!sw) continue;
+    seen++;
+    assert.equal(sw.dataType, 'string', handle);
+    assert.deepEqual(sw.valueList, [], handle);
+    assert.match(sw.valueText, /G-code/, handle);
+  }
+  assert.ok(seen > 0, 'a printer fixture carries the Software row');
+  assert.equal(SPEC_KEYS.find((k) => k.key === 'connectivity.software')!.type, 'string');
+});

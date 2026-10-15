@@ -238,9 +238,26 @@ test('format E (H2C): accepted whole, box items per version, wiki documents, pro
   const nameOf = new Map(p.groups.flatMap((g) => g.values).map((v) => [v.id, v.name_en]));
   const box = p.specs.filter((s) => s.key === 'package.contents');
   const scopes = box.map((s) => (s.scope_kind === 'product' ? 'product' : nameOf.get(s.scope_id))).sort();
-  assert.deepEqual(scopes, ['H2C AMS Combo', 'H2C Laser Full Combo', 'product']);
-  const laser = box.find((s) => nameOf.get(s.scope_id) === 'H2C Laser Full Combo')!;
-  assert.ok((laser.value_list as Array<{ text: string }>).some((i) => /Laser Module/.test(i.text)), 'the laser modules ship with the Laser Full Combo only');
+  // No product-level box (review 5): the table's columns do not cover the Vortek bundle, so nothing is claimed for
+  // "every version"; each item ships with the versions it is marked under, a "depending on option" module with
+  // the option it names.
+  assert.deepEqual(scopes, ['10W Laser', '40W Laser', 'H2C AMS Combo', 'H2C Laser Full Combo']);
+  const items = (name: string) => (box.find((s) => nameOf.get(s.scope_id) === name)!.value_list as Array<{ text: string; qty: number | null }>).map((i) => i.text);
+  assert.deepEqual(items('10W Laser'), ['10W Laser Module']);
+  assert.deepEqual(items('40W Laser'), ['40W Laser Module']);
+  assert.ok(!items('H2C Laser Full Combo').some((t) => /Laser Module/.test(t)), 'each laser module ships with its own option, not both with the combo');
+  assert.ok(items('H2C Laser Full Combo').includes('Emergency Stop Button') && !items('H2C AMS Combo').includes('Emergency Stop Button'));
+  const everywhere = box.flatMap((s) => (s.value_list as Array<{ text: string }>).map((i) => i.text));
+  for (const none of ['AMS HT', '0.2mm Stainless Steel Hotend', '0.6mm Hardened Steel Hotend']) assert.ok(!everywhere.includes(none), `${none} is marked under no version and ships with none`);
+  assert.equal(p.notes.filter((n) => n.field === 'package.contents').length, 3, 'the three unmarked rows are listed for review');
+  // The FAQ: a pair whose question is store policy goes whole (its package table too); an answer loses only its
+  // refused sentences; the foot note's store terms are gone.
+  const faq = p.content_blocks.find((b) => b.section_kind === 'faq')!.body_en;
+  assert.doesNotMatch(faq, /How will my order be shipped|Package Amount|Package 1/);
+  assert.match(faq, /Two AMS 2 Pro feed the right induction hotends/, 'the AMS wiring of question 2 stays');
+  assert.doesNotMatch(faq, /recommend purchasing|recommended to purchase|expected to be available/);
+  const all = p.content_blocks.map((b) => `${b.title_en}\n${b.body_en}`).join('\n');
+  assert.doesNotMatch(all, /Terms of Service/);
   const wiki = p.documents.filter((d) => d.kind === 'wiki').map((d) => d.url);
   assert.equal(wiki.length, 3);
   assert.equal(p.product.usage_official_url, wiki[0]);

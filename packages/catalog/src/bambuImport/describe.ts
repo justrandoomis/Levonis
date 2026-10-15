@@ -38,7 +38,12 @@ export type Block =
   | { t: 'list'; items: string[] }
   | { t: 'link'; url: string; text: string }
   | { t: 'video'; url: string }
-  | { t: 'box_item'; text: string; qty: number | null; image: string | null; scopes?: string[] }
+  /**
+   * An in-the-box item. `scopes`, when present, are the version columns of a format-E table the item is marked
+   * under — `[]` when it is marked under none (the item ships with no listed version). `conditional` holds the
+   * cell words of a version that ships it only for some choices ("depending on option").
+   */
+  | { t: 'box_item'; text: string; qty: number | null; image: string | null; scopes?: string[]; conditional?: string }
   | { t: 'faq'; question: string; answer: string };
 
 export interface Section {
@@ -212,6 +217,30 @@ function richText(s: string): string {
   if (!s) return '';
   if (/<[a-z!/]/i.test(s)) return textOf(parseHtml(s), { lines: true });
   return decodeEntities(s).split('\n').map(collapseWs).filter(Boolean).join('\n');
+}
+
+/**
+ * Rich text whose tables stay tables: each row one line, its cells joined by " | " (a FAQ answer's package
+ * table read one cell per line was a list of words with no row left).
+ */
+function richTextRows(s: string): string {
+  if (!/<table/i.test(s)) return richText(s);
+  const out: string[] = [];
+  for (const part of s.split(/(<table[\s\S]*?<\/table>)/i)) {
+    if (!part.trim()) continue;
+    if (/^<table/i.test(part)) {
+      for (const t of findAll(parseHtml(part), (n) => n.type === 'el' && n.tag === 'table', true)) {
+        for (const row of tableGrid(t as ElementNode).rows) {
+          const line = row.map(collapseWs).filter(Boolean).join(' | ');
+          if (line) out.push(line);
+        }
+      }
+    } else {
+      const text = richText(part);
+      if (text) out.push(text);
+    }
+  }
+  return out.join('\n');
 }
 
 /** Events from a D2 client component's (closed-list) props. */
@@ -712,7 +741,8 @@ function componentList(components: unknown, d: Described): void {
     const byTitle = sectionKindOf(title);
     const byAnchor = sectionKindOf(anchorName);
     const kind: SectionKind = E_KIND[ct] ?? (byTitle !== 'other' ? byTitle : byAnchor !== 'other' ? byAnchor : 'features');
-    const s: Section = { kind, title: title || anchorName, path: `e:${str(c.componentName) || ct}[${i}]`, blocks: [] };
+    // A foot note sits under the anchor of the section before it: it borrows no title from it.
+    const s: Section = { kind, title: ct === 'FootNote' ? title : title || anchorName, path: `e:${str(c.componentName) || ct}[${i}]`, blocks: [] };
     const htmlLinks = (raw: string) => {
       for (const l of linksOfHtml(raw)) s.blocks.push({ t: 'link', url: l.url, text: l.text });
     };
@@ -741,20 +771,26 @@ function componentList(components: unknown, d: Described): void {
         const image = [...arr(c1.image).map((x) => str(obj(x).url)), str(obj(o.imageSrc).url)].map(imageUrl).find(Boolean) ?? null;
         let qty = parsed.qty;
         const scopes: string[] = [];
+        let conditional = '';
         for (const k of cols) {
           const cell = obj(o[k]);
           const t = collapseWs(str(cell.text));
           if (cell.showCheckIcon === true || t) scopes.push(collapseWs(str(headers[k])));
           const n = /^[x×]?\s*(\d{1,3})$/i.exec(t);
           if (qty === null && n) qty = Number(n[1]);
+          // A cell that is neither a count nor a tick ("depending on option"): the version ships it for some choices.
+          else if (t && !n && !conditional) conditional = t;
         }
-        s.blocks.push({ t: 'box_item', text: parsed.text, qty, image, ...(cols.length && scopes.length < cols.length ? { scopes } : {}) });
+        // A version table always says which listed versions an item ships with — none is an answer too. The
+        // table's columns need not cover every version (H2C: no "Vortek Ultimate Bundle" column), so a full row is
+        // never read as "every version" either: the builder scopes each item to the columns it is marked under.
+        s.blocks.push({ t: 'box_item', text: parsed.text, qty, image, ...(cols.length ? { scopes } : {}), ...(conditional ? { conditional } : {}) });
       }
     } else if (ct === 'FAQ') {
       for (const it of arr(data.faqItems)) {
         const o = obj(it);
         const q = collapseWs(richText(str(o.question)));
-        const a = richText(str(o.answer));
+        const a = richTextRows(str(o.answer));
         if (q || a) s.blocks.push({ t: 'faq', question: q, answer: a });
         htmlLinks(str(o.answer));
       }

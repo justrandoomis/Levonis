@@ -187,3 +187,39 @@ test('without the reviewed file, or with one value it does not know, the groups 
   assert.equal(compatLabelReviewed(REAL, 'Not a label'), false);
   assert.equal(compatLabelReviewed(null, 'A1'), false);
 });
+
+/**
+ * A REVIEWED DISPLAY LABEL ON A PRINTER VALUE (review 5, findings 4 and 5): the
+ * reviewed file is keyed by the source's words, so the lookup reads them; the
+ * row SHOWS the reviewed label whatever its state (resolved, pending or
+ * unresolvable), and its id stays the one the source label gives.
+ */
+test('a labelled printer value: the row shows the reviewed label in every state, its id is the source label\'s', () => {
+  const x = sample('bambu-textured-pei-plate');
+  const productId = newProductId(x.sourceProductId);
+  const h2c = x.groups.flatMap((g) => g.values).find((v) => v.value === 'H2C')!.id;
+  const a2l = x.groups.flatMap((g) => g.values).find((v) => v.value === 'A2L')!.id;
+  const labels = {
+    [h2c]: { name_en: 'H2C printer', name_ar: 'طابعة H2C', name_ckb: 'چاپکەری H2C' },
+    [a2l]: { name_en: 'A2L printer', name_ar: 'طابعة A2L', name_ckb: 'چاپکەری A2L' },
+  };
+  const targets: CompatTargets = { version: 1, labels: { H2C: { kind: 'printer', to: { source_handle: 'h2c' } } } };
+  const rowsOf = (valueLabels: typeof labels | null, sourceId: string) => {
+    const model = buildOptions(x, productId, { valueLabels });
+    const v = model.groups.flatMap((g) => g.values).find((val) => val.sourceId === sourceId)!;
+    return buildRelations({ productId, handle: x.handle, model, described: describe(x.description), relationBullets: [], targets }).rows.filter((r) => r.scopeId === v.id);
+  };
+  // Pending (mapped by the file): the label shows, the source words do not; the id is unchanged.
+  const pendingPlain = rowsOf(null, h2c);
+  const pendingLabelled = rowsOf(labels, h2c);
+  assert.equal(pendingLabelled.length, 1);
+  assert.equal(pendingLabelled[0].state, 'pending');
+  assert.equal(pendingLabelled[0].targetLabel, 'H2C printer');
+  assert.deepEqual(pendingLabelled.map((r) => r.id), pendingPlain.map((r) => r.id));
+  // Unresolvable (not in the file): the same.
+  const loosePlain = rowsOf(null, a2l);
+  const looseLabelled = rowsOf(labels, a2l);
+  assert.equal(looseLabelled[0].state, 'unresolvable');
+  assert.equal(looseLabelled[0].targetLabel, 'A2L printer');
+  assert.deepEqual(looseLabelled.map((r) => r.id), loosePlain.map((r) => r.id));
+});

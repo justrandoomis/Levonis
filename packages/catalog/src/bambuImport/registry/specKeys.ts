@@ -225,7 +225,8 @@ export const SPEC_KEYS: readonly SpecKey[] = [
   k('printing.door_sensor', 'boolean', '', tri('حساس الباب', 'Door sensor', 'هەستەوەری دەرگا'), ['Door Sensor'], { appliesTo: PRINTER }),
   k('printing.filament_cutter', 'string', '', tri('قاطع الخيط', 'Filament cutter', 'بڕەری فیلامێنت'), ['Filament Cutter'], { appliesTo: PRINTER }),
   k('physical.outer_frame', 'string', '', tri('الإطار الخارجي', 'Outer frame', 'چوارچێوەی دەرەوە'), ['Outer Frame'], { appliesTo: PRINTER }),
-  k('connectivity.software', 'list', '', tri('البرمجيات', 'Software', 'نەرمەکاڵا'), ['Software', 'Slicer', 'Slicer & Software']),
+  // A string: the printers' cells are prose ("… export standard G-code, such as Super Slicer, PrusaSlicer and Cura …").
+  k('connectivity.software', 'string', '', tri('البرمجيات', 'Software', 'نەرمەکاڵا'), ['Software', 'Slicer', 'Slicer & Software']),
   k('connectivity.operating_systems', 'list', '', tri('أنظمة التشغيل المدعومة', 'Supported operating systems', 'سیستەمە کارپێکەرە پشتگیریکراوەکان'),
     ['Operating Systems', 'Supported Operating System', 'Supported Operating Systems']),
   k('connectivity.control_interface', 'list', '', tri('واجهة التحكم', 'Control interface', 'ڕووکاری کۆنترۆڵ'), ['Control Interface'], { appliesTo: PRINTER }),

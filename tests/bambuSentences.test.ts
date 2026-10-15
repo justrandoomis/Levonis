@@ -42,6 +42,11 @@ const KEPT = [
   'The side panels we shipped earlier also did not have tabs.', // left-plastic-panel-p1-series
   'Add All To Cart - ZH088', // n20-reduction-gear-motor: an option value's own name
   'X1 Series Exclusive', // the compatibility value of 54 spare parts
+  // Near misses of the review 5 patterns: technical advice and a range, kept.
+  'We recommend using a 0.6 mm hardened steel nozzle for carbon-fibre filaments.',
+  'Available in 1000 g and 500 g spools.',
+  'Available in 12 colours.',
+  'Two AMS 2 Pro feed the right induction hotends; AMS HT feeds the left hotends.',
 ];
 const REMOVED: Array<[string, 'money' | 'promotion' | 'shipping_policy']> = [
   ['30-day price protection, 2-year warranty & 30-day returns at official store.', 'money'],
@@ -118,6 +123,11 @@ const CORPUS_REMOVED_2: Array<[string, 'money' | 'promotion' | 'shipping_policy'
   ["Orders can be placed at Maker's Supply.", 'shipping_policy'], // m2-button-head-cap-machine-screws-bhcs and 6 more
   ['If you require a filament buffer, you can add it to your shopping cart below.', 'shipping_policy'], // p2s
   ['* High-flow Hotends are optional equipments, buy at official store.', 'shipping_policy'], // h2c
+  // Review 5 (format E): buying advice, the store's own terms, availability dates.
+  ['To fully experience the Vortek 6-hotend automatic swap system, we recommend purchasing extra AMS and Hotends which include: 3 × 0.4 mm induction hotends.', 'promotion'], // h2c FAQ 2
+  ['However, the upgrade process is complex and time-consuming, so users who want the Vortek experience are recommended to purchase H2C directly.', 'promotion'], // h2c FAQ 4
+  ['The Vortek Upgrade Kit is expected to be available in early 2026.', 'shipping_policy'], // h2c FAQ 4
+  ['See our Terms of Service for more information.', 'shipping_policy'], // h2c foot note
 ];
 const WITHHELD = [
   'The warranty will only cover manufacturing defects, not cosmetic damage like scratches, dents, or cracks.',
