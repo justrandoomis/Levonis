@@ -14,12 +14,22 @@
  *       its hold released under a live escrow.
  *
  * Real routes, real migrations; D1's single-writer model is `serialD1`.
+ *
+ * A RACE WITH ONE MEANT ORDER IS FORCED, NOT TIMED. `Promise.all` over two
+ * requests interleaves them only when starting a request costs no event-loop
+ * turn. Under Node 22.22.2, tsx loads through the off-thread loader, so
+ * stubApp's per-request `await import('./autoPublish')` costs one, and the
+ * other side ran its whole microtask chain first: the sweep finished before
+ * the dispute started, and the first tap finished before the second one read.
+ * Each race below that means one interleaving lands the other request at
+ * the exact write it is about (`RaceD1`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, json, count, row, all, spendable, holds, type Mount } from './fixtures/app';
+import { freshDb, asD1, stubApp, post, json, count, row, all, spendable, holds, pending, type Mount } from './fixtures/app';
 import { serialD1 } from './fixtures/serialD1';
+import { RaceD1 } from './fixtures/raceD1';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
 import { adminCommunityRoutes } from '../worker/routes/adminCommunity';
 import { runCommunitySweeps } from '../worker/lib/communityRequests';
@@ -90,11 +100,18 @@ test('F1 (probe C1 inverted): the auto-confirm sweep racing the customer’s dis
   const due = row<{ a: string }>(raw, 'SELECT auto_complete_at a FROM community_orders WHERE id = ?', orderId)!.a;
   const after = new Date(Date.parse(due) + 60_000).toISOString();
 
-  const db = serialD1(raw);
-  const [report, disputed] = await Promise.all([
-    runCommunitySweeps({ DB: db } as never, after),
-    post(as(raw, 'buyer', 'customer', db), `/api/marketplace/orders/${orderId}/dispute`, { description: 'The part arrived broken in two' }),
-  ]);
+  // The probe's window, forced: the sweep has read the order (due) and its
+  // escrow (held) and is about to post the release batch. At that instant,
+  // the customer's dispute runs to the end, with its after-response work.
+  const race = new RaceD1(raw);
+  race.when = (sqls) => sqls.some((s) => /UPDATE community_escrows\s+SET state = 'released'/.test(s));
+  let disputed = null as Response | null;
+  race.hook = async () => {
+    disputed = await post(as(raw, 'buyer'), `/api/marketplace/orders/${orderId}/dispute`, { description: 'The part arrived broken in two' });
+    await Promise.allSettled(pending.splice(0));
+  };
+  const report = await runCommunitySweeps({ DB: race } as never, after);
+  assert.ok(disputed, 'the dispute landed between the sweep’s read and its release batch');
   assert.equal(disputed.status, 201, JSON.stringify(await json(disputed.clone())));
   assert.equal(report.auto_completed, 0, 'the sweep completed nothing');
   assert.equal(escrowState(raw, escrowId), 'disputed', 'the money stays frozen');
@@ -242,14 +259,25 @@ test('F2: work never starts on money that is not held — 409 ESCROW_NOT_HELD; a
   assert.equal((await json(start)).code, 'ESCROW_NOT_HELD');
   assert.equal(orderState(raw, orderId), 'funded');
 
+  // A DOUBLE tap: both taps read the order while it is still `funded`. The
+  // first tap is about to flip it when the second runs to the end, so the
+  // second flips first and the first tap's flip matches nothing. (A LATER tap
+  // that reads `in_progress` is refused by the state table, 409
+  // CUSTOM_ORDER_CANNOT_START: tests/customOrderReviewFixes.test.ts F12.)
   const raw2 = seed();
   const a2 = await accepted(raw2);
-  const db = serialD1(raw2);
-  const taps = await Promise.all([
-    post(as(raw2, 'owner', 'customer', db), `/api/marketplace/orders/${a2.orderId}/start`),
-    post(as(raw2, 'owner', 'customer', db), `/api/marketplace/orders/${a2.orderId}/start`),
-  ]);
+  const race = new RaceD1(raw2);
+  race.whenRun = (sql) => sql.includes("SET state = 'in_progress'");
+  let second = null as Response | null;
+  race.runHook = async () => {
+    second = await post(as(raw2, 'owner'), `/api/marketplace/orders/${a2.orderId}/start`);
+    await Promise.allSettled(pending.splice(0));
+  };
+  const first = await post(as(raw2, 'owner', 'customer', race), `/api/marketplace/orders/${a2.orderId}/start`);
+  assert.ok(second, 'the second tap ran between the first tap’s read and its flip');
+  const taps = [first, second];
   assert.deepEqual(taps.map((t) => t.status), [200, 200], 'the losing tap is told the work IS started');
+  assert.equal((await json(first)).replayed, true, 'the tap whose flip matched nothing is the replay');
   assert.equal(orderState(raw2, a2.orderId), 'in_progress');
   assert.equal(count(raw2, "SELECT COUNT(*) n FROM audit_log WHERE action = 'community.order_started'"), 1, 'started once');
 });

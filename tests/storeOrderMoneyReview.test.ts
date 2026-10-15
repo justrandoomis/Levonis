@@ -25,6 +25,7 @@ import {
 } from './fixtures/app';
 import { legacyLedgerWrite } from './fixtures/legacyLedger';
 import { serialD1 } from './fixtures/serialD1';
+import { RaceD1 } from './fixtures/raceD1';
 import { cartRoutes } from '../worker/routes/cart';
 import { storeOrderRoutes } from '../worker/routes/storeOrders';
 import { orderRoutes } from '../worker/routes/orders';
@@ -412,12 +413,23 @@ test('F7 (probe P7 inverted): two checkout tabs with two keys on ONE cart — on
   seed(raw);
   await addToCart(raw);
   const q = await json(await post(buyerApp(asD1(raw)), '/api/store-orders/quote', {}));
-  const db = serialD1(raw);
-  const results = await Promise.all([
-    post(buyerApp(db), '/api/store-orders', { idempotencyKey: 'tab-one-000001', addressId: 'a1', quoteFingerprint: q.quote.quote_fingerprint }),
-    post(buyerApp(db), '/api/store-orders', { idempotencyKey: 'tab-two-000002', addressId: 'a1', quoteFingerprint: q.quote.quote_fingerprint }),
-  ]);
+  // Both tabs price the cart, forced, not timed. Tab one has read the cart and
+  // reserved its money, and is about to post its order batch. At that instant,
+  // tab two checks out to the end. With `Promise.all`, a slow request start
+  // (stubApp's per-request import under Node 22.22.2's off-thread loader) let
+  // tab one finish first, and tab two then read an EMPTY cart: 400 CART_EMPTY,
+  // with no hold taken. That is a different, sequential case.
+  const race = new RaceD1(raw);
+  race.when = (sqls) => sqls.some((s) => /INSERT INTO orders\s*\(/.test(s));
+  let tabTwo = null as Response | null;
+  race.hook = async () => {
+    tabTwo = await post(buyerApp(asD1(raw)), '/api/store-orders', { idempotencyKey: 'tab-two-000002', addressId: 'a1', quoteFingerprint: q.quote.quote_fingerprint });
+    await Promise.allSettled(pending.splice(0));
+  };
+  const tabOne = await post(buyerApp(race), '/api/store-orders', { idempotencyKey: 'tab-one-000001', addressId: 'a1', quoteFingerprint: q.quote.quote_fingerprint });
   await Promise.allSettled(pending.splice(0));
+  assert.ok(tabTwo, 'tab two checked out between tab one’s pricing and its order batch');
+  const results = [tabOne, tabTwo];
   const statuses = results.map((r) => r.status).sort();
   assert.deepEqual(statuses, [201, 409]);
   const loser = results.find((r) => r.status === 409)!;
