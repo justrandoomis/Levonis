@@ -85,7 +85,10 @@ import { requireTradeInV2, tradeInV2Installed } from '../lib/tradeInSchema';
 import { requireCostRead } from '../lib/costAccess';
 import { deviceReturned, intakeRequest } from '../lib/tradeInIntake';
 import { bookTradeInStock } from '../lib/tradeInStock';
-import { overrideRecord } from '../lib/tradeInOffer';
+import { overrideRecord, valuationsOf } from '../lib/tradeInOffer';
+import { QUEUE_CHIPS, adminQueue, isUsdText, listComponentRefs, tradeInPnl, type QueueChip } from '../lib/tradeInAdminQueue';
+import { getSetting, normalizeTradeInPolicy, setSetting, TRADE_IN_POLICY_DEFAULTS, TRADE_IN_POLICY_RANGES } from '../lib/settings';
+import { auditStatements } from '../lib/audit';
 import { isListedDeviceTarget, searchTargets } from '../lib/tradeInTargets';
 import { listMyDevices } from '../lib/services/myDevices';
 import type { DeviceFacts } from '../../packages/contracts/src/myDevices';
@@ -430,6 +433,7 @@ tradeInRoutes.post('/requests/:id/cancel', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const reason = str(body.reason, 'reason', { max: 500, required: false });
   const req = await run(async () => cancelRequest(c.env, await ownRequest(c.env.DB, user.id, requestIdOf(c)), { id: user.id, role: 'customer' }, reason));
+  if (req.intake_at) afterResponse(c, notifyAdmins(c.env, req, 'device_to_return'));
   return c.json({ success: true, request: await requestView(c.env, req, 'customer') });
 });
 
@@ -441,7 +445,14 @@ for (const decision of ['accept', 'reject'] as const) {
     const offerNo = offerNoOf(body);
     const res = await run(async () => decideValue(c.env, await ownRequest(c.env.DB, user.id, requestIdOf(c)), offerNo, decision, 'web'));
     if (!res.replayed) {
-      afterResponse(c, Promise.all([stampCustomerPrompt(c.env, res.request), notifyAdmins(c.env, res.request, decision === 'accept' ? 'accepted' : 'rejected')]));
+      afterResponse(
+        c,
+        Promise.all([
+          stampCustomerPrompt(c.env, res.request),
+          notifyAdmins(c.env, res.request, decision === 'accept' ? 'accepted' : 'rejected'),
+          ...(decision === 'reject' && res.request.intake_at ? [notifyAdmins(c.env, res.request, 'device_to_return')] : []),
+        ])
+      );
     }
     return c.json({ success: true, replayed: res.replayed, request: await requestView(c.env, res.request, 'customer') });
   });
@@ -493,12 +504,26 @@ async function adminRequest(c: Context<AppContext>) {
   return req;
 }
 
+/**
+ * THE QUEUE (S-P2 §6.13, any admin): `q` searches the customer (name, e-mail, the phone's last
+ * digits), the request and order ids, the serials and the device names; `chip` is a work stage;
+ * `cursor` the keyset of the next page. Rows carry staff figures (offer, ceiling, final), never a
+ * cost. A database without 0192 answers the old list.
+ */
 adminTradeInRoutes.get('/requests', async (c) => {
   const status = c.req.query('status') || null;
   const family = c.req.query('family') || null;
   if (status && !(TRADE_IN_STATUSES as readonly string[]).includes(status)) throw badRequest('Unknown status');
   if (family && !(TRADE_IN_FAMILIES as readonly string[]).includes(family)) throw badRequest('Unknown family');
   const search = (c.req.query('q') || '').trim().slice(0, 120) || null;
+  c.header('Cache-Control', 'private, no-store');
+  if (await tradeInV2Installed(c.env.DB)) {
+    const chip = c.req.query('chip') || null;
+    if (chip && !(QUEUE_CHIPS as readonly string[]).includes(chip)) throw badRequest('Unknown chip');
+    const cursor = (c.req.query('cursor') || '').slice(0, 120) || null;
+    const out = await adminQueue(c.env.DB, { q: search, chip: chip as QueueChip | null, family, status, cursor });
+    return c.json({ success: true, ...out });
+  }
   const page = int(c.req.query('page'), 'page', { min: 1, max: 1000, def: 1 });
   const limit = 30;
   const out = await adminList(c.env.DB, { status, family, search, limit, offset: (page - 1) * limit });
@@ -589,6 +614,7 @@ adminTradeInRoutes.post('/requests/:id/intake', async (c) => {
   if (out.revalued) {
     afterResponse(c, notifyCustomerOfValue(c.env, out.request).then(() => processOutbox(c.env, 5, { eventKeyPrefix: `trade_in:${out.request.id}:` })));
   }
+  afterResponse(c, notifyAdmins(c.env, out.request, 'received'));
   // A request completed before its device was received (cut-over, §7): the device is stock now.
   let request = out.request;
   if (request.status === 'completed' && (await run(() => bookTradeInStock(c.env, request, { id: admin.id, role: 'admin' })))) {
@@ -718,6 +744,7 @@ adminTradeInRoutes.post('/requests/:id/cancel', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const reason = str(body.reason, 'reason', { min: 3, max: 500 });
   const req = await run(async () => cancelRequest(c.env, await adminRequest(c), { id: admin.id, role: 'admin' }, reason));
+  if (req.intake_at) afterResponse(c, notifyAdmins(c.env, req, 'device_to_return'));
   return c.json({ success: true, request: await requestView(c.env, req, adminAudience(c)) });
 });
 
@@ -733,6 +760,128 @@ adminTradeInRoutes.get('/rules', requireCostRead, async (c) => {
     // The valuation rules decide every estimate a financial admin may approve: the owner's alone (decision 3).
     owner_scope: ownerScope(c),
   });
+});
+
+/**
+ * THE OWNER'S VALUATION RECORD of one request (cost_read): every valuation row — the store cap,
+ * the expected margin, each component's resale, costs and offer, the parameters — and the stock
+ * it became (lot, hidden draft, cost basis). The same refusal for a real and an invented id.
+ */
+adminTradeInRoutes.get('/requests/:id/valuation', requireCostRead, async (c) => {
+  await requireTradeInV2(c.env.DB);
+  c.header('Cache-Control', 'private, no-store');
+  const req = await adminRequest(c);
+  const [valuations, stock] = await Promise.all([
+    valuationsOf(c.env.DB, req.id),
+    c.env.DB.prepare('SELECT lot_id, product_id, cost_basis_iqd, order_id, created_at FROM trade_in_stock WHERE request_id = ?')
+      .bind(req.id)
+      .first<{ lot_id: string; product_id: string; cost_basis_iqd: number; order_id: string; created_at: string }>(),
+  ]);
+  return c.json({
+    success: true,
+    request_id: req.id,
+    valuations,
+    stock: stock ? { lot_id: stock.lot_id, draft_product_id: stock.product_id, cost_basis_iqd: stock.cost_basis_iqd, order_id: stock.order_id, booked_at: stock.created_at } : null,
+  });
+});
+
+/** The owner's trade-in windows and fees (§4.4): read with the costs, written by the owner. */
+adminTradeInRoutes.get('/policy', requireCostRead, async (c) => {
+  c.header('Cache-Control', 'private, no-store');
+  return c.json({ success: true, policy: await getSetting(c.env.DB, 'tradeInPolicy'), ranges: TRADE_IN_POLICY_RANGES, defaults: TRADE_IN_POLICY_DEFAULTS });
+});
+
+adminTradeInRoutes.put('/policy', requireMoneyAuthority('trade_in_rules'), async (c) => {
+  const admin = c.get('user')!;
+  await rateLimit(c, 'admin-trade-in-policy', 60, 3600);
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const current = await getSetting(c.env.DB, 'tradeInPolicy');
+  const errors: string[] = [];
+  const next: Record<string, unknown> = { ...current };
+  for (const [k, [lo, hi]] of Object.entries(TRADE_IN_POLICY_RANGES)) {
+    if (!(k in body)) continue;
+    const v = body[k];
+    if (typeof v !== 'number' || !Number.isSafeInteger(v) || v < lo || v > hi) errors.push(k);
+    else next[k] = v;
+  }
+  if ('require_serial_match' in body) {
+    if (typeof body.require_serial_match !== 'boolean') errors.push('require_serial_match');
+    else next.require_serial_match = body.require_serial_match;
+  }
+  if (errors.length) throw new HttpError(400, 'Some policy values are out of range.', 'TRADE_IN_POLICY_INVALID', { errors });
+  const policy = normalizeTradeInPolicy(next);
+  await setSetting(c.env.DB, 'tradeInPolicy', policy);
+  await c.env.DB.batch((await auditStatements(c.env.DB, admin.id, 'trade_in.policy.save', 'tradeInPolicy', { policy })).statements);
+  return c.json({ success: true, policy });
+});
+
+/**
+ * THE OWNER'S COMPONENT REFERENCES (§4.3 rules 3–4): for a model whose printer-only or AMS-only
+ * part has no price of its own today, a listed product that stands for it, or a USD figure.
+ * Read with the costs; written by the owner.
+ */
+adminTradeInRoutes.get('/component-refs', requireCostRead, async (c) => {
+  await requireTradeInV2(c.env.DB);
+  c.header('Cache-Control', 'private, no-store');
+  return c.json({ success: true, refs: await listComponentRefs(c.env.DB) });
+});
+
+function refKeyOf(body: Record<string, unknown>) {
+  const product_id = str(body.product_id, 'product_id', { min: 1, max: 80 });
+  const option_value_id = str(body.option_value_id, 'option_value_id', { max: 80, required: false }) ?? '';
+  const role = oneOf(body.role, 'role', ['device', 'ams'] as const);
+  return { product_id, option_value_id, role };
+}
+
+adminTradeInRoutes.put('/component-refs', requireMoneyAuthority('trade_in_rules'), async (c) => {
+  await requireTradeInV2(c.env.DB);
+  const admin = c.get('user')!;
+  await rateLimit(c, 'admin-trade-in-refs', 120, 3600);
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const key = refKeyOf(body);
+  const refProduct = body.ref_product_id === null || body.ref_product_id === undefined || body.ref_product_id === '' ? null : str(body.ref_product_id, 'ref_product_id', { max: 80 });
+  const refUsd = body.ref_price_usd === null || body.ref_price_usd === undefined || body.ref_price_usd === '' ? null : String(body.ref_price_usd).trim();
+  if (refUsd !== null && !isUsdText(refUsd)) throw badRequest('ref_price_usd must be a dollar figure above zero with at most two decimals', 'TRADE_IN_REF_INVALID');
+  if (!refProduct && !refUsd) throw badRequest('Name a reference product or a dollar figure', 'TRADE_IN_REF_INVALID');
+  const exists = await c.env.DB.prepare(
+    `SELECT (SELECT 1 FROM products WHERE id = ?1) AS model, (SELECT 1 FROM products WHERE id = ?2) AS ref`
+  )
+    .bind(key.product_id, refProduct ?? '')
+    .first<{ model: number | null; ref: number | null }>();
+  if (!exists?.model) throw notFound('Product not found');
+  if (refProduct && !exists.ref) throw notFound('Reference product not found');
+  const now = new Date().toISOString();
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO trade_in_component_refs (product_id, option_value_id, role, ref_product_id, ref_price_usd, updated_by, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+       ON CONFLICT (product_id, option_value_id, role) DO UPDATE SET ref_product_id = ?4, ref_price_usd = ?5, updated_by = ?6, updated_at = ?7`
+    ).bind(key.product_id, key.option_value_id, key.role, refProduct, refUsd, admin.id, now),
+    ...(await auditStatements(c.env.DB, admin.id, 'trade_in.component_ref.save', key.product_id, { ...key, ref_product_id: refProduct, ref_price_usd: refUsd })).statements,
+  ]);
+  return c.json({ success: true, refs: await listComponentRefs(c.env.DB) });
+});
+
+adminTradeInRoutes.delete('/component-refs', requireMoneyAuthority('trade_in_rules'), async (c) => {
+  await requireTradeInV2(c.env.DB);
+  const admin = c.get('user')!;
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const key = refKeyOf(body);
+  await c.env.DB.batch([
+    c.env.DB.prepare('DELETE FROM trade_in_component_refs WHERE product_id = ? AND option_value_id = ? AND role = ?').bind(key.product_id, key.option_value_id, key.role),
+    ...(await auditStatements(c.env.DB, admin.id, 'trade_in.component_ref.delete', key.product_id, key)).statements,
+  ]);
+  return c.json({ success: true, refs: await listComponentRefs(c.env.DB) });
+});
+
+/** The owner's trade-in P&L over [from, to) — ISO dates; the last 30 days by default (cost_read). */
+adminTradeInRoutes.get('/pnl', requireCostRead, async (c) => {
+  c.header('Cache-Control', 'private, no-store');
+  const day = (v: string | undefined, d: Date) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) && Number.isFinite(Date.parse(v)) ? new Date(`${v}T00:00:00.000Z`) : d);
+  const to = day(c.req.query('to'), new Date(Date.now() + 86_400_000));
+  const from = day(c.req.query('from'), new Date(to.getTime() - 31 * 86_400_000));
+  if (from >= to) throw badRequest('from must be before to');
+  return c.json({ success: true, pnl: await tradeInPnl(c.env.DB, from.toISOString(), to.toISOString()) });
 });
 
 function familyOf(c: Context<AppContext>): TradeInFamily {

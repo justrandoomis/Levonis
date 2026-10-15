@@ -21,6 +21,7 @@ import { adminWalletAdjustRoutes } from '../../worker/routes/adminWalletAdjust';
 import { farmAdminRoutes } from '../../worker/routes/farmAdmin';
 import { adminOrderPriceRoutes } from '../../worker/routes/orderPriceAdjust';
 import { adminTradeInRoutes } from '../../worker/routes/tradeIn';
+import { adminServicesRoutes } from '../../worker/routes/myServices';
 
 export default {
   family: 'money',
@@ -61,6 +62,25 @@ export default {
         // The rules decide every estimate a financial admin may approve: the owner's alone (owner decision 3).
         'PUT /rules/:family': 'owner',
         'POST /rules/:family/test': { cls: 'op', noBody: 'tries a valuation rule of one device family on a sample; needs a family the role fixture does not seed' },
+        // S-P2 (§6.13): the owner's valuation record of a request (store cap, margins, resale, costs) and the stock it became.
+        'GET /requests/:id/valuation': 'cost_read',
+        // The windows and fees, and the component references the offer prices from: read with the costs, written by the owner.
+        'GET /policy': 'cost_read',
+        'PUT /policy': 'owner',
+        'GET /component-refs': 'cost_read',
+        'PUT /component-refs': 'owner',
+        'DELETE /component-refs': 'owner',
+        // The trade-in P&L: credits, stock at cost, resale margin, write-offs, overrides, re-issues.
+        'GET /pnl': 'cost_read',
+      },
+    },
+    {
+      prefix: '/api/admin/services',
+      name: 'adminServicesRoutes',
+      router: adminServicesRoutes,
+      routes: {
+        // Counts of what waits on the desk; no figure.
+        'GET /badge': 'op',
       },
     },
     {

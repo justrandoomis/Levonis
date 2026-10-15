@@ -3285,6 +3285,15 @@ export async function requestView(env: Env, req: RequestRow, audience: RequestAu
   };
   if (!staff) return base;
   const intakePhotos = photos.filter((p) => p.phase === 'intake').map((p) => ({ ...photoView(p), proves: p.proves ?? '' }));
+  const byName = req.intake_by ? ((await db.prepare('SELECT name FROM users WHERE id = ?').bind(req.intake_by).first<{ name: string | null }>())?.name ?? null) : null;
+  // What the customer declared against what the desk saw, answer by answer (§6.13).
+  const declaredVsIntake = comps.flatMap((c) => {
+    const declared = safeParse<Record<string, unknown>>(c.inputs_json, {});
+    const seen = safeParse<Record<string, unknown>>(c.intake_inputs_json ?? '{}', {});
+    return Object.keys(seen)
+      .filter((k) => JSON.stringify(seen[k]) !== JSON.stringify(declared[k]))
+      .map((field) => ({ role: c.role, field, declared: declared[field] ?? null, seen: seen[field] }));
+  });
   return {
     ...base,
     offer_expires_at: req.offer_expires_at ?? null,
@@ -3297,6 +3306,7 @@ export async function requestView(env: Env, req: RequestRow, audience: RequestAu
           received_at: req.intake_at!,
           serial_matched: req.intake_serial_match === 'match',
           by: req.intake_by ?? null,
+          by_name: byName,
           serial_norm: req.intake_serial_norm ?? null,
           serial_match: req.intake_serial_match ?? null,
           hours_seen: intakeFacts.hours_seen ?? null,
@@ -3307,6 +3317,7 @@ export async function requestView(env: Env, req: RequestRow, audience: RequestAu
         }
       : null,
     intake_photos: intakePhotos,
+    declared_vs_intake: declaredVsIntake,
     device_returned_at: req.device_returned_at ?? null,
     cutover: v2 ? false : req.status !== 'draft' && !isTerminal(req.status),
   };
@@ -3552,7 +3563,11 @@ function adminLink(env: Env, id: string): string | null {
  * money it ends in is a direct sale of the new device, and that is the desk
  * that will hand it over. Never throws (`announceToAdmins`).
  */
-export async function notifyAdmins(env: Env, req: RequestRow, event: 'submitted' | 'accepted' | 'rejected' | 'order_placed'): Promise<void> {
+export async function notifyAdmins(
+  env: Env,
+  req: RequestRow,
+  event: 'submitted' | 'accepted' | 'rejected' | 'order_placed' | 'received' | 'device_to_return'
+): Promise<void> {
   const src = safeParse<{ name?: string; order_id?: string }>(req.source_snapshot_json, {});
   const tgt = safeParse<{ name?: string }>(req.target_snapshot_json, {});
   const name = sanitizeUserText(String(src.name ?? ''), { max: 120 });
@@ -3563,7 +3578,14 @@ export async function notifyAdmins(env: Env, req: RequestRow, event: 'submitted'
         ? '✅ وافق الزبون على قيمة الاستبدال'
         : event === 'rejected'
           ? '❌ رفض الزبون قيمة الاستبدال'
-          : '🧾 طلب شراء بقيمة الاستبدال';
+          : event === 'received'
+            ? '📦 استُلم جهاز استبدال في المتجر'
+            : event === 'device_to_return'
+              ? '↩️ جهاز استبدال يُعاد إلى الزبون'
+              : '🧾 طلب شراء بقيمة الاستبدال';
+  // S-P2 staff topics: the offer and the ceiling (staff figures), never a cap, a margin or a cost.
+  const serial =
+    req.intake_serial_match === 'match' ? 'مطابق' : req.intake_serial_match === 'mismatch' ? 'غير مطابق — قرار المالك' : req.intake_serial_match === 'unrecorded' ? 'غير مسجّل — الاعتماد للمالك' : 'لا ينطبق';
   const lines = [
     `${head} — ${req.id}`,
     `الجهاز: ${name} (طلب ${src.order_id ?? req.order_id})`,
@@ -3571,7 +3593,11 @@ export async function notifyAdmins(env: Env, req: RequestRow, event: 'submitted'
     `الجهاز الجديد: ${sanitizeUserText(String(tgt.name ?? ''), { max: 120 })} — ${iqdText(req.target_price_iqd ?? 0, 'ar')}`,
     event === 'submitted'
       ? `التقدير الأولي: ${iqdText(req.estimated_iqd ?? 0, 'ar')}`
-      : `القيمة: ${iqdText(req.final_value_iqd ?? req.admin_value_iqd ?? 0, 'ar')} · الفرق: ${iqdText(req.difference_iqd ?? 0, 'ar')}`,
+      : event === 'received'
+        ? `العرض: ${iqdText(req.offer_iqd ?? req.estimated_iqd ?? 0, 'ar')} · الحد الأعلى: ${iqdText(req.ceiling_iqd ?? 0, 'ar')} · الرقم التسلسلي: ${serial}`
+        : event === 'device_to_return'
+          ? 'الجهاز في المتجر: يُسلَّم للزبون ثم يُعلَّم «أُعيد الجهاز».'
+          : `القيمة: ${iqdText(req.final_value_iqd ?? req.admin_value_iqd ?? 0, 'ar')} · الفرق: ${iqdText(req.difference_iqd ?? 0, 'ar')}`,
   ];
   const url = adminLink(env, req.id);
   await announceToAdmins(env, 'orders_direct', lines.join('\n'), url ? { reply_markup: { inline_keyboard: [[{ text: '🔗 فتح في لوحة الإدارة', url }]] } } : {});

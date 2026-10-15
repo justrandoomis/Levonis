@@ -53,7 +53,7 @@ import { publicApiRoutes } from '../../worker/routes/publicApi';
 import { miscRoutes } from '../../worker/routes/misc';
 import { giftRoutes } from '../../worker/routes/gifts';
 import { adminTradeInRoutes, tradeInRoutes } from '../../worker/routes/tradeIn';
-import { myServicesRoutes } from '../../worker/routes/myServices';
+import { adminServicesRoutes, myServicesRoutes } from '../../worker/routes/myServices';
 import { priceProtectionRoutes, returnRoutes } from '../../worker/routes/returns';
 import { adminRoutes } from '../../worker/routes/admin';
 import { adminBundlesRoutes } from '../../worker/routes/adminBundles';
@@ -179,6 +179,7 @@ export const BASE_MOUNTS: readonly MountSpec[] = [
   ['/api/admin/serial-rules', adminSerialRulesRoutes as Router],
   ['/api/trade-in', tradeInRoutes as Router],
   ['/api/me/services', myServicesRoutes as Router],
+  ['/api/admin/services', adminServicesRoutes as Router],
   ['/api/admin/trade-in', adminTradeInRoutes as Router],
   ['/api/wallet', walletRoutes as Router],
   ['/api/invest', investRoutes as Router],
