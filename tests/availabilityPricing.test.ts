@@ -223,7 +223,7 @@ const freeCtx = { tier: 'free' as const, tierActive: false, membershipActive: fa
 const primeCtx = { tier: 'prime' as const, tierActive: true, membershipActive: true, proContext: false, proPolicy: DEFAULT_PRO_POLICY, transportDefaults: [], tierStatus: null, benefitRules: [], catalogAncestry: null, benefitNowIso: '2026-09-14T12:00:00Z' };
 
 test('card price: the CHEAPEST variant wins, honestly labelled «يبدأ من»', () => {
-  const out = publicWithDisplayPrice(row(), freeCtx);
+  const out = publicWithDisplayPrice(row(), freeCtx, { sellable: true });
   assert.equal(out.display_price_iqd, 80_000); // option A1, not the 100k base
   assert.equal(out.display_regular_iqd, 80_000); // the SAME level's regular
   assert.equal(out.display_from, true); // 80k..120k genuinely differ
@@ -236,11 +236,11 @@ test('card price: the CHEAPEST variant wins, honestly labelled «يبدأ من»
   // is not paused).
   assert.equal(out.display_pro_iqd, 90_000);
   // While PRO is paused the card names no PRO price either.
-  assert.equal(publicWithDisplayPrice(row(), { ...freeCtx, proPaused: true }).display_pro_iqd, null);
+  assert.equal(publicWithDisplayPrice(row(), { ...freeCtx, proPaused: true }, { sellable: true }).display_pro_iqd, null);
 });
 
 test('card price: a PRIME viewer\'s minimum uses their tier level by level', () => {
-  const out = publicWithDisplayPrice(row(), primeCtx);
+  const out = publicWithDisplayPrice(row(), primeCtx, { sellable: true });
   // A1 has no prime price → its applied stays 80k; A2's prime is 90k; the
   // base row has none → 100k. Cheapest is still A1 at 80k, with its own
   // regular beside it — never a cross-variant comparison.
@@ -250,7 +250,7 @@ test('card price: a PRIME viewer\'s minimum uses their tier level by level', () 
 });
 
 test('card price: a flat product (no variants) keeps its plain base numbers', () => {
-  const out = publicWithDisplayPrice(row({ options: '[]' }), freeCtx);
+  const out = publicWithDisplayPrice(row({ options: '[]' }), freeCtx, { sellable: true });
   assert.equal(out.display_price_iqd, 100_000);
   assert.equal(out.display_from, false);
 });

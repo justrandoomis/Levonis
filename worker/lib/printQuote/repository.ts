@@ -320,7 +320,7 @@ export async function loadMaterialPrices(
     .prepare(
       `SELECT m.id, m.material_type, m.default_iqd_per_kg, p.price_iqd, p.spec_fields
          FROM print_materials m
-         LEFT JOIN products p ON p.id = m.product_id AND ${(await listing(db)).listed('p')}
+         LEFT JOIN products p ON p.id = m.product_id AND ${(await listing(db)).sellable('p')}
         WHERE m.active = 1 AND m.id IN (SELECT value FROM json_each(?))`
     )
     .bind(materialsJson)
@@ -375,7 +375,7 @@ export async function loadMaterialPrices(
       .prepare(
         `SELECT price_iqd, spec_fields
            FROM products
-          WHERE ${(await listing(db)).listed('products')} AND template_family = 'materials' AND price_iqd > 0
+          WHERE ${(await listing(db)).sellable('products')} AND template_family = 'materials' AND price_iqd > 0
           LIMIT 500`
       )
       .all<Row>();

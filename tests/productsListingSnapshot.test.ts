@@ -23,7 +23,8 @@ import { asD1, freshDb, get, json, proOnSale, stubApp } from './fixtures/app';
 import { seedLiveCatalog } from './fixtures/liveCatalog';
 import { productRoutes } from '../worker/routes/products';
 
-const NEW_CARD_FIELDS = ['sale_types', 'created_at', 'compare_type'];
+// `price_status` (DECISIONS row 240): every card says whether it is priced; the snapshot predates it.
+const NEW_CARD_FIELDS = ['sale_types', 'created_at', 'compare_type', 'price_status'];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function withoutNewFields(body: Record<string, any>) {

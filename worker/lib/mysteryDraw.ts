@@ -484,10 +484,10 @@ export async function loadCandidates(
   // PRODUCT_INACTIVE like a hidden one.
   const L = await listing(db);
   const { results } = await db
-    .prepare(CANDIDATE_SQL(preview, L.listed('p')))
+    .prepare(CANDIDATE_SQL(preview, L.sellable('p')))
     .bind(pool.id, family)
     .all<EntryJoinRow>();
-  const heldEntries = await L.heldIds(results.map((r) => String(r.product_id)));
+  const heldEntries = await L.unsellableIds(results.map((r) => String(r.product_id)));
 
   const modeById = new Map(results.map((r) => [r.product_id, r.inventory_mode]));
   const productIds = [...modeById.keys()];
@@ -528,7 +528,7 @@ export async function loadCandidates(
       drop('ZERO_WEIGHT');
       continue;
     }
-    if (!L.isListedRow({ id: r.product_id, status: r.status }, heldEntries)) {
+    if (!L.isSellableRow({ id: r.product_id, status: r.status }, heldEntries)) {
       drop('PRODUCT_INACTIVE');
       continue;
     }

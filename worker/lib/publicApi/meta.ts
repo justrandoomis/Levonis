@@ -156,12 +156,13 @@ async function contextDocument(routes: readonly PublicRoute[], req: PublicReques
     db
       .prepare(
         `SELECT
-           (SELECT COUNT(*) FROM products WHERE ${L.listed('products')} AND composition = '') AS products,
-           (SELECT COUNT(*) FROM products WHERE ${L.listed('products')} AND composition <> '') AS bundles,
+           (SELECT COUNT(*) FROM products WHERE ${L.visible('products')} AND composition = '') AS products,
+           (SELECT COUNT(*) FROM products WHERE ${L.sellable('products')} AND composition = '') AS products_priced,
+           (SELECT COUNT(*) FROM products WHERE ${L.sellable('products')} AND composition <> '') AS bundles,
            (SELECT COUNT(*) FROM catalogs WHERE active = 1) AS sections,
            (SELECT COUNT(*) FROM brands WHERE active = 1) AS brands`
       )
-      .first<{ products: number; bundles: number; sections: number; brands: number }>()
+      .first<{ products: number; products_priced: number; bundles: number; sections: number; brands: number }>()
       .catch(() => null),
     readCommunityGate(db).catch(() => null),
   ]);
@@ -212,6 +213,8 @@ async function contextDocument(routes: readonly PublicRoute[], req: PublicReques
     ],
     content: {
       products: counts ? Number(counts.products) || 0 : null,
+      // DECISIONS row 240: of `products`, those with a price that can be bought now (the rest show «price not available yet»).
+      products_priced: counts ? Number(counts.products_priced) || 0 : null,
       bundles_and_mystery_boxes: counts ? Number(counts.bundles) || 0 : null,
       sections: counts ? Number(counts.sections) || 0 : null,
       brands: counts ? Number(counts.brands) || 0 : null,

@@ -371,7 +371,7 @@ async function indexHits(db: D1Database, raw: string, limit: number): Promise<st
 
 async function searchMaterials({ db, raw, like, limit }: SearchInput) {
   const subtree = catalogSubtreeFilter(MATERIALS_CATALOG, 'products');
-  const listed = (await listing(db)).listed('products');
+  const listed = (await listing(db)).visible('products');
   const hits = await indexHits(db, raw, COUNT_BOUND);
   if (hits) {
     if (hits.length === 0) return { rows: [], total: 0 };
@@ -556,7 +556,7 @@ async function suggestions(db: D1Database, raw: string, viewer: string): Promise
 /** Catalogue product names: the index's top hits where it answers, the LIKE fallback otherwise. */
 async function catalogueSuggestions(db: D1Database, raw: string, like: string, prefix: string): Promise<Suggestion[]> {
   const hits = await indexHits(db, raw, SUGGEST_MAX);
-  const listed = (await listing(db)).listed('products');
+  const listed = (await listing(db)).visible('products');
   let rows: Array<{ id: string; slug: string; name: string; name_ar: string }>;
   if (hits) {
     if (hits.length === 0) return [];

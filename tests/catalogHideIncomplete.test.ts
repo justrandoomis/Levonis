@@ -12,14 +12,21 @@
  *     the public API answer, the sitemap names it, the cart takes it;
  *   - the owner reads the count first; the switch refuses a stale count
  *     (HIDE_COUNT_CHANGED) and unchecked products (COMPLETENESS_NOT_READY);
- *   - ON: it is gone from the listing, search, home, its page (404), the quote,
- *     the public API (list, page, counts), the sitemap, compare, the cart's
- *     add (404) and view — while every admin read still shows it, flagged;
- *   - completing it (the data file's apply, a real write) shows it again with
+ *   - ON, a COMMERCIAL gap (DECISIONS row 240): it stays shown in the
+ *     catalog-only state — listed, searchable, its page and the public API
+ *     answer with `price_status: 'unpriced'` and no number — and every purchase
+ *     door refuses it (quote and cart add 409 PRICE_NOT_AVAILABLE, the cart
+ *     view lists it apart); the public counts say it is not priced;
+ *   - ON, a CATALOG gap (no picture): it is gone from the listing, search,
+ *     home, its page (404), the quote, the public API (list, page, counts), the
+ *     sitemap, compare, the cart's add (404) and view — while every admin read
+ *     still shows it, flagged;
+ *   - completing it (the data file's apply, a real write) sells it again with
  *     no other act, and turning the switch off restores everything;
  *   - only the verified owner moves the switch (a full admin, an assistant and
  *     an unverified owner are refused; the generic settings PUT refuses it);
- *   - a database without 0184 lists exactly as before.
+ *   - a database without 0184 (and so without 0189) shows every active product
+ *     catalog-only and sells nothing.
  *
  * Run: node --import tsx --test tests/catalogHideIncomplete.test.ts
  */
@@ -27,7 +34,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { asD1, dbThrough, freshDb, get, json, post, put } from './fixtures/app';
 import { ASSISTANT, CUSTOMER, FULL_ADMIN, OWNER, recount, seedCatalog, seedProduct, world, type World } from './fixtures/completeness';
-import { listedWithoutHeld, listedWithoutV2, listing, optimisticListed, runListed, withoutHeld, withoutV2 } from '../worker/lib/listing';
+import {
+  completenessAbsentLately,
+  listing,
+  optimisticSellable,
+  optimisticVisible,
+  pricingV2AbsentLately,
+  runListed,
+  withoutHeld,
+  withoutV2,
+} from '../worker/lib/listing';
 
 const slugsOf = (body: Record<string, unknown>): string[] => {
   const list = (body.products ?? (body.data as unknown[]) ?? []) as Array<{ slug?: string }>;
@@ -45,12 +61,24 @@ async function surfaces(w: World) {
   const search = await listingSlugs(w, '?search=Gap');
   const home = await json(await w.guest('/api/home'));
   const homeLatest = ((home.latest ?? home.products ?? []) as Array<{ slug?: string }>).map((p) => String(p.slug ?? ''));
-  const detail = (await w.guest('/api/products/gap-printer')).status;
-  const quote = (await w.guest('/api/products/gap-printer/quote', { method: 'POST', body: { qty: 1 } })).status;
-  const apiList = slugsOf(await json(await w.guest('/api/public/v1/products')));
+  const page = await w.guest('/api/products/gap-printer');
+  const detail = page.status;
+  const detailBody = detail === 200 ? await json(page) : null;
+  const quoteRes = await w.guest('/api/products/gap-printer/quote', { method: 'POST', body: { qty: 1 } });
+  const quote = quoteRes.status;
+  const quoteCode = quote === 200 ? null : String((await json(quoteRes)).code ?? '');
+  const apiListBody = await json(await w.guest('/api/public/v1/products'));
+  const apiList = slugsOf(apiListBody);
+  const apiGap = ((apiListBody.data ?? []) as Array<{ slug: string; price: { status: string; amount: number | null } }>).find((p) => p.slug === 'gap-printer');
   const apiDetail = (await w.guest('/api/public/v1/products/gap-printer')).status;
   const sitemap = await (await w.guest('/sitemap.xml')).text();
-  return { listingAll, search, homeLatest, detail, quote, apiList, apiDetail, sitemap };
+  return { listingAll, search, homeLatest, detail, detailBody, quote, quoteCode, apiList, apiGap, apiDetail, sitemap };
+}
+
+/** A catalog gap (DECISIONS row 240): no picture. The cost is filled, so IMAGE is the one code missing. */
+function imageGap(w: World): void {
+  w.raw.exec("UPDATE products SET product_cost_iqd = 70000 WHERE id = 'p_gap'");
+  w.raw.exec("DELETE FROM product_images WHERE product_id = 'p_gap'");
 }
 
 /**
@@ -122,8 +150,51 @@ test('the owner reads the count; the switch refuses a moved count and unchecked 
   assert.equal(w.raw.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action LIKE 'catalog.hide_incomplete.%'").get()!.n, 1);
 });
 
-test('ON: the incomplete product is gone from every customer surface — and every admin read still shows it, flagged', async () => {
+test('ON, a commercial gap: the product stays shown catalog-only — no number anywhere — and every purchase door refuses it', async () => {
   const w = world();
+  weightGap(w);
+  await recount(w);
+  await recount(w);
+  assert.equal((await setSwitch(w, true)).status, 200);
+  const s = await surfaces(w);
+  assert.ok(s.listingAll.includes('gap-printer') && s.listingAll.includes('full-printer'), 'listing: shown');
+  assert.ok(s.listingAll.indexOf('full-printer') < s.listingAll.indexOf('gap-printer'), 'browse puts the priced product first (R1)');
+  assert.ok(s.search.includes('gap-printer'), 'search finds it');
+  assert.equal(s.detail, 200, 'its page answers');
+  assert.equal(s.detailBody!.price_status, 'unpriced');
+  assert.equal(s.detailBody!.product.price_iqd, null);
+  assert.equal(s.detailBody!.product.display_price_iqd, null);
+  assert.equal(s.detailBody!.pricing, null);
+  assert.equal(s.detailBody!.availability, null);
+  assert.equal(s.quote, 409, 'the quote refuses it');
+  assert.equal(s.quoteCode, 'PRICE_NOT_AVAILABLE');
+  assert.ok(s.apiList.includes('gap-printer'), 'public API list');
+  assert.deepEqual({ status: s.apiGap!.price.status, amount: s.apiGap!.price.amount }, { status: 'unpriced', amount: null });
+  assert.equal(s.apiDetail, 200, 'public API page');
+  assert.match(s.sitemap, /gap-printer/);
+  const ctx = await json(await w.guest('/api/public/v1/context'));
+  assert.equal(ctx.content.products, 2, 'the public count includes it');
+  assert.equal(ctx.content.products_priced, 1, 'and says it is not priced');
+  // Compare passes it as on display (these fixtures carry no spec sheet, so the next check is the one that answers).
+  const cmp = await w.guest('/api/compare?ids=p_full,p_gap');
+  assert.equal((await json(cmp)).code, 'COMPARE_NO_SPECS', 'not COMPARE_NOT_VISIBLE');
+  // The cart: refused at the add, by name.
+  const add = await post(w.shopper(), '/api/cart/items', { productId: 'p_gap', qty: 1 });
+  assert.equal(add.status, 409);
+  assert.equal((await json(add)).code, 'PRICE_NOT_AVAILABLE');
+  // Admin: the list shows it, flagged.
+  const list = await json(await get(w.admin(), '/api/admin/products-v2?limit=50'));
+  const row = (list.products as Array<{ id: string; held: boolean; missing_count: number | null }>).find((p) => p.id === 'p_gap')!;
+  assert.equal(row.held, true);
+  assert.equal(w.raw.prepare("SELECT status FROM products WHERE id = 'p_gap'").get()!.status, 'active');
+  // No legacy number of the product reached any customer answer.
+  assert.doesNotMatch(JSON.stringify(s.detailBody), /100000|100,000/);
+});
+
+test('ON, a catalog gap (no picture): the product is gone from every customer surface — and every admin read still shows it, flagged', async () => {
+  const w = world();
+  imageGap(w);
+  await recount(w);
   await recount(w);
   assert.equal((await setSwitch(w, true)).status, 200);
   const s = await surfaces(w);
@@ -152,11 +223,10 @@ test('ON: the incomplete product is gone from every customer surface — and eve
   assert.equal((await get(w.admin(), '/api/admin/products-v2/p_gap')).status, 200);
   const only = await json(await get(w.admin(), '/api/admin/products-v2?incomplete=1'));
   assert.deepEqual((only.products as Array<{ id: string }>).map((p) => p.id), ['p_gap']);
-  // Nothing about the product itself moved.
   assert.equal(w.raw.prepare("SELECT status FROM products WHERE id = 'p_gap'").get()!.status, 'active');
 });
 
-test('a cart line already holding it drops out of the cart view while the switch is on, and comes back', async () => {
+test('a cart line already holding it is listed apart (PRICE_NOT_AVAILABLE) while the switch is on, and comes back', async () => {
   const w = world();
   weightGap(w);
   await recount(w);
@@ -168,19 +238,26 @@ test('a cart line already holding it drops out of the cart view while the switch
   await recount(w);
   await setSwitch(w, true);
   const during = await json(await get(w.shopper(), '/api/cart'));
-  assert.equal((during.items as unknown[]).length, 0, 'held: read as a hidden product');
+  assert.equal((during.items as unknown[]).length, 0, 'held: never priced in the cart');
+  const apart = during.unavailable_lines as Array<{ product_id: string; code: string }>;
+  assert.deepEqual(apart.map((l) => [l.product_id, l.code]), [['p_gap', 'PRICE_NOT_AVAILABLE']], 'still shown, so the line says why');
+  assert.doesNotMatch(JSON.stringify(apart), /100000|price_iqd/);
   assert.equal(w.raw.prepare("SELECT COUNT(*) AS n FROM cart_items WHERE product_id = 'p_gap'").get()!.n, 1, 'the line itself is untouched');
   await setSwitch(w, false);
   const after = await json(await get(w.shopper(), '/api/cart'));
   assert.equal((after.items as unknown[]).length, 1);
 });
 
-test('completing the product (the data file, a real write) shows it again at once; turning the switch off restores everything', async () => {
+test('completing the product (the data file, a real write) sells it again at once; turning the switch off restores everything', async () => {
   const w = world();
   weightGap(w);
   await recount(w);
   await setSwitch(w, true);
-  assert.equal((await w.guest('/api/products/gap-printer')).status, 404);
+  const statusOf = async () => {
+    const res = await w.guest('/api/products/gap-printer');
+    return res.status === 200 ? String((await json(res)).price_status) : String(res.status);
+  };
+  assert.equal(await statusOf(), 'unpriced', 'shown catalog-only while the weight is missing');
 
   // The owner's data file: the preview names what would still be missing, then the apply writes the weight.
   const file = await (await get(w.admin(), '/api/admin/template/data-export/p_gap')).text();
@@ -197,15 +274,15 @@ test('completing the product (the data file, a real write) shows it again at onc
 
   const row = w.raw.prepare("SELECT complete, held FROM product_completeness WHERE product_id = 'p_gap'").get()!;
   assert.deepEqual({ complete: row.complete, held: row.held }, { complete: 1, held: 0 }, 're-evaluated by the write itself');
-  assert.equal((await w.guest('/api/products/gap-printer')).status, 200, 'shown again');
+  assert.equal(await statusOf(), 'priced', 'sold again');
   assert.ok((await listingSlugs(w)).includes('gap-printer'));
 
-  // Break it again, then switch off: shown whatever its state.
+  // Break it again, then switch off: sold whatever its state.
   w.raw.exec("UPDATE products SET package_weight_g = NULL, updated_at = '2026-10-02T00:00:00.000Z' WHERE id = 'p_gap'");
   await recount(w);
-  assert.equal((await w.guest('/api/products/gap-printer')).status, 404);
+  assert.equal(await statusOf(), 'unpriced');
   assert.equal((await setSwitch(w, false)).status, 200);
-  assert.equal((await w.guest('/api/products/gap-printer')).status, 200);
+  assert.equal(await statusOf(), 'priced');
   assert.equal(Number(w.raw.prepare('SELECT COUNT(*) AS n FROM product_completeness WHERE held = 1').get()!.n), 0);
 });
 
@@ -243,37 +320,44 @@ test('the flags: the owner reads the private field by name; any other admin read
   assert.equal(full.complete, true);
 });
 
-test('a database without 0184 (and so without 0189) lists nothing and breaks no read; the completeness routes answer as before', async () => {
+test('a database without 0184 (and so without 0189) shows every active product catalog-only, sells nothing and breaks no read; the completeness routes answer as before', async () => {
   const raw = dbThrough('0183');
   seedCatalog(raw);
   seedProduct(raw, { id: 'p_old', slug: 'old-printer' });
   const db = asD1(raw);
   const L = await listing(db);
   assert.equal(L.installed, false);
-  // The clean start (spec addendum A.4.1): before 0189 no product is V2-published — the predicate lists
-  // nothing (fail closed), never a legacy price.
+  // The clean start (spec addendum A.4.1): before 0189 no product is V2-published — SELLABLE is nothing
+  // (fail closed), never a legacy price; VISIBLE is every active product (DECISIONS row 240).
   assert.equal(L.v2, false);
-  assert.equal(L.listed('p'), "p.status = 'active' AND 0");
-  assert.equal((await L.heldIds(['p_old'])).size, 1);
+  assert.equal(L.sellable('p'), "p.status = 'active' AND 0");
+  assert.equal(L.visible('p'), "p.status = 'active'");
+  assert.equal((await L.unsellableIds(['p_old'])).size, 1);
+  assert.equal((await L.statesOf(['p_old'])).get('p_old'), 'catalog_only');
   // The first screen's optimistic reads: refused for each missing table, run again without it — no read breaks.
-  const optimistic = `SELECT slug FROM products p WHERE ${optimisticListed(db, 'p')}`;
+  const optimistic = `SELECT slug FROM products p WHERE ${optimisticSellable(db, 'p')}`;
   assert.match(optimistic, /product_completeness/);
   assert.equal(withoutV2(withoutHeld(optimistic)), "SELECT slug FROM products p WHERE p.status = 'active' AND 0");
   const rows = await runListed(db, optimistic, (q) => db.prepare(q).all<{ slug: string }>());
   assert.deepEqual(rows.results.map((r) => r.slug), []);
-  assert.equal(listedWithoutHeld(db), true, 'remembered for a minute: the next read builds the older SQL');
-  assert.equal(listedWithoutV2(db), true);
-  assert.equal(optimisticListed(db, 'p'), "p.status = 'active' AND 0");
+  assert.equal(completenessAbsentLately(db), true, 'remembered for a minute: the next read builds the older SQL');
+  assert.equal(pricingV2AbsentLately(db), true);
+  assert.equal(optimisticSellable(db, 'p'), "p.status = 'active' AND 0");
+  assert.equal(optimisticVisible(db, 'p'), "p.status = 'active'");
+  const shown = await runListed(db, `SELECT slug FROM products p WHERE ${optimisticVisible(db, 'p')}`, (q) => db.prepare(q).all<{ slug: string }>());
+  assert.deepEqual(shown.results.map((r) => r.slug), ['old-printer']);
   // A migrated database never prepares the retry.
   const fresh = asD1(freshDb());
   const statements: string[] = [];
-  await runListed(fresh, `SELECT id FROM products WHERE ${optimisticListed(fresh)}`, (q) => (statements.push(q), fresh.prepare(q).all()));
+  await runListed(fresh, `SELECT id FROM products WHERE ${optimisticVisible(fresh)} AND ${optimisticSellable(fresh)}`, (q) => (statements.push(q), fresh.prepare(q).all()));
   assert.equal(statements.length, 1);
-  assert.equal(listedWithoutHeld(fresh), false);
+  assert.equal(completenessAbsentLately(fresh), false);
   const w = world({ raw: dbThrough('0183') });
   const s = await surfaces(w);
-  assert.ok(!s.listingAll.includes('gap-printer') && !s.listingAll.includes('full-printer'));
-  assert.equal(s.detail, 404);
+  assert.ok(s.listingAll.includes('gap-printer') && s.listingAll.includes('full-printer'), 'shown, catalog-only');
+  assert.equal(s.detail, 200);
+  assert.equal(s.detailBody!.price_status, 'unpriced', 'never a legacy price');
+  assert.equal(s.quote, 409, 'and nothing is sold');
   const flags = await json(await get(w.admin(), '/api/admin/products-v2/p_gap/completeness'));
   assert.equal(flags.installed, false);
   // The owner's summary is a read: it answers as on 0184 (200), saying not installed; only the acts refuse.

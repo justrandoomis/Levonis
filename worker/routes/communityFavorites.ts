@@ -12,6 +12,7 @@
  */
 
 import { listing } from '../lib/listing';
+import { priceStatusOf, sellableNowOf } from '../lib/commercialState';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAuth, notFound } from '../lib/http';
@@ -75,14 +76,15 @@ communityFavoriteRoutes.get('/', requireAuth, async (c) => {
    * product the shop has since retired drops off both, and it drops off
    * QUIETLY — a list of things that can no longer be bought is not a feature.
    */
-  const listedP = (await listing(db)).listed('p');
+  // VISIBLE, with the SELLABLE flag (DECISIONS row 240): a catalog-only product is kept with no price.
+  const L = await listing(db);
   const catalogue = await db
     .prepare(
       `SELECT f.product_id, f.created_at AS saved_at,
-              p.slug, p.name, p.name_ar, p.price_iqd, p.original_price_iqd
+              p.slug, p.name, p.name_ar, p.price_iqd, p.original_price_iqd, ${L.sellableFlag('p')} AS sellable_now
          FROM favorites f
          JOIN products p ON p.id = f.product_id
-        WHERE f.user_id = ? AND ${listedP}
+        WHERE f.user_id = ? AND ${L.visible('p')}
         ORDER BY f.created_at DESC
         LIMIT 100`
     )
@@ -129,8 +131,10 @@ communityFavoriteRoutes.get('/', requireAuth, async (c) => {
     name: r.name,
     name_ar: r.name_ar,
     image: catalogueImages.get(String(r.product_id)) ?? null,
-    price_iqd: r.price_iqd,
-    original_price_iqd: r.original_price_iqd ?? null,
+    // Never the archived dinar figure of a catalog-only product: null, and the state says why.
+    price_status: priceStatusOf(sellableNowOf(r)),
+    price_iqd: sellableNowOf(r) ? r.price_iqd : null,
+    original_price_iqd: sellableNowOf(r) ? (r.original_price_iqd ?? null) : null,
     /**
      * NOT KNOWN FROM HERE, and so not claimed.
      *

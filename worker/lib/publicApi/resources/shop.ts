@@ -68,14 +68,15 @@ async function cardsForIds(db: D1Database, ids: string[], urls: PublicUrls, ctx:
   if (ids.length === 0) return [];
   const { results } = await db
     .prepare(
-      `SELECT * FROM products WHERE ${(await listing(db)).listed('products')} AND composition = '' AND id IN (SELECT value FROM json_each(?))`
+      // SELLABLE (DECISIONS row 240, rule R4): the API's featured and flash-deal lists are commercial shelves.
+      `SELECT * FROM products WHERE ${(await listing(db)).sellable('products')} AND composition = '' AND id IN (SELECT value FROM json_each(?))`
     )
     .bind(JSON.stringify(ids))
     .all<Rec>();
   const rows = new Map((results ?? []).map((r) => [String(r.id), r]));
   const ordered = ids.map((id) => rows.get(id)).filter((r): r is Rec => !!r);
   const [cards, idx, brands] = await Promise.all([
-    resolveProductCards(db, ordered, await ctx, null),
+    resolveProductCards(db, ordered, await ctx, null, 'sellable'),
     catalogIndexFor(db).catch(() => null),
     brandsById(db, ordered.map((r) => r.brand_id)),
   ]);

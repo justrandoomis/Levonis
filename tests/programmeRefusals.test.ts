@@ -179,6 +179,16 @@ const REQUIRED: Record<string, readonly string[]> = {
   // The clean start (DECISIONS row 222, spec addendum A.13): a product not yet V2-published, and
   // migration 0190's database refusal of a purchase price review decided twice.
   'Pricing V2 clean start, addendum A.13 (0190)': ['PRICING_V2_NEEDS_PRICING', 'PRICING_REVIEW_DECIDED'],
+  // Catalog-only products (a visible product with no V2 price is refused by every purchase path) and the
+  // signed-in «طلب السعر» door (migration 0193).
+  'Catalog-only and price requests (DECISIONS rows 239-240, 0193)': [
+    'PRICE_NOT_AVAILABLE',
+    'PRICE_REQUEST_SELECTION_REQUIRED',
+    'PRICE_REQUEST_SELECTION_INVALID',
+    'PRICE_REQUEST_ALREADY_PRICED',
+    'PRICE_REQUEST_LIMIT',
+    'PRICE_REQUESTS_UNAVAILABLE',
+  ],
 };
 
 /** §6.1 "Dropped codes": merged into one of the codes above, never raised. */

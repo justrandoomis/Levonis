@@ -47,6 +47,7 @@ import {
   COMPLETENESS_ENTRIES,
   COMPLETENESS_LIST_VERSION,
   OWNER_DATA_CODE,
+  isCatalogBlockingCode,
   isCompletenessCode,
   type CompletenessCode,
   type CompletenessItem,
@@ -120,7 +121,8 @@ const FACTS_SQL = `SELECT p.id AS id, p.slug AS slug, p.status AS status, p.upda
   (SELECT COUNT(*) || ':' || TOTAL(f.enabled) || ':' || TOTAL(f.cost_iqd IS NOT NULL) || ':' || TOTAL(f.cost_adjust_iqd IS NOT NULL) FROM product_option_fulfillment f WHERE f.product_id = p.id) AS cells_sig,
   (SELECT COUNT(*) || ':' || TOTAL(t.enabled) || ':' || TOTAL(t.cost_iqd IS NOT NULL) || ':' || TOTAL(t.cost_adjust_iqd IS NOT NULL) FROM product_option_transports t WHERE t.product_id = p.id) AS routes_sig,
   (SELECT COUNT(*) || ':' || TOTAL(k.active) FROM product_colors k WHERE k.product_id = p.id) AS colors_sig,
-  pc.facts_key AS stored_key, pc.list_version AS stored_version, pc.complete AS stored_complete, pc.held AS stored_held
+  pc.facts_key AS stored_key, pc.list_version AS stored_version, pc.complete AS stored_complete, pc.held AS stored_held,
+  pc.missing_json AS stored_missing
 FROM products p
 LEFT JOIN product_pricing_state s ON s.product_id = p.id
 LEFT JOIN product_completeness pc ON pc.product_id = p.id`;
@@ -150,6 +152,8 @@ export interface FactsRow {
   stored_version: number | null;
   stored_complete: number | null;
   stored_held: number | null;
+  /** The stored codes (DECISIONS row 240: a catalog-blocking one decides whether a held product is shown). */
+  stored_missing?: string | null;
 }
 
 /** The digest of one product's facts (64 hex, the column's bound). */
@@ -362,6 +366,8 @@ export interface Verdict {
   facts_key: string;
   /** `held` as stored before this recompute (null: no row yet). */
   held_before: boolean | null;
+  /** Held for a CATALOG-blocking code before this recompute (hidden, not only unsellable — DECISIONS row 240). */
+  catalog_held_before: boolean;
 }
 
 export interface RecomputeResult {
@@ -446,6 +452,7 @@ export async function recomputeCompleteness(
       complete,
       facts_key: key,
       held_before: f.stored_held === null || f.stored_held === undefined ? null : Number(f.stored_held) === 1,
+      catalog_held_before: Number(f.stored_held) === 1 && parseMissing(f.stored_missing ?? '[]').some((i) => isCatalogBlockingCode(i.code)),
     });
     writes.push(
       db
@@ -457,8 +464,15 @@ export async function recomputeCompleteness(
     await db.batch(writes);
     statements += writes.length;
   }
+  // A flip of SELLABLE (`held`) or of VISIBLE (held for a catalog-blocking code, DECISIONS row 240): either
+  // changes what a customer's cached page says, so both are purged.
   const flipped = verdicts
-    .filter((v) => v.status === 'active' && (v.held_before ?? false) !== (switchOn && !v.complete))
+    .filter((v) => {
+      if (v.status !== 'active') return false;
+      const heldNow = switchOn && !v.complete;
+      const catalogHeldNow = heldNow && v.items.some((i) => isCatalogBlockingCode(i.code));
+      return (v.held_before ?? false) !== heldNow || v.catalog_held_before !== catalogHeldNow;
+    })
     .map((v) => v.slug)
     .filter(Boolean);
   return { verdicts, flipped, statements };

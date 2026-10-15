@@ -129,7 +129,7 @@ export async function listBundles(
   const { kind, search, categoryId, family, featured, limit, offset } = f;
   const params: unknown[] = [];
   // Listed to customers (worker/lib/listing.ts) — a composition too: hidden until it has a V2 price (Q7).
-  let where = (await listing(db)).listed('p');
+  let where = (await listing(db)).sellable('p');
   if (kind === 'bundle' || kind === 'mystery') {
     where += ' AND p.composition = ?';
     params.push(kind);
@@ -251,7 +251,7 @@ bundlesRoutes.post('/:productId/view', async (c) => {
   await rateLimit(c, 'bundle_view', 60, 300);
   const productId = str(c.req.param('productId'), 'productId', { min: 1, max: 60 });
   const row = await c.env.DB
-    .prepare(`SELECT p.id AS id FROM products p WHERE p.id = ? AND ${(await listing(c.env.DB)).listed('p')} AND p.composition <> ''`)
+    .prepare(`SELECT p.id AS id FROM products p WHERE p.id = ? AND ${(await listing(c.env.DB)).sellable('p')} AND p.composition <> ''`)
     .bind(productId)
     .first<{ id: string }>();
   if (!row) throw notFound('bundle');

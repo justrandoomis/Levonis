@@ -1505,7 +1505,7 @@ priceProtectionRoutes.post('/claims', async (c) => {
   // held, or not yet priced in dollars) has no "price a buyer would pay today" — never its old dinar
   // figure. The window's recorded prices are read as always; placed orders and claims never change.
   const listingNow = await listing(c.env.DB);
-  const listedNow = listingNow.isListedRow(productRow, await listingNow.unlistedIds([String(productRow.id)]));
+  const listedNow = listingNow.isSellableRow(productRow, await listingNow.unsellableIds([String(productRow.id)]));
   // THE COMPARISON PRICE IS THE ONE A BUYER WOULD PAY TODAY, so the product is
   // read the way the cart reads it: the relational option/colour rows win over
   // the JSON mirrors on `products`. This claim decides a real credit — reading

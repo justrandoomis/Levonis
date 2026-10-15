@@ -63,13 +63,15 @@
  * `UNION ALL`) because a product classified under a catalog it is also
  * explicitly placed in is one membership, not two.
  *
- * Every branch filters on «listed to customers» (active, and not held by the
- * owner's «hide incomplete» switch — worker/lib/listing.ts) here rather than
- * at the caller, so a draft or held product can never inflate a shelf count.
+ * Every branch filters on VISIBLE to customers (active, and not held by the
+ * owner's «hide incomplete» switch for a catalog gap — worker/lib/listing.ts;
+ * a catalog-only product counts, since a tap on the section shows it) here
+ * rather than at the caller, so a draft or hidden product can never inflate a
+ * shelf count.
  * `heldInstalled`: include the held clause (callers run the statement through `runListed`, worker/lib/listing.ts).
  */
 export function membershipCte(heldInstalled: boolean): string {
-  const listed = listedSql('p', heldInstalled);
+  const listed = visibleSql('p', heldInstalled);
   return `
   membership(product_id, catalog_id) AS (
     SELECT pc.product_id, pc.catalog_id
@@ -88,7 +90,7 @@ export function membershipCte(heldInstalled: boolean): string {
 }
 
 import { catalogImageUrl } from './siteMedia';
-import { listedSql, listedWithoutHeld, runListed } from './listing';
+import { completenessAbsentLately, runListed, visibleSql } from './listing';
 import { isSchemaMissing } from './membershipBenefits';
 
 /**
@@ -259,7 +261,7 @@ async function missingCardPictureColumns(db: D1Database, e: unknown): Promise<Se
 export async function catalogTreeWithCounts(db: D1Database): Promise<CatalogCountRow[]> {
   type Row = Omit<CatalogCountRow, (typeof CARD_PICTURES)[number]['url']> & Partial<Record<CardPictureColumn, unknown>>;
   // Optimistic on the held clause (worker/lib/listing.ts `runListed`): no probe before the first screen's wave.
-  const heldInstalled = !listedWithoutHeld(db);
+  const heldInstalled = !completenessAbsentLately(db);
   const read = async (covers: readonly string[]) =>
     (await runListed(db, treeSql(covers, heldInstalled), (q) => db.prepare(q).all<Row>())).results ?? [];
 

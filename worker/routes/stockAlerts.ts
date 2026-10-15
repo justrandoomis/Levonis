@@ -49,6 +49,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { badRequest, conflict, notFound, oneOf, requireAuth, str, unavailable } from '../lib/http';
+import { refuseIfOnlyCatalog } from '../lib/listing';
 import { rateLimit } from '../lib/ratelimit';
 import { newId } from '../lib/crypto';
 import { channelReadiness } from '../lib/channelReadiness';
@@ -389,6 +390,9 @@ stockAlertRoutes.post('/', async (c) => {
   const wish = readWish(body);
 
   const ctx = await contextFor(c, productId);
+  // D7 (DECISIONS row 240): a product a customer can see but not buy yet has no stock to wait for — «طلب
+  // السعر» is its affordance. 409 PRICE_NOT_AVAILABLE; a product hidden for any other reason keeps waiting.
+  if (ctx.unlisted === true) await refuseIfOnlyCatalog(c.env.DB, productId);
   assertArmable(ctx, wish);
 
   // The cap counts what exists BESIDES this exact target, so re-arming a wish
@@ -456,6 +460,7 @@ stockAlertRoutes.put('/product/:id', async (c) => {
   }
 
   const ctx = await contextFor(c, productId);
+  if (ctx.unlisted === true) await refuseIfOnlyCatalog(c.env.DB, productId);
 
   // Deduplicate on the same identity the unique index uses, so a client that
   // sends the same wish twice saves one row rather than colliding with itself

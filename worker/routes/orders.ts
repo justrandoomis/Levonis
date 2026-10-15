@@ -2247,12 +2247,12 @@ export async function computeCheckout(
   // owner's «hide incomplete» switch holds is refused below exactly like a
   // hidden product's. A granted gift's line is honoured as granted.
   const listingNow = await listing(c.env.DB);
-  const heldLines = await listingNow.heldIds(rows.map((r) => String(r.id ?? '')));
+  const heldLines = await listingNow.unsellableIds(rows.map((r) => String(r.id ?? '')));
   // The clean start (DECISIONS row 222, spec addendum A.5): a line whose product a customer may not see or
   // buy — hidden, held, or never V2-published (every product until its dollar price is published) — is
   // refused before anything is priced, naming every such product: 409 PRODUCT_CURRENTLY_UNAVAILABLE, the
   // sentence the client shows in ar/en/ckb. A granted gift's line is honoured as granted (below).
-  const unavailableIds = [...new Set(rows.filter((r) => !giftEntitlementIdOf(r) && !listingNow.isListedRow(r, heldLines)).map((r) => String(r.id ?? '')))];
+  const unavailableIds = [...new Set(rows.filter((r) => !giftEntitlementIdOf(r) && !listingNow.isSellableRow(r, heldLines)).map((r) => String(r.id ?? '')))];
   if (unavailableIds.length) throw productsUnavailable(unavailableIds);
 
   // §1: the cart rule guarantees one shipping type across the lines, so the
@@ -2674,7 +2674,7 @@ export async function computeCheckout(
         continue;
       }
 
-      if (!listingNow.isListedRow(row, heldLines)) throw productsUnavailable([String(row.id)]);
+      if (!listingNow.isSellableRow(row, heldLines)) throw productsUnavailable([String(row.id)]);
       const view = views.get(String(row.id));
       const sel = selectionFromCartRow(row);
       const isPrinter = printerIds.has(String(row.id));

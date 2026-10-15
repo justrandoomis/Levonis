@@ -360,7 +360,7 @@ export async function resolveProductPreview(
   // (tests/storeShareCards.test.ts).
   const product = await db
     .prepare(
-      `SELECT id, name, name_ar, description, description_ar, light_image FROM products WHERE slug = ? AND ${(await listing(db)).listed('products')}`
+      `SELECT id, name, name_ar, description, description_ar, light_image FROM products WHERE slug = ? AND ${(await listing(db)).visible('products')}`
     )
     .bind(slug)
     .first<PreviewRow>();

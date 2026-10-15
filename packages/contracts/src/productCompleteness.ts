@@ -33,6 +33,22 @@ export const COMPLETENESS_LIST_VERSION = 1;
 export const COMPLETENESS_CODES = ['NAME_AR', 'PRICE', 'COST', 'ENGINE_INPUTS', 'IMAGE', 'CATEGORY', 'PACKAGE_WEIGHT', 'PACKAGE_BOX'] as const;
 export type CompletenessCode = (typeof COMPLETENESS_CODES)[number];
 
+/**
+ * THE CODES THAT HIDE A PRODUCT, not only stop its sale (DECISIONS rows 239 (3) and 240).
+ *
+ * While the owner's switch is on, a held product misses at least one code. A product
+ * with no picture or no section is a broken catalogue entry and stays hidden from
+ * customers; every other code (the price, the cost, the USD pricing data, the
+ * package data, the Arabic name — the English name is required and shown) is
+ * commercial: the product is shown in the catalog-only state («السعر غير متوفر
+ * حالياً») and every purchase path refuses it. worker/lib/listing.ts builds the
+ * visibility clause from this list (a constant string, never input).
+ */
+export const CATALOG_BLOCKING_CODES = ['IMAGE', 'CATEGORY'] as const satisfies readonly CompletenessCode[];
+export type CatalogBlockingCode = (typeof CATALOG_BLOCKING_CODES)[number];
+export const isCatalogBlockingCode = (code: string): code is CatalogBlockingCode =>
+  (CATALOG_BLOCKING_CODES as readonly string[]).includes(code);
+
 /** What a non-owner admin reads in place of every private code. */
 export const OWNER_DATA_CODE = 'OWNER_DATA' as const;
 export type CompletenessItemCode = CompletenessCode | typeof OWNER_DATA_CODE;

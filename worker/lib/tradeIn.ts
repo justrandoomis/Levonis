@@ -1447,8 +1447,8 @@ const coverOf = (doc: ReturnType<typeof parseProductRow>): string => {
  */
 export async function priceTarget(env: Env, userId: string, sel: TargetSelection): Promise<PricedTarget> {
   const db = env.DB;
-  const row = await db.prepare(`SELECT * FROM products WHERE id = ? AND ${(await listing(db)).listed('products')}`).bind(sel.product_id).first<Record<string, unknown>>();
-  // S-P2: an unlisted target (hidden, held, «يحتاج تسعيرًا», gone) reads its own sentence.
+  const row = await db.prepare(`SELECT * FROM products WHERE id = ? AND ${(await listing(db)).sellable('products')}`).bind(sel.product_id).first<Record<string, unknown>>();
+  // S-P2: a target a customer cannot buy (hidden, held, catalog-only «بلا سعر», gone) reads its own sentence.
   if (!row) throw refuse('TRADE_IN_TARGET_NOT_LISTED');
   const parsed = parseProductRow(row);
   if (parsed.composition !== '') throw refuse('TRADE_IN_TARGET_UNAVAILABLE', { reason: 'composition' });
@@ -1536,7 +1536,7 @@ export async function listTargets(env: Env) {
   const db = env.DB;
   const { results } = await db
     .prepare(
-      `SELECT * FROM products WHERE ${(await listing(db)).listed('products')} AND COALESCE(composition, '') = ''
+      `SELECT * FROM products WHERE ${(await listing(db)).sellable('products')} AND COALESCE(composition, '') = ''
         ORDER BY is_featured DESC, display_order, created_at DESC LIMIT 400`
     )
     .all<Record<string, unknown>>();

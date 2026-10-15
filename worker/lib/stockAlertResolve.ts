@@ -504,7 +504,7 @@ export async function loadAlertContexts(
   // The clean start (DECISIONS row 222, spec addendum A.5): an active product a customer may not see or
   // buy yet (held, or not V2-published) is UNAVAILABLE for now — never «عاد للمخزون» — but its alert
   // stays armed: it can come true the moment the product is priced and published.
-  const unlisted = await (await listing(db)).unlistedIds(products.map((r) => r.id));
+  const unlisted = await (await listing(db)).unsellableIds(products.map((r) => r.id));
 
   const groupsBy = bucket(groups);
   const valuesBy = bucket(values);

@@ -167,7 +167,8 @@ export interface CompareInputProduct {
   product_type: string | null;
   section_slugs: string[];
   spec_fields: Record<string, unknown>;
-  price_iqd: number;
+  /** Null for a catalog-only product (DECISIONS row 240): read as missing, never a loss and never the cheapest. */
+  price_iqd: number | null;
   /**
    * The unit's condition document (worker/lib/condition.ts), null or absent
    * for a NEW product. When any column carries one, the comparison opens with

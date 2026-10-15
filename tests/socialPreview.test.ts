@@ -394,9 +394,10 @@ test('only a published product is readable — a draft must not leak through a c
   assert.equal(selects.length, 3, `expected three reads, saw ${selects.length}`);
   for (const select of selects) {
     assert.match(select, /\bslug = \?\d?/, 'the slug is a bound parameter');
-    // The catalogue's read asks the one listing predicate (worker/lib/listing.ts):
-    // `status = 'active'` and not held by the owner's «hide incomplete» switch.
-    assert.match(select, /\bstatus = 'active'|\.listed\('products'\)/, 'a draft or hidden product is not a card');
+    // The catalogue's read asks the VISIBLE predicate (worker/lib/listing.ts, DECISIONS row 240):
+    // `status = 'active'` and not held by the owner's «hide incomplete» switch for a catalogue gap. A
+    // catalog-only product (shown, not priced yet) unfurls as itself — a share card carries no price.
+    assert.match(select, /\bstatus = 'active'|\.visible\('products'\)/, 'a draft or hidden product is not a card');
   }
   // And the slug is bound, never interpolated.
   assert.ok(!/\$\{slug\}/.test(source));

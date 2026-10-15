@@ -308,7 +308,7 @@ export async function sitemapRoute(c: Context<AppContext>): Promise<Response> {
     } else {
       const { results } = await c.env.DB.prepare(
         `SELECT slug, updated_at FROM products
-          WHERE ${(await listing(c.env.DB)).listed('products')} AND slug <> ''
+          WHERE ${(await listing(c.env.DB)).visible('products')} AND slug <> ''
           ORDER BY updated_at DESC
           LIMIT ${MAX_SITEMAP_URLS}`
       ).all<SitemapRow>();

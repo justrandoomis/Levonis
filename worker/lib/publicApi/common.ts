@@ -170,6 +170,8 @@ export async function brandsById(db: D1Database, ids: Iterable<unknown>): Promis
 
 export interface PublicPrice {
   currency: 'IQD';
+  /** DECISIONS row 240: `unpriced` — shown, not sold yet; every amount is null. `members_only` — a locked composition. */
+  status: 'priced' | 'unpriced' | 'members_only';
   amount: number | null;
   regular: number | null;
   from: boolean;
@@ -179,9 +181,13 @@ export interface PublicPrice {
 export const PRICE_SCHEMA = object(
   {
     currency: enumOf(['IQD'], 'Iraqi dinar. Every amount is a whole number of dinars.'),
+    status: enumOf(
+      ['priced', 'unpriced', 'members_only'],
+      '`priced`: the amounts below are what a customer pays. `unpriced`: the product is shown but its price is not available yet (it cannot be bought; the site says «السعر غير متوفر حالياً» and offers «طلب السعر») — every amount is null. `members_only`: the price is shown only to members.'
+    ),
     amount: nullable(
       integer(
-        'The item price a signed-out customer sees for one unit today, offers applied; the lowest option\'s price when `from` is true. A way to buy can cost more: the `purchase` block of the full product record gives what the cart charges for each. Null when the price is shown only to members.'
+        'The item price a signed-out customer sees for one unit today, offers applied; the lowest option\'s price when `from` is true. A way to buy can cost more: the `purchase` block of the full product record gives what the cart charges for each. `amount` is null when the price is not available yet (`status: unpriced`) or shown only to members.'
       )
     ),
     regular: nullable(integer('The regular price the amount is compared with (equal to `amount` when nothing is discounted).')),
@@ -200,12 +206,15 @@ export const PRICE_SCHEMA = object(
 );
 
 export function priceFromCard(card: Record<string, unknown>, locked = false): PublicPrice {
-  if (locked) return { currency: 'IQD', amount: null, regular: null, from: false, member_price: null };
+  if (locked) return { currency: 'IQD', status: 'members_only', amount: null, regular: null, from: false, member_price: null };
+  // A catalog-only card carries no number at all (DECISIONS row 240): never 0, never the row's archive.
+  if (card.price_status === 'unpriced') return { currency: 'IQD', status: 'unpriced', amount: null, regular: null, from: false, member_price: null };
   const amount = int(card.display_price_iqd) ?? int(card.price_iqd);
   const regular = int(card.display_regular_iqd) ?? amount;
   const pro = int(card.display_pro_iqd);
   return {
     currency: 'IQD',
+    status: 'priced',
     amount,
     regular,
     from: card.display_from === true,
@@ -243,6 +252,8 @@ export const AVAILABILITY_SCHEMA = object(
 
 /** The card's own rule (src/lib/productCard.ts `cardAvailability`), low-stock at 2. */
 export function availabilityFromCard(card: Record<string, unknown>): PublicAvailability {
+  // A catalog-only card claims no stock and no way to buy (DECISIONS row 240).
+  if (card.price_status === 'unpriced') return { state: 'unknown', quantity: null, low_stock: false, sale_modes: [] };
   const saleModes = Array.isArray(card.sale_types)
     ? (card.sale_types as unknown[]).filter((t): t is string => t === 'direct_sale' || t === 'pre_order' || t === 'bundle')
     : [];

@@ -1013,7 +1013,21 @@ export function capacityFrom(
  * colour's own rung is the arithmetic of that figure, not a price anyone pays
  * on a product priced per SKU (Pricing V2 V2-0, C5; DECISIONS row 225).
  */
-export function publicRelations(view: ProductRelationsView, coarse = false) {
+export function publicRelations(
+  view: ProductRelationsView,
+  coarse = false,
+  /**
+   * DECISIONS row 240: a CATALOG-ONLY product (shown, not sold) publishes the
+   * structure the choosers draw and no stock at all — no `available`, no
+   * `stock_state`: stock nobody configured must never read as «نفد».
+   */
+  opts: { catalogOnly?: boolean } = {}
+) {
+  const block = relationsBlock(view, coarse);
+  return opts.catalogOnly ? withoutStock(block) : block;
+}
+
+function relationsBlock(view: ProductRelationsView, coarse: boolean) {
   if (!view.has_relations) return null;
   const linksByColor = new Map<string, ColorLinkRow[]>();
   for (const l of view.links) {
@@ -1104,4 +1118,26 @@ export function publicRelations(view: ProductRelationsView, coarse = false) {
       height: i.height,
     })),
   };
+}
+
+/** A relations block with every stock fact removed (the catalog-only page). */
+function withoutStock<T extends Record<string, unknown> | null>(block: T): T {
+  if (!block) return block;
+  const strip = (x: Record<string, unknown>) => {
+    const { available: _a, stock_state: _s, ...rest } = x;
+    void _a;
+    void _s;
+    return rest;
+  };
+  const b = block as Record<string, unknown> & {
+    option_groups: Array<Record<string, unknown> & { values: Record<string, unknown>[] }>;
+    colors: Record<string, unknown>[];
+    variants: Record<string, unknown>[];
+  };
+  return {
+    ...b,
+    option_groups: b.option_groups.map((g) => ({ ...g, values: g.values.map(strip) })),
+    colors: b.colors.map(strip),
+    variants: b.variants.map(strip),
+  } as unknown as T;
 }

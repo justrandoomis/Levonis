@@ -1203,7 +1203,7 @@ export async function loadCompositionBySlug(
 ): Promise<Record<string, unknown> | null> {
   // Listed to customers only (worker/lib/listing.ts): a composition is a platform product like any other,
   // and under the clean start it stays hidden until it has a V2 price (owner question Q7).
-  const listed = (await listing(db)).listed('p');
+  const listed = (await listing(db)).sellable('p');
   const rows = await compositionSelect(
     db,
     (cols, from) => `SELECT ${cols} ${from} WHERE p.slug = ? AND p.composition <> '' AND ${listed} LIMIT 1`,

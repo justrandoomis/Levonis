@@ -1022,7 +1022,7 @@ export async function loadCompositionMembers(
     db,
     rows.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))
   );
-  const held = opts.customer ? await (await listing(db)).heldIds(rows.map((r) => String(r.id))) : new Set<string>();
+  const held = opts.customer ? await (await listing(db)).unsellableIds(rows.map((r) => String(r.id))) : new Set<string>();
   for (const r of rows) {
     const id = String(r.id);
     if (held.has(id)) r.status = 'hidden';

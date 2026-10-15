@@ -841,7 +841,7 @@ reviewRoutes.get('/product/:idOrSlug', async (c) => {
     .first<{ id: string; status: string }>();
   // A product customers cannot see (the clean start: still «يحتاج تسعيرًا») answers like one that does not exist.
   const L = product ? await listing(c.env.DB) : null;
-  if (!product || !L!.isListedRow(product, await L!.unlistedIds([product.id]))) throw notFound('Product not found');
+  if (!product || !L!.isVisibleRow(product, await L!.invisibleIds([product.id]))) throw notFound('Product not found');
   const page = Math.max(1, Math.min(1000, parseInt(c.req.query('page') || '1', 10) || 1));
   const offset = (page - 1) * PAGE_SIZE;
 

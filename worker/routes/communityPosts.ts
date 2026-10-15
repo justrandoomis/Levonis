@@ -232,7 +232,7 @@ export async function withViewerFlags<T extends Card>(db: D1Database, viewerId: 
 export async function withListedEmbeds<T extends Card>(db: D1Database, cards: T[]): Promise<T[]> {
   const ids = [...new Set(cards.flatMap((c) => [c.printer.product?.id, c.material.product?.id]).filter((x): x is string => !!x))];
   if (!ids.length) return cards;
-  const unlisted = await (await listing(db)).unlistedIds(ids);
+  const unlisted = await (await listing(db)).invisibleIds(ids);
   if (!unlisted.size) return cards;
   return cards.map((c) => ({
     ...c,
@@ -662,7 +662,7 @@ async function checkLinks(env: Env, userId: string, input: Partial<PostInput>, c
     const row = await env.DB.prepare('SELECT id, status FROM products WHERE id = ?').bind(productId).first<{ id: string; status: string }>();
     if (!row) return false;
     const L = await listing(env.DB);
-    return L.isListedRow(row, await L.unlistedIds([productId]));
+    return L.isVisibleRow(row, await L.invisibleIds([productId]));
   };
   if (input.printer_product_id && !(await linkable(input.printer_product_id))) throw badRequest('That printer is not in the catalogue', 'POST_LINK_NOT_FOUND');
   if (input.material_product_id && !(await linkable(input.material_product_id))) throw badRequest('That material is not in the catalogue', 'POST_LINK_NOT_FOUND');

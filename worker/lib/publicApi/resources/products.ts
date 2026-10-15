@@ -13,6 +13,7 @@
  * on the page.
  */
 import { listing } from '../../listing';
+import { sellableNowOf } from '../../commercialState';
 import { HttpError, notFound } from '../../http';
 import { catalogIndexFor } from '../../catalogPresentation';
 import { parseProductRow } from '../../productModel';
@@ -171,7 +172,7 @@ const PRODUCT_SCHEMA = object(
     price: ref('Price'),
     availability: ref('Availability'),
     offer: nullable(ref('Offer')),
-    purchase: object(
+    purchase: nullable(object(
       {
         direct_sale: nullable(integer('The unit price when bought from stock in Iraq (the opening choice), offers applied.')),
         pre_order: array(
@@ -186,8 +187,8 @@ const PRODUCT_SCHEMA = object(
           'The ways to pre-order and their unit prices (the opening choice), offers applied.'
         ),
       },
-      'How the product can be bought and what the cart charges per unit for each way. These are the prices to quote as what a customer pays; `price` is the item price, which a way to buy can exceed.'
-    ),
+      'How the product can be bought and what the cart charges per unit for each way. These are the prices to quote as what a customer pays; `price` is the item price, which a way to buy can exceed. Null when the price is not available yet (`price.status: unpriced`).'
+    )),
     options: array(OPTION_SCHEMA),
     colors: array(COLOR_SCHEMA),
     combinations: array(
@@ -385,6 +386,8 @@ function productDetailDto(
 ) {
   const product = asRec(body.product);
   const slug = String(row.slug);
+  // DECISIONS row 240: a catalog-only product's body carries no level, mode or availability at all.
+  const unpriced = body.price_status === 'unpriced';
   const levels = asRec(body.price_levels);
   const availableBy = availabilityById(body.relations);
 
@@ -451,9 +454,11 @@ function productDetailDto(
     images,
     light_image: urls.media(product.light_image),
     price: priceFromCard(product),
-    availability: availabilityFromSale(asRec(body.availability), product.sale_types),
-    offer: offerFromCard(product),
-    purchase: {
+    availability: unpriced
+      ? { state: 'unknown' as const, quantity: null, low_stock: false, sale_modes: [] }
+      : availabilityFromSale(asRec(body.availability), product.sale_types),
+    offer: unpriced ? null : offerFromCard(product),
+    purchase: unpriced ? null : {
       direct_sale: int(direct.unit_subtotal_iqd),
       pre_order: asList(modes.preorder)
         .filter((p) => p.method === 'air' || p.method === 'sea' || p.method === 'land')
@@ -530,12 +535,16 @@ function productDetailDto(
 }
 
 async function activeProductRow(db: D1Database, slug: string): Promise<Rec> {
+  // VISIBLE with the SELLABLE flag (DECISIONS row 240): a catalog-only product is described with no price.
+  const L = await listing(db);
   const row = await db
-    .prepare(`SELECT * FROM products WHERE slug = ? AND ${(await listing(db)).listed('products')}`)
+    .prepare(`SELECT *, ${L.sellableFlag('products')} AS sellable_now FROM products WHERE slug = ? AND ${L.visible('products')}`)
     .bind(slug)
     .first<Rec>();
   if (!row) throw notFound('Product not found');
   if (String(row.composition ?? '') !== '') {
+    // A composition is described only while sellable (default D6); otherwise it is not there.
+    if (!sellableNowOf(row)) throw notFound('Product not found');
     // A bundle or a mystery box is a product row too; its page is its own.
     throw new HttpError(404, 'This slug is a bundle; read it from /bundles/{slug}.', 'IS_BUNDLE', {
       bundle_path: `/api/public/v1/bundles/${slug}`,
@@ -550,7 +559,7 @@ async function getProduct(req: PublicRequest) {
   const row = await activeProductRow(db, slug);
   const parsed = parseProductRow(row);
   const [{ body, lowestSku }, idx] = await Promise.all([
-    catalogProductDetail(db, row, parsed, pricingCtxForUser(db, null), { lowestSku: true }),
+    catalogProductDetail(db, row, parsed, pricingCtxForUser(db, null), { lowestSku: true, sellable: sellableNowOf(row) }),
     catalogIndexFor(db).catch(() => null),
   ]);
   // The brand block of the page carries no slug; one read on its primary key.
@@ -596,7 +605,7 @@ async function productReviews(req: PublicRequest) {
   const { db, urls, query } = req;
   const slug = req.path.slug;
   const product = await db
-    .prepare(`SELECT id, slug FROM products WHERE slug = ? AND ${(await listing(db)).listed('products')}`)
+    .prepare(`SELECT id, slug FROM products WHERE slug = ? AND ${(await listing(db)).visible('products')}`)
     .bind(slug)
     .first<{ id: string; slug: string }>();
   if (!product) throw notFound('Product not found');

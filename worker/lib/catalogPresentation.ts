@@ -19,7 +19,7 @@
  * something a child shelf does not already say.
  */
 import { membershipCte } from './catalogMembership';
-import { listedWithoutHeld, runListed } from './listing';
+import { completenessAbsentLately, runListed } from './listing';
 import { catalogImageUrl } from './siteMedia';
 import { isSchemaMissing } from './membershipBenefits';
 import { isTemplateFamily, productTypeForBranch, type SectionRef } from './templateFamilies';
@@ -104,7 +104,7 @@ export async function loadCatalogRecords(db: D1Database): Promise<CatalogRecord[
  * terms (the CTE), far under D1's five.
  */
 export async function loadMemberships(db: D1Database): Promise<Array<{ product_id: string; catalog_id: string }>> {
-  const membership = membershipCte(!listedWithoutHeld(db));
+  const membership = membershipCte(!completenessAbsentLately(db));
   const { results } = await runListed(
     db,
     `WITH ${membership}

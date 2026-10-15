@@ -29,6 +29,7 @@
  */
 
 import { listing } from '../lib/listing';
+import { rowPriceIfSellable, sellableNowOf } from '../lib/commercialState';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { deliversToHome, getSetting, getSettings, type CheckoutPaymentMethod, type DeliveryMethod } from '../lib/settings';
 import { allowedPaymentMethods } from '../lib/paymentPolicy';
@@ -508,6 +509,7 @@ const T: Record<Locale, Record<string, string>> = {
     f_serial: 'الرقم التسلسلي',
     f_warranty: 'الضمان',
     f_price: 'السعر',
+    price_unavailable: 'السعر غير متوفر حالياً',
     est_pending: 'الطلب {id} بانتظار التأكيد — لا يسري أي موعد توصيل بعد.',
     est_cancelled: 'الطلب {id} ملغى.',
     est_printer:
@@ -643,6 +645,7 @@ const T: Record<Locale, Record<string, string>> = {
     f_serial: 'Serial',
     f_warranty: 'Warranty',
     f_price: 'Price',
+    price_unavailable: 'Price not available yet',
     est_pending: 'Order {id} is awaiting confirmation — no delivery window applies yet.',
     est_cancelled: 'Order {id} is cancelled.',
     est_printer:
@@ -779,6 +782,7 @@ const T: Record<Locale, Record<string, string>> = {
     f_serial: 'ژمارەی زنجیرەیی',
     f_warranty: 'گەرەنتی',
     f_price: 'نرخ',
+    price_unavailable: 'نرخ هێشتا بەردەست نییە',
     est_pending: 'داواکاری {id} چاوەڕوانی پشتڕاستکردنەوەیە — هێشتا هیچ ماوەیەکی گەیاندن نییە.',
     est_cancelled: 'داواکاری {id} هەڵوەشێنراوەتەوە.',
     est_printer:
@@ -891,6 +895,11 @@ function fmtIqd(loc: Locale, n: number): string {
   return loc === 'en' ? `${num} IQD` : `${num} د.ع`;
 }
 
+/** «السعر: …» — or «السعر غير متوفر حالياً» for a catalog-only product (DECISIONS row 240): never a 0. */
+function priceSubtitle(loc: Locale, price: number | null): string {
+  return price === null || !(price > 0) ? `${tr(loc, 'f_price')}: ${tr(loc, 'price_unavailable')}` : `${tr(loc, 'f_price')}: ${fmtIqd(loc, price)}`;
+}
+
 function fmtDate(iso: unknown): string {
   const s = typeof iso === 'string' ? iso : '';
   const ms = Date.parse(s);
@@ -929,6 +938,8 @@ interface AssistantChoice {
 interface AssistantCard {
   title: string;
   subtitle?: string;
+  /** DECISIONS row 240: 'unpriced' — the subtitle carries «السعر غير متوفر حالياً», never a number. */
+  price_status?: 'priced' | 'unpriced';
   image?: string;
   badge?: string;
   fields?: Array<{ label: string; value: string }>;
@@ -1351,10 +1362,11 @@ async function handleProductSearch(c: Context<AppContext>, params: Record<string
   const q = str(params.q, 'q', { max: 100, required: false }) || freeText.trim();
   if (q.length < 2) return { intent: 'product_search', text: tr(loc, 'search_empty') };
   const like = likePattern(q);
+  // VISIBLE with the SELLABLE flag (DECISIONS row 240): a catalog-only product is found, with no price.
   const L = await listing(c.env.DB);
   const { results } = await c.env.DB.prepare(
-    `SELECT * FROM products
-      WHERE ${L.listed('products')}
+    `SELECT *, ${L.sellableFlag('products')} AS sellable_now FROM products
+      WHERE ${L.visible('products')}
         AND (name LIKE ?1 ESCAPE '\\' OR name_ar LIKE ?1 ESCAPE '\\' OR name_ku LIKE ?1 ESCAPE '\\' OR brand LIKE ?1 ESCAPE '\\')
       ORDER BY is_featured DESC, created_at DESC
       LIMIT 5`
@@ -1376,12 +1388,12 @@ async function handleProductSearch(c: Context<AppContext>, params: Record<string
     results.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))
   );
   const cards: AssistantCard[] = results.map((row) => {
-    const p = publicWithDisplayPrice(row, ctx, views.get(String(row.id))) as Record<string, unknown>;
+    const p = publicWithDisplayPrice(row, ctx, { sellable: sellableNowOf(row) }, views.get(String(row.id))) as Record<string, unknown>;
     const images = Array.isArray(p.images) ? p.images : [];
     const image = typeof images[0] === 'string' ? (images[0] as string) : undefined;
     const stock = p.stock;
     const badge = typeof stock === 'number' ? (stock > 0 ? tr(loc, 'in_stock') : tr(loc, 'out_of_stock')) : undefined;
-    const shown = Number(p.display_price_iqd ?? p.price_iqd ?? 0) || 0;
+    const shown = p.price_status === 'unpriced' ? null : typeof p.display_price_iqd === 'number' ? p.display_price_iqd : null;
     return {
       title: pickName(loc, {
         p_name: String(row.name ?? ''),
@@ -1389,7 +1401,8 @@ async function handleProductSearch(c: Context<AppContext>, params: Record<string
         p_name_ku: String(row.name_ku ?? ''),
         name_snapshot: null,
       }),
-      subtitle: `${tr(loc, 'f_price')}: ${fmtIqd(loc, shown)}`,
+      subtitle: priceSubtitle(loc, shown),
+      price_status: p.price_status === 'unpriced' ? ('unpriced' as const) : ('priced' as const),
       image,
       badge,
       link: { label: tr(loc, 'open_product'), to: `/product/${row.slug}` },
@@ -1453,8 +1466,8 @@ async function findComparable(db: D1Database, q: string, tax: ReturnType<typeof 
   if (!like) return [];
   const L = await listing(db);
   const { results } = await db.prepare(
-    `SELECT ${COMPARE_PRODUCT_COLUMNS} FROM products
-      WHERE ${L.listed('products')} AND spec_fields <> '{}' AND spec_fields <> ''
+    `SELECT ${COMPARE_PRODUCT_COLUMNS}, ${L.sellableFlag('products')} AS sellable_now FROM products
+      WHERE ${L.visible('products')} AND spec_fields <> '{}' AND spec_fields <> ''
         AND (${sqlLikeClause(['name', 'name_ar', 'name_ku'], '?1')})
       ORDER BY is_featured DESC, created_at DESC
       LIMIT ${limit}`
@@ -1494,7 +1507,7 @@ async function handlePowerUsage(
   let target: Placed | null = null;
   if (ids.length) {
     const row = await db
-      .prepare(`SELECT ${COMPARE_PRODUCT_COLUMNS} FROM products WHERE id = ? AND ${(await listing(db)).listed('products')}`)
+      .prepare(`SELECT ${COMPARE_PRODUCT_COLUMNS} FROM products WHERE id = ? AND ${(await listing(db)).visible('products')}`)
       .bind(ids[0])
       .first<CompareProductRow>();
     if (row) target = place(row, tax);
@@ -1575,8 +1588,8 @@ async function handleCompareProducts(
   if (ids.length) {
     const L = await listing(db);
     const { results } = await db.prepare(
-      `SELECT ${COMPARE_PRODUCT_COLUMNS} FROM products
-        WHERE id IN (${ids.map(() => '?').join(',')}) AND ${L.listed('products')}`
+      `SELECT ${COMPARE_PRODUCT_COLUMNS}, ${L.sellableFlag('products')} AS sellable_now FROM products
+        WHERE id IN (${ids.map(() => '?').join(',')}) AND ${L.visible('products')}`
     )
       .bind(...ids)
       .all<CompareProductRow>();
@@ -1676,7 +1689,8 @@ async function handleCompareProducts(
       product_type: p.productType,
       section_slugs: p.branch.map((b) => b.slug),
       spec_fields: p.specs,
-      price_iqd: Number(p.row.price_iqd) || 0,
+      // Null for a catalog-only product: the price row reads it as missing, never as the cheapest.
+      price_iqd: rowPriceIfSellable(p.row),
     })),
   });
 
@@ -1845,10 +1859,11 @@ const STUDIO_ORIGIN = 'https://studio.levonis-iq.com';
 async function handleChoosePrinter(c: Context<AppContext>, loc: Locale): Promise<AssistantReply> {
   const db = c.env.DB;
   const tax = taxonomy(await loadCatalogs(db));
+  // SELLABLE (DECISIONS row 240, rule R5): «with their real prices» — a printer that cannot be bought is not offered.
   const L = await listing(db);
   const { results } = await db.prepare(
-    `SELECT ${COMPARE_PRODUCT_COLUMNS} FROM products
-      WHERE ${L.listed('products')} AND spec_fields <> '{}' AND spec_fields <> ''
+    `SELECT ${COMPARE_PRODUCT_COLUMNS}, ${L.sellableFlag('products')} AS sellable_now FROM products
+      WHERE ${L.sellable('products')} AND spec_fields <> '{}' AND spec_fields <> ''
       ORDER BY is_featured DESC, created_at DESC
       LIMIT 40`
   ).all<CompareProductRow>();
@@ -1862,7 +1877,7 @@ async function handleChoosePrinter(c: Context<AppContext>, loc: Locale): Promise
     text: tr(loc, 'choose_printer_intro'),
     cards: printers.map((p) => ({
       title: compareName(p, loc),
-      subtitle: `${tr(loc, 'f_price')}: ${fmtIqd(loc, Number(p.row.price_iqd) || 0)}`,
+      subtitle: priceSubtitle(loc, rowPriceIfSellable(p.row)),
       link: { label: tr(loc, 'open_product'), to: `/product/${p.row.slug}` },
     })),
     choices: printers.map((p) => ({

@@ -26,6 +26,7 @@
  */
 import { withCacheEpoch } from '../lib/publicApi/cache';
 import { listing } from '../lib/listing';
+import { sellableNowOf } from '../lib/commercialState';
 import { Hono, type Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
@@ -60,9 +61,10 @@ async function loadCandidates(c: Context<AppContext>): Promise<Loaded> {
     pricingCtx(c),
     db
       .prepare(
-        `SELECT * FROM products
-          WHERE ${L.listed('products')} AND composition = '' AND spec_fields <> '{}' AND spec_fields <> ''
-          ORDER BY is_featured DESC, display_order ASC, created_at DESC
+        // VISIBLE with each row's SELLABLE flag (DECISIONS row 240): priced machines first (rule R1).
+        `SELECT *, ${L.sellableFlag('products')} AS sellable_now FROM products
+          WHERE ${L.visible('products')} AND composition = '' AND spec_fields <> '{}' AND spec_fields <> ''
+          ORDER BY sellable_now DESC, is_featured DESC, display_order ASC, created_at DESC
           LIMIT ?`
       )
       .bind(FINDER_CANDIDATE_CAP)
@@ -78,9 +80,10 @@ async function loadCandidates(c: Context<AppContext>): Promise<Loaded> {
     machines.push({ row, type, specs });
   }
   const machineRows = machines.map((m) => m.row);
+  // The resolver never runs over a catalog-only row: its money columns hold the archived ladder.
   const [cards, pricing] = await Promise.all([
-    resolveProductCards(db, machineRows, ctx, idx),
-    resolveVariantPricing(db, machineRows, ctx),
+    resolveProductCards(db, machineRows, ctx, idx, 'flag'),
+    resolveVariantPricing(db, machineRows.filter((r) => sellableNowOf(r)), ctx),
   ]);
   const regular = new Map<string, number>();
   /**
@@ -99,10 +102,17 @@ async function loadCandidates(c: Context<AppContext>): Promise<Loaded> {
     const productAvailable = Math.max(0, Number(card.direct_stock_available ?? 0) || 0);
     const leaf = String(m.row.sub_category_id || m.row.category_id || '');
     const sectionSlugs = leaf ? idx.branch(leaf).map((n) => n.slug) : [];
+    if (!sellableNowOf(m.row)) {
+      // Catalog-only: shown with no price, never in a budget, ranked after the priced (rule R5).
+      const specs = variantSheet(m.specs, null);
+      candidates.push({ id, productId: id, card: withMulticolor(card, specs), productType: m.type, price: null, available: 0, sectionSlugs, specs, rank, variant: null });
+      return;
+    }
     const variants = pricing.get(id)?.options ?? [];
     if (variants.length === 0) {
-      const price = Number(card.display_price_iqd ?? m.row.price_iqd) || 0;
-      regular.set(id, Number(card.display_regular_iqd ?? m.row.price_iqd) || 0);
+      // Never the row's own column: a priced card always carries its display price.
+      const price = typeof card.display_price_iqd === 'number' ? card.display_price_iqd : null;
+      regular.set(id, typeof card.display_regular_iqd === 'number' ? card.display_regular_iqd : 0);
       const specs = variantSheet(m.specs, null);
       candidates.push({ id, productId: id, card: withMulticolor(card, specs), productType: m.type, price, available: productAvailable, sectionSlugs, specs, rank, variant: null });
       return;
@@ -161,6 +171,7 @@ printerFinderRoutes.get('/meta', async (c) => {
   const budgets = Object.entries(FINDER_BUDGETS).map(([range, r]) => ({
     range,
     count: products(printers.filter((x) => {
+      if (x.price === null) return false;
       const p = regular.get(x.id) ?? x.price;
       return p >= r.min && (r.max === null || p <= r.max);
     })),

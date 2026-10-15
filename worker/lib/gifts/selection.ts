@@ -146,7 +146,7 @@ export async function loadGiftProduct(env: { DB: D1Database }, productId: string
   if (!row) return { productId: id, row: null, view: undefined, ctx };
   const views = await loadRelationsViews(env.DB, [{ id, inventory_mode: row.inventory_mode }]);
   const L = await listing(env.DB);
-  const listed = L.isListedRow(row, await L.unlistedIds([id]));
+  const listed = L.isSellableRow(row, await L.unsellableIds([id]));
   return { productId: id, row, view: views.get(id), ctx, listed };
 }
 
@@ -168,10 +168,10 @@ export async function loadGiftProducts(env: { DB: D1Database }, productIds: read
     [...byId.values()].map((r) => ({ id: text(r.id), inventory_mode: r.inventory_mode }))
   );
   const L = await listing(env.DB);
-  const unlisted = await L.unlistedIds([...byId.keys()]);
+  const unlisted = await L.unsellableIds([...byId.keys()]);
   for (const id of ids) {
     const row = byId.get(id) ?? null;
-    out.set(id, { productId: id, row, view: row ? views.get(id) : undefined, ctx, listed: !!row && L.isListedRow(row, unlisted) });
+    out.set(id, { productId: id, row, view: row ? views.get(id) : undefined, ctx, listed: !!row && L.isSellableRow(row, unlisted) });
   }
   return out;
 }

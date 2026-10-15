@@ -123,9 +123,9 @@ test('the projection is applied to the OUTPUT, never to the query that resolves 
   // whole row to the resolver and only then project.
   const src = readFileSync(join(ROOT, 'worker/routes/products.ts'), 'utf8');
   assert.ok(
-    // The listing predicate (completeness hold, DECISIONS row 205) replaced the bare
-    // status filter; the SELECT is still the whole row.
-    src.includes('let sql = `SELECT * FROM products WHERE ${optimisticListed(db)}`'),
+    // The listing predicates (completeness hold, DECISIONS row 205; VISIBLE + the SELLABLE
+    // flag, row 240) replaced the bare status filter; the SELECT is still the whole row.
+    src.includes('const selectList = `SELECT *, ${optimisticSellableFlag(db)} AS sellable_now FROM products`;'),
     'the list route no longer selects the whole row — the resolver would lose the option ladder'
   );
   assert.ok(

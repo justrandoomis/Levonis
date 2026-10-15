@@ -2,7 +2,8 @@
  * «الجهاز الجديد» — THE SERVER'S SEARCH OVER THE DEVICES A TRADE-IN CAN BUY
  * (Services S-P2 spec §6.4, G19).
  *
- * Only LISTED products (V2-published, active, not held: `listing(db).listed`)
+ * Only SELLABLE products (V2-published, active, not held: `listing(db).sellable`;
+ * DECISIONS row 240: a trade-in target is a purchase-side reader)
  * that are devices (FDM / resin / laser / AMS — never an accessory, never a
  * composition), searched by name in every language, slug and brand, twenty a
  * page on a keyset `(display_order, id)`. Each carries THIS customer's lowest
@@ -76,7 +77,7 @@ export async function searchTargets(env: Env, userId: string, q: { q: string; fa
   const term = productId ? '' : q.q.trim().slice(0, 80);
   const searching = term.length >= 2;
   const cursor = searching ? parseCursor(q.cursor) : null;
-  const where = [(await listing(db)).listed('products'), "COALESCE(composition, '') = ''"];
+  const where = [(await listing(db)).sellable('products'), "COALESCE(composition, '') = ''"];
   const args: unknown[] = [];
   if (productId) {
     args.push(productId);
@@ -166,11 +167,11 @@ export async function searchTargets(env: Env, userId: string, q: { q: string; fa
   return { targets, next_cursor: nextCursor };
 }
 
-/** Is this product a listed device a trade-in can buy (the product-page entry)? One read. */
+/** Is this product a SELLABLE device a trade-in can buy (the product-page entry)? One read. */
 export async function isListedDeviceTarget(env: Env, productId: string): Promise<boolean> {
   const db = env.DB;
   const row = await db
-    .prepare(`SELECT * FROM products WHERE id = ? AND ${(await listing(db)).listed('products')} AND COALESCE(composition, '') = ''`)
+    .prepare(`SELECT * FROM products WHERE id = ? AND ${(await listing(db)).sellable('products')} AND COALESCE(composition, '') = ''`)
     .bind(productId)
     .first<Record<string, unknown>>();
   if (!row) return false;

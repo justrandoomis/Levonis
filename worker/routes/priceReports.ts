@@ -54,7 +54,7 @@
  */
 
 import { pricingV2Installed } from '../lib/engineInstalled';
-import { listing } from '../lib/listing';
+import { listing, refuseIfOnlyCatalog } from '../lib/listing';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { badRequest, conflict, int, notFound, oneOf, requireAdmin, requireAuth, str } from '../lib/http';
@@ -165,12 +165,17 @@ priceReportRoutes.post('/', async (c) => {
    * either the id was guessed or the page is stale — and answering it would
    * confirm to a stranger that an unpublished product id is real.
    */
+  // SELLABLE (DECISIONS row 240): «لكيتها بمكان أرخص» compares against a real price. A product a customer can
+  // see but not buy yet answers 409 PRICE_NOT_AVAILABLE; any other 404 as before.
   const product = await c.env.DB.prepare(
-    `SELECT id, name, name_ar, price_iqd FROM products WHERE id = ? AND ${(await listing(c.env.DB)).listed('products')}`
+    `SELECT id, name, name_ar, price_iqd FROM products WHERE id = ? AND ${(await listing(c.env.DB)).sellable('products')}`
   )
     .bind(productId)
     .first<{ id: string; name: string; name_ar: string; price_iqd: number }>();
-  if (!product) throw notFound('Product not found');
+  if (!product) {
+    await refuseIfOnlyCatalog(c.env.DB, productId);
+    throw notFound('Product not found');
+  }
 
   const ourPrice = Number(product.price_iqd) || 0;
 

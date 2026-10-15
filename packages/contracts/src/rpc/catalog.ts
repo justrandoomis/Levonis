@@ -33,14 +33,16 @@ export interface IndexRow {
   hashtags: string[];
   catalog_ids: string[];
   brand_id: string | null;
-  /** Null unless `listed`: an unlisted product's stored figure may be an old dinar price (the clean start). */
+  /** Null unless SELLABLE: a catalog-only product's stored figure may be an old dinar price (the clean start). */
   price_iqd: number | null;
   doc_version: number;
   /**
-   * Listed to customers now (core worker/lib/listing.ts: active, not held, V2-published — the clean
-   * start, DECISIONS row 222). A search index shows only listed rows.
+   * VISIBLE to customers now (core worker/lib/listing.ts; DECISIONS row 240: active and not held for a
+   * catalog gap). A search index shows only listed rows — a catalog-only product among them, unpriced.
    */
   listed: boolean;
+  /** DECISIONS row 240: 'priced' only while SELLABLE (active, not held, V2-published); else 'unpriced'. */
+  price_status?: 'priced' | 'unpriced';
 }
 
 export interface CatalogApi {

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { listing } from '../lib/listing';
+import { priceStatusOf, sellableNowOf } from '../lib/commercialState';
 import type { AppContext } from '../lib/types';
 import { publicUser, localeToDb } from '../lib/types';
 import { requireAuth, badRequest, conflict, notFound, str, oneOf, username, displayName } from '../lib/http';
@@ -326,10 +327,13 @@ profileRoutes.post('/onboarding', async (c) => {
 
 profileRoutes.get('/favorites', async (c) => {
   const user = c.get('user')!;
+  // VISIBLE, with the SELLABLE flag (DECISIONS row 240): a catalog-only favourite stays in the
+  // collection with no price — its row's `price_iqd` is the archived dinar figure and never leaves.
+  const L = await listing(c.env.DB);
   const { results } = await c.env.DB.prepare(
-    `SELECT p.id, p.slug, p.name, p.name_ar, p.price_iqd
+    `SELECT p.id, p.slug, p.name, p.name_ar, p.price_iqd, ${L.sellableFlag('p')} AS sellable_now
        FROM favorites f JOIN products p ON p.id = f.product_id
-      WHERE f.user_id = ? AND ${(await listing(c.env.DB)).listed('p')} ORDER BY f.created_at DESC LIMIT 100`
+      WHERE f.user_id = ? AND ${L.visible('p')} ORDER BY f.created_at DESC LIMIT 100`
   )
     .bind(user.id)
     .all<Record<string, unknown>>();
@@ -345,7 +349,8 @@ profileRoutes.get('/favorites', async (c) => {
       name: p.name,
       name_ar: p.name_ar,
       image: images.get(String(p.id)) ?? '',
-      price_iqd: p.price_iqd,
+      price_status: priceStatusOf(sellableNowOf(p)),
+      price_iqd: sellableNowOf(p) ? p.price_iqd : null,
     })),
   });
 });
@@ -353,7 +358,8 @@ profileRoutes.get('/favorites', async (c) => {
 profileRoutes.put('/favorites/:productId', async (c) => {
   const user = c.get('user')!;
   const productId = c.req.param('productId');
-  const product = await c.env.DB.prepare(`SELECT id FROM products WHERE id = ? AND ${(await listing(c.env.DB)).listed('products')}`)
+  // Saving is not buying: a catalog-only product may be saved (VISIBLE).
+  const product = await c.env.DB.prepare(`SELECT id FROM products WHERE id = ? AND ${(await listing(c.env.DB)).visible('products')}`)
     .bind(productId)
     .first();
   if (!product) throw notFound('Product not found');

@@ -755,6 +755,39 @@ export const COST_REFUSALS = {
     en: 'This cost was already reviewed',
     ckb: 'ئەم تێچووە پێشتر پێداچوونەوەی بۆ کراوە',
   },
+  // Catalog-only products and price requests (DECISIONS rows 239 (3)-(4) and 240, migration 0193): a
+  // product a customer can see but not buy yet (no V2 price, or a commercial completeness gap), and the
+  // signed-in «طلب السعر» door's own answers.
+  PRICE_NOT_AVAILABLE: {
+    ar: 'سعر هذا المنتج غير متوفر حالياً، فلا يمكن شراؤه الآن. اطلب السعر ونخبرك عند توفره.',
+    en: "This product's price is not available yet, so it cannot be bought now. Request the price and we will tell you when it is ready.",
+    ckb: 'نرخی ئەم بەرهەمە هێشتا بەردەست نییە، بۆیە ئێستا ناتوانرێت بکڕدرێت. داوای نرخ بکە و کاتێک ئامادە بوو ئاگادارت دەکەینەوە.',
+  },
+  PRICE_REQUEST_SELECTION_REQUIRED: {
+    ar: 'اختر الخيارات المطلوبة أولاً.',
+    en: 'Choose the required options first.',
+    ckb: 'سەرەتا هەڵبژاردنە پێویستەکان دیاری بکە.',
+  },
+  PRICE_REQUEST_SELECTION_INVALID: {
+    ar: 'هذا الاختيار غير موجود في هذا المنتج.',
+    en: 'That choice is not part of this product.',
+    ckb: 'ئەم هەڵبژاردنە بەشێک نییە لەم بەرهەمە.',
+  },
+  PRICE_REQUEST_ALREADY_PRICED: {
+    ar: 'هذا الاختيار صار له سعر، ويمكنك شراؤه الآن.',
+    en: 'This choice has a price now; you can buy it.',
+    ckb: 'ئەم هەڵبژاردنە ئێستا نرخی هەیە و دەتوانیت بیکڕیت.',
+  },
+  PRICE_REQUEST_LIMIT: {
+    ar: 'لديك طلبات سعر مفتوحة كثيرة. اسحب بعضها ثم حاول مجدداً.',
+    en: 'You have too many open price requests. Withdraw some and try again.',
+    ckb: 'داواکارییە کراوەکانی نرخت زۆرن. هەندێکیان بکشێنەوە و دووبارە هەوڵ بدەرەوە.',
+  },
+  PRICE_REQUESTS_UNAVAILABLE: {
+    ar: 'طلب السعر غير متاح الآن، حاول لاحقاً.',
+    en: 'Price requests are not available right now; please try later.',
+    ckb: 'داواکردنی نرخ لە ئێستادا بەردەست نییە؛ تکایە دواتر هەوڵ بدەرەوە.',
+  },
 } as const satisfies Record<string, CostRefusal>;
 
 export type CostRefusalCode = keyof typeof COST_REFUSALS;

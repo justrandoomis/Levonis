@@ -41,10 +41,15 @@ export interface ListingItem {
   /** The serialised card, returned as is. */
   card: Record<string, unknown>;
   name: string;
-  /** The viewer's resolved «from» price (`display_price_iqd`). */
-  price: number;
-  /** The regular price the same card compares against. */
-  regular: number;
+  /**
+   * The viewer's resolved «from» price (`display_price_iqd`); NULL for a
+   * catalog-only product (DECISIONS row 240: shown, not sold yet) — a price
+   * range and the offer and member filters exclude it, and both price sorts
+   * put it last.
+   */
+  price: number | null;
+  /** The regular price the same card compares against (null when `price` is). */
+  regular: number | null;
   prime: number | null;
   pro: number | null;
   /** Direct-sale units available now (0 when none or not offered). */
@@ -59,6 +64,8 @@ export interface ListingItem {
   rank: number;
   /** A live or upcoming scheduled offer is attached. */
   scheduledOffer: boolean;
+  /** SELLABLE now (`price_status: 'priced'`): browse lists put these first (rule R1). Absent reads as priced. */
+  priced?: boolean;
   specs: Record<string, unknown>;
 }
 
@@ -152,18 +159,24 @@ type FilterKey = 'avail' | 'sale' | 'price' | 'brands' | 'fits' | 'offer' | 'mem
 
 export const hasSaleType = (item: ListingItem, t: 'direct_sale' | 'pre_order'): boolean => item.saleTypes.includes(t);
 
-/** «عليها عرض»: a SALE price (the card's badge) or a live/upcoming offer window. */
-export const onOffer = (item: ListingItem): boolean => item.price < item.regular || item.scheduledOffer;
+/** «عليها عرض»: a SALE price (the card's badge) or a live/upcoming offer window. Never an unpriced product. */
+export const onOffer = (item: ListingItem): boolean =>
+  item.price !== null && ((item.regular !== null && item.price < item.regular) || item.scheduledOffer);
 
-/** «سعر أقل للأعضاء»: a member rung strictly below what this viewer pays. */
+/** «سعر أقل للأعضاء»: a member rung strictly below what this viewer pays. Never an unpriced product. */
 export const memberCheaper = (item: ListingItem): boolean =>
-  (item.prime !== null && item.prime < item.price) || (item.pro !== null && item.pro < item.price);
+  item.price !== null && ((item.prime !== null && item.prime < item.price) || (item.pro !== null && item.pro < item.price));
+
+/** Priced (sellable) — the default when a caller did not say (every item before DECISIONS row 240 was). */
+const isPriced = (item: ListingItem): boolean => item.priced !== false && item.price !== null;
 
 function passes(item: ListingItem, f: ListingFilters, except: FilterKey | null): boolean {
   if (except !== 'avail' && f.avail && !(item.available > 0)) return false;
   if (except !== 'sale' && f.sale === 'direct' && !hasSaleType(item, 'direct_sale')) return false;
   if (except !== 'sale' && f.sale === 'preorder' && !hasSaleType(item, 'pre_order')) return false;
   if (except !== 'price' && f.price) {
+    // R3: a price range excludes a product that has no price yet.
+    if (item.price === null) return false;
     if (f.price.min !== null && item.price < f.price.min) return false;
     if (f.price.max !== null && item.price > f.price.max) return false;
   }
@@ -202,29 +215,39 @@ const byRank = (a: ListingItem, b: ListingItem) => a.rank - b.rank;
  */
 export function sortItems(items: ListingItem[], sort: ListingSort, hasSearch: boolean): ListingItem[] {
   const out = items.slice();
+  /** R1 (DECISIONS row 240): sellable first — a stable partition ahead of the surface's own order. */
+  const pricedFirst = (a: ListingItem, b: ListingItem) => Number(isPriced(b)) - Number(isPriced(a));
+  /** R3: a missing price sorts last in BOTH directions, then by rank. */
+  const byPrice = (dir: 1 | -1) => (a: ListingItem, b: ListingItem) => {
+    if (a.price === null || b.price === null) return Number(a.price === null) - Number(b.price === null) || byRank(a, b);
+    return dir * (a.price - b.price) || byRank(a, b);
+  };
   switch (sort) {
     case 'newest':
       return out.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : byRank(a, b)));
     case 'price_asc':
-      return out.sort((a, b) => a.price - b.price || byRank(a, b));
+      return out.sort(byPrice(1));
     case 'price_desc':
-      return out.sort((a, b) => b.price - a.price || byRank(a, b));
+      return out.sort(byPrice(-1));
     case 'name':
       return out.sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base', numeric: true }) || byRank(a, b));
     case 'available':
       return out.sort(
-        (a, b) => Number(b.available > 0) - Number(a.available > 0) || b.available - a.available || byRank(a, b)
+        (a, b) =>
+          pricedFirst(a, b) || Number(b.available > 0) - Number(a.available > 0) || b.available - a.available || byRank(a, b)
       );
     case 'direct':
       return out.sort(
         (a, b) =>
+          pricedFirst(a, b) ||
           Number(hasSaleType(b, 'direct_sale')) - Number(hasSaleType(a, 'direct_sale')) ||
           Number(b.available > 0) - Number(a.available > 0) ||
           byRank(a, b)
       );
     default:
+      // R2: a search keeps the engine's relevance — the shopper typed a name, and each card states its price.
       if (hasSearch) return out.sort(byRank);
-      return out.sort((a, b) => Number(b.available > 0) - Number(a.available > 0) || byRank(a, b));
+      return out.sort((a, b) => pricedFirst(a, b) || Number(b.available > 0) - Number(a.available > 0) || byRank(a, b));
   }
 }
 
@@ -287,7 +310,7 @@ export function facetCounts(
   const forOffer = applyFilters(all, f, 'offer');
   const forMember = applyFilters(all, f, 'member');
 
-  const prices = forPrice.map((i) => i.price).filter((p) => Number.isFinite(p) && p > 0);
+  const prices = forPrice.map((i) => i.price).filter((p): p is number => p !== null && Number.isFinite(p) && p > 0);
   const pmin = prices.length ? Math.min(...prices) : null;
   const pmax = prices.length ? Math.max(...prices) : null;
 

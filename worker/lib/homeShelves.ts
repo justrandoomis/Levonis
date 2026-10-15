@@ -16,7 +16,7 @@
  */
 
 import { OFFER_NOT_SUSPENDED_SQL } from './offers';
-import { optimisticListed, runListed } from './listing';
+import { optimisticSellable, runListed } from './listing';
 import { SOLD_STATES_SQL } from './soldStates';
 
 /** How many cards a shelf carries. A rail, not a catalogue. */
@@ -63,14 +63,14 @@ export async function bestSellerIds(
     params.push(opts.catalogId);
   }
   params.push(limit);
-  const L = { listed: (alias?: string) => optimisticListed(db, alias) };
+  const L = { sellable: (alias?: string) => optimisticSellable(db, alias) };
   const { results } = await runListed(
     db,
     `SELECT oi.product_id AS id, SUM(oi.qty) AS units
            FROM order_items oi
            JOIN orders o ON o.id = oi.order_id AND o.status IN ${SOLD_STATES_SQL}
            JOIN products p ON p.id = oi.product_id
-          WHERE ${L.listed('p')} AND p.composition = ''${scope}
+          WHERE ${L.sellable('p')} AND p.composition = ''${scope}
           GROUP BY oi.product_id
           ORDER BY units DESC, oi.product_id
           LIMIT ?`,
@@ -101,7 +101,7 @@ export async function flashDealIds(
   nowIso: string,
   limit = SHELF_LIMIT
 ): Promise<string[]> {
-  const L = { listed: (alias?: string) => optimisticListed(db, alias) };
+  const L = { sellable: (alias?: string) => optimisticSellable(db, alias) };
   const { results } = await runListed(
     db,
     `SELECT w.subject_id AS id
@@ -111,7 +111,7 @@ export async function flashDealIds(
             AND w.active = 1
             AND w.offer_price_mode <> ''
             AND ${OFFER_NOT_SUSPENDED_SQL}
-            AND ${L.listed('p')} AND p.composition = ''
+            AND ${L.sellable('p')} AND p.composition = ''
             AND (w.starts_at IS NULL OR w.starts_at <= ?)
             AND (w.ends_at IS NULL OR w.ends_at > ?)
           ORDER BY (w.ends_at IS NULL), w.ends_at ASC, w.subject_id
@@ -136,7 +136,7 @@ export async function flashDealIds(
  * over a few hundred strings at most.
  */
 export async function filamentCandidateIds(db: D1Database, rootCatalogId: string): Promise<string[]> {
-  const L = { listed: (alias?: string) => optimisticListed(db, alias) };
+  const L = { sellable: (alias?: string) => optimisticSellable(db, alias) };
   const { results } = await runListed(
     db,
     `WITH RECURSIVE subtree(id) AS (
@@ -146,7 +146,7 @@ export async function filamentCandidateIds(db: D1Database, rootCatalogId: string
          )
          SELECT DISTINCT p.id
            FROM products p
-          WHERE ${L.listed('p')} AND p.composition = ''
+          WHERE ${L.sellable('p')} AND p.composition = ''
             AND (
               p.category_id IN (SELECT id FROM subtree)
               OR p.sub_category_id IN (SELECT id FROM subtree)
@@ -203,11 +203,11 @@ export const shuffleSeed = (nowMs: number): number => Math.floor(nowMs / SHUFFLE
  * a second ordering column nobody would maintain.
  */
 export async function featuredIds(db: D1Database, limit = SHELF_LIMIT): Promise<string[]> {
-  const L = { listed: (alias?: string) => optimisticListed(db, alias) };
+  const L = { sellable: (alias?: string) => optimisticSellable(db, alias) };
   const { results } = await runListed(
     db,
     `SELECT id FROM products
-          WHERE ${L.listed('products')} AND composition = '' AND is_featured = 1
+          WHERE ${L.sellable('products')} AND composition = '' AND is_featured = 1
           ORDER BY created_at DESC, id
           LIMIT ?`,
     (q) => db.prepare(q).bind(limit).all<{ id: string }>()

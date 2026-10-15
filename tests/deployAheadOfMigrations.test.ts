@@ -76,8 +76,14 @@ test('HOME SURVIVES a database that has not had migration 0085 applied', async (
   assert.equal(b.success, true);
   // The strips that had nothing to do with the missing column still answer.
   assert.equal(Array.isArray(b.latest), true);
-  // The clean start (A.12.4 item 6): a database without 0189 knows no V2 price, so it lists nothing — fail closed.
-  assert.equal(b.latest.length, 0, 'a database without the V2 tables lists nothing, never a legacy price');
+  // The clean start (A.12.4 item 6) and DECISIONS row 240: a database without 0189 knows no V2 price, so it
+  // SELLS nothing — every active product is shown catalog-only, with no number, never a legacy price.
+  assert.equal(b.latest.length, 1, 'the product is shown (VISIBLE), as catalog-only');
+  for (const card of b.latest as Array<Record<string, unknown>>) {
+    assert.equal(card.price_status, 'unpriced');
+    assert.equal(card.price_iqd, null, 'never a legacy price');
+    assert.equal(card.display_price_iqd, null, 'never a legacy price');
+  }
   assert.equal(Array.isArray(b.categories), true);
   assert.equal(Array.isArray(b.brands), true);
   assert.ok(b.settings, 'and so are the settings the page is laid out from');
@@ -437,11 +443,11 @@ test('A PRODUCT SAVE still works on a database without the search index', async 
   const found = await pub.request('/api/products?search=Bambu', undefined, undefined, ctx);
   const fb = await json(found);
   assert.equal(found.status, 200, JSON.stringify(fb));
-  // The clean start (spec addendum A.6): before 0189 no product can be V2-published, so the listing fails
-  // closed — the search answers (no crash on the missing index), and lists nothing.
-  assert.deepEqual(
-    (fb.products as Array<{ id: string }>).map((p) => p.id),
-    [],
-    'the LIKE fallback answers while the index does not exist, and a database before 0189 lists nothing'
-  );
+  // The clean start (spec addendum A.6) and DECISIONS row 240: before 0189 no product can be V2-published,
+  // so nothing SELLS — the search answers (no crash on the missing index) and finds the product catalog-only,
+  // with no number.
+  const hits = fb.products as Array<{ id: string; price_status: string; display_price_iqd: unknown }>;
+  assert.deepEqual(hits.map((p) => p.id), [id], 'the LIKE fallback answers while the index does not exist');
+  assert.equal(hits[0]!.price_status, 'unpriced', 'a database before 0189 sells nothing');
+  assert.equal(hits[0]!.display_price_iqd, null);
 });

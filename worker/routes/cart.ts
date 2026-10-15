@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { listing } from '../lib/listing';
+import { listing, refuseIfOnlyCatalog } from '../lib/listing';
 import { cartShippingType, typeForTransport, type ShippingType } from '../lib/shippingType';
 import {
   cartSellerScope,
@@ -723,10 +723,11 @@ export interface UnavailableCartLine {
   product_id: string;
   name: { ar: string; en: string; ckb: string };
   image: string;
-  code: 'PRODUCT_CURRENTLY_UNAVAILABLE';
+  /** DECISIONS row 240: `PRICE_NOT_AVAILABLE` while the product is still shown (catalog-only, no price yet). */
+  code: 'PRODUCT_CURRENTLY_UNAVAILABLE' | 'PRICE_NOT_AVAILABLE';
 }
 
-function unavailableCartLine(row: Record<string, unknown>): UnavailableCartLine {
+function unavailableCartLine(row: Record<string, unknown>, catalogOnly = false): UnavailableCartLine {
   const text = (v: unknown) => (typeof v === 'string' ? v : '');
   let image = '';
   try {
@@ -741,7 +742,7 @@ function unavailableCartLine(row: Record<string, unknown>): UnavailableCartLine 
     product_id: String(row.id ?? ''),
     name: { ar, en: en || ar, ckb: text(row.name_ku) || ar },
     image,
-    code: 'PRODUCT_CURRENTLY_UNAVAILABLE',
+    code: catalogOnly ? 'PRICE_NOT_AVAILABLE' : 'PRODUCT_CURRENTLY_UNAVAILABLE',
   };
 }
 
@@ -753,9 +754,17 @@ async function loadCart(c: Context<AppContext>) {
   // exactly as a hidden product's (worker/lib/listing.ts) — it drops out of the
   // view below. In memory only; no row is touched. A granted gift's line is
   // honoured as granted and keeps its own status.
+  // SELLABLE, with each product's state in ONE statement (DECISIONS row 240): a line whose product is still
+  // shown but has no price yet is listed apart with code PRICE_NOT_AVAILABLE, never priced.
   const L = await listing(c.env.DB);
-  const heldInCart = await L.heldIds(results.map((r) => String(r.id ?? '')));
-  for (const r of results) if (heldInCart.has(String(r.id ?? '')) && !giftEntitlementIdOf(r)) r.status = 'hidden';
+  const cartStates = await L.statesOf(results.map((r) => String(r.id ?? '')));
+  const catalogOnlyInCart = new Set<string>();
+  for (const r of results) {
+    const id = String(r.id ?? '');
+    if ((cartStates.get(id) ?? 'hidden') === 'sellable' || giftEntitlementIdOf(r)) continue;
+    if (cartStates.get(id) === 'catalog_only' && r.status === 'active') catalogOnlyInCart.add(String(r.cart_item_id));
+    r.status = 'hidden';
+  }
 
   // Display-only: which lines carry the explicit support-gift eligibility
   // flag. One extra query for the whole cart, never per line, and it feeds
@@ -908,7 +917,7 @@ async function loadCart(c: Context<AppContext>) {
       // buy — hidden, held, or not yet priced in dollars — is no longer dropped silently. It is listed
       // apart, with no price and no old number, and is excluded from every total; the checkout
       // refuses it (409 PRODUCT_CURRENTLY_UNAVAILABLE). The page shows «غير متاح حاليًا — أزله من السلة».
-      unavailableLines.push(unavailableCartLine(row));
+      unavailableLines.push(unavailableCartLine(row, catalogOnlyInCart.has(String(row.cart_item_id))));
       continue;
     }
     const composition = String(row.composition ?? '');
@@ -2094,11 +2103,15 @@ cartRoutes.post('/items', async (c) => {
   const fulfillmentType = parseFulfillmentType(body.fulfillmentType);
   const warrantyPlanId = str(body.warrantyPlanId, 'warrantyPlanId', { max: 60, required: false });
 
-  // Listed to customers (worker/lib/listing.ts): a held product answers as a hidden one.
-  const product = await c.env.DB.prepare(`SELECT * FROM products WHERE id = ? AND ${(await listing(c.env.DB)).listed('products')}`)
+  // SELLABLE (worker/lib/listing.ts): a held or unpriced product is not added. One a customer can still see
+  // (catalog-only, DECISIONS row 240) answers 409 PRICE_NOT_AVAILABLE; any other answers 404 as before.
+  const product = await c.env.DB.prepare(`SELECT * FROM products WHERE id = ? AND ${(await listing(c.env.DB)).sellable('products')}`)
     .bind(productId)
     .first<Record<string, unknown>>();
-  if (!product) throw notFound('Product not found or unavailable');
+  if (!product) {
+    await refuseIfOnlyCatalog(c.env.DB, productId);
+    throw notFound('Product not found or unavailable');
+  }
 
   // A COMPOSITION ROW TAKES ITS OWN DOOR (§5). It has no options, no colours,
   // no warranty plan and no stock of its own, so none of the ordinary

@@ -92,7 +92,8 @@ test('the options come from the TABLES, through the product page’s resolver', 
   // Owner round 11: `options` is not a PRODUCT_COLUMNS column and the options
   // live in product_option_values, so parsing them off the row answered «no
   // options» for every printer and refused every `product:option` link.
-  assert.match(src, /const pricing = await resolveVariantPricing\(c\.env\.DB, full, ctx\);/);
+  // Only a SELLABLE product's rows are priced (DECISIONS row 240): a catalog-only one's options are named.
+  assert.match(src, /resolveVariantPricing\(c\.env\.DB, full\.filter\(\(r\) => sellableIds\.has\(String\(r\.id\)\)\), ctx\)/);
   assert.ok(!/parseProductRow\(byId\.get\(id\)/.test(src), 'the options are being read off the row again');
 });
 
@@ -104,7 +105,8 @@ test('the configured price is the product page’s, never arithmetic here', () =
   // the product page — the model's direct-sale cell included, which the grid
   // this used to call knew nothing about (A1 Combo: 965,000, not 915,000).
   assert.match(src, /import \{ pricingCtx, resolveVariantPricing, type PricingCtx \} from '\.\/products';/);
-  assert.match(src, /return level \? level\.unit_subtotal_iqd : Number\(rows\[index\]\.price_iqd\) \|\| 0;/);
+  // The row's own price only when it was read SELLABLE (never a catalog-only product's archive).
+  assert.match(src, /return level \? level\.unit_subtotal_iqd : rowPriceIfSellable\(rows\[index\]\);/);
   assert.ok(!/buildGrid/.test(src), 'a second pricing path is back');
   // The two things a second implementation would look like.
   const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');

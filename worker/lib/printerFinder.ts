@@ -54,8 +54,12 @@ export interface FinderCandidate<Card = Record<string, unknown>> {
   card: Card;
   /** `printer` or `laser` (the laser machines' own section). */
   productType: 'printer' | 'laser';
-  /** The viewer's resolved «from» price. */
-  price: number;
+  /**
+   * The viewer's resolved «from» price; NULL for a catalog-only machine (shown,
+   * not sold yet — DECISIONS row 240): a budget excludes it and it ranks after
+   * every priced machine.
+   */
+  price: number | null;
   /** Direct-sale units available now. */
   available: number;
   /** The branch the product is filed in, leaf first (a technology fallback). */
@@ -410,7 +414,9 @@ function techOk(c: FinderCandidate<unknown>, tech: FinderAnswers['tech']): boole
 }
 
 const inBudget = (c: FinderCandidate<unknown>, min: number | null, max: number | null) =>
-  (min === null || c.price >= min) && (max === null || c.price <= max);
+  min === null && max === null
+    ? true
+    : c.price !== null && (min === null || c.price >= min) && (max === null || c.price <= max);
 
 export interface FinderOutcome<Card> {
   total: number;
@@ -453,7 +459,7 @@ export function runFinder<Card>(candidates: FinderCandidate<Card>[], answers: Fi
 
   const relaxationsOf = (c: FinderCandidate<Card>): FinderRelaxation[] => {
     const out: FinderRelaxation[] = [];
-    if (budget && budget.max !== null && c.price > budget.max) out.push('budget_plus_20');
+    if (budget && budget.max !== null && c.price !== null && c.price > budget.max) out.push('budget_plus_20');
     if (wantDirect && !(c.available > 0)) out.push('allow_preorder');
     if (!techOk(c, tech)) out.push('any_tech');
     return out;
@@ -496,7 +502,8 @@ export function runFinder<Card>(candidates: FinderCandidate<Card>[], answers: Fi
   // (plan rollout step 5): weight 0, not a zero for everyone.
   if (cols.use_fit.every((v) => v === null)) weights.use_fit = 0;
   const wsum = CRITERIA.reduce((a, k) => a + weights[k], 0);
-  const budgetCeiling = budget?.max ?? (survivors.length ? Math.max(...survivors.map((c) => c.price)) : 1);
+  const priced = survivors.map((c) => c.price).filter((p): p is number => p !== null);
+  const budgetCeiling = budget?.max ?? (priced.length ? Math.max(...priced) : 1);
 
   const claimIndex = new Map(survivors.map((c, i) => [c.id, i]));
   const scored: Scored<Card>[] = survivors.map((c, i) => {
@@ -504,13 +511,17 @@ export function runFinder<Card>(candidates: FinderCandidate<Card>[], answers: Fi
     let total = wsum > 0 ? CRITERIA.reduce((a, k) => a + weights[k] * (s[k] ?? 0), 0) / wsum : 0;
     if (answers.level === 'beginner' && raw(c.specs, 'skill_level').toLowerCase() === 'professional') total *= 0.85;
     if (c.available > 0) total += AVAILABLE_NOW_BONUS;
-    if (budgetCeiling > 0) total -= VALUE_TIE_BREAK * (c.price / budgetCeiling);
+    if (budgetCeiling > 0 && c.price !== null) total -= VALUE_TIE_BREAK * (c.price / budgetCeiling);
     return { c, s, relaxed: relaxationsOf(c), total };
   });
 
+  // R5 (DECISIONS row 240): a catalog-only machine (no price yet) ranks after every priced one.
   scored.sort(
     (a, b) =>
-      Number(a.relaxed.length > 0) - Number(b.relaxed.length > 0) || b.total - a.total || a.c.rank - b.c.rank
+      Number(a.relaxed.length > 0) - Number(b.relaxed.length > 0) ||
+      Number(a.c.price === null) - Number(b.c.price === null) ||
+      b.total - a.total ||
+      a.c.rank - b.c.rank
   );
   // ONE CONFIGURATION PER PRINTER: the best-matching one. The others stay in
   // the normalisation above (they are real machines at real prices) but a
@@ -688,7 +699,7 @@ export function whyFor(
   if (answers.use && answers.use !== 'unsure' && answers.use !== 'multicolor' && useFit(c.specs, answers.use) === 1) {
     out.push({ code: 'use_listed', use: answers.use });
   }
-  if (budget && c.price > 0 && inBudget(c as FinderCandidate<unknown>, budget.min, budget.max)) {
+  if (budget && c.price !== null && c.price > 0 && inBudget(c as FinderCandidate<unknown>, budget.min, budget.max)) {
     out.push({ code: 'budget', price_iqd: c.price });
   }
   if (answers.sale === 'direct' && c.available > 0) out.push({ code: 'direct', units: c.available });

@@ -101,7 +101,8 @@ test('the anchor-free list obeys the one rule both lists share', () => {
   // forbid it, and a grep over prose would fail on the warning itself.
   const code = fn.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
   assert.ok(!/'%' \+ q/.test(code), 'a concatenated LIKE pattern is a 500 for Arabic search');
-  assert.match(fn, /ORDER BY created_at DESC/, 'with no anchor there is nothing to rank by but recency');
+  // R1 (DECISIONS row 240): priced machines first, then recency — nothing else to rank by without an anchor.
+  assert.match(fn, /ORDER BY sellable_now DESC, created_at DESC/, 'with no anchor there is nothing to rank by but recency');
 });
 
 test('the client sends no `for` when there is none', () => {

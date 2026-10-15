@@ -386,7 +386,7 @@ test('printer maintenance reads start while unrelated pricing is still pending',
     return t.db.prepare(sql);
   };
   const product = row(t.raw, "SELECT * FROM products WHERE id='prd_a1'")!;
-  const detail = catalogProductDetail(tracked, product, parseProductRow(product), pricing);
+  const detail = catalogProductDetail(tracked, product, parseProductRow(product), pricing, { sellable: true });
   try {
     // Let all ready database promises run; the price remains deliberately
     // unresolved. A late maintenance waterfall cannot start in this window.
@@ -497,8 +497,13 @@ test('ahead of 0148 every reader answers «none», and only a save that asks for
   seedPrinters(raw);
   const db = asD1(raw);
   const guest = stubApp(db, null, mountShop);
-  // The clean start (A.12.4 item 6): a database without 0189 lists nothing — the product page is not found.
-  assert.equal((await get(guest, '/api/products/bambu-lab-a1')).status, 404);
+  // The clean start (A.12.4 item 6) and DECISIONS row 240: a database without 0189 sells nothing — the
+  // product page shows the product catalog-only, with no price.
+  const page = await get(guest, '/api/products/bambu-lab-a1');
+  assert.equal(page.status, 200);
+  const body = await json(page);
+  assert.equal(body.price_status, 'unpriced');
+  assert.deepEqual(body.fits_printers, []);
   const listing = await json(await get(guest, '/api/products?fits=bambu-lab-a1'));
   assert.deepEqual(listing.products, []);
   const faceted = await json(await get(guest, '/api/products?facets=1'));

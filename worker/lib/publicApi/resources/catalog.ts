@@ -149,7 +149,8 @@ const BRAND_SCHEMA = object(
 const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 async function brandRows(db: D1Database, slug?: string) {
-  const listedP = (await listing(db)).listed('p');
+  // VISIBLE (DECISIONS row 240): the count matches what the brand's listing shows, catalog-only included.
+  const listedP = (await listing(db)).visible('p');
   const { results } = await db
     .prepare(
       `SELECT b.id, b.slug, b.name_ar, b.name_en, b.name_ckb, COUNT(p.id) AS n

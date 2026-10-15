@@ -10,7 +10,16 @@
  * is always recomputed at checkout.
  */
 
-import { listing as listingOf, listedProductBySlug, optimisticListed, runListed } from '../lib/listing';
+import {
+  listing as listingOf,
+  optimisticSellable,
+  optimisticSellableFlag,
+  optimisticVisible,
+  priceNotAvailable,
+  runListed,
+  visibleProductBySlug,
+} from '../lib/listing';
+import { checkSelection, sellableNowOf, selectionKey, skuPriced, unpricedSkuKeys } from '../lib/commercialState';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -22,7 +31,7 @@ import { notFound, int, str } from '../lib/http';
 import { getSetting, getSettings, PUBLIC_SETTING_KEYS, projectPublicSettings, publicPrintServiceRates } from '../lib/settings';
 import { getPublicDisplayRate } from '../lib/fx/displayRate';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
-import { parseProductRow, projectPublic, projectAdmin } from '../lib/productModel';
+import { DIMENSION_FIELDS, parseProductRow, projectPublic, projectAdmin } from '../lib/productModel';
 import { customerAvailability, customerLinePrice } from '../lib/customerPricing';
 import type { ProductDoc } from '../lib/productModel';
 import { resolveUnitPrice, proPolicyFrom, DEFAULT_PRO_POLICY, type MemberFallback } from '../lib/pricing';
@@ -1245,6 +1254,12 @@ export function firstUsableDirectSelection(
     activeGroupIds?: ReadonlySet<string>;
     transportDefaults?: Array<{ method: string; commission_iqd: number }>;
     coarseStock?: boolean;
+    /**
+     * DECISIONS row 240 (per-SKU): a candidate the page may OPEN on. A product
+     * whose engine priced some SKUs and not others never opens on an unpriced
+     * one — the page would show a selection it cannot sell as its first screen.
+     */
+    accept?: (optionValueIds: readonly string[], colorId: string | null) => boolean;
   }
 ): InitialDirectSaleSelection | null {
   const declaredOptions = sourceDoc.options.filter((o) => o.active !== false);
@@ -1281,6 +1296,7 @@ export function firstUsableDirectSelection(
   ): InitialDirectSaleSelection | null => {
     if (evaluatedSelections >= MAX_OPENING_SELECTIONS) return null;
     evaluatedSelections += 1;
+    if (input.accept && !input.accept(optionValueIds, colorId)) return null;
     const availability = saleAvailability(doc, {
       optionValueIds,
       colorId,
@@ -2371,6 +2387,44 @@ export function priceLevels(
   return { base: at(null, null), option, color, combo, complete };
 }
 
+/** `PriceLevels` where a level can be null: a selection the engine has not priced (DECISIONS row 240). */
+export interface PartialPriceLevels {
+  base: PriceLevel;
+  option: Record<string, PriceLevel | null>;
+  color: Record<string, PriceLevel | null>;
+  combo: Record<string, PriceLevel | null>;
+  complete: boolean;
+}
+
+/**
+ * THE LEVELS OF A PRODUCT PRICED FOR SOME SKUs AND NOT OTHERS (DECISIONS row
+ * 240). An option's and a colour's figure come from the PRICED SKUs only — the
+ * lowest of them (`lowestSkuLevels`), null when none carries it — and an
+ * option × colour pair no priced SKU carries is null. Alone, either would
+ * resolve to the ladder: another SKU's price, or the archived dinars.
+ */
+export function partialPriceLevels(
+  doc: ProductDoc,
+  view: ProductRelationsView | undefined,
+  ctx: PricingCtx,
+  offer: OfferView | null | undefined,
+  now: number
+): PartialPriceLevels {
+  const full = priceLevels(doc, ctx, offer, now);
+  const lowest = lowestSkuLevels(doc, view, ctx, offer, now);
+  const priced = skuLevelSelections(doc, view);
+  const option: Record<string, PriceLevel | null> = {};
+  for (const id of Object.keys(full.option)) option[id] = lowest.option[id]?.level ?? null;
+  const color: Record<string, PriceLevel | null> = {};
+  for (const id of Object.keys(full.color)) color[id] = lowest.color[id]?.level ?? null;
+  const combo: Record<string, PriceLevel | null> = {};
+  for (const [key, level] of Object.entries(full.combo)) {
+    const [o, c] = key.split('|');
+    combo[key] = priced.some((sku) => sku.option_value_ids.includes(o) && sku.color_id === c) ? level : null;
+  }
+  return { base: full.base, option, color, combo, complete: full.complete };
+}
+
 /**
  * «كل خيار آلة مختلفة» — THE PRICE OF EVERY WAY TO BUY A MACHINE, for the
  * comparison and the printer finder, from the SAME resolver the product page
@@ -2491,8 +2545,12 @@ export async function resolveVariantPricing(
       : null;
     // FX-7: the SKUs the rung names, each priced once (none on a product priced per model, or without 0183).
     const priced = skuLevelSelections(doc, view).map((sku) => ({ sku, level: levelPrice(doc, ctx, offer, sku.option_id, sku.color_id, now, sku) }));
+    // Per SKU (DECISIONS row 240): an option no priced SKU carries is not offered at a price (alone it would
+    // read the ladder — another SKU's price, or the archive).
+    const partial = doc.sku_strict === true && priced.length > 0 && unpricedSkuKeys(doc, view).length > 0;
     const options = doc.options
       .filter((o) => o.active !== false)
+      .filter((o) => !partial || priced.some((p) => p.sku.option_value_ids.includes(o.id)))
       .map((option) => {
         const stock = snap ? resolveStock(snap, { option_value_ids: [option.id], color_id: null }) : null;
         const sku = priced.length ? lowestSkuLevel(priced, option.id) : null;
@@ -2505,6 +2563,54 @@ export async function resolveVariantPricing(
       });
     out.set(id, { doc, base: levelPrice(doc, ctx, offer, null, null, now), options });
   }
+  return out;
+}
+
+/**
+ * THE CATALOG-ONLY CARD (DECISIONS rows 239 (3) and 240): what a customer
+ * receives for a product they may SEE but not BUY — no V2 price yet, or a
+ * commercial completeness gap.
+ *
+ * AN ALLOW-LIST, NEVER A STRIP. Migration 0190 left every old product's dinar
+ * ladder in its row and its relation rows (`price_iqd`, the member rungs, the
+ * option and colour columns, the routes), so this card is built from the keys
+ * below and nothing else, and the resolver never runs over those columns: no
+ * `display_*`, no member price, no stock or sale type («نفد المخزون» is never
+ * said of stock nobody configured), no offer, no route fee, no condition, no
+ * payment or delivery option. `price_iqd` and `display_price_iqd` are NULL —
+ * never 0 — and `price_status: 'unpriced'` says why.
+ */
+const CATALOG_ONLY_KEYS = [
+  'id', 'slug', 'status', 'name', 'name_ar', 'name_en', 'name_ckb', 'name_ku',
+  'description', 'description_ar', 'description_en', 'description_ckb', 'description_ku',
+  'composition', 'brand', 'brand_id', 'category_id', 'sub_category_id', 'subcategory_id', 'categories',
+  'template_family', 'sku', 'spec_fields', 'spec_groups', 'specifications', 'dimensions',
+  'media', 'images', 'light_image', 'labels', 'hashtags', 'features',
+  'description_images', 'description_videos', 'content_blocks', 'usage_guide',
+  'how_to_use', 'how_to_use_ar', 'how_to_use_ckb', 'gini_url', 'is_featured', 'display_order', 'created_at',
+] as const;
+/** What a chooser draws for an option or a colour of a catalog-only product: names and pictures. No price, no stock, no route. */
+const CATALOG_ONLY_OPTION_KEYS = [
+  'id', 'name_ar', 'name_en', 'name_ckb', 'image', 'order', 'active', 'variant_key', 'variant_label', 'merged_into', 'group_en', ...DIMENSION_FIELDS,
+] as const;
+const CATALOG_ONLY_COLOR_KEYS = [
+  'id', 'name_ar', 'name_en', 'name_ckb', 'hex', 'gradient', 'image', 'option_id', 'option_ids', 'order', 'active', ...DIMENSION_FIELDS,
+] as const;
+
+const pickKeys = (x: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> => {
+  const out: Record<string, unknown> = {};
+  for (const k of keys) if (x[k] !== undefined) out[k] = x[k];
+  return out;
+};
+
+export function catalogOnlyCard(doc: ProductDoc, coarse = false): Record<string, unknown> {
+  const shaped = publicShape(doc, coarse);
+  const out = pickKeys(shaped, CATALOG_ONLY_KEYS);
+  out.options = (Array.isArray(shaped.options) ? (shaped.options as Record<string, unknown>[]) : []).map((o) => pickKeys(o, CATALOG_ONLY_OPTION_KEYS));
+  out.colors = (Array.isArray(shaped.colors) ? (shaped.colors as Record<string, unknown>[]) : []).map((c) => pickKeys(c, CATALOG_ONLY_COLOR_KEYS));
+  out.price_status = 'unpriced';
+  out.price_iqd = null;
+  out.display_price_iqd = null;
   return out;
 }
 
@@ -2524,6 +2630,13 @@ export async function resolveVariantPricing(
 export function publicWithDisplayPrice(
   row: Record<string, unknown>,
   ctx: PricingCtx,
+  /**
+   * THE ROW'S COMMERCIAL STATE (DECISIONS row 240), decided by the SELLABLE
+   * predicate (worker/lib/listing.ts) — never by the row's money columns.
+   * Required, so the compiler names every caller. Not sellable: the
+   * catalog-only card below, with no resolver run at all.
+   */
+  state: { sellable: boolean },
   view?: ProductRelationsView,
   /**
    * A COMPOSITION ROW'S OWN DISPLAY BLOCK (§4.3, §4.4), and the two reasons it
@@ -2570,6 +2683,7 @@ export function publicWithDisplayPrice(
   coarseStock = false
 ): Record<string, unknown> {
   const doc = view ? applyRelations(parseProductRow(row), view) : parseProductRow(row);
+  if (!state.sellable) return catalogOnlyCard(doc, coarseStock);
   // The coarse rule is applied by the ONE projector, so `options[].stock` and
   // `colors[].stock` are blanked with the base counter rather than beside it.
   const out = publicShape(doc, coarseStock);
@@ -2586,12 +2700,23 @@ export function publicWithDisplayPrice(
   );
   if (directStock !== null) out.direct_stock_available = directStock;
   const levels: Array<{ optionId?: string; colorId?: string; sku?: SkuLevelSelection }> = [{}];
-  for (const o of doc.options) if (o.active !== false) levels.push({ optionId: o.id });
-  for (const col of doc.colors) if (col.active !== false) levels.push({ colorId: col.id });
+  const skuLevels = skuLevelSelections(doc, view);
+  /**
+   * PER SKU (DECISIONS row 240): on a V2 product whose engine priced some SKUs
+   * and not others, an option or a colour that no PRICED SKU carries is not a
+   * level — alone it would resolve to the ladder, which is another SKU's price
+   * (or the archive). Fully priced and per-model products keep today's
+   * arithmetic exactly.
+   */
+  const partial = doc.sku_strict === true && unpricedSkuKeys(doc, view).length > 0;
+  const pricedOptionIds = new Set(skuLevels.flatMap((sku) => sku.option_value_ids));
+  const pricedColorIds = new Set(skuLevels.map((sku) => sku.color_id).filter((id): id is string => !!id));
+  for (const o of doc.options) if (o.active !== false && (!partial || pricedOptionIds.has(o.id))) levels.push({ optionId: o.id });
+  for (const col of doc.colors) if (col.active !== false && (!partial || pricedColorIds.has(col.id))) levels.push({ colorId: col.id });
   // FX-7 (0183): every SKU the rung names, read with its whole selection as the cart reads it, so a
   // product priced per colour or variant is shown «from» its lowest SKU — an option or a colour alone
   // reads the ladder beneath the rung, which holds each model's HIGHEST SKU.
-  for (const sku of skuLevelSelections(doc, view)) levels.push({ sku });
+  for (const sku of skuLevels) levels.push({ sku });
   let best: ResolvedPrice | null = null;
   let maxApplied = 0;
   let primeMin: number | null = null;
@@ -2744,6 +2869,7 @@ export function publicWithDisplayPrice(
       else proMin = cheapest;
     }
   }
+  out.price_status = 'priced';
   out.display_price_iqd = resolved.applied_iqd;
   out.display_applied_tier = resolved.applied_tier;
   // §4: no compare-at. The regular price is exposed so a member can see what
@@ -2834,7 +2960,8 @@ export function compositionDetailBody(
   ctx: PricingCtx,
   mystery?: MysteryContext
 ): Record<string, unknown> {
-  const publicRow = publicWithDisplayPrice(b.row, ctx, b.view, displayOverride(b));
+  // A composition is shown only while SELLABLE (DECISIONS row 240, default D6): its content is its price.
+  const publicRow = publicWithDisplayPrice(b.row, ctx, { sellable: true }, b.view, displayOverride(b));
   if (b.locked) return { ...lockedCard(b, publicRow), viewer_tier: viewerTier(ctx) };
 
   // Bound to `doc` deliberately: `tests/bundleAvailability.test.ts` pins that
@@ -2957,6 +3084,8 @@ const CARD_FIELDS = [
   // only when the product has one — the card shows it on the light theme and
   // the gallery primary on the dark one.
   'light_image',
+  // DECISIONS row 240: 'priced' or 'unpriced' (the catalog-only card: every price below is null).
+  'price_status',
   'price_iqd',
   'display_price_iqd',
   'display_regular_iqd',
@@ -3030,7 +3159,7 @@ export function cardShape(out: Record<string, unknown>): Record<string, unknown>
 }
 
 export function compositionCard(b: ResolvedBundle, ctx: PricingCtx): Record<string, unknown> {
-  return bundleCard(b, publicWithDisplayPrice(b.row, ctx, b.view, displayOverride(b)));
+  return bundleCard(b, publicWithDisplayPrice(b.row, ctx, { sellable: true }, b.view, displayOverride(b)));
 }
 
 /**
@@ -3061,7 +3190,14 @@ export async function resolveProductCards(
   db: D1Database,
   rows: Record<string, unknown>[],
   ctx: PricingCtx,
-  idx: CatalogIndex | null
+  idx: CatalogIndex | null,
+  /**
+   * How each row's commercial state is known (DECISIONS row 240): `'flag'` — the
+   * rows were read VISIBLE with `… AS sellable_now` (absent reads as NOT
+   * sellable: fail closed); `'sellable'` — they were read through the SELLABLE
+   * predicate itself (a commercial shelf).
+   */
+  state: 'flag' | 'sellable'
 ): Promise<Map<string, Record<string, unknown>>> {
   const out = new Map<string, Record<string, unknown>>();
   if (rows.length === 0) return out;
@@ -3073,8 +3209,9 @@ export async function resolveProductCards(
   ]);
   for (const r of rows) {
     const id = String(r.id);
+    const sellable = state === 'sellable' || sellableNowOf(r);
     const card = cardShape(
-      publicWithDisplayPrice(r, ctx, views.get(id), undefined, offers.get(offerKey(subjectOf(id))), pooled.has(id))
+      publicWithDisplayPrice(r, ctx, { sellable }, views.get(id), undefined, offers.get(offerKey(subjectOf(id))), pooled.has(id))
     );
     out.set(id, withCompareType(card, r, idx));
   }
@@ -3111,10 +3248,19 @@ function listingItemOf(
   brandSlug: string | null,
   fits: string[] = []
 ): ListingItem {
-  const price = numOrNull(card.display_price_iqd) ?? numOrNull(card.price_iqd) ?? (Number(row.price_iqd) || 0);
-  const saleTypes = Array.isArray(card.sale_types)
-    ? (card.sale_types as unknown[]).map(String)
-    : safeParse<unknown[]>(String(row.sale_types ?? '[]'), []).map(String);
+  /**
+   * NEVER THE ROW'S OWN PRICE (DECISIONS row 240): a catalog-only card carries
+   * no number, and the row still holds the archived dinar ladder. A priced card
+   * always carries `display_price_iqd`; a missing one is null, never the row.
+   */
+  const unpriced = card.price_status === 'unpriced';
+  const price = unpriced ? null : numOrNull(card.display_price_iqd) ?? numOrNull(card.price_iqd);
+  // No stock and no sale type is claimed for a catalog-only product: the direct and pre-order filters exclude it.
+  const saleTypes = unpriced
+    ? []
+    : Array.isArray(card.sale_types)
+      ? (card.sale_types as unknown[]).map(String)
+      : safeParse<unknown[]>(String(row.sale_types ?? '[]'), []).map(String);
   const offer = card.offer as { schedule_state?: string } | null | undefined;
   const specs = safeParse<Record<string, unknown>>(String(row.spec_fields ?? '{}'), {});
   return {
@@ -3122,11 +3268,12 @@ function listingItemOf(
     card,
     name: String(card.name ?? row.name ?? ''),
     price,
-    regular: numOrNull(card.display_regular_iqd) ?? price,
-    prime: numOrNull(card.display_prime_iqd),
-    pro: numOrNull(card.display_pro_iqd),
-    available: Math.max(0, numOrNull(card.direct_stock_available) ?? 0),
-    saleTypes: saleTypes.length ? saleTypes : [String(row.selling_type || 'direct_sale')],
+    regular: price === null ? null : numOrNull(card.display_regular_iqd) ?? price,
+    prime: price === null ? null : numOrNull(card.display_prime_iqd),
+    pro: price === null ? null : numOrNull(card.display_pro_iqd),
+    available: unpriced ? 0 : Math.max(0, numOrNull(card.direct_stock_available) ?? 0),
+    saleTypes: unpriced ? [] : saleTypes.length ? saleTypes : [String(row.selling_type || 'direct_sale')],
+    priced: !unpriced,
     brandId: row.brand_id ? String(row.brand_id) : null,
     brandSlug,
     fits,
@@ -3163,7 +3310,7 @@ productRoutes.get('/print-calculator', async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT id, slug, name, name_ar, name_ku, price_iqd, spec_fields, images, template_family
        FROM products
-      WHERE ${L.listed('products')} AND template_family = 'materials' AND price_iqd > 0
+      WHERE ${L.sellable('products')} AND template_family = 'materials' AND price_iqd > 0
       ORDER BY price_iqd
       LIMIT 200`
   ).all<Record<string, unknown>>();
@@ -3363,10 +3510,18 @@ export async function listCatalogProducts(
    */
   const categoryField = category ? { category: categoryRef } : {};
 
-  // Listed to customers: active, and not held by the owner's «hide incomplete»
-  // switch (worker/lib/listing.ts) — optimistic, no probe: the first screen's
-  // wave count stands. The count below rewrites this prefix.
-  let sql = `SELECT * FROM products WHERE ${optimisticListed(db)}`;
+  /**
+   * VISIBLE to customers, with each row's SELLABLE flag (worker/lib/listing.ts;
+   * DECISIONS row 240) — optimistic, no probe: the first screen's wave count
+   * stands. A catalog-only product is listed with no price; a composition only
+   * while sellable (default D6). The commercial lists — discounted, featured,
+   * bundles — are SELLABLE only. The count below rewrites the SELECT list.
+   */
+  const commercialList = type === 'discounted' || type === 'featured' || type === 'bundle';
+  const selectList = `SELECT *, ${optimisticSellableFlag(db)} AS sellable_now FROM products`;
+  let sql = commercialList
+    ? `${selectList} WHERE ${optimisticSellable(db)}`
+    : `${selectList} WHERE ${optimisticVisible(db)} AND (products.composition = '' OR ${optimisticSellable(db)})`;
   const params: unknown[] = [];
   /**
    * THE SEARCH THAT COULD NOT FIND THIS SHOP'S OWN FLAGSHIP.
@@ -3534,7 +3689,7 @@ export async function listCatalogProducts(
     }
     sql +=
       ' AND id IN (SELECT f.product_id FROM product_printer_fits f JOIN products pr ON pr.id = f.printer_id' +
-      ` WHERE ${optimisticListed(db, 'pr')} AND pr.slug IN (SELECT value FROM json_each(?)))`;
+      ` WHERE ${optimisticVisible(db, 'pr')} AND pr.slug IN (SELECT value FROM json_each(?)))`;
     params.push(JSON.stringify(listingState.fits));
   }
   /**
@@ -3547,15 +3702,20 @@ export async function listCatalogProducts(
    * shelf order it always had.
    */
   // One COUNT over the same WHERE, before ORDER BY and paging are appended.
-  const countSql = !listing && opts.withTotal ? sql.replace('SELECT * FROM products', 'SELECT COUNT(*) AS n FROM products') : null;
+  const countSql = !listing && opts.withTotal ? sql.replace(selectList, 'SELECT COUNT(*) AS n FROM products') : null;
   const countParams = countSql ? [...params] : [];
   if (searchOrder) {
     // The id's position in the engine's ranking — `key` is the array index
     // `json_each` reports — rather than a `CASE` with one bound id per branch.
     sql += ' ORDER BY (SELECT CAST(r.key AS INTEGER) FROM json_each(?) r WHERE r.value = products.id) LIMIT ? OFFSET ?';
     params.push(JSON.stringify(searchOrder));
-  } else {
+  } else if (search) {
+    // R2 (DECISIONS row 240, default D3): a search — here the substring fallback while the index cannot
+    // answer — keeps today's order whatever the price state; each card says whether it is priced.
     sql += ' ORDER BY display_order ASC, created_at DESC LIMIT ? OFFSET ?';
+  } else {
+    // R1 (DECISIONS row 240): browsing puts the sellable first, so the candidate cap keeps priced items.
+    sql += ' ORDER BY sellable_now DESC, display_order ASC, created_at DESC LIMIT ? OFFSET ?';
   }
   // The listing pages in MEMORY, after the viewer's prices are known, so SQL
   // hands back the whole capped candidate set in its natural order (+1 row to
@@ -3635,6 +3795,7 @@ export async function listCatalogProducts(
         publicWithDisplayPrice(
           p,
           ctx,
+          { sellable: sellableNowOf(p) },
           views.get(String(p.id)),
           undefined,
           offers.get(offerKey(subjectOf(String(p.id)))),
@@ -3743,8 +3904,12 @@ export async function catalogProductDetail(
    * `lowestSku`: also answer each option's and each colour's «from» figure on a
    * product priced per SKU (`lowestSkuLevels`) — the public API v1 asks; the
    * storefront page does not, and pays nothing for it.
+   *
+   * `sellable` (DECISIONS row 240): the row's SELLABLE flag (`sellable_now`).
+   * Required, so no caller can forget it. Not sellable: the catalog-only body —
+   * no price, no level, no mode, no availability, and the resolver never runs.
    */
-  opts: { lowestSku?: boolean } = {}
+  opts: { lowestSku?: boolean; sellable: boolean }
 ): Promise<{ ctx: PricingCtx; body: Record<string, unknown>; lowestSku?: LowestSkuLevels }> {
   // EVERYTHING THAT NEEDS ONLY THE ROW'S ID GOES OUT TOGETHER (P2a): the
   // pool membership, the offer window and the «يناسب» links used to be three
@@ -3813,18 +3978,59 @@ export async function catalogProductDetail(
    * One extra read, and only for a graded row — an ordinary product pays
    * nothing for this feature.
    */
-  let conditionReference: { reference_iqd: number; saving_iqd: number } | null = null;
-  if (parsed.condition?.new_product_id) {
-    const newId = parsed.condition.new_product_id;
-    const ref = await runListed(db, `SELECT price_iqd FROM products WHERE id = ? AND ${optimisticListed(db)}`, (q) =>
-      db.prepare(q).bind(newId).first<{ price_iqd: number }>()
-    );
-    conditionReference = conditionSaving(Number(parsed.price_iqd) || 0, ref ? Number(ref.price_iqd) : null);
-  }
   const ratingCount = Number(ratingRow?.n) || 0;
   const ratingSummary = ratingCount > 0
     ? { average: Math.round(Number(ratingRow?.avg_stars ?? 0) * 10) / 10, count: ratingCount }
     : null;
+  // 0148 — «يناسب» and «مواد الصيانة لهذه الطابعة» (see below).
+  const fitsPrinters = fitsMap.get(productId) ?? [];
+  const fitsBody = fitsPrinters.map((p) => ({ id: p.id, slug: p.slug, name: p.name_en, name_ar: p.name_ar, name_ckb: p.name_ckb }));
+  if (!opts.sellable) {
+    /**
+     * THE CATALOG-ONLY PAGE (DECISIONS rows 239 (3) and 240). Everything a
+     * shopper reads about the product — names, pictures, options and colours,
+     * specifications, documents, «يناسب», reviews — and nothing that prices,
+     * stocks or sells it: `pricing`, `price_levels`, `pricing_modes`,
+     * `membership_preview`, `availability` and `initial_selection` are null,
+     * the plans empty, and the resolver never ran (the row still holds the
+     * archived dinar ladder).
+     */
+    const product = catalogOnlyCard(applyRelations(parsed, relations), poolMember);
+    product.is_printer = isPrinter;
+    product.warranty_plans = [];
+    return {
+      ctx,
+      ...(opts.lowestSku ? { lowestSku: { option: {}, color: {} } } : {}),
+      body: {
+        product,
+        source: 'catalog',
+        price_status: 'unpriced',
+        brand: brandRow ?? null,
+        sales_badge: salesBadge,
+        rating: ratingSummary,
+        condition_reference: null,
+        fits_printers: fitsBody,
+        maintenance_parts: maintenanceParts,
+        relations: publicRelations(relations, poolMember, { catalogOnly: true }),
+        initial_selection: null,
+        pricing: null,
+        membership_preview: null,
+        price_levels: null,
+        pricing_modes: null,
+        warranty_plans: [],
+        availability: null,
+        viewer_tier: viewerTier(ctx),
+      },
+    };
+  }
+  let conditionReference: { reference_iqd: number; saving_iqd: number } | null = null;
+  if (parsed.condition?.new_product_id) {
+    const newId = parsed.condition.new_product_id;
+    const ref = await runListed(db, `SELECT price_iqd FROM products WHERE id = ? AND ${optimisticSellable(db)}`, (q) =>
+      db.prepare(q).bind(newId).first<{ price_iqd: number }>()
+    );
+    conditionReference = conditionSaving(Number(parsed.price_iqd) || 0, ref ? Number(ref.price_iqd) : null);
+  }
   const doc = applyRelations(parsed, relations);
   // ONE FIELD, ONE MEANING. `display_price_iqd` is the CARD price — the
   // cheapest way to buy the product — everywhere else it appears, and this
@@ -3840,6 +4046,9 @@ export async function catalogProductDetail(
     reserved: Number(row.stock_reserved ?? 0),
     low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
   });
+  // DECISIONS row 240 (per SKU): the selections the engine has not priced yet — shown, requested, never sold.
+  const unpricedKeys = unpricedSkuKeys(doc, relations);
+  const unpricedSet = new Set(unpricedKeys);
   const initialSelection = firstUsableDirectSelection(doc, {
     inventory,
     links: relations.links,
@@ -3850,6 +4059,7 @@ export async function catalogProductDetail(
       : undefined,
     transportDefaults: ctx.transportDefaults,
     coarseStock: poolMember,
+    ...(unpricedKeys.length ? { accept: (ids: readonly string[], colorId: string | null) => !unpricedSet.has(selectionKey(ids, colorId)) } : {}),
   });
   const initialOptionValueIds = initialSelection?.option_value_ids ?? [];
   const initialOptionId = initialOptionValueIds[0] ?? null;
@@ -3871,7 +4081,7 @@ export async function catalogProductDetail(
   // C2: the page seeds its first quote with this answer, so it carries the
   // live offer the cart will charge — never the higher ladder price.
   const openingPrice = withLiveOffer(resolved, doc, ctx, offer, now);
-  const out = publicWithDisplayPrice(row, ctx, relations, undefined, offer, poolMember);
+  const out = publicWithDisplayPrice(row, ctx, { sellable: true }, relations, undefined, offer, poolMember);
   // A fact about the product, not a price: the storefront renders the
   // home-delivery note beside a printer's price block from this flag.
   out.is_printer = isPrinter;
@@ -3903,15 +4113,14 @@ export async function catalogProductDetail(
    * A used unit's parts are its MODEL's (`condition.new_product_id`, the
    * link a graded listing already carries). Both empty before 0148.
    */
-  // Fits and optional printer maintenance now arrive in the initial wave.
-  const fitsPrinters = fitsMap.get(productId) ?? [];
-
+  // Fits and optional printer maintenance now arrive in the initial wave (`fitsBody` above).
   return {
     ctx,
     ...(opts.lowestSku ? { lowestSku: lowestSkuLevels(doc, relations, ctx, offer, now) } : {}),
     body: {
     product: out,
     source: 'catalog',
+    price_status: 'priced',
     brand: brandRow ?? null,
     /**
      * The two header signals the page could not previously show.
@@ -3937,7 +4146,7 @@ export async function catalogProductDetail(
      */
     condition_reference: conditionReference,
     // 0148 — «يناسب» and «مواد الصيانة لهذه الطابعة» (see above).
-    fits_printers: fitsPrinters.map((p) => ({ id: p.id, slug: p.slug, name: p.name_en, name_ar: p.name_ar, name_ckb: p.name_ckb })),
+    fits_printers: fitsBody,
     maintenance_parts: maintenanceParts,
     // The structure the JSON model could not express: option GROUPS, the
     // real many-to-many colour links, modelled combinations and bound
@@ -3968,7 +4177,9 @@ export async function catalogProductDetail(
     // EVERY SELECTION THE CHOOSERS CAN REACH, PRICED HERE (see `priceLevels`).
     // The page paints the exact figure on the same frame as the tap, and the
     // debounced quote becomes a confirmation rather than a prerequisite.
-    price_levels: priceLevels(doc, ctx, offer, now),
+    // Per SKU (DECISIONS row 240): an unpriced selection's level is null, never another SKU's price.
+    price_levels: unpricedKeys.length ? partialPriceLevels(doc, relations, ctx, offer, now) : priceLevels(doc, ctx, offer, now),
+    ...(unpricedKeys.length ? { unpriced_selections: unpricedKeys } : {}),
     // The final price of every way to get the opening selection (the quote
     // re-computes them per selection) — the page's fulfilment pills and
     // transport rows read these, and compute nothing. A live offer prices
@@ -4015,8 +4226,9 @@ productRoutes.get('/:slug', (c) => anonymousCached(c, { perViewer: true }, () =>
 
 async function productDetail(c: Context<AppContext>): Promise<Response> {
   const slug = c.req.param('slug') ?? '';
-  // A product the owner's «hide incomplete» switch holds answers exactly as a hidden one: 404.
-  const row = await listedProductBySlug(c.env.DB, slug);
+  // VISIBLE (DECISIONS row 240): a product held for a catalog gap answers exactly as a hidden one, 404;
+  // one a customer may see but not buy yet answers the catalog-only body.
+  const row = await visibleProductBySlug(c.env.DB, slug);
   if (row) {
     const user = c.get('user');
     const parsed = parseProductRow(row);
@@ -4032,6 +4244,8 @@ async function productDetail(c: Context<AppContext>): Promise<Response> {
      * navigates; the payload is already correct if it does not.
      */
     if (parsed.composition !== '') {
+      // A composition is shown only while SELLABLE (default D6): its content is its price.
+      if (row.sellable_now !== 1) throw notFound('Product not found');
       const ctx = await pricingCtx(c);
       const bundle = await compositionDetail(c.env.DB, slug, ctx);
       if (!bundle) throw notFound('Product not found');
@@ -4051,7 +4265,7 @@ async function productDetail(c: Context<AppContext>): Promise<Response> {
           .first()
       : Promise.resolve(null);
     const [{ ctx, body }, favRow] = await Promise.all([
-      catalogProductDetail(c.env.DB, row, parsed, pricingCtx(c)),
+      catalogProductDetail(c.env.DB, row, parsed, pricingCtx(c), { sellable: row.sellable_now === 1 }),
       favPromise,
     ]);
 
@@ -4125,8 +4339,14 @@ async function productDetail(c: Context<AppContext>): Promise<Response> {
 productRoutes.post('/:slug/quote', async (c) => {
   await rateLimit(c, 'product_quote', 120, 60);
   const slug = c.req.param('slug');
-  const row = await listedProductBySlug(c.env.DB, slug);
+  const row = await visibleProductBySlug(c.env.DB, slug);
   if (!row) throw notFound('Product not found');
+  // Shown but not sold (DECISIONS row 240): the door's own refusal. The page never asks for it. A composition
+  // is never shown unless sellable (default D6), so it answers 404 exactly as before.
+  if (row.sellable_now !== 1) {
+    if (String(row.composition ?? '') !== '') throw notFound('Product not found');
+    throw priceNotAvailable();
+  }
 
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   // Read up to what the quantity field can hold; above the ceiling the answer
@@ -4267,6 +4487,30 @@ productRoutes.post('/:slug/quote', async (c) => {
     body.fulfillmentType === 'direct_sale' || body.fulfillmentType === 'pre_order' ? body.fulfillmentType : null;
   const warrantyPlanId = typeof body.warrantyPlanId === 'string' && body.warrantyPlanId ? body.warrantyPlanId : null;
 
+  /**
+   * PER SKU (DECISIONS row 240): a COMPLETE selection whose SKU the engine has
+   * not priced is answered with no number at all — never the ladder, which is
+   * another SKU's price or the archive. The page shows «السعر غير متوفر حالياً»
+   * and «طلب السعر» for this selection; the others price and sell as before. A
+   * SKU priced on another channel only keeps today's `VARIANT_UNAVAILABLE`.
+   */
+  if (doc.sku_strict === true) {
+    const key = selectionKey(optionValueIds, colorId);
+    if (!skuPriced(doc, key) && checkSelection(doc, relations, optionValueIds, colorId).ok) {
+      return c.json({
+        success: true,
+        price_status: 'unpriced',
+        selection_key: key,
+        quote: null,
+        membership_preview: null,
+        pricing_modes: null,
+        warranty_plans: [],
+        availability: null,
+        viewer_tier: viewerTier(ctx),
+      });
+    }
+  }
+
   const resolved = resolveUnitPrice({
     product: doc,
     optionId,
@@ -4295,6 +4539,7 @@ productRoutes.post('/:slug/quote', async (c) => {
 
   return c.json({
     success: true,
+    price_status: 'priced',
     // C5: the final numbers only — no components, no fee, no rule.
     quote: {
       ...customerLinePrice(priced),
@@ -4364,7 +4609,7 @@ productRoutes.post('/:slug/quote', async (c) => {
  */
 async function openBoxShelf(db: D1Database): Promise<Record<string, unknown>[]> {
   try {
-    const r = await runListed(db, `SELECT * FROM products WHERE ${optimisticListed(db)} AND condition_doc <> '{}' ORDER BY created_at DESC LIMIT 12`, (q) =>
+    const r = await runListed(db, `SELECT * FROM products WHERE ${optimisticSellable(db)} AND condition_doc <> '{}' ORDER BY created_at DESC LIMIT 12`, (q) =>
       db.prepare(q).all<Record<string, unknown>>()
     );
     return r.results ?? [];
@@ -4372,6 +4617,23 @@ async function openBoxShelf(db: D1Database): Promise<Record<string, unknown>[]> 
     if (await isConditionColumnMissing(db, e)) return [];
     throw e;
   }
+}
+
+/** The home «وصل حديثاً» strip's length. */
+export const HOME_LATEST_LIMIT = 20;
+/**
+ * R4 (DECISIONS row 240, default D13): catalog-only products may appear on the
+ * home page but must not crowd it — they fill only the slots priced products
+ * leave empty, and at most a quarter of the strip.
+ */
+export const HOME_CATALOG_ONLY_MAX = 5;
+
+/** The new-arrivals rows (read `sellable_now DESC, created_at DESC`): every priced row, then the capped catalog-only fill. */
+export function homeLatest<T extends Record<string, unknown>>(rows: readonly T[]): T[] {
+  const priced = rows.filter((r) => sellableNowOf(r));
+  const room = Math.max(0, Math.min(HOME_CATALOG_ONLY_MAX, HOME_LATEST_LIMIT - priced.length));
+  const unpriced = rows.filter((r) => !sellableNowOf(r)).slice(0, room);
+  return [...priced, ...unpriced].slice(0, HOME_LATEST_LIMIT);
 }
 
 export const homeRoutes = new Hono<AppContext>();
@@ -4419,9 +4681,14 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
    */
   const ctxPromise = pricingCtx(c);
   const settingsPromise = getSettings(c.env.DB, PUBLIC_SETTING_KEYS);
-  // Listed to customers (worker/lib/listing.ts): optimistic, no probe before the first wave.
+  // worker/lib/listing.ts, optimistic, no probe before the first wave: the commercial strips are SELLABLE,
+  // the new arrivals and the brand counts VISIBLE (DECISIONS row 240, rule R4).
   const db = c.env.DB;
-  const L = { listed: (alias?: string) => optimisticListed(db, alias) };
+  const L = {
+    visible: (alias?: string) => optimisticVisible(db, alias),
+    sellable: (alias?: string) => optimisticSellable(db, alias),
+    sellableFlag: (alias?: string) => optimisticSellableFlag(db, alias),
+  };
   // The display currency's rate (FX plan §8): the one public FX figure, in the first wave.
   const displayRatePromise = getPublicDisplayRate(c.env.DB);
   const [settings, discounted, latest, openBoxRows, categories, brands, ctx, display] = await Promise.all([
@@ -4455,14 +4722,19 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
       return runListed(
         db,
         `SELECT * FROM products
-          WHERE ${L.listed('products')} AND composition = ''
+          WHERE ${L.sellable('products')} AND composition = ''
             AND ${reach.sql}
           ORDER BY created_at DESC LIMIT 10`,
         (q) => db.prepare(q).bind(...reach.params).all<Record<string, unknown>>()
       );
     }),
-    runListed(db, `SELECT * FROM products WHERE ${L.listed('products')} ORDER BY created_at DESC LIMIT 20`, (q) =>
-      db.prepare(q).all<Record<string, unknown>>()
+    // R4: priced first; catalog-only items fill only the slots priced items leave empty (`homeLatest`).
+    runListed(
+      db,
+      `SELECT *, ${L.sellableFlag('products')} AS sellable_now FROM products
+        WHERE ${L.visible('products')} AND (products.composition = '' OR ${L.sellable('products')})
+        ORDER BY sellable_now DESC, created_at DESC LIMIT ${HOME_LATEST_LIMIT}`,
+      (q) => db.prepare(q).all<Record<string, unknown>>()
     ),
     // OPEN BOX / USED / REFURBISHED, newest first.
     //
@@ -4500,7 +4772,7 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
       `WITH counted AS (
          SELECT b.id, b.slug, b.name_ar, b.name_en, b.name_ckb,
                 (SELECT COUNT(*) FROM products p
-                  WHERE p.brand_id = b.id AND ${L.listed('p')}) AS n
+                  WHERE p.brand_id = b.id AND ${L.visible('p')}) AS n
            FROM brands b
           WHERE b.active = 1
        )
@@ -4539,8 +4811,9 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
   // was about. One batched read for both strips, not N+1 per card.
   // A product can be in BOTH strips, and the same id twice would bind a
   // duplicate placeholder for nothing.
+  const latestRows = homeLatest(latest.results ?? []);
   const homeRows = new Map<string, { id: string; inventory_mode: unknown }>();
-  for (const r of [...discounted.results, ...latest.results, ...openBoxRows]) {
+  for (const r of [...discounted.results, ...latestRows, ...openBoxRows]) {
     homeRows.set(String(r.id), { id: String(r.id), inventory_mode: r.inventory_mode });
   }
   const [homeViews, homePooled, homeOffers] = await Promise.all([
@@ -4589,14 +4862,14 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
   if (referenceIds.length > 0) {
     const { results: refRows } = await runListed(
       db,
-      `SELECT id, price_iqd FROM products WHERE ${L.listed('products')} AND id IN (${referenceIds.map(() => '?').join(',')})`,
+      `SELECT id, price_iqd FROM products WHERE ${L.sellable('products')} AND id IN (${referenceIds.map(() => '?').join(',')})`,
       (q) => db.prepare(q).bind(...referenceIds).all<{ id: string; price_iqd: number }>()
     );
     for (const r of refRows ?? []) referencePrices.set(String(r.id), Number(r.price_iqd) || 0);
   }
   const openBoxCards = openBoxRows.map((p) => {
     const card = cardShape(
-      publicWithDisplayPrice(p, ctx, homeViews.get(String(p.id)), undefined, offerFor(p.id), homePooled.has(String(p.id)))
+      publicWithDisplayPrice(p, ctx, { sellable: true }, homeViews.get(String(p.id)), undefined, offerFor(p.id), homePooled.has(String(p.id)))
     );
     const condition = parseConditionDoc(p.condition_doc);
     const reference = condition?.new_product_id ? referencePrices.get(condition.new_product_id) : undefined;
@@ -4608,10 +4881,12 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
     success: true,
     settings: safeSettings,
     discounted: discounted.results.map((p) =>
-      cardShape(publicWithDisplayPrice(p, ctx, homeViews.get(String(p.id)), undefined, offerFor(p.id), homePooled.has(String(p.id))))
+      cardShape(publicWithDisplayPrice(p, ctx, { sellable: true }, homeViews.get(String(p.id)), undefined, offerFor(p.id), homePooled.has(String(p.id))))
     ),
-    latest: latest.results.map((p) =>
-      cardShape(publicWithDisplayPrice(p, ctx, homeViews.get(String(p.id)), undefined, offerFor(p.id), homePooled.has(String(p.id))))
+    latest: latestRows.map((p) =>
+      cardShape(
+        publicWithDisplayPrice(p, ctx, { sellable: sellableNowOf(p) }, homeViews.get(String(p.id)), undefined, offerFor(p.id), homePooled.has(String(p.id)))
+      )
     ),
     // Already filtered to catalogs that hold something, at both levels —
     // homeCategoryTree drops the empties rather than making the client do it.
@@ -4723,6 +4998,8 @@ async function homeSections(c: Context<AppContext>): Promise<Response> {
         publicWithDisplayPrice(
           p,
           ctx,
+          // Every shelf here is read through the SELLABLE predicate (homeShelves.ts, rule R4).
+          { sellable: true },
           views.get(id),
           undefined,
           offers.get(offerKey(subjectOf(id))),

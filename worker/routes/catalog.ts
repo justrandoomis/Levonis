@@ -122,12 +122,14 @@ async function availableProductIds(
 ): Promise<Set<string> | null> {
   if (ids.length === 0) return new Set();
   if (ids.length > TREE_AVAILABILITY_CAP) return null;
+  // VISIBLE with each row's SELLABLE flag (DECISIONS row 240): a catalog-only card claims no stock.
+  const L = await listing(db);
   const { results } = await db.prepare(
-    `SELECT * FROM products WHERE ${(await listing(db)).listed('products')} AND composition = '' AND id IN (SELECT value FROM json_each(?))`
+    `SELECT *, ${L.sellableFlag('products')} AS sellable_now FROM products WHERE ${L.visible('products')} AND composition = '' AND id IN (SELECT value FROM json_each(?))`
   )
     .bind(JSON.stringify(ids))
     .all<Record<string, unknown>>();
-  const cards = await resolveProductCards(db, results ?? [], await ctxPromise, idx);
+  const cards = await resolveProductCards(db, results ?? [], await ctxPromise, idx, 'flag');
   const out = new Set<string>();
   for (const [id, card] of cards) if (Number(card.direct_stock_available ?? 0) > 0) out.add(id);
   return out;
@@ -194,18 +196,19 @@ catalogRoutes.get('/:slug', async (c) => {
     // not check `active` either, and a dead link over a full shelf is worse.
     if (memberIds.length === 0) throw notFoundCategory();
 
+    // VISIBLE, priced first so the page cap keeps priced items (DECISIONS row 240, rule R1).
     const L = await listing(c.env.DB);
     const { results } = await c.env.DB.prepare(
-      `SELECT * FROM products
-        WHERE ${L.listed('products')} AND composition = '' AND id IN (SELECT value FROM json_each(?))
-        ORDER BY display_order ASC, created_at DESC
+      `SELECT *, ${L.sellableFlag('products')} AS sellable_now FROM products
+        WHERE ${L.visible('products')} AND composition = '' AND id IN (SELECT value FROM json_each(?))
+        ORDER BY sellable_now DESC, display_order ASC, created_at DESC
         LIMIT ?`
     )
       .bind(JSON.stringify(memberIds), CATEGORY_PAGE_CAP)
       .all<Record<string, unknown>>();
     const rows = results ?? [];
     const ctx = await pricingCtx(c);
-    const cards = await resolveProductCards(c.env.DB, rows, ctx, idx);
+    const cards = await resolveProductCards(c.env.DB, rows, ctx, idx, 'flag');
     const truncated = memberIds.length > rows.length;
 
     const availableIds = new Set([...cards].filter(([, card]) => Number(card.direct_stock_available ?? 0) > 0).map(([id]) => id));

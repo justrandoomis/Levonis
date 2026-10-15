@@ -1,10 +1,11 @@
 /**
  * THE CLEAN START, END TO END (spec addendum A.12.4; DECISIONS row 222).
  *
- *   1. after 0190 every pre-existing product is unlisted and unpurchasable
- *      until its first complete V2 write: the listing, the product page and
- *      the cart refuse it; an open cart lists it as unavailable (ar/en/ckb,
- *      no number);
+ *   1. after 0190 every pre-existing product is unpurchasable until its first
+ *      complete V2 write — and, since DECISIONS row 240, SHOWN catalog-only:
+ *      the listing and the page carry it with `price_status: 'unpriced'` and
+ *      no number; the cart refuses it (PRICE_NOT_AVAILABLE); an open cart
+ *      lists it apart (ar/en/ckb, no number);
  *   2. a V2-published product is listed and sold again, priced from its SKU
  *      rows;
  *   3. no legacy number reaches a new order line: cost NULL, basis
@@ -12,7 +13,8 @@
  *      cost — and `calculateGoods` reads it as `estimated`;
  *   4. the archive: one `clean_start` row per product present when 0190 runs,
  *      every legacy money field kept, a second run inserts nothing;
- *   5. deploy-ahead: on a database at 0188 the new Worker lists nothing.
+ *   5. deploy-ahead: on a database at 0188 the new Worker sells nothing and
+ *      shows every product catalog-only (never a legacy price).
  *
  * Every app here opts out of the route-test auto-publish (`publishV2: false`).
  * LOCAL ONLY: in-memory SQLite, no network.
@@ -49,44 +51,59 @@ const appFor = (db: D1Database, user: StubUser | null = BUYER) =>
     { publishV2: false }
   );
 
-test('1. after the cut-over a legacy product is unlisted and unpurchasable; an open cart line is unavailable, never priced', async () => {
+test('1. after the cut-over a legacy product is shown catalog-only and unpurchasable; an open cart line is unavailable, never priced', async () => {
   const raw = seedCatalogue();
   const db = asD1(raw);
   // An open cart from before the cut-over.
   raw.exec("INSERT INTO cart_items (id, user_id, product_id, qty) VALUES ('ci_old', 'buyer', 'p_nozzle', 2)");
   const app = appFor(db);
   const list = await json(await get(app, '/api/products'));
-  const listed = (list.products ?? list.items ?? []) as Array<{ id: string }>;
-  assert.equal(listed.length, 0, 'no legacy product is listed');
+  const listed = (list.products ?? list.items ?? []) as Array<{ id: string; price_status: string; price_iqd: unknown; display_price_iqd: unknown }>;
+  assert.ok(listed.length > 0, 'the legacy products are shown (DECISIONS row 240)');
+  for (const card of listed) {
+    assert.equal(card.price_status, 'unpriced', card.id);
+    assert.equal(card.price_iqd, null, card.id);
+    assert.equal(card.display_price_iqd, null, card.id);
+  }
+  assert.doesNotMatch(JSON.stringify(list), /"(display_|prime_|pro_)?price_iqd":[1-9]/, 'no legacy number on any card');
   const page = await get(app, '/api/products/nozzle');
-  assert.equal(page.status, 404);
+  assert.equal(page.status, 200);
+  const pageBody = await json(page);
+  assert.equal(pageBody.price_status, 'unpriced');
+  assert.equal(pageBody.pricing, null);
   const add = await post(app, '/api/cart/items', { productId: 'p_pla', qty: 1 });
-  assert.notEqual(add.status, 200);
+  assert.equal(add.status, 409);
+  assert.equal((await json(add)).code, 'PRICE_NOT_AVAILABLE');
   const cart = await json(await get(app, '/api/cart'));
   const lines = (cart.items ?? []) as unknown[];
   assert.equal(lines.length, 0, 'a hidden line is never priced in the cart');
   const unavailable = cart.unavailable_lines as Array<Record<string, unknown>>;
   assert.equal(unavailable.length, 1);
   assert.equal(unavailable[0]!.product_id, 'p_nozzle');
-  assert.equal(unavailable[0]!.code, 'PRODUCT_CURRENTLY_UNAVAILABLE');
+  assert.equal(unavailable[0]!.code, 'PRICE_NOT_AVAILABLE', 'still shown: the line names the missing price');
   const names = unavailable[0]!.name as { ar: string; en: string; ckb: string };
   assert.ok(names.ar && names.en && names.ckb && names.ckb !== names.ar, 'ar, en and real Sorani');
-  assert.doesNotMatch(JSON.stringify(unavailable), /5000|price/i, 'no number for a hidden line');
+  assert.doesNotMatch(JSON.stringify(unavailable), /5000|_iqd|"price/, 'no number for an unsellable line');
 });
 
-test('2. a V2-published product is listed and sold again; the others stay hidden', async () => {
+test('2. a V2-published product is listed priced and sold again; the others stay catalog-only', async () => {
   const raw = seedCatalogue();
   const db = asD1(raw);
   await publishV2(raw, 'p_nozzle');
   assert.equal(isV2Published(raw, 'p_nozzle'), true);
   const app = appFor(db);
   const list = await json(await get(app, '/api/products'));
-  const ids = ((list.products ?? list.items ?? []) as Array<{ id: string }>).map((p) => p.id);
-  assert.deepEqual(ids, ['p_nozzle']);
-  assert.equal((await get(app, '/api/products/nozzle')).status, 200);
+  const cards = (list.products ?? list.items ?? []) as Array<{ id: string; price_status: string }>;
+  assert.deepEqual(cards.filter((p) => p.price_status === 'priced').map((p) => p.id), ['p_nozzle']);
+  assert.equal(cards[0]!.id, 'p_nozzle', 'browse puts the priced product first (R1)');
+  const nozzle = await get(app, '/api/products/nozzle');
+  assert.equal(nozzle.status, 200);
+  assert.equal((await json(nozzle)).price_status, 'priced');
   const add = await json(await post(app, '/api/cart/items', { productId: 'p_nozzle', qty: 1 }));
   assert.equal(add.success, true, JSON.stringify(add));
-  assert.equal((await get(app, '/api/products/pla')).status, 404);
+  const pla = await get(app, '/api/products/pla');
+  assert.equal(pla.status, 200);
+  assert.equal((await json(pla)).price_status, 'unpriced');
 });
 
 test('3. no legacy number reaches a new order line; the frozen V2 estimate is read as `estimated`', async () => {
@@ -141,13 +158,18 @@ test('4. the archive: one clean_start row per product present at 0190, every leg
   assert.throws(() => raw.exec("DELETE FROM pricing_legacy_snapshots WHERE product_id = 'p_a'"));
 });
 
-test('5. deploy-ahead: on a database at 0188 the new Worker lists nothing (fail closed)', async () => {
+test('5. deploy-ahead: on a database at 0188 the new Worker sells nothing and shows every product catalog-only (fail closed)', async () => {
   const raw = dbThrough('0188');
   raw.exec("INSERT INTO products (id, slug, name, price_iqd, status, stock, selling_type, sale_types) VALUES ('p_x', 'x', 'X', 50000, 'active', 3, 'direct_sale', '[\"direct_sale\"]')");
   const app = appFor(asD1(raw), null);
   const res = await get(app, '/api/products');
   assert.equal(res.status, 200);
   const body = await json(res);
-  assert.equal(((body.products ?? body.items ?? []) as unknown[]).length, 0);
-  assert.equal((await get(app, '/api/products/x')).status, 404);
+  const cards = (body.products ?? body.items ?? []) as Array<{ id: string; price_status: string; price_iqd: unknown }>;
+  assert.deepEqual(cards.map((c) => [c.id, c.price_status, c.price_iqd]), [['p_x', 'unpriced', null]]);
+  assert.doesNotMatch(JSON.stringify(body), /50000|50,000/, 'never the legacy price');
+  const page = await get(app, '/api/products/x');
+  assert.equal(page.status, 200);
+  assert.equal((await json(page)).price_status, 'unpriced');
+  assert.equal((await post(app, '/api/products/x/quote', { qty: 1 })).status, 409);
 });

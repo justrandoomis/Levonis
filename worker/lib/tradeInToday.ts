@@ -4,12 +4,14 @@
  *
  * The lowest PUBLIC new price of the same SKU (model + colour) on any channel
  * the shop sells it today: direct sale, or a pre-order route when that is
- * cheaper (V2 keeps P ≤ D). It is read ONLY from a product the customer
- * surfaces list — V2-published, active, not held (`listing(db).listed`) —
+ * cheaper (V2 keeps P ≤ D). It is read ONLY from a product a customer can
+ * BUY — SELLABLE: V2-published, active, not held (`listing(db).sellable`;
+ * DECISIONS row 240: a valuation is a purchase-side reader) —
  * through the same strict resolver the cart uses, for a guest (the regular
  * public class; the paid-net figure already carries the buyer's membership).
- * An unlisted, held, hidden or «يحتاج تسعيرًا» product answers null, and so does
- * a SKU × channel the V2 writer never priced (`VARIANT_UNAVAILABLE`).
+ * An unsellable product (hidden, held, catalog-only «بلا سعر», «يحتاج تسعيرًا»)
+ * answers null, and so does a SKU × channel the V2 writer never priced
+ * (`VARIANT_UNAVAILABLE`).
  *
  * NEVER READ: `products.price_iqd`, an option's `regular_price_iqd` /
  * `regular_adjust_iqd`, `pricing_legacy_snapshots` — the archive of old dinar
@@ -52,7 +54,7 @@ export interface ListedProduct {
  */
 export class TodayReader {
   private ctx: Promise<PricingCtx> | null = null;
-  private listedSql: Promise<string> | null = null;
+  private sellableClause: Promise<string> | null = null;
   private products = new Map<string, Promise<ListedProduct | null>>();
   constructor(private readonly env: Env) {}
 
@@ -61,14 +63,14 @@ export class TodayReader {
     return this.ctx;
   }
 
-  /** The product as a customer may see it, or null (unlisted, held, hidden, needs pricing, absent). */
+  /** The product as a customer may buy it, or null (unsellable: held, hidden, catalog-only, needs pricing, absent). */
   product(productId: string): Promise<ListedProduct | null> {
     let p = this.products.get(productId);
     if (!p) {
       p = (async () => {
         const db = this.env.DB;
-        this.listedSql ??= listing(db).then((l) => l.listed('products'));
-        const row = await db.prepare(`SELECT * FROM products WHERE id = ? AND ${await this.listedSql}`).bind(productId).first<Record<string, unknown>>();
+        this.sellableClause ??= listing(db).then((l) => l.sellable('products'));
+        const row = await db.prepare(`SELECT * FROM products WHERE id = ? AND ${await this.sellableClause}`).bind(productId).first<Record<string, unknown>>();
         if (!row) return null;
         const parsed = parseProductRow(row);
         const [relations, isPrinter] = await Promise.all([loadRelationsView(db, productId, row.inventory_mode), isPrinterProduct(db, productId)]);

@@ -55,6 +55,7 @@
  */
 
 import { listing } from '../lib/listing';
+import { priceStatusOf, rowPriceIfSellable, sellableNowOf } from '../lib/commercialState';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
@@ -121,6 +122,8 @@ export interface ProductRow {
   name_ar: string;
   name_ku: string;
   price_iqd: number;
+  /** DECISIONS row 240: 1 when read with the SELLABLE flag and sellable; absent or 0 = shown without a price. */
+  sellable_now?: number;
   spec_fields: string;
   template_family: string | null;
   category_id: string | null;
@@ -166,8 +169,13 @@ export interface CompareProductCard {
    * on a member-tier price would compare the viewer's membership as much as
    * the machines, and a signed-out visitor would see a different comparison
    * from a signed-in one.
+   *
+   * NULL for a catalog-only product (DECISIONS row 240: shown, not sold yet) —
+   * never 0 and never the archived figure its row still holds; `price_status`
+   * says why, and the «الأرخص» mark and the price sorts ignore it.
    */
-  price_iqd: number;
+  price_iqd: number | null;
+  price_status: 'priced' | 'unpriced';
   product_type: ProductTypeId | null;
   section: { id: string; slug: string; label: Trilingual } | null;
   brand_id: string | null;
@@ -189,7 +197,7 @@ export interface CompareProductCard {
    * this product can be added as, so the picker can ask «أي خيار؟» before it
    * adds. Absent — not empty — when there is nothing to ask.
    */
-  options?: Array<{ id: string; label: Trilingual; price_iqd?: number; available?: number | null }>;
+  options?: Array<{ id: string; label: Trilingual; price_iqd?: number | null; available?: number | null }>;
   /** ON A COMPARISON COLUMN ONLY: the URL named no option, so this is the base configuration. */
   default_option?: boolean;
   /**
@@ -362,7 +370,9 @@ export function cardOf(p: Placed, pics?: { image: string | null; light: string }
     name: tri(p.row.name_ar, p.row.name, p.row.name_ku),
     image: pics?.image ?? null,
     ...(pics?.light ? { light_image: pics.light } : {}),
-    price_iqd: Number(p.row.price_iqd) || 0,
+    // Only a row read SELLABLE carries its price (DECISIONS row 240): never the archive of a catalog-only one.
+    price_iqd: rowPriceIfSellable(p.row),
+    price_status: priceStatusOf(sellableNowOf(p.row as unknown as Record<string, unknown>)),
     product_type: p.productType,
     section: leaf
       ? { id: leaf.id, slug: leaf.slug, label: tri(leaf.name_ar, leaf.name_en, leaf.name_ckb) }
@@ -506,10 +516,12 @@ compareRoutes.get('/', async (c) => {
   // two columns.
   const rows = slots.map((slot) => byId.get(slot.productId)!);
 
-  // A product the owner's «hide incomplete» switch holds is «not on display» exactly like a hidden one.
+  // VISIBLE (DECISIONS row 240): a product held for a catalog gap is «not on display» exactly like a hidden
+  // one; a catalog-only product is compared with no price. One statement for every id.
   const L = await listing(c.env.DB);
-  const held = await L.heldIds(ids);
-  const hidden = rows.filter((r) => !L.isListedRow(r, held));
+  const states = await L.statesOf(ids);
+  for (const r of rows) r.sellable_now = states.get(String(r.id)) === 'sellable' ? 1 : 0;
+  const hidden = rows.filter((r) => String(r.status) !== 'active' || (states.get(String(r.id)) ?? 'hidden') === 'hidden');
   if (hidden.length) {
     throw badRequest(
       `«${label(hidden[0])}» مو معروض حالياً، فما نكدر نقارنه. / “${hidden[0].name || hidden[0].slug}” is not on display right now, so it cannot be compared.`,
@@ -540,7 +552,13 @@ compareRoutes.get('/', async (c) => {
    * that knew nothing of the model's direct-sale cell. The figure a column
    * shows is now the figure the product page shows for that option.
    */
-  const pricing = await resolveVariantPricing(c.env.DB, full, ctx);
+  // The resolver never runs over a catalog-only row (its columns hold the archived ladder): its options
+  // are named from the tables, unpriced.
+  const sellableIds = new Set(ids.filter((id) => states.get(id) === 'sellable'));
+  const [pricing, unpricedOptions] = await Promise.all([
+    resolveVariantPricing(c.env.DB, full.filter((r) => sellableIds.has(String(r.id))), ctx),
+    namedOptions(c.env.DB, full.filter((r) => !sellableIds.has(String(r.id)))),
+  ]);
   const tax = taxonomy(catalogRows);
   const placed = rows.map((row) => place(row, tax));
 
@@ -561,6 +579,12 @@ compareRoutes.get('/', async (c) => {
    * cheapest way to buy (packages/pricing/src/cheapestBase.ts) — and says so.
    */
   const picked = slots.map((slot) => {
+    if (!sellableIds.has(slot.productId)) {
+      // Catalog-only: the named option, unpriced; no option named is the product itself.
+      if (!slot.optionId) return null;
+      const named = (unpricedOptions.get(slot.productId) ?? []).find((o) => o.id === slot.optionId);
+      if (named) return { option: named, level: null, available: null };
+    }
     const variants = pricing.get(slot.productId)?.options ?? [];
     if (!slot.optionId) return defaultVariant(variants);
     const hit = variants.find((v) => v.option.id === slot.optionId);
@@ -576,11 +600,12 @@ compareRoutes.get('/', async (c) => {
     return hit;
   });
 
-  /** The price of a column: the chosen option's, else the product's — both from the resolver. */
-  const priceOf = (index: number): number => {
+  /** The price of a column: the chosen option's, else the product's — both from the resolver. Null when not sellable. */
+  const priceOf = (index: number): number | null => {
+    if (!sellableIds.has(slots[index].productId)) return null;
     const variant = picked[index];
     const level = variant ? variant.level : pricing.get(slots[index].productId)?.base;
-    return level ? level.unit_subtotal_iqd : Number(rows[index].price_iqd) || 0;
+    return level ? level.unit_subtotal_iqd : rowPriceIfSellable(rows[index]);
   };
 
   /** The spec sheet of the CONFIGURATION: the product's, then the option's allow-listed differences. */
@@ -666,7 +691,9 @@ compareRoutes.get('/', async (c) => {
    */
   const cards = placed.map((product, i) => {
     const variant = picked[i];
-    const variants = pricing.get(product.row.id)?.options ?? [];
+    const variants = sellableIds.has(product.row.id)
+      ? (pricing.get(product.row.id)?.options ?? [])
+      : (unpricedOptions.get(product.row.id) ?? []).map((option) => ({ option, level: null, available: null }));
     const profile = multicolorProfile(sheets[i]);
     return {
       ...cardOf(product, images.get(product.row.id)),
@@ -732,9 +759,29 @@ function optionLabel(o: { id: string; name_ar: string; name_en: string; name_ckb
   return { id: o.id, label: tri(o.name_ar, o.name_en, o.name_ckb) };
 }
 
-/** One option as the page OFFERS it: named, priced by the resolver, stock when tracked. */
-function pricedOption(v: { option: { id: string; name_ar: string; name_en: string; name_ckb: string }; level: { unit_subtotal_iqd: number }; available: number | null }) {
-  return { ...optionLabel(v.option), price_iqd: v.level.unit_subtotal_iqd, available: v.available };
+/** One option as the page OFFERS it: named, priced by the resolver, stock when tracked — null for a catalog-only product. */
+function pricedOption(v: { option: { id: string; name_ar: string; name_en: string; name_ckb: string }; level: { unit_subtotal_iqd: number } | null; available: number | null }) {
+  return { ...optionLabel(v.option), price_iqd: v.level ? v.level.unit_subtotal_iqd : null, available: v.available };
+}
+
+/**
+ * A catalog-only product's active options, named from the tables (the same
+ * overlay the product page draws) — never priced: the resolver would read the
+ * archived ladder (DECISIONS row 240).
+ */
+async function namedOptions(
+  db: D1Database,
+  rows: Record<string, unknown>[]
+): Promise<Map<string, Array<{ id: string; name_ar: string; name_en: string; name_ckb: string }>>> {
+  const out = new Map<string, Array<{ id: string; name_ar: string; name_en: string; name_ckb: string }>>();
+  if (!rows.length) return out;
+  const views = await loadRelationsViews(db, rows.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode })));
+  for (const r of rows) {
+    const view = views.get(String(r.id));
+    const doc = view ? applyRelations(parseProductRow(r), view) : parseProductRow(r);
+    out.set(String(r.id), doc.options.filter((o) => o.active !== false && !o.merged_into));
+  }
+  return out;
 }
 
 /**
@@ -811,9 +858,11 @@ export async function rankCompareCandidates(
   const bindings: unknown[] = [anchorPlaced.row.id, anchorLeaf, anchorPlaced.row.category_id ?? ''];
   if (pattern) bindings.push(pattern);
 
+  // VISIBLE with the SELLABLE flag (DECISIONS row 240): a catalog-only machine is offered, with no price.
+  const L = await listing(db);
   const { results } = await db.prepare(
-    `SELECT ${PRODUCT_COLUMNS} FROM products
-      WHERE ${(await listing(db)).listed('products')} AND id <> ?1 AND spec_fields <> '{}' AND spec_fields <> ''
+    `SELECT ${PRODUCT_COLUMNS}, ${L.sellableFlag('products')} AS sellable_now FROM products
+      WHERE ${L.visible('products')} AND id <> ?1 AND spec_fields <> '{}' AND spec_fields <> ''
       ${textClause}
       ORDER BY (COALESCE(sub_category_id,'') = ?2) DESC,
                (COALESCE(category_id,'') = ?3) DESC,
@@ -864,11 +913,9 @@ export async function rankCompareCandidates(
     scored.push({ placed, score });
   }
 
-  scored.sort(
-    (a, b) =>
-      b.score - a.score ||
-      (Number(a.placed.row.price_iqd) || 0) - (Number(b.placed.row.price_iqd) || 0)
-  );
+  // Cheaper first among equals; an unpriced machine (no price yet) after every priced one.
+  const priceKey = (p: Placed) => rowPriceIfSellable(p.row) ?? Number.POSITIVE_INFINITY;
+  scored.sort((a, b) => b.score - a.score || priceKey(a.placed) - priceKey(b.placed));
   const selected = scored.slice(0, limit).map((candidate) => candidate.placed);
   const images = await loadCompareImages(
     db,
@@ -914,10 +961,16 @@ async function withOptions(
    * named only.
    */
   const labelled = new Map<string, NonNullable<CompareProductCard['options']>>();
+  const sellable = new Set(cards.filter((card) => card.price_status === 'priced').map((card) => card.id));
   if (ctx) {
     const { results } = await db.prepare(`SELECT * FROM products WHERE id IN (${marks})`).bind(...ids).all<Record<string, unknown>>();
-    const pricing = await resolveVariantPricing(db, results ?? [], ctx);
+    // Only a SELLABLE product's options are priced (DECISIONS row 240); a catalog-only one's are named.
+    const [pricing, named] = await Promise.all([
+      resolveVariantPricing(db, (results ?? []).filter((r) => sellable.has(String(r.id))), ctx),
+      namedOptions(db, (results ?? []).filter((r) => !sellable.has(String(r.id)))),
+    ]);
     for (const [id, p] of pricing) labelled.set(id, p.options.map(pricedOption));
+    for (const [id, options] of named) labelled.set(id, options.map((option) => pricedOption({ option, level: null, available: null })));
   } else {
     const { results } = await db
       .prepare(`SELECT ${PRODUCT_COLUMNS}, inventory_mode FROM products WHERE id IN (${marks})`)
@@ -960,11 +1013,13 @@ export async function browseCompareCandidates(
   const textClause = pattern ? ` AND (${sqlLikeClause(['name', 'name_ar', 'name_ku'], '?1')})` : '';
   const bindings: unknown[] = pattern ? [pattern] : [];
 
+  // VISIBLE with the SELLABLE flag (DECISIONS row 240), priced first (rule R1).
+  const L = await listing(db);
   const { results } = await db.prepare(
-    `SELECT ${PRODUCT_COLUMNS} FROM products
-      WHERE ${(await listing(db)).listed('products')} AND spec_fields <> '{}' AND spec_fields <> ''
+    `SELECT ${PRODUCT_COLUMNS}, ${L.sellableFlag('products')} AS sellable_now FROM products
+      WHERE ${L.visible('products')} AND spec_fields <> '{}' AND spec_fields <> ''
       ${textClause}
-      ORDER BY created_at DESC
+      ORDER BY sellable_now DESC, created_at DESC
       LIMIT ${CANDIDATE_POOL}`
   )
     .bind(...bindings)
@@ -1029,8 +1084,9 @@ compareRoutes.get('/candidates', async (c) => {
     });
   }
 
+  const LA = await listing(c.env.DB);
   const anchor = await c.env.DB
-    .prepare(`SELECT ${PRODUCT_COLUMNS} FROM products WHERE id = ? AND ${(await listing(c.env.DB)).listed('products')}`)
+    .prepare(`SELECT ${PRODUCT_COLUMNS}, ${LA.sellableFlag('products')} AS sellable_now FROM products WHERE id = ? AND ${LA.visible('products')}`)
     .bind(anchorId)
     .first<ProductRow>();
   if (!anchor) throw notFound('Product not found');

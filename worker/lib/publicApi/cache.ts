@@ -31,8 +31,11 @@
  * release miss in every colo at once — so no page priced in the old dinars is
  * served after the deploy (they age out unseen). Change it only for a release
  * that must drop every cached catalogue answer.
+ *
+ * 2026-10-15 (DECISIONS row 240): catalog-only products appear (an answer cached
+ * before would hide them, or 404 their page), and every card carries `price_status`.
  */
-export const CATALOG_CACHE_EPOCH = 'pv2-clean-start';
+export const CATALOG_CACHE_EPOCH = 'catalog-only-2026-10-15';
 
 /** A cache key URL carrying the epoch (appended last, so the declared params keep their order). */
 export function withCacheEpoch(url: string): string {

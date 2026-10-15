@@ -107,8 +107,10 @@ export const ANONYMOUS_CACHE_CONTROL = cacheControlFor(ANONYMOUS_LIFETIME);
  * built by this projection revision may answer. Bump when removing fields.
  * 2026-10-13 (DECISIONS row 220): the print-service rates, the owner's FX
  * adjustment in `displayUsdRate`, a picture's supplier link and the estimate's
- * quantity curve left the public answers. */
-export const PUBLIC_PROJECTION_REVISION = 'cost-privacy-2026-10-13';
+ * quantity curve left the public answers.
+ * 2026-10-15 (DECISIONS row 240): catalog-only cards and pages (`price_status`,
+ * null prices) — a body cached before could say the product is absent. */
+export const PUBLIC_PROJECTION_REVISION = 'catalog-only-2026-10-15';
 const PROJECTION_HEADER = 'X-Levonis-Public-Projection';
 
 /**
