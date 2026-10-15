@@ -391,8 +391,22 @@ test('the storefront never recomputes: only the owner pricing router, the engine
     assert.deepEqual(engine, [...new Set([...helpers, ...(CLEAN_START_DOORS[f] ?? [])])].sort(), f);
   }
   assert.doesNotMatch(files.find((x) => x.f === 'worker/lib/pricingEngine/procurementRate.ts')!.src, /from\s+['"][^'"]*(?:\/costToPrice|\/fxChain|\/ruleResolution|\/engineWrite|\/writer|\/procurementPreview)['"]/);
+  // Services S-P2 (spec §4.3 rule 4, DECISIONS row 238): the trade-in offer prices a part that has no
+  // price of its own from the owner's private USD reference, ceil-1,000 at the APPROVED USD/IQD rate.
+  // The same kind of helper as the purchase routes' above: ONE helper that computes no price hands it the
+  // approved figure alone (no version, no shipping rate, no price computer). Every product price the offer
+  // reads is the engine's STORED V2 result through the strict resolver (worker/lib/tradeInToday.ts), never
+  // recomputed; the request module itself stays outside the engine (worker/lib/tradeIn.ts, above).
+  const TRADE_IN_RATE: Readonly<Record<string, readonly string[]>> = { 'worker/lib/tradeInOffer.ts': ['./pricingEngine/approvedRate'] };
+  for (const [f, helpers] of Object.entries(TRADE_IN_RATE)) {
+    const src = files.find((x) => x.f === f)!.src;
+    const engine = [...src.matchAll(/from\s+['"]([^'"]*(?:\/pricingEngine\/[^'"]+|\/costToPrice|\/fxChain))['"]/g)].map((m) => m[1]).sort();
+    assert.deepEqual(engine, [...helpers].sort(), f);
+  }
+  const approvedRate = files.find((x) => x.f === 'worker/lib/pricingEngine/approvedRate.ts')!.src;
+  assert.deepEqual([...approvedRate.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1]), ['./rates'], 'the approved-rate helper imports the engine\'s rate reader and nothing else');
   for (const f of ['worker/routes/products.ts', 'worker/routes/cart.ts', 'worker/routes/orders.ts', 'worker/routes/catalog.ts', 'worker/routes/compare.ts', 'worker/routes/seo.ts', 'worker/lib/listing.ts', 'worker/lib/publicApi/resources/products.ts']) {
     assert.doesNotMatch(files.find((x) => x.f === f)!.src, /from\s+['"][^'"]*\/adminProducts['"]/, `${f} reaches no admin product router`);
   }
-  assert.deepEqual(importers.filter((f) => !allowed(f) && !(f in DECISION6) && !(f in V2_PRODUCT_SAVE) && !(f in CLEAN_START_DOORS) && !(f in PURCHASE_RATE) && !OWNER_TOOLS.includes(f)), []);
+  assert.deepEqual(importers.filter((f) => !allowed(f) && !(f in DECISION6) && !(f in V2_PRODUCT_SAVE) && !(f in CLEAN_START_DOORS) && !(f in PURCHASE_RATE) && !(f in TRADE_IN_RATE) && !OWNER_TOOLS.includes(f)), []);
 });

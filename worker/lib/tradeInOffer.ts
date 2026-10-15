@@ -20,7 +20,8 @@ import type { Env } from './types';
 import { safeParse } from './types';
 import { newId } from './crypto';
 import { closedClaimSql } from './deviceOps';
-import { loadPricingRates } from './pricingEngine/rates';
+// The approved USD/IQD rate only — no price computer, nothing else of the engine (USD design §2.4).
+import { approvedUsdIqdRate } from './pricingEngine/approvedRate';
 import { TodayReader, type NowChannel, type TodayPrice } from './tradeInToday';
 import type { ComponentRow, EligibleUnit, RequestRow, RuleBook, StoredRuleSet } from './tradeIn';
 import {
@@ -113,7 +114,7 @@ export async function componentNows(
   const sel = unit.selection;
   let rate: string | null | undefined;
   const usdRate = async () => {
-    if (rate === undefined) rate = (await loadPricingRates(env.DB).catch(() => null))?.usd_iqd ?? null;
+    if (rate === undefined) rate = await approvedUsdIqdRate(env.DB).catch(() => null);
     return rate;
   };
   const fromUsd = async (usd: string | null) => (usd && (await usdRate()) ? usdToIqdCeil(usd, (await usdRate())!) : null);

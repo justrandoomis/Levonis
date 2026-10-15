@@ -19,7 +19,7 @@
  *   7. a credit given back (the 0192 cancel trigger, the return batch) is told to its customer.
  *
  * EVERY STATEMENT IS CHARGED BEFORE IT IS SENT: a read before its read, a batch before its batch
- * (`StatementBudget.spend`), a completion at its measured upper bound. A step that does not fit
+ * (`ServicesBudget.spend`), a completion at its measured upper bound. A step that does not fit
  * stops the sweep cleanly; the next tick resumes. A request's batch that loses a race (an intake,
  * a checkout, a customer's cancel) aborts on its fence and is skipped — never retried in the tick.
  *
@@ -28,7 +28,6 @@
  * only, never a figure (row 107).
  */
 import type { Env } from './types';
-import type { StatementBudget } from './fx/budget';
 import { newId, randomToken } from './crypto';
 import { notifyStatement } from './notifications';
 import { getSetting } from './settings';
@@ -97,13 +96,23 @@ interface Copy {
 
 const pick = (c: Copy, lang: EmailLang) => (lang === 'en' ? [c.title_en, c.body_en] : lang === 'ckb' ? [c.title_ckb, c.body_ckb] : [c.title_ar, c.body_ar]);
 
+/**
+ * The statement budget the sweep charges: the shape of worker/lib/fx/budget.ts `StatementBudget`,
+ * which the quarter-hour cron hands in. Named here rather than imported — the FX module is imported
+ * only by the cron and the pricing doors (tests/pricingCurrencyRoles.test.ts).
+ */
+export interface ServicesBudget {
+  /** Charges `n` statements; false (and nothing charged) when they do not fit. */
+  spend(n: number): boolean;
+}
+
 class Stop extends Error {}
 
 /**
  * THE SWEEP. Never throws (a step's failure is logged and the next tick tries again); returns what
  * it did. A database without 0192 does nothing.
  */
-export async function runServicesSweep(env: Env, budget: StatementBudget, now: Date = new Date()): Promise<ServicesSweepReport> {
+export async function runServicesSweep(env: Env, budget: ServicesBudget, now: Date = new Date()): Promise<ServicesSweepReport> {
   const report: ServicesSweepReport = {
     stamped: 0,
     offer_reminders: 0,
