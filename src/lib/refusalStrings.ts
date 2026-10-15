@@ -133,6 +133,57 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ckb: 'ئەم ئۆفەرە گەیشتە سنووری خۆی.',
   },
 
+  // ---- a promo code refused at checkout (validateCoupon's reasons) ---------
+  // The checkout answers each as its refusal code (worker/routes/orders.ts), and
+  // since S-P1 the order batch's own trigger can answer INACTIVE and
+  // CODE_NOT_FOUND too. The sentences are PromoCodeField's, so the cart and the
+  // checkout say the same thing.
+  CODE_REQUIRED: {
+    ar: 'اكتب الكود أولًا.',
+    en: 'Enter a code first.',
+    ckb: 'سەرەتا کۆد بنووسە.',
+  },
+  CODE_NOT_FOUND: {
+    ar: 'هذا الكود غير موجود.',
+    en: 'That code does not exist.',
+    ckb: 'ئەم کۆدە بوونی نییە.',
+  },
+  INACTIVE: {
+    ar: 'هذا الكود غير مفعّل.',
+    en: 'That code is not active.',
+    ckb: 'ئەم کۆدە چالاک نییە.',
+  },
+  NOT_STARTED: {
+    ar: 'لم يبدأ العمل بهذا الكود بعد.',
+    en: 'That code has not started yet.',
+    ckb: 'ئەم کۆدە هێشتا دەستی پێنەکردووە.',
+  },
+  EXPIRED: {
+    ar: 'انتهت صلاحية هذا الكود.',
+    en: 'That code has expired.',
+    ckb: 'ماوەی ئەم کۆدە تەواو بووە.',
+  },
+  MIN_TOTAL_NOT_MET: {
+    ar: 'قيمة السلة أقل من الحد الأدنى لهذا الكود.',
+    en: 'Your cart is below this code’s minimum.',
+    ckb: 'سەبەتەکەت لە کەمترین بڕی ئەم کۆدە کەمترە.',
+  },
+  TIER_REQUIRED: {
+    ar: 'هذا الكود لأعضاء عضوية أعلى.',
+    en: 'That code is for a higher membership tier.',
+    ckb: 'ئەم کۆدە بۆ ئەندامێتی باڵاترە.',
+  },
+  NO_DISCOUNT: {
+    ar: 'لا ينتج عن هذا الكود أي خصم على سلتك.',
+    en: 'That code produces no discount on your cart.',
+    ckb: 'ئەم کۆدە هیچ داشکاندنێک لە سەبەتەکەت ناکات.',
+  },
+  COUPON_INVALID: {
+    ar: 'لا يمكن استخدام هذا الكود.',
+    en: 'This code cannot be used.',
+    ckb: 'ناتوانرێت ئەم کۆدە بەکاربهێنرێت.',
+  },
+
   // ---- composition (§15.3) -----------------------------------------------
   BUNDLE_QTY_LIMIT: {
     ar: 'تجاوزت الحد الأقصى لعدد هذه الحزمة في الطلب الواحد.',

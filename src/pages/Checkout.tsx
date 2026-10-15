@@ -1697,6 +1697,18 @@ export default function Checkout() {
         setSubmitError(S.policyRequired);
       } else if (err instanceof ApiError && err.code === 'SHIPPING_NEEDS_CONFIG') {
         setSubmitError(S.needsConfig);
+      } else if (err instanceof ApiError && couponCode && COUPON_FAILURES.has(err.code ?? '')) {
+        /**
+         * THE CODE STOPPED BEING VALID BETWEEN THE QUOTE AND THE PRESS (switched
+         * off, spent, not this buyer's). The same answer the quote path gives:
+         * said beside the code field in the reader's language, and the code is
+         * dropped so the quote re-runs without it and a second press does not
+         * meet the same refusal.
+         */
+        setCouponError(apiRefusal(err, lang as 'ar' | 'en' | 'ckb', ''));
+        setCouponCode('');
+        storePromo('');
+        setSubmitError(msg);
       } else if (err instanceof ApiError && (err.code ?? '').startsWith('DELIVERY_DAY_')) {
         /**
          * THE DAY WAS REFUSED, AND THE ORDER IS ONE TAP FROM GOING THROUGH.

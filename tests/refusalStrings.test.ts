@@ -127,6 +127,9 @@ test('every code the table translates is one the server can actually emit', () =
     // undialable number or no governorate is a delivery that fails.
     'worker/routes/addresses.ts',
     'worker/routes/memberships.ts',
+    // validateCoupon's reasons (CODE_REQUIRED … TIER_REQUIRED): the checkout
+    // answers each as the refusal code itself (orders.ts, `check.reason`).
+    'worker/lib/membershipOps.ts',
     // «وجدتها بمكان أرخص» refuses in the customer's own sheet, so its codes are
     // translated rather than rendered as the route's slash-joined ar/en pair.
     'worker/routes/priceReports.ts',
@@ -554,4 +557,27 @@ test('every Phase 5 refusal code has real Sorani — not the Arabic pasted acros
     if (/پێشنیار|وەرشە/.test(e.ckb)) problems.push(`${code}: ckb says «پێشنیار»/«وەرشە», the pages say «ئۆفەر»/«وۆرکشۆپ»`);
   }
   assert.deepEqual(problems, []);
+});
+
+test('every promo-code refusal the checkout can meet reads in the customer\'s language, on the quote and on the press', () => {
+  // Checkout's COUPON_FAILURES: the codes that mean «the code is the problem».
+  // INACTIVE and CODE_NOT_FOUND also come from the order batch's own trigger
+  // since S-P1 (0191), on the place-order press, not only on the quote.
+  const checkout = readFileSync(join(ROOT, 'src/pages/Checkout.tsx'), 'utf8');
+  const set = checkout.match(/const COUPON_FAILURES = new Set\(\[([\s\S]*?)\]\)/);
+  assert.ok(set, 'COUPON_FAILURES is declared in Checkout.tsx');
+  const codes = [...set[1].matchAll(/'([A-Z_]+)'/g)].map((m) => m[1]);
+  assert.ok(codes.includes('INACTIVE') && codes.includes('CODE_NOT_FOUND'), codes.join(','));
+  for (const code of codes) {
+    const entry = REFUSAL_STRINGS[code];
+    assert.ok(entry, `${code} has no sentence: the checkout shows the server's English`);
+    const server = { code, message: `Coupon could not be applied (${code})` };
+    for (const lang of ['ar', 'ckb'] as const) {
+      const said = apiRefusal(server, lang, 'x');
+      assert.equal(said, entry[lang], `${code}.${lang}`);
+      assert.ok(!said.includes(code), `${code}.${lang} prints the machine code`);
+    }
+  }
+  // Both checkout paths treat them as the code's failure: the quote and the place-order press.
+  assert.ok((checkout.match(/COUPON_FAILURES\.has\(/g) ?? []).length >= 2, 'the place-order catch handles a refused code like the quote does');
 });
