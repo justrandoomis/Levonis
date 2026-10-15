@@ -28,6 +28,9 @@ import type { DatabaseSync } from 'node:sqlite';
 import { dbThrough, row, all, asD1, stubApp, get, post, json } from './fixtures/app';
 import { deviceRoutes } from '../worker/routes/devices';
 import { claimFiledColumnsInstalled } from '../worker/lib/deviceOps';
+import { priceProtectionRoutes, returnRoutes } from '../worker/routes/returns';
+import { RaceD1 } from './fixtures/raceD1';
+import { ppWorld } from './sv2_price-protection_fixture';
 
 const MIGRATION = readFileSync(new URL('../migrations/0191_services_integrity.sql', import.meta.url), 'utf8');
 const LONG_AGO = '2026-01-10T10:00:00.000Z';
@@ -221,4 +224,28 @@ test('ahead: the claim door over a database at 0190 files without the new column
   const third = await json(await claim('ahead-key-0003'));
   assert.equal(third.success, true, JSON.stringify(third));
   assert.equal(row<{ s: string }>(raw, 'SELECT filed_cover_state AS s FROM warranty_claims WHERE id = ?', third.id)!.s, 'active');
+});
+
+test('ahead: without 0191\'s ppc_one_open, the protection claim door still records one «requested» claim per line, even under a race', async () => {
+  const w = ppWorld();
+  // The shape of a database at 0190 for this rule: no trigger behind the insert.
+  w.raw.exec('DROP TRIGGER ppc_one_open');
+  w.raw.prepare(`INSERT INTO products (id, slug, name, status, price_iqd, stock) VALUES ('p', 'p', 'Plain', 'active', 40000, 5)`).run();
+  const { itemId } = w.deliveredLine({ productId: 'p', unit: 50_000 });
+  const race = new RaceD1(w.raw);
+  race.whenRun = (sql) => sql.includes('INSERT INTO price_protection_claims');
+  const seen: { inner?: number } = {};
+  race.runHook = async () => {
+    seen.inner = (await w.claim(itemId)).status;
+  };
+  const app = stubApp(race as unknown as D1Database, { id: 'buyer', role: 'customer', email: 's@x.co' }, (a) => {
+    a.route('/api/price-protection', priceProtectionRoutes);
+    a.route('/api/returns', returnRoutes);
+  });
+  const outer = await post(app, '/api/price-protection/claims', { orderItemId: itemId });
+  const body = await json(outer);
+  assert.equal(seen.inner, 200);
+  assert.equal(outer.status, 400, JSON.stringify(body));
+  assert.equal(body.code, 'CLAIM_PENDING');
+  assert.equal(w.n("SELECT COUNT(*) n FROM price_protection_claims WHERE order_item_id = ? AND state = 'requested'", itemId), 1);
 });

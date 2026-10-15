@@ -10,6 +10,9 @@
  *     PP-B4 (the buyer's price class), PP-B6 (the customer is told the
  *     decision), PP-B7 (the customer's projection) and PP-B10 (Arabic and
  *     Sorani refusals) — the protection-rule stage.
+ * Landed with S-P1 (migration 0191, DECISIONS row 237):
+ *   - G3 one «requested» claim per line — inside the claim insert and in the
+ *     database (ppc_one_open), so two presses at once cannot both write.
  * PP-B5 (per-unit claims) and PP-B9 (a refund net of a credit) land with S-P8.
  *
  * Run: node --import tsx --test tests/sv2_price-protection_bugs.test.ts
@@ -17,6 +20,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PRE_V5, ppWorld } from './sv2_price-protection_fixture';
+import { json, post, stubApp } from './fixtures/app';
+import { RaceD1 } from './fixtures/raceD1';
+import { priceProtectionRoutes, returnRoutes } from '../worker/routes/returns';
 
 /** A plain product, one price, no options. */
 function plain(w: ReturnType<typeof ppWorld>, id = 'p', price = 40_000) {
@@ -146,4 +152,49 @@ test('PP-B10 every refusal the claim route can answer reads in Arabic and Sorani
     'FX_ONLY_DROP', 'NO_ELIGIBLE_DROP', 'ALREADY_COMPENSATED', 'PRICE_PROTECTION_RETURN_REVIEW'];
   const missing = codes.filter((k) => refusalText(k, 'ckb', '\u0000') === '\u0000' || refusalText(k, 'ar', '\u0000') === '\u0000');
   assert.deepEqual(missing, [], `an Arabic/Sorani customer reads the server's English for: ${missing.join(', ')}`);
+});
+
+// ---------------------------------------------------------------- G3 (S-P1)
+test('G3 the database keeps one «requested» claim per line: a second aborts CLAIM_PENDING, a decided one or another line does not', () => {
+  const w = ppWorld();
+  plain(w);
+  const a = w.deliveredLine({ productId: 'p', unit: 50_000 });
+  const b = w.deliveredLine({ productId: 'p', unit: 50_000 });
+  const ins = w.raw.prepare(
+    `INSERT INTO price_protection_claims (id, user_id, order_id, order_item_id, original_unit_iqd, observed_unit_iqd, qty, state)
+     VALUES (?, 'buyer', ?, ?, 50000, 40000, 1, ?)`
+  );
+  ins.run('ppc_1', a.orderId, a.itemId, 'requested');
+  assert.throws(() => ins.run('ppc_2', a.orderId, a.itemId, 'requested'), /CLAIM_PENDING/);
+  ins.run('ppc_3', a.orderId, a.itemId, 'rejected');
+  ins.run('ppc_4', b.orderId, b.itemId, 'requested');
+  assert.equal(w.n("SELECT COUNT(*) n FROM price_protection_claims WHERE order_item_id = ? AND state = 'requested'", a.itemId), 1);
+  // Once decided, a new claim on the line may be requested again.
+  w.raw.exec("UPDATE price_protection_claims SET state = 'rejected' WHERE id = 'ppc_1'");
+  ins.run('ppc_5', a.orderId, a.itemId, 'requested');
+});
+
+test('G3 two claims on one line pressed at the same moment: exactly one is recorded, the other answers CLAIM_PENDING', async () => {
+  const w = ppWorld();
+  plain(w);
+  const { itemId } = w.deliveredLine({ productId: 'p', unit: 50_000 });
+  const race = new RaceD1(w.raw);
+  // The first request has passed its «already awaiting review» read and is about to write.
+  race.whenRun = (sql) => sql.includes('INSERT INTO price_protection_claims');
+  const seen: { inner?: { status: number; body: Record<string, unknown> } } = {};
+  race.runHook = async () => {
+    seen.inner = await w.claim(itemId);
+  };
+  const outerApp = stubApp(race as unknown as D1Database, { id: 'buyer', role: 'customer', email: 's@x.co' }, (a) => {
+    a.route('/api/price-protection', priceProtectionRoutes);
+    a.route('/api/returns', returnRoutes);
+  });
+  const outer = await post(outerApp, '/api/price-protection/claims', { orderItemId: itemId });
+  const body = await json(outer);
+  assert.ok(seen.inner, 'the second press ran inside the race');
+  assert.equal(seen.inner.status, 200, JSON.stringify(seen.inner.body));
+  assert.equal(outer.status, 400, JSON.stringify(body));
+  assert.equal(body.code, 'CLAIM_PENDING');
+  assert.equal(w.n("SELECT COUNT(*) n FROM price_protection_claims WHERE order_item_id = ? AND state = 'requested'", itemId), 1);
+  assert.equal(w.n('SELECT COUNT(*) n FROM price_protection_claims WHERE order_item_id = ?', itemId), 1);
 });

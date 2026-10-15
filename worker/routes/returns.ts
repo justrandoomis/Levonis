@@ -1605,27 +1605,42 @@ priceProtectionRoutes.post('/claims', async (c) => {
   // A v5 claim stores what it covers and its basis in their own columns (0181), never in the snapshot
   // the customer reads; every older claim — and every claim on a database without 0181 — is the exact
   // INSERT it always was.
-  if (decision.eligible_unit !== null && (await claimBasisColumns(c.env.DB))) {
-    await c.env.DB.prepare(
-      `INSERT INTO price_protection_claims (id, user_id, order_id, order_item_id, original_unit_iqd,
-         observed_unit_iqd, qty, credited_iqd, state, policy_snapshot,
-         eligible_unit_iqd, basis, usd_iqd_at_purchase, base_usd_at_purchase, base_usd_observed)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'requested', ?, ?, ?, ?, ?, ?)`
-    )
-      .bind(
-        id, user.id, String(item.order_id), orderItemId, originalUnit, observedUnit, qty, policySnapshot,
-        decision.eligible_unit, decision.basis, engineSnapshot?.usd_iqd_at_purchase ?? null, engineSnapshot?.base_usd_at_purchase ?? null, decision.base_usd_observed
-      )
-      .run();
-  } else {
-    await c.env.DB.prepare(
-      `INSERT INTO price_protection_claims (id, user_id, order_id, order_item_id, original_unit_iqd,
-         observed_unit_iqd, qty, credited_iqd, state, policy_snapshot)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'requested', ?)`
-    )
-      .bind(id, user.id, String(item.order_id), orderItemId, originalUnit, observedUnit, qty, policySnapshot)
-      .run();
+  //
+  // G3 (row 237): ONE «requested» CLAIM PER LINE, asked inside the insert. The read above is the fast
+  // path; between it and here are many awaits, and two presses at once both passed it and both wrote.
+  // The conditional insert holds on any database; 0191's ppc_one_open refuses the same from the
+  // database itself (CLAIM_PENDING), and both answer the same 400.
+  const pendingRefusal = () => badRequest('A claim for this item is already awaiting review', 'CLAIM_PENDING');
+  const noneRequested = `WHERE NOT EXISTS (SELECT 1 FROM price_protection_claims p WHERE p.order_item_id = ?4 AND p.state = 'requested')`;
+  let inserted: { meta: { changes?: number } };
+  try {
+    inserted =
+      decision.eligible_unit !== null && (await claimBasisColumns(c.env.DB))
+        ? await c.env.DB.prepare(
+            `INSERT INTO price_protection_claims (id, user_id, order_id, order_item_id, original_unit_iqd,
+               observed_unit_iqd, qty, credited_iqd, state, policy_snapshot,
+               eligible_unit_iqd, basis, usd_iqd_at_purchase, base_usd_at_purchase, base_usd_observed)
+             SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, 'requested', ?8, ?9, ?10, ?11, ?12, ?13
+              ${noneRequested}`
+          )
+            .bind(
+              id, user.id, String(item.order_id), orderItemId, originalUnit, observedUnit, qty, policySnapshot,
+              decision.eligible_unit, decision.basis, engineSnapshot?.usd_iqd_at_purchase ?? null, engineSnapshot?.base_usd_at_purchase ?? null, decision.base_usd_observed
+            )
+            .run()
+        : await c.env.DB.prepare(
+            `INSERT INTO price_protection_claims (id, user_id, order_id, order_item_id, original_unit_iqd,
+               observed_unit_iqd, qty, credited_iqd, state, policy_snapshot)
+             SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, 'requested', ?8
+              ${noneRequested}`
+          )
+            .bind(id, user.id, String(item.order_id), orderItemId, originalUnit, observedUnit, qty, policySnapshot)
+            .run();
+  } catch (e) {
+    if (/CLAIM_PENDING/.test(e instanceof Error ? e.message : String(e))) throw pendingRefusal();
+    throw e;
   }
+  if ((inserted.meta.changes ?? 0) === 0) throw pendingRefusal();
 
   await audit(c.env.DB, user.id, 'price_protection.claim', id, {
     order_item_id: orderItemId, original: originalUnit, observed: observedUnit, computed_iqd: computed,
