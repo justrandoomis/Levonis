@@ -4,6 +4,20 @@ Read `CLAUDE.md` first. The default branch is `claude/new-session-2hq4ci`;
 code pushes deploy through workflow 7 only. No feature branches, merges,
 force-pushes, or alternate deployment path.
 
+## Catalog-only products and price requests — server half (branch `feat/catalog-only`, DECISIONS 240, not yet landed)
+
+- Migration **0193_price_requests.sql** (two new tables, additive). `EXPECTED_MIGRATION_COUNT` is 185 on
+  this branch; it becomes 186 if S-P2's 0192 lands first — the integrator settles it in the landing commit
+  (`tests/schemaVersion.test.ts`).
+- The listing predicate is two: VISIBLE (catalogue) and SELLABLE (purchase). After deploy, every active
+  unpriced product is SHOWN with «السعر غير متوفر حالياً» and no number, and sells nowhere. The edge
+  cache epoch moved (`catalog-only-2026-10-15`), so no pre-release body is served.
+- The quarter-hour tick gained a last step (price-request sweep + hourly admin digest to the «البلاغات»
+  topic, 40 statements at most). Without 0193 the customer doors answer 503 `PRICE_REQUESTS_UNAVAILABLE`
+  and the admin sort/filter fall back.
+- The client half (cards, the product page's «طلب السعر» panel, the admin queue column) and the local
+  browser e2e (`scripts/e2e-catalog-only.mjs`) are a separate lane. Read `docs/PRICING-V2.md` §9.
+
 ## Releases of 2026-10-14/15 (all live, workflow 7 green)
 
 - `abd1d411` — **Services S-P2, trade-in v2** (DECISIONS 238), deployed 2026-10-15 15:20 UTC, migration

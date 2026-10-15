@@ -737,3 +737,58 @@ IQD, with a pre-order discount of $50 = 75,000.
     minimum.
   - **D3:** today's rule. Direct 1,533,000 while pre-order stays 1,425,000, and the discount
     silently grows to 108,000.
+
+---
+
+## 9. Catalog-only products and price requests (DECISIONS rows 239 and 240, migration 0193)
+
+**Two predicates, not one** (`worker/lib/listing.ts`):
+
+- **VISIBLE**: the product is `active` and the owner's «إخفاء المنتجات الناقصة» switch does not hold it
+  for a catalogue gap (`IMAGE` or `CATEGORY`, `CATALOG_BLOCKING_CODES`). Every customer READ asks it:
+  the listing, search, sections, the product page, the public API, the sitemap, the bot preview, the
+  comparison, both favourites lists, the community search, the printer finder, «يناسب» and the RPC feed.
+- **SELLABLE**: the old «listed» predicate byte for byte — visible, not held for ANY gap, and
+  V2-published. Every PURCHASE path asks it: cart add and read, the quote, checkout, Quick Buy, new
+  gifts, bundles and mystery offers, the trade-in target, «لكيتها بمكان أرخص», the print calculator's
+  materials and the stock-alert arming.
+- **Catalog-only** = visible and not sellable. It is derived, never stored. A database without 0189
+  shows every active product catalog-only and sells nothing; one without 0184 drops both held clauses
+  (`runListed` retries once per missing piece). `tests/listingPredicateGuard.test.ts` counts every
+  call site per family; `tests/listingSplit.test.ts` holds the matrix.
+
+**No number for an unpriced product.** Every customer projection carries `price_status`
+(`priced` / `unpriced`). An unpriced card is an allow-list (`catalogOnlyCard`): identity, text, media,
+classification, specs, options and colours without a price or stock key, `price_iqd: null`,
+`display_price_iqd: null`, no availability, no sale types — the legacy dinar columns are never read,
+so the archive 0190 kept never surfaces. A purchase door answers 409 `PRICE_NOT_AVAILABLE`
+(ar / en / ckb); checkout keeps `PRODUCT_CURRENTLY_UNAVAILABLE` naming the products; a granted gift is
+honoured at its frozen value.
+
+**Per SKU.** A V2 product whose engine priced some SKUs and not others (a colour added after
+publication) stays sellable. The page lists `unpriced_selections`; `price_levels.combo` for those keys
+and the levels with no priced SKU are `null` (never the ladder, which is another SKU's price); the
+quote answers 200 `price_status: 'unpriced'` with no number for such a selection; the cart keeps
+`VARIANT_UNAVAILABLE` for it; `initial_selection` is always a priced SKU.
+
+**Order rules.** Browse lists (the listing without search, sections, home new arrivals, the finder)
+put sellable first (`sellable_now DESC` in SQL, so the 300-candidate cap keeps priced items); search
+keeps its relevance; both price sorts put unpriced last; price ranges, «عليها عرض» and «سعر أقل
+للأعضاء» exclude unpriced; commercial shelves (featured, discounted, flash, best sellers, open box,
+filament) are sellable only; new arrivals take at most 5 catalog-only products, only in slots fewer
+than 20 priced ones leave empty. The edge-cache epoch and the public projection revision moved to
+`catalog-only-2026-10-15`.
+
+**«طلب السعر»** (`worker/routes/priceRequests.ts`, `worker/lib/priceRequests.ts`): signed-in only.
+`POST /api/price-requests` `{ product_id, option_value_ids?, color_id?, notify? }` keeps ONE row per
+(person, product, selection) — a repeat tap raises `click_count`, never the count of people — and
+recomputes `product_price_request_stats` from source in the same batch. The selection is checked on the
+server against the product's real SKUs (`checkSelection`, worker/lib/commercialState.ts). Caps: 50 open
+a person, 20 a product; rate limits 20 / 600 s (ask), 120 / 60 s (read), 30 / 600 s (change). The
+quarter-hour tick runs `sweepPriceRequests` last (its own 40 statements): a selection that became
+sellable through any door is `notified` (in-app with Sorani in `meta`, plus outbox rows, key
+`price_available:<id>:<cycle>`) or `closed(priced)` without consent; then `digestPriceRequests` sends
+at most one Arabic digest an hour to the «البلاغات» topic, at 1, 3, 10, 25, 50, 100 people and every
+100 after, claim-then-send. The needs-pricing queue orders by distinct requesters then the latest
+request in SQL (inside the 200 cap) and offers «الأكثر طلباً» with per-selection counts; the products
+list has a `price_requests` column, a `requests` sort and `requested=1`. Customers never see counts.
