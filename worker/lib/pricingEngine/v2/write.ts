@@ -3,6 +3,11 @@
  * engineWrite.ts `engineWriteStatements` and reuses its extracted pieces).
  *
  * In order:
+ *   0. the import stock gate (Bambu import spec §B.10; worker/lib/importStock.ts):
+ *      a product the catalogue import created and whose stock mode the owner has
+ *      not chosen yet is never published — its own fence, so a miss answers
+ *      409 IMPORT_STOCK_NOT_CONFIGURED, never PRICING_CHANGED. Laid only while
+ *      migration 0194 is present: on an older database the batch is today's;
  *   1. `batchHead`: the product's pricing state (inputs_seq, write_seq, mode) and
  *      config_version as read, the owner-input token, the state row when absent;
  *   2. fences: the control row not paused, the PRICE IMAGE equal to the one the
@@ -38,6 +43,8 @@ import { skuPriceHistoryKey } from '@levonis/pricing/skuChannel';
 import { newId } from '../../crypto';
 import { fence } from '../../operations';
 import { auditStatements } from '../../audit';
+import { catalogKnowledgeInstalled } from '../../catalogKnowledge';
+import { importStockFence } from '../../importStock';
 import { directPurchaseStatement } from '../directPurchase';
 import { PRICE_IMAGE_SQL, RATES_FENCE_SQL, SKU_COST_CHUNK, priceRowStatements, rateFenceBinds, type AutoWrite } from '../engineWrite';
 import { batchHead, batchTail, inputStatements, pricingAuditStatement, pricingAuditStatements, ruleStatements, type PricingAuditRow } from '../store';
@@ -82,6 +89,13 @@ export interface V2WriteOptions {
    * rows.
    */
   firstWrite?: readonly D1PreparedStatement[];
+  /**
+   * The import stock gate (step 0): migration 0194's presence, when the caller asked already — a pass with a
+   * statement budget (the automatic repricing, the owner's rate preview) charges the probe itself and hands the
+   * answer in, so this function sends nothing it did not pay for. Undefined: asked here (one statement per
+   * binding while unknown; worker/lib/catalogKnowledge.ts).
+   */
+  stockGate?: boolean;
 }
 
 /** The private result row of one planned SKU × channel (each 0189 pair written whole). */
@@ -189,7 +203,10 @@ export async function v2WriteStatements(db: D1Database, ev: V2Evaluation, o: V2W
   ];
 
   const fresh = o.newProduct === true;
+  // 0. Never publish an imported product whose stock mode is not chosen (§B.10). First, so its miss is the one reported.
+  const stockGate = o.stockGate ?? (await catalogKnowledgeInstalled(db));
   return [
+    ...(stockGate ? importStockFence(db, pid) : []),
     // (A product this save creates: its row and relations first — everything below names it.)
     ...(fresh ? (o.structure ?? []) : []),
     // 1-2. What was read, as read.

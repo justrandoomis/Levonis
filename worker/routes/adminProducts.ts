@@ -138,6 +138,7 @@ import {
 import { ProductMediaIngestError, verifyStoredProductMedia, type ProductMediaReference } from '../lib/productMediaIngest';
 import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
 import { loadPrinterFitIds, printerOptions } from '../lib/printerFits';
+import { loadImportStock } from '../lib/importStock';
 
 /** Kept under its old name: the diff is now the contract's (productPersistence). */
 export const priceHistoryDeltas = sharedPriceHistoryDeltas;
@@ -1559,6 +1560,10 @@ adminProductsRoutes.get('/:id', async (c) => {
     // Pricing V2 (spec §5.1 as amended by addendum A.7): a flag, never a figure — every admin may know it.
     // `needs_pricing`: not V2-published (no method, or no complete V2 write yet), so no customer sees it.
     pricing_v2: pricingV2,
+    // «إعداد المخزون للمنتج المستورد» (Bambu import spec §B.10): the stock decision of a product the catalogue
+    // import created or merged — `not_configured` until an admin chooses, and its V2 publish is refused until
+    // then. Staff only: no customer projection reads it. Null for every other product (and without 0194).
+    import_stock: await loadImportStock(c.env.DB, id),
   });
 });
 

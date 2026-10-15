@@ -41,7 +41,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, ArrowLeft, Save, Eye, RefreshCw, AlertTriangle, Check, Plus, FileUp } from 'lucide-react';
 import { api, ApiError, failureText } from '../../lib/api';
 import { refusalIssues } from './applyResult';
-import { contractRefusal, refusalLang } from '../../lib/refusalStrings';
+import { contractRefusal, refusalLang, refusalText } from '../../lib/refusalStrings';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
 // «الأسعار» — Pricing V2 for every product (the clean start, DECISIONS row 222): sections ٣ and ٥ and
@@ -64,6 +64,7 @@ import {
   specIdsOutsideTemplate,
   toEditorDoc,
   type EditorDoc,
+  type ImportStockState,
   type ProductResponse,
   type SaveResponse,
 } from './types';
@@ -109,6 +110,8 @@ import { WarrantySection } from './form/WarrantySection';
 import { ConditionSection, nearestSectionSerial } from './form/ConditionSection';
 import { DimensionsSection } from './form/DimensionsSection';
 import { InventorySummary } from './form/InventorySummary';
+// «إعداد المخزون للمنتج المستورد» (Bambu import spec §B.10): an imported product's stock mode, before its price.
+import ImportStockCard, { importStockMissing, importStockText } from './form/ImportStockCard';
 import OwnerCostVerifyCard, { CostOpensAfterSave } from '../auth/OwnerCostVerifyCard';
 import PricePreview from './PricePreview';
 import MembershipDiscountSection from './form/MembershipDiscountSection';
@@ -318,6 +321,14 @@ export default function ProductForm({
   /** «تحديث البيانات»: the sheet, and what its last save did (shown until the next edit). */
   const [sectionUpdateOpen, setSectionUpdateOpen] = useState(false);
   const [fileUpdateNote, setFileUpdateNote] = useState<string | null>(null);
+  /**
+   * «إعداد المخزون للمنتج المستورد» (Bambu import spec §B.10): the imported product's stock decision, as the
+   * admin read answers it. While it is `not_configured` its price cannot be published (409
+   * IMPORT_STOCK_NOT_CONFIGURED): section ٣ shows the card, and the save bar the refusal in place of «نشر».
+   */
+  const [importStock, setImportStock] = useState<ImportStockState | null>(null);
+  /** The stock mode was just chosen here: section ٣ says so once, where the card was. */
+  const [importStockDone, setImportStockDone] = useState(false);
 
   // ------------------------------------------------------------- loading
 
@@ -374,6 +385,8 @@ export default function ProductForm({
     setCostLoaded(carriesCost(p.product) && relationsCarryCost(r));
     setLoadedUpdatedAt(p.product.updated_at ?? '');
     setBaseline(JSON.stringify({ d, rs }));
+    setImportStock(p.import_stock ?? null);
+    setImportStockDone(false);
   }, []);
   const loadProduct = useCallback(async (id: string) => {
     setLoading(true);
@@ -698,6 +711,13 @@ export default function ProductForm({
       release();
     };
   }, [leaveWarning]);
+  /** The imported product's price publish waits for its stock mode (§B.10): «نشر» gives way to the refusal. */
+  const stockMissing = importStockMissing(importStock);
+  /** The save bar's way to the stock card: section ٣ opened, the card scrolled to. */
+  const showImportStock = () => {
+    setOpen(3);
+    requestAnimationFrame(() => document.querySelector('[data-import-stock]')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+  };
   /** «اعرض»: the section a pricing refusal or a missing line names, opened and scrolled to (٣ the product, ٥ its models). */
   const showPricing = (n: 3 | 5) => {
     setOpen(n);
@@ -1468,6 +1488,23 @@ export default function ProductForm({
             cost appears after the save (which keeps every stored cost). */}
         {canSeeCost && !costLoaded && <CostOpensAfterSave />}
 
+        {/* «إعداد المخزون للمنتج المستورد» (§B.10): the stock mode an imported product needs before its price. */}
+        {stockMissing && doc.id ? (
+          <ImportStockCard
+            productId={doc.id}
+            dirty={dirty}
+            onDecided={(next) => {
+              setImportStock(next);
+              setImportStockDone(true);
+            }}
+          />
+        ) : null}
+        {importStockDone && !stockMissing ? (
+          <p className="mb-3 text-[12px] text-text-secondary" role="status" data-import-stock-done>
+            {importStockText('done', v2Lang)}
+          </p>
+        ) : null}
+
         <PricesSectionV2 modelNames={modelNames} firstModelId={firstModelId} packageDims={doc.dimensions ?? null} onJump={showPricing} productId={doc.id || null} />
 
         {/* The real cost layers behind the stock (the owner's batches): renders nothing
@@ -2028,6 +2065,11 @@ export default function ProductForm({
               <span className="text-amber-300" data-pricing-status={v2.touched ? 'unsaved' : undefined}>
                 {v2s.unsaved}
               </span>
+            ) : stockMissing ? (
+              // «نشر» waits for the imported product's stock mode (§B.10): the refusal, said before it is met.
+              <span className="text-amber-300" title={refusalText('IMPORT_STOCK_NOT_CONFIGURED', v2Lang)} data-pricing-status="import-stock">
+                {refusalText('IMPORT_STOCK_NOT_CONFIGURED', v2Lang)}
+              </span>
             ) : (
               <span className="text-emerald-300 inline-flex items-center gap-1" data-pricing-status="saved">
                 <Check className="w-3.5 h-3.5 shrink-0" /> {fileUpdateNote ?? v2s.saved}
@@ -2056,15 +2098,22 @@ export default function ProductForm({
           >
             {v2s.draft}
           </button>
-          <button
-            type="button"
-            data-action="save"
-            className={`${btnPrimary} h-10`}
-            disabled={saving}
-            onClick={() => void save('active')}
-          >
-            {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} {v2s.publish}
-          </button>
+          {stockMissing ? (
+            // No «نشر» while the stock mode is missing (it could only be refused): the way to the card instead.
+            <button type="button" data-action="import-stock" className={`${btnGhost} h-10`} onClick={showImportStock}>
+              {importStockText('open', v2Lang)}
+            </button>
+          ) : (
+            <button
+              type="button"
+              data-action="save"
+              className={`${btnPrimary} h-10`}
+              disabled={saving}
+              onClick={() => void save('active')}
+            >
+              {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} {v2s.publish}
+            </button>
+          )}
         </div>
       </div>
 

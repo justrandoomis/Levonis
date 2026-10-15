@@ -43,6 +43,14 @@ export interface IndexableProduct {
   categoryNames?: string[];
   /** Option and colour names: "Combo", "Dual nozzle", "Jade White". */
   variantNames?: string[];
+  /**
+   * The product's search aliases (./aliases.ts, migration 0194): its
+   * searchable external ids — a colour code «10101», a part code «FAP035», a
+   * SKU code — and its identity model and series («H2D», «X1 Series»). Read by
+   * the caller through `loadSearchAliases`, the one loader both index writers
+   * use; indexed beside the option names, at their weight.
+   */
+  aliases?: string[];
 }
 
 const text = (v: unknown): string[] => (typeof v === 'string' && v.trim() ? [v] : []);
@@ -71,7 +79,9 @@ export function toSearchDoc(p: IndexableProduct): SearchDoc {
       // words for it are written down.
       name: [...text(p.name), ...text(p.name_ar), ...text(p.name_ku), ...text(p.name_ckb), ...text(p.sku)],
       brand: p.brandName ? [p.brandName] : [],
-      model: p.variantNames ?? [],
+      // Model and option names, and the aliases a shopper types for the product
+      // itself (a colour code, a part code, the model it belongs to).
+      model: [...(p.variantNames ?? []), ...(p.aliases ?? []).filter((a) => typeof a === 'string' && a.trim() !== '')],
       hashtag: list(p.hashtags),
       category: p.categoryNames ?? [],
       description: text(p.description),

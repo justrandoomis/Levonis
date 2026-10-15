@@ -42,6 +42,7 @@ import { composeIqdRates, sameRate } from '@levonis/pricing/fxChain';
 import type { ShippingProfile } from '@levonis/pricing/skuChannel';
 import { sha256Hex } from '../crypto';
 import { isMissingTable, type FxPairId } from '../fx/pairs';
+import { catalogKnowledgeInstalled, catalogKnowledgeKnown } from '../catalogKnowledge';
 import { loadPreviewContext, loadProducts } from './load';
 import { loadProductsPricing } from './store';
 import type { PricingRates } from './rates';
@@ -232,6 +233,7 @@ export async function previewRateAct(db: D1Database, move: RateMove, rates: Pric
   const blocked: RatePreviewBlocked[] = [];
   const evaluated: Array<{ pid: string; hash: string | null; code: string | null }> = [];
   const ready: Array<{ ev: { product_id: string; rows: Array<{ old_iqd: number | null; new_iqd: number | null }> }; deficit: number; cost: number }> = [];
+  let stockGate: boolean | undefined;
   if (ids.length) {
     const control = await loadEngineControl(db);
     const images = await priceImagesOf(db, ids);
@@ -267,12 +269,18 @@ export async function previewRateAct(db: D1Database, move: RateMove, rates: Pric
           continue;
         }
         evaluated.push({ pid, hash: v2.hash, code: null });
+        // The V2 writer's import stock gate (v2/write.ts step 0): its 0194 probe is one of the preview's reads.
+        if (stockGate === undefined) {
+          if (catalogKnowledgeKnown(db) === null) statements += 1;
+          stockGate = await catalogKnowledgeInstalled(db);
+        }
         const batch = await v2WriteStatements(db, v2, {
           actor: 'preview',
           now: new Date(0).toISOString(),
           source: AUTO_REPRICE_SOURCE,
           idempotencyKey: `preview:${pid}`,
           auto: { priceSource: priceSourceOf(p.reasons), pricesUnchanged: pricesUnchangedV2(v2), trigger: 'owner_rate', reasons: p.reasons },
+          stockGate,
         });
         ready.push({ ev: { product_id: pid, rows: v2.rows }, deficit: deficitOfV2(v2), cost: batch.length });
         for (const r of v2.rows) {

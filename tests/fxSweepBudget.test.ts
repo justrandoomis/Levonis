@@ -21,6 +21,10 @@
  *   - the catch-up runs after the jobs and spends no more than they left
  *     (`quarterHourSearchBudget`), the sweep last within what is left
  *     (`quarterHourSweepBudget`: its 200, cut to 1,000 − 50 − the rest);
+ *   - the catch-up's backfill pays for the search aliases (Bambu import spec
+ *     §C.1, migration 0194: every census product here carries a part code, a
+ *     colour code and an identity model and series) inside its own share: the
+ *     presence probe once per binding and one alias read per 90 products;
  *   - the jobs' own statements are the same with and without sweep work;
  *   - nothing is lost to the pacing: tick after tick the staff recalculations,
  *     the index and the stale prices finish, each tick under the limit, and
@@ -232,6 +236,33 @@ function seedOutbox(raw: DatabaseSync) {
 }
 
 /**
+ * THE SEARCH ALIASES OF MIGRATION 0194 on every product (Bambu import spec
+ * §C.1): a searchable part code and colour code, an opaque store id the index
+ * never reads, and the identity model and series. A catch-up tick's backfill
+ * reads them (worker/lib/search/aliases.ts) and writes their tokens, so every
+ * tick below carries the alias read and the larger documents it brings.
+ */
+function seedSearchAliases(raw: DatabaseSync): void {
+  const ids = (raw.prepare('SELECT id FROM products ORDER BY id').all() as Array<{ id: string }>).map((r) => r.id);
+  const ext = raw.prepare('INSERT INTO product_external_ids (product_id, id_type, value, searchable) VALUES (?, ?, ?, ?)');
+  const spec = raw.prepare(
+    `INSERT INTO product_spec_values (id, product_id, canonical_key, group_key, data_type, value_text, status, confidence, source_kind, source_ref)
+     VALUES (?, ?, ?, 'identity', 'string', ?, 'verified', 'official_page', 'store_page', 'https://store.example/p')`
+  );
+  ids.forEach((id, i) => {
+    ext.run(id, 'part_code', `FAP${100 + i}`, 1);
+    ext.run(id, 'color_code', String(20000 + i), 1);
+    ext.run(id, 'bambu_product_id', String(9_000_000_000 + i), 0);
+    spec.run(`psv_qm_${i}`, id, 'identity.model', `Q${i}X`);
+    spec.run(`psv_qs_${i}`, id, 'identity.series', `Q${i} Series`);
+  });
+}
+
+/** The alias loader's presence probe (worker/lib/catalogKnowledge.ts) and its read (worker/lib/search/aliases.ts). */
+const ALIAS_PROBE = /^SELECT \(SELECT 1 FROM product_source_refs LIMIT 1\) AS r/;
+const ALIAS_READ = /FROM product_external_ids\s+WHERE searchable = 1 AND product_id IN/;
+
+/**
  * The world once, copied: the same jobs at their bound, with and without stale
  * engine products. `steady` is the live database's state: the search index is
  * current (every product save writes its own rows; the backfill of the
@@ -249,6 +280,7 @@ async function copies(opts: { steady: boolean; staff?: boolean }): Promise<{ sta
     await seedStaffRecalculations(w.raw);
     seedUploadSessions(w.raw);
     seedOutbox(w.raw);
+    seedSearchAliases(w.raw);
     scratch = mkdtempSync(join(tmpdir(), 'levonis-fx-sweep-'));
     template = join(scratch, 'template.db');
     w.raw.exec(`VACUUM INTO '${template.replace(/'/g, "''")}'`);
@@ -431,6 +463,42 @@ test('EVERY job at its bound in ONE tick — a staff recalculation waiting (two 
   );
 });
 
+test('the alias read rides inside the catch-up: a catch-up tick sends the 0194 probe once and one alias read for its 50 products, all within the catch-up share — and the tick stays under its limit', async () => {
+  const { stale } = await copies({ steady: false, staff: true });
+  const before = staleIndex(stale);
+  assert.ok(before >= 40, `the whole catalogue waits for the index (${before})`);
+  const t = await tick(stale);
+  assert.deepEqual(t.errors, [], 'no job reported an error');
+
+  const catchUp = t.log.slice(t.own, t.jobs);
+  const probes = t.log.flatMap((sql, i) => (ALIAS_PROBE.test(sql) ? [i] : []));
+  const reads = t.log.flatMap((sql, i) => (ALIAS_READ.test(sql) ? [i] : []));
+  assert.equal(probes.length, 1, 'the presence probe once a tick (a fresh binding each tick here; once per isolate live)');
+  assert.equal(reads.length, 1, 'ONE alias read: a pass selects 50 products, one statement per 90');
+  assert.ok([...probes, ...reads].every((i) => i >= t.own && i < t.jobs), 'both inside the catch-up, before the sweep');
+  assert.equal(catchUp.filter((sql) => ALIAS_PROBE.test(sql) || ALIAS_READ.test(sql)).length, 2);
+
+  // The catch-up, the alias read included, spent no more than the jobs left; the tick stays under its limit.
+  const searchShare = quarterHourSearchBudget(t.own);
+  assert.ok(t.catchUp <= searchShare, `the catch-up spent ${t.catchUp} of its ${searchShare}`);
+  assert.ok(t.total <= Math.max(t.own, QUARTER_HOUR_TICK_LIMIT), `the tick: ${t.total} statements (limit ${QUARTER_HOUR_TICK_LIMIT})`);
+  assert.ok(t.total < D1_INVOCATION_STATEMENT_LIMIT);
+
+  // What it indexed carries the aliases.
+  const indexed = before - staleIndex(stale);
+  assert.ok(indexed > 0, 'the catch-up indexed what fitted');
+  const withAliases = count(
+    stale,
+    `SELECT COUNT(DISTINCT t.product_id) AS n FROM search_tokens t
+      WHERE t.token = ? AND EXISTS (SELECT 1 FROM search_tokens a WHERE a.product_id = t.product_id AND a.token LIKE 'fap1%')
+        AND EXISTS (SELECT 1 FROM search_tokens s WHERE s.product_id = t.product_id AND s.token = 'series')`,
+    INDEX_STAMP
+  );
+  assert.ok(withAliases >= indexed, `every product the tick indexed carries its part code and series (${withAliases} of ${indexed})`);
+  assert.equal(count(stale, "SELECT COUNT(*) AS n FROM search_tokens WHERE token LIKE '90000000%'"), 0, 'never an opaque store id');
+  console.log(`catch-up tick with the alias read: jobs ${t.own}, catch-up ${t.catchUp} (share ${searchShare}, ${indexed} products), total ${t.total} <= ${QUARTER_HOUR_TICK_LIMIT}`);
+});
+
 test('nothing is lost to the pacing: tick after tick the staff recalculations, the search index and the stale prices finish — every tick under 1,000 — and end exactly where the same work done unpaced ends', async () => {
   const paced = (await copies({ steady: false, staff: true })).stale;
   const reference = (await copies({ steady: false, staff: true })).stale;
@@ -463,6 +531,10 @@ test('nothing is lost to the pacing: tick after tick the staff recalculations, t
   );
   same('SELECT staff_id, revision, state, processed_orders, adjusted_orders, error FROM finance_staff_reconciliations ORDER BY staff_id', 'the same recalculations');
   same('SELECT product_id, token, weight FROM search_tokens ORDER BY product_id, token', 'the same search index');
+  assert.ok(
+    count(paced, "SELECT COUNT(DISTINCT product_id) AS n FROM search_tokens WHERE token LIKE 'fap1%'") >= 40,
+    'the index the pacing finished carries the aliases (one loader, every pass)'
+  );
   same('SELECT product_id, combo_key, channel, usd_iqd_rate, replacement_cost_iqd, final_price_iqd FROM pricing_v2_sku_results ORDER BY product_id, combo_key, channel', 'the same engine figures');
   same('SELECT id, price_iqd FROM products ORDER BY id', 'the same prices');
   console.log(`paced to completion in ${totals.length} ticks, the largest ${Math.max(...totals)} statements (D1 allows ${D1_INVOCATION_STATEMENT_LIMIT})`);

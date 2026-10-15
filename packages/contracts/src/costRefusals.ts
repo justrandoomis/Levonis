@@ -788,6 +788,19 @@ export const COST_REFUSALS = {
     en: 'Price requests are not available right now; please try later.',
     ckb: 'داواکردنی نرخ لە ئێستادا بەردەست نییە؛ تکایە دواتر هەوڵ بدەرەوە.',
   },
+  // The import stock gate (Bambu import spec §B.10, §C.11; DECISIONS row 241; owner decision L-16): a product
+  // the catalogue import created carries no stock decision until the owner chooses «تتبّع الكمية» or «بلا تتبّع
+  // (حسب الطلب)», and the Pricing V2 write refuses to publish it until then (worker/lib/importStock.ts).
+  IMPORT_STOCK_NOT_CONFIGURED: {
+    ar: 'حدّد طريقة المخزون لهذا المنتج المستورد قبل نشر سعره.',
+    en: "Set this imported product's stock mode before publishing its price.",
+    ckb: 'پێش بڵاوکردنەوەی نرخ، شێوازی کۆگای ئەم بەرهەمە هاوردەکراوە دیاری بکە.',
+  },
+  IMPORT_STOCK_TRACKED_EMPTY: {
+    ar: 'لتتبّع الكمية أدخل كمية المخزون أولاً.',
+    en: 'To track quantity, enter the stock quantity first.',
+    ckb: 'بۆ بەدواداچوونی بڕ، سەرەتا بڕی کۆگا بنووسە.',
+  },
 } as const satisfies Record<string, CostRefusal>;
 
 export type CostRefusalCode = keyof typeof COST_REFUSALS;

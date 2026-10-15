@@ -799,16 +799,24 @@ test('the brand/section name lookup stays under D1’s 100-parameter refusal', a
     });
   }
 
+  // Every statement passes through; each `bind` is counted. A statement sent unbound (the search-alias
+  // loader's presence probe, worker/lib/catalogKnowledge.ts) binds nothing and passes as it is.
   const bindCounts: number[] = [];
   const counting = {
     prepare(sql: string) {
-      const st = (db as unknown as { prepare(s: string): { bind(...a: unknown[]): unknown } }).prepare(sql);
-      return {
-        bind(...args: unknown[]) {
-          bindCounts.push(args.length);
-          return (st as { bind(...a: unknown[]): unknown }).bind(...args);
+      const st = db.prepare(sql);
+      return new Proxy(st, {
+        get(target, prop) {
+          if (prop === 'bind') {
+            return (...args: unknown[]) => {
+              bindCounts.push(args.length);
+              return target.bind(...args);
+            };
+          }
+          const value = Reflect.get(target, prop, target) as unknown;
+          return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value;
         },
-      };
+      });
     },
   } as unknown as D1Database;
 
@@ -817,6 +825,9 @@ test('the brand/section name lookup stays under D1’s 100-parameter refusal', a
   assert.ok(bindCounts.length > 0, 'the lookup really ran');
   const worst = Math.max(...bindCounts);
   assert.ok(worst <= 90, `no statement may bind more than 90 parameters; the worst bound ${worst}`);
+  // The alias read (worker/lib/search/aliases.ts) is a UNION too: its numbered parameters serve both
+  // halves, so fifty products bind fifty values, once.
+  assert.ok(bindCounts.includes(50), 'the alias read bound its fifty product ids once');
   // And the names still reach the documents, chunked or not.
   assert.ok(docs[49].fields.brand?.includes('Brand 049'), 'the last chunk is not dropped');
   assert.ok(docs[49].fields.category?.includes('Sub 049'));

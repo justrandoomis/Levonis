@@ -61,6 +61,8 @@ import { fence } from '../operations';
 import { purgeCatalogueFromJob } from '../edgePolicy';
 import { engineDbRefusalCode } from '../pricingDbRefusals';
 import { isMissingTable } from '../fx/pairs';
+import { catalogKnowledgeInstalled, catalogKnowledgeKnown } from '../catalogKnowledge';
+import { isImportStockMiss } from '../importStock';
 import { loadPreviewContext, loadProducts } from './load';
 import { loadProductsPricing, pricingAuditStatement } from './store';
 import { isMissingV2Schema } from '../productOverlay';
@@ -517,6 +519,16 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
     for (const f of failing) await block(f.p, f.code);
 
     // 5. Deficit first: one atomic, fenced, idempotent, audited batch per product, while the budget lasts.
+    // The V2 writer's import stock gate asks for migration 0194 once per binding (worker/lib/catalogKnowledge.ts):
+    // charged here when the probe is sent, and its answer handed to every batch (v2/write.ts step 0).
+    let stockGate: boolean | undefined;
+    if (ready.some((r) => 'v2' in r)) {
+      const known = catalogKnowledgeKnown(db);
+      if (known === null && !budget.spend(1)) {
+        report.deferred.push(...ready.map((r) => r.p.state.product_id));
+        ready.length = 0;
+      } else stockGate = known ?? (await catalogKnowledgeInstalled(db));
+    }
     const slugs: string[] = [];
     for (let i = 0; i < ready.length; i++) {
       const item = ready[i]!;
@@ -531,7 +543,7 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
         idempotencyKey: `auto:${pid}:${'v2' in item ? item.v2.hash : item.ev.hash}`,
         auto: { priceSource: priceSourceOf(p.reasons), pricesUnchanged: unchanged, trigger: opts.trigger, reasons: p.reasons },
       };
-      const statements = 'v2' in item ? await v2WriteStatements(db, item.v2, write) : await engineWriteStatements(db, item.ev, [], [], write);
+      const statements = 'v2' in item ? await v2WriteStatements(db, item.v2, { ...write, stockGate }) : await engineWriteStatements(db, item.ev, [], [], write);
       if (statements.length > AUTO_REPRICE_STATEMENT_CAP) {
         await block(p, 'PRICING_SET_TOO_LARGE');
         continue;
@@ -547,6 +559,13 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
         const msg = e instanceof Error ? e.message : String(e);
         // The same evaluation already written (another run got there first): done.
         if (/UNIQUE constraint failed: pricing_audit\.idempotency_key/i.test(msg)) continue;
+        // The import stock gate (v2/write.ts step 0): not a race to retry — a decision only the owner makes. It cannot
+        // be reached by construction (the run reprices published products, and an imported product is published only
+        // after its stock mode is chosen); were it reached, the product is listed with the code, not retried forever.
+        if (isImportStockMiss(e)) {
+          await block(p, 'IMPORT_STOCK_NOT_CONFIGURED');
+          continue;
+        }
         if (fenceMissed(e) || /UNIQUE constraint failed: ops_guards/i.test(msg)) {
           report.conflicts.push(pid);
           continue;

@@ -294,12 +294,24 @@ export interface ListingResponse {
   requests_unavailable?: boolean;
 }
 
+/**
+ * «إعداد المخزون للمنتج المستورد» (Bambu import spec §B.10): the stock decision of a product the catalogue
+ * import created (`not_configured` until an admin chooses — its price cannot be published until then) or
+ * merged (`not_required`). Staff only; null for every other product, and on a server without migration 0194.
+ */
+export interface ImportStockState {
+  decision: 'not_required' | 'not_configured' | 'tracked' | 'untracked';
+  decided_at: string | null;
+}
+
 export interface ProductResponse {
   product: ProductDocV2 & { catalog_ids: string[]; printer_fit_ids?: string[] };
   /** The engine prices this product (owner decision 8): its price cells are read only. Absent on an older server. */
   engine_managed?: boolean;
   /** The engine prices direct sale only; model, colour and pre-order prices stay the owner's (DI-2). */
   engine_direct_only?: boolean;
+  /** The imported product's stock decision (absent on an older server: treated as none). */
+  import_stock?: ImportStockState | null;
 }
 
 export interface SaveResponse {
