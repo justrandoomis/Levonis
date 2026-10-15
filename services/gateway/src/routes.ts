@@ -131,6 +131,10 @@ export const ROUTES: readonly RouteRule[] = [
   // reprice. It is deliberately NOT with /api/price-protection, which is
   // order-linked money owed to someone who already bought.
   { prefix: '/api/price-reports', hosts: 'root', owner: 'CATALOG', flipPhase: 5, requires: 'auth', rateClass: 'write' },
+  // «طلب السعر» (DECISIONS row 240, migration 0193): a signed-in customer asks for a catalog-only
+  // product's price. Like «لكيتها بمكان أرخص» it exists to answer "which product is priced next", a
+  // catalogue decision; the customer's notice is delivered through Notifications, a transport.
+  { prefix: '/api/price-requests', hosts: 'root', owner: 'CATALOG', flipPhase: 5, requires: 'auth', rateClass: 'write' },
 
   // -------------------------------------------------------- catalog (admin)
   { prefix: '/api/admin/bundles', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },

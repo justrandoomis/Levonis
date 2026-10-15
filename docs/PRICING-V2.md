@@ -750,8 +750,10 @@ IQD, with a pre-order discount of $50 = 75,000.
   comparison, both favourites lists, the community search, the printer finder, «يناسب» and the RPC feed.
 - **SELLABLE**: the old «listed» predicate byte for byte — visible, not held for ANY gap, and
   V2-published. Every PURCHASE path asks it: cart add, read and edit, the quote, checkout, Quick Buy, new
-  gifts, bundles and mystery offers, the trade-in target, «لكيتها بمكان أرخص», the print calculator's
-  materials and the stock-alert arming.
+  gifts, bundles and mystery offers, the trade-in target (and, since Services S-P2, its search, the
+  product page's trade-in entry and «سعر اليوم», the new price a valuation reads:
+  `worker/lib/tradeInTargets.ts`, `worker/lib/tradeInToday.ts`), «لكيتها بمكان أرخص», the print
+  calculator's materials and the stock-alert arming.
 - **Catalog-only** = visible and not sellable. It is derived, never stored. A database without 0189
   shows every active product catalog-only and sells nothing; one without 0184 drops both held clauses
   (`runListed` retries once per missing piece). `tests/listingPredicateGuard.test.ts` counts every
@@ -790,7 +792,8 @@ than 20 priced ones leave empty. The edge-cache epoch and the public projection 
 recomputes `product_price_request_stats` from source in the same batch. The selection is checked on the
 server against the product's real SKUs (`checkSelection`, worker/lib/commercialState.ts). Caps: 50 open
 a person, 20 a product; rate limits 20 / 600 s (ask), 120 / 60 s (read), 30 / 600 s (change). The
-quarter-hour tick runs `sweepPriceRequests` last (its own 40 statements): a selection that became
+quarter-hour tick runs `sweepPriceRequests` after the completeness catch-up and before the services
+sweep (S-P2, last), on its own 40 statements: a selection that became
 sellable through any door is `notified` (in-app with Sorani in `meta`, plus outbox rows, key
 `price_available:<id>:<cycle>`) or `closed(priced)` without consent. It reads 20 rows a product
 (least recently checked first) and progresses PER ROW: each batch carries its rows' writes, their

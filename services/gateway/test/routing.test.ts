@@ -27,6 +27,8 @@ const EXPECTED_OWNER: Record<string, string> = {
   '/api/public/v1': 'CORE',
   '/api/stock-alerts': 'CATALOG',
   '/api/price-reports': 'CATALOG',
+  // DECISIONS row 240 (0193): «طلب السعر», the catalogue's demand signal beside «لكيتها بمكان أرخص».
+  '/api/price-requests': 'CATALOG',
   '/api/admin/price-reports': 'CATALOG',
   '/api/bundles': 'CATALOG',
   '/api/admin/bundles': 'CATALOG',
