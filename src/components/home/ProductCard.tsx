@@ -204,10 +204,10 @@ function CompactCard({
         {priced && <SaleBadge p={p} hasSale={hasSale} />}
         {/* A scheduled special offer (§12, §13.2): decoration only — the API
             refuses an expired offer, and the price is already the offer's. */}
-        {/* The clock's own spans are zinc (Countdown): on this onyx pill they read snow in either theme. */}
+        {/* The clock names zinc on its own spans (Countdown): on this onyx pill they read snow in either theme. */}
         {clock && (
           <span className="absolute bottom-1.5 start-1.5 rounded-sm bg-onyx/80 px-1.5 py-0.5">
-            <Countdown target={clock.target} kind={clock.kind} className="text-[10px] text-snow [&_*]:text-snow" />
+            <Countdown target={clock.target} kind={clock.kind} className="text-[10px] !text-snow [&_*]:text-snow" />
           </span>
         )}
         {/* Graded stock says so on the card, on the photograph so the
@@ -298,7 +298,7 @@ function RegularCard({ p, widthClass }: { p: ApiProduct; widthClass: string }) {
         {priced && <SaleBadge p={p} hasSale={hasSale} />}
         {clock && (
           <span className="absolute bottom-2 start-2 rounded-sm bg-onyx/80 px-1.5 py-0.5">
-            <Countdown target={clock.target} kind={clock.kind} className="text-[10px] text-snow [&_*]:text-snow" />
+            <Countdown target={clock.target} kind={clock.kind} className="text-[10px] !text-snow [&_*]:text-snow" />
           </span>
         )}
       </div>

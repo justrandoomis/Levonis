@@ -166,5 +166,8 @@ test('the clock on the photograph reads snow on its onyx pill in the light theme
   const card = readFileSync('src/components/home/ProductCard.tsx', 'utf8');
   const clocks = card.match(/<Countdown target=\{clock\.target\} kind=\{clock\.kind\} className="([^"]*)" \/>/g) ?? [];
   assert.equal(clocks.length, 2, 'the compact and the regular card');
-  for (const c of clocks) assert.match(c, /\[&_\*\]:text-snow/);
+  for (const c of clocks) {
+    assert.match(c, / !text-snow /, 'the label span itself (Countdown names zinc-400 on it)');
+    assert.match(c, /\[&_\*\]:text-snow/, 'and the bold days and time inside it (zinc-200)');
+  }
 });
