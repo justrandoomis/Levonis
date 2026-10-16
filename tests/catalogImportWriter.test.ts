@@ -750,6 +750,56 @@ test('an aux medium (a swatch) is proven by its R2 object: gone, the swatch is n
   assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM catalog_import_conflicts WHERE item_id = ? AND kind = 'image_review' AND field = 'media.not_stored'", s.itemId), 1);
 });
 
+test('review 6b, 2: a thrown R2 HEAD on a swatch, in-the-box or description object is a transient 503 at /write — nothing committed, never "not stored"', async () => {
+  const { R2Double } = await import('./fixtures/imageDoubles');
+  const auxOf = (s: ReturnType<typeof stage>, kind: 'swatch' | 'box' | 'description'): string => {
+    const gallery = new Set(s.payload.images.map((i) => i.source_media_id));
+    const ids =
+      kind === 'swatch'
+        ? s.payload.swatches.map((x) => x.source_media_id)
+        : kind === 'box'
+          ? s.payload.specs.flatMap((x) => x.value_list.flatMap((v) => (v && typeof v === 'object' && (v as { source_media_id?: string }).source_media_id ? [(v as { source_media_id: string }).source_media_id] : [])))
+          : s.payload.content_blocks.filter((b) => b.kind === 'image' && b.source_media_id).map((b) => b.source_media_id);
+    const id = ids.find((x) => !gallery.has(x));
+    assert.ok(id, `${kind}: an aux medium that is not a gallery one`);
+    return id!;
+  };
+  const cases = [
+    ['pla-basic-filament', 'swatch', 'SELECT COUNT(*) AS n FROM product_option_value_swatches WHERE product_id = ? AND r2_key = ?'],
+    ['h2c', 'box', "SELECT COUNT(*) AS n FROM product_spec_values WHERE product_id = ? AND canonical_key = 'package.contents' AND instr(value_list, ?) > 0"],
+    ['h2d', 'description', 'SELECT COUNT(*) AS n FROM products WHERE id = ? AND instr(content_blocks, ?) > 0'],
+  ] as const;
+  for (const shape of ['one bucket (the fixtures)', 'R2_PUBLIC apart from the legacy BUCKET (wrangler.jsonc)'] as const) {
+    for (const [handle, kind, presentSql] of cases) {
+      const label = `${handle} ${kind}, ${shape}`;
+      const w = newWorld();
+      if (!shape.startsWith('one')) w.media = { ...w.media, BUCKET: new R2Double() };
+      const s = stage(w, handle);
+      const id = auxOf(s, kind);
+      const key = (w.raw.prepare('SELECT r2_key FROM catalog_import_media WHERE run_id = ? AND source_media_id = ?').get(RUN_ID, id) as { r2_key: string }).r2_key;
+      const head = w.bucket.head.bind(w.bucket);
+      let thrown = 0;
+      w.bucket.head = (async (k: string) => {
+        if (k === key && thrown === 0) {
+          thrown++;
+          throw new Error('R2 internal error (10001)');
+        }
+        return head(k);
+      }) as typeof w.bucket.head;
+      const e = await refused(() => write(w, s), 'IMAGE_STORAGE_FAILED');
+      assert.equal(thrown, 1, label);
+      assert.equal(e.status, 503, `${label}: transient, the runner sends /write again`);
+      assert.equal(e.blocker, '', `${label}: no blocker`);
+      nothingWritten(w, s.payload.product_id);
+      assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM catalog_import_items WHERE id = ? AND processing_state = 'WRITING'", s.itemId), 1, `${label}: still WRITING`);
+      // R2 answers again: the same write commits WITH the medium.
+      await write(w, s);
+      assert.equal(count(w.raw, presentSql, s.payload.product_id, key), 1, `${label}: the medium is written`);
+      assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM catalog_import_conflicts WHERE item_id = ? AND field = 'media.not_stored'", s.itemId), 0, `${label}: no "not stored" conflict`);
+    }
+  }
+});
+
 test('a merge into a product that has its primary picture: the owner\'s stays the only primary, every appended row is written', async () => {
   const w = newWorld();
   await existingA1(w);

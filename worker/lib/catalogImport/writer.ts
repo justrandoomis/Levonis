@@ -89,7 +89,6 @@ import {
   type UsageGuideV2,
 } from '../productModel';
 import { verifyAndNormalizeProductMedia } from '../productMediaWrite';
-import { headMediaObject } from '../mediaStorage';
 import { loadPrinterFitIds } from '../printerFits';
 import { printerProductIds } from '../printerIdentity';
 import { loadSearchAliases, ALIAS_SPEC_KEYS } from '../search/aliases';
@@ -101,6 +100,7 @@ import type { Env } from '../types';
 import { GUARDED_ROW_TABLES, IMPORT_GUARD_ID, IMPORT_GUARD_REFUSAL, jsonElementMoneySql, nonDefaultSql, type GuardedColumn } from './protectedTables';
 import { countingD1, IMPORT_INVOCATION_LIMIT, IMPORT_RESERVE, packedInserts, type InvocationCounter } from './budget';
 import { newImportProductDoc } from './doc';
+import { importObjectHead } from './media';
 import {
   checkReviewedScope,
   payloadSha256,
@@ -808,6 +808,11 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
    * R2 HEAD (present, non-empty, WebP), which costs no D1 statement: the full byte verification with its cleanup
    * guard (four statements an object) is spent on the gallery rows the planner writes. These objects were
    * converted and stored by /media, and catalog_import_media.r2_key keeps them referenced (worker/lib/mediaRefs.ts).
+   * Only an object R2 positively does not have (absent, empty, not WebP) is left out (conflict media.not_stored):
+   * a HEAD that FAILED says nothing, so the write is refused whole as the gallery verification refuses it —
+   * 503 IMAGE_STORAGE_FAILED, nothing committed, the runner sends /write again (§B.5 transient). Read as "not
+   * stored", one passing R2 error would commit the product without that medium for good (nothing re-writes an
+   * item past WRITING) while /media still answers it stored, and VERIFY would fail on it every round.
    */
   const auxIds = [
     ...payload.swatches.map((s) => s.source_media_id),
@@ -818,18 +823,9 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
   if (media) {
     if (!ctx.media) throw new ImportWriteRefused('IMPORT_MEDIA_UNAVAILABLE', '', 503, 'media_bindings_missing');
     const keys = [...new Set(auxIds.map((id) => stored(id)?.r2_key ?? '').filter(Boolean))];
-    const heads = await Promise.all(
-      keys.map(async (key) => {
-        try {
-          const h = await headMediaObject(ctx.media!, 'public', key);
-          const type = h?.httpMetadata?.contentType?.toLowerCase() ?? '';
-          return h && Number(h.size ?? 0) > 0 && (!type || type === 'image/webp') ? key : '';
-        } catch {
-          return '';
-        }
-      })
-    );
-    for (const k of heads) if (k) auxPresent.add(k);
+    const heads = await Promise.all(keys.map(async (key) => ({ key, ...(await importObjectHead(ctx.media!, key)) })));
+    if (heads.some((h) => h.presence === 'unknown')) throw new ImportWriteRefused('IMAGE_STORAGE_FAILED', '', 503, 'media_not_verified');
+    for (const h of heads) if (h.presence === 'present' && (!h.contentType || h.contentType === 'image/webp')) auxPresent.add(h.key);
   }
   const storedAux = (sourceMediaId: string): MediaRow | null => {
     const m = stored(sourceMediaId);

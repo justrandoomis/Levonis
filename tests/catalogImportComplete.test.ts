@@ -202,3 +202,44 @@ test('review 6b: a merge completes on the before_fp_equal its write recorded, an
   const ok = await complete(w, s.payload.source_product_id, { lease_token: 'lease_test_0001', live_url: URL_OF(result.slug), edge_evidence: merged });
   assert.equal(ok.state, 'COMPLETE', JSON.stringify(ok.d1_checks.failed.concat(ok.d1_checks.agreement.failed)));
 });
+
+test('review 6b, 2: a thrown R2 HEAD during the recompute is a transient 503 before any record, in both binding shapes; only an object R2 lacks fails d1.media', async () => {
+  const { R2Double } = await import('./fixtures/imageDoubles');
+  for (const shape of ['one bucket (the fixtures)', 'R2_PUBLIC apart from the legacy BUCKET (wrangler.jsonc)'] as const) {
+    const { w, s, result } = await verifying();
+    const sid = s.payload.source_product_id;
+    const env = { DB: w.db, BUCKET: (shape.startsWith('one') ? w.bucket : new R2Double()) as never, R2_PUBLIC: w.bucket as never, R2_PRIVATE: w.media.R2_PRIVATE as never };
+    const call = async () =>
+      completeItem(env, `${ORIGIN}/api/ops/catalog-import/items/${sid}/complete`, RUN, await itemBySource(w.db, RUN_ID, sid), w.bundle, {
+        lease_token: 'lease_test_0001',
+        live_url: URL_OF(result.slug),
+        edge_evidence: evidence(s.payload, result.slug),
+      });
+    const head = w.bucket.head.bind(w.bucket);
+    let thrown = 0;
+    w.bucket.head = (async (k: string) => {
+      if (thrown === 0) {
+        thrown++;
+        throw new Error('R2 internal error (10001)');
+      }
+      return head(k);
+    }) as typeof w.bucket.head;
+    await assert.rejects(call, (e: unknown) => e instanceof OpsRefusal && e.status === 503 && e.code === 'IMPORT_STORAGE_UNAVAILABLE', shape);
+    assert.equal(thrown, 1, shape);
+    assert.equal(itemRow(w, s.itemId).state, 'VERIFYING_LIVE', `${shape}: nothing moved`);
+    assert.equal(itemRow(w, s.itemId).d1_checks, '{}', `${shape}: no d1_checks recorded`);
+    assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM catalog_import_events WHERE item_id = ? AND code = 'IMPORT_VERIFY_DISAGREES'", s.itemId), 0, `${shape}: no disagreement event`);
+    // An object R2 positively does not have is a failed check, not a transient answer.
+    w.bucket.head = head as typeof w.bucket.head;
+    const gone = (w.raw.prepare('SELECT r2_key FROM product_images WHERE product_id = ? AND is_primary = 0 LIMIT 1').get(s.payload.product_id) as { r2_key: string }).r2_key;
+    const bytes = w.bucket.objects.get(gone);
+    w.bucket.objects.delete(gone);
+    const missing = await call();
+    assert.equal(missing.state, 'VERIFYING_LIVE', shape);
+    assert.ok(missing.d1_checks.agreement.failed.includes('d1.media'), `${shape}: ${JSON.stringify(missing.d1_checks.agreement.failed)}`);
+    // R2 answers and has every object: COMPLETE.
+    w.bucket.objects.set(gone, bytes!);
+    const ok = await call();
+    assert.equal(ok.state, 'COMPLETE', `${shape}: ${JSON.stringify(ok.d1_checks.agreement.failed)}`);
+  }
+});

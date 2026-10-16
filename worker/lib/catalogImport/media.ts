@@ -150,19 +150,27 @@ export type ObjectPresence = 'present' | 'absent' | 'unknown';
  * "not stored".
  */
 export async function importObjectPresence(env: Pick<Env, 'BUCKET' | 'R2_PUBLIC' | 'R2_PRIVATE'>, key: string): Promise<ObjectPresence> {
-  if (!isSafeMediaKey(key)) return 'absent';
+  return (await importObjectHead(env, key)).presence;
+}
+
+/** importObjectPresence with the object's own content type (lower case, '' when R2 records none), for a caller that checks it. */
+export async function importObjectHead(
+  env: Pick<Env, 'BUCKET' | 'R2_PUBLIC' | 'R2_PRIVATE'>,
+  key: string
+): Promise<{ presence: ObjectPresence; contentType: string }> {
+  if (!isSafeMediaKey(key)) return { presence: 'absent', contentType: '' };
   const primary = mediaBucket(env, 'public');
   const buckets = [primary, ...(env.BUCKET && env.BUCKET !== primary ? [env.BUCKET] : [])].filter(Boolean);
   let errored = false;
   for (const bucket of buckets) {
     try {
       const h = await bucket.head(key);
-      if (h && Number(h.size ?? 0) > 0) return 'present';
+      if (h && Number(h.size ?? 0) > 0) return { presence: 'present', contentType: h.httpMetadata?.contentType?.toLowerCase() ?? '' };
     } catch {
       errored = true;
     }
   }
-  return errored ? 'unknown' : 'absent';
+  return { presence: errored ? 'unknown' : 'absent', contentType: '' };
 }
 
 interface StoredRow {

@@ -15,7 +15,8 @@
  *                      or were left as they were / filled (merge)
  *   memberships        product_catalogs ⊇ the map's secondary memberships (and = primary + secondaries on a create)
  *   search             the current INDEX_STAMP row, the title's tokens and every searchable alias's tokens
- *   media              R2 HEAD of every image, swatch and in-the-box object (when the media bindings are given)
+ *   media              R2 HEAD of every image, swatch and in-the-box object (when the media bindings are given);
+ *                      a HEAD that fails is no answer: 503 IMPORT_STORAGE_UNAVAILABLE, nothing recorded
  *   swatches_own       every swatch row of the product names one of its own option values
  *   counts             groups, values, variants, image bindings, spec statuses and regions, documents and
  *                      relations equal what the write recorded (stage_data.written)
@@ -24,14 +25,16 @@
  *   price_request      the default selection (and every selection the runner checked) is eligible when
  *                      complete and SELECTION_REQUIRED when not, through validatePriceRequestSelection
  *
- * The answer holds booleans and counts only: never a value, a name or a URL.
+ * The answer holds booleans and counts only: never a value, a name or a URL. Reads only — the one refusal it
+ * throws (the storage error above) leaves nothing behind.
  */
 import { listing } from '../listing';
-import { headMediaObject } from '../mediaStorage';
 import { validatePriceRequestSelection } from '../priceRequests';
 import { INDEX_STAMP } from '../search/store';
 import { isUsefulToken, tokenize } from '../search/normalize';
 import type { Env } from '../types';
+import { OpsRefusal } from './auth';
+import { importObjectPresence } from './media';
 import { IMPORT_GUARD_ID } from './protectedTables';
 import { taxonomyOfRow, type ReviewedBundle } from './reviewed';
 import type { WrittenCounts } from './writer';
@@ -200,8 +203,12 @@ export async function recomputeD1Checks(db: D1Database, input: D1CheckInput): Pr
       }
     });
     const keys = [...new Set([...images.map((i) => i.r2_key), ...(swatchRows ?? []).map((s) => s.r2_key), ...boxKeys].filter(Boolean))];
-    const present = await Promise.all(keys.map(async (k) => !!(await headMediaObject(input.media!, 'public', k).catch(() => null))));
-    checks.media = present.every(Boolean);
+    const presence = await Promise.all(keys.map((k) => importObjectPresence(input.media!, k)));
+    // A HEAD that FAILED is not a missing object (§B.5: transient), as at /media and /readback: the whole call is
+    // answered 503 before completeItem records anything, and the runner asks again. Only an object R2 positively
+    // does not have (absent, or empty) fails the check.
+    if (presence.includes('unknown')) throw new OpsRefusal(503, 'IMPORT_STORAGE_UNAVAILABLE', [input.itemId]);
+    checks.media = presence.every((p) => p === 'present');
     counts.media_objects = keys.length;
   } else {
     checks.media = null;
