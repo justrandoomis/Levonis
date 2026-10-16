@@ -1,28 +1,39 @@
 /**
- * THE BROWSER CHECK (Bambu import spec §I.1.7).
+ * THE BROWSER CHECK (Bambu import spec §I.1.7, §G.2, §G.3, §1 row 27).
  *
  * Playwright, Chromium headless, ONE browser per job, on the public site only:
  * every request to another host is aborted and counted, and a request to a
  * Bambu Lab host fails the check outright — the store is never opened in a
  * browser (§J.1: no headless browser on the store).
  *
- * `/product/<slug>` in Arabic (the default):
- *   - the main image — the hero frame's own picture, never a thumbnail —
- *     decodes (`naturalWidth > 0`) and keeps its ratio (`object-fit: contain`);
- *   - «السعر غير متوفر حالياً» is visible and «طلب السعر» present; there is no
- *     add-to-cart, buy-now or Quick Buy control and no 0 before a dinar unit;
- *   - the opening selection is the page's §G.3 rule (selection.ts): the
- *     defaults while they form a variant, else the first default alone, and
- *     every single-value group that fits;
+ * `/product/<slug>` in Arabic (the default), read through the hooks the page
+ * renders (src/pages/Product.tsx, src/components/product/*):
+ *   - the main image — the picture in the hero frame (`[data-gallery-hero]`),
+ *     never a thumbnail — decodes (`naturalWidth > 0`) and keeps its ratio
+ *     (`object-fit: contain`);
+ *   - the request door (`[data-price-request-cta]`) is there, «السعر غير متوفر
+ *     حالياً» is visible; there is no add-to-cart, buy-now or Quick Buy control
+ *     and no 0 before a dinar unit;
+ *   - the opening selection is the page's §G.3 rule, read from what the option
+ *     groups show pressed (`fieldset[data-option-group]`, each control's
+ *     `data-option-value`);
  *   - for each colour, version or size value (≤ 12; all for the audit
- *     classes), in its group's fieldset (a swatch by its value id, a chip by
- *     its exact name): a value the selection does not offer must be disabled
- *     and show «غير متاح مع هذا الاختيار», and is never clicked; any other is
- *     chosen, and the WHOLE selection the page now holds (the other groups'
- *     choices kept, as the page keeps them) decides the expected gallery — the
- *     hero is one of the images that lead it, and no image the selection
- *     contradicts is in the gallery (R6). The gallery is the rows the Worker
- *     WROTE (gallery.ts: byte-identical images collapsed, §C.4 step 1);
+ *     classes), in its group's fieldset: a value the selection does not offer
+ *     is marked so (`data-offered="false"`, dimmed) with «غير متاح مع هذا
+ *     الاختيار» (a chip's own line; a swatch's accessible name and its group's
+ *     note), and a value it offers is not; NO value is disabled (a dead end,
+ *     §1 row 27). Each value is then pressed — an unoffered one too: the page
+ *     takes it and lets go of the other groups' clashing values, a group left
+ *     with one fitting value taking it (`chooseValue`) — and the WHOLE
+ *     selection the page then holds must be the one that rule gives; it decides
+ *     the expected gallery: the hero is one of the images that lead it, and no
+ *     image the selection contradicts is in the gallery (R6). The gallery is the
+ *     rows the Worker WROTE (gallery.ts: byte-identical images collapsed, §C.4
+ *     step 1);
+ *   - the knowledge tabs (`[data-knowledge]`, near the viewport) are the tabs
+ *     the page's own `knowledgeTabs` gives the expected answer for the
+ *     selection on screen, and every US 110 V row sits under «إصدارات أخرى»
+ *     (`details[data-knowledge-other]`, L-20) in every tab;
  *   - the breadcrumb names the leaf section (a leaf the tree does not name
  *     fails it: nothing is not a match).
  * For a MERGE into an existing product the chooser, the price and the buying
@@ -38,8 +49,10 @@ import { createRequire } from 'node:module';
 import { existsSync, realpathSync } from 'node:fs';
 import { mediaPath } from '@levonis/catalog/bambuImport/fingerprint';
 import type { ImportPayload } from '@levonis/catalog/bambuImport/payload';
+import { productVariantIdForSelection } from '@levonis/pricing/productSelectionMedia';
+import { knowledgeTabs, type KnowledgeAnswer } from '../../src/lib/productKnowledge';
 import type { MediaAnswerRow } from './opsClient';
-import { expectedGallery, pageDefaultSelection, valueOffered, withValue } from './selection';
+import { expectedGallery, pageDefaultSelection, pressValue, valueOffered } from './selection';
 
 export const UNPRICED_AR = 'السعر غير متوفر حالياً';
 export const REQUEST_AR = 'طلب السعر';
@@ -72,6 +85,7 @@ interface PwRoute {
 interface PwLocator {
   count(): Promise<number>;
   first(): PwLocator;
+  nth(index: number): PwLocator;
   locator(selector: string): PwLocator;
   getAttribute(name: string): Promise<string | null>;
   isDisabled(): Promise<boolean>;
@@ -88,6 +102,7 @@ interface PwPage {
   goto(url: string, opts?: { waitUntil?: string; timeout?: number }): Promise<unknown>;
   locator(selector: string): PwLocator;
   getByText(text: string, opts?: { exact?: boolean }): PwLocator;
+  evaluate<T>(fn: () => T): Promise<T>;
   waitForTimeout(ms: number): Promise<void>;
   screenshot(opts?: { fullPage?: boolean }): Promise<Buffer>;
   on(event: string, fn: (arg: unknown) => void): void;
@@ -113,6 +128,11 @@ export interface BrowserInput {
   leafName: string;
   /** All values (audit classes) or at most 12. */
   allValues: boolean;
+  /**
+   * The knowledge answer VERIFY expects (verify.ts `expectedKnowledge`, the route's own assembly): the tabs the page
+   * must draw for it. Null when not known (a merge: the existing product's page).
+   */
+  knowledge: KnowledgeAnswer | null;
   screenshot: boolean;
 }
 
@@ -120,6 +140,10 @@ export interface BrowserCounts {
   values_checked: number;
   values_failed: number;
   values_not_offered: number;
+  /** The knowledge tabs (or phone sections) the page drew. */
+  knowledge_tabs: number;
+  /** US 110 V rows the knowledge tabs drew (each under «إصدارات أخرى» or a failure). */
+  us_110v_notes: number;
   blocked_requests: number;
   store_requests: number;
   page_errors: number;
@@ -129,7 +153,7 @@ export interface BrowserResult {
   ok: boolean;
   checks: Record<string, boolean>;
   counts: BrowserCounts;
-  /** Every selection the page held when it was checked: the opening one, then the whole selection after each click. */
+  /** Every selection the page held when it was checked: the opening one, then the whole selection after each press. */
   selections: string[][];
   screenshots: Buffer[];
 }
@@ -139,14 +163,27 @@ export interface BrowserResult {
 /** One value's control in its group: a swatch or a chip. */
 export interface ChipDriver {
   pressed(): Promise<boolean>;
-  /** Disabled natively (`disabled`) or by `aria-disabled="true"`. */
+  /** The page marks it not offered with the current choice (`data-offered="false"`: dimmed, still pressable). */
+  notOffered(): Promise<boolean>;
+  /** Disabled natively (`disabled`) or by `aria-disabled="true"`: a dead end the page never draws for a value. */
   disabled(): Promise<boolean>;
-  /** The «غير متاح مع هذا الاختيار» helper is shown for it. */
+  /** «غير متاح مع هذا الاختيار» is said for it: a chip's own line; a swatch's accessible name and its group's note. */
   helper(): Promise<boolean>;
   click(): Promise<void>;
 }
 
-/** What the checks read from the product page, and the one thing they do to it (choose a value). */
+/** What the knowledge tabs drew, near the viewport. */
+export interface KnowledgeView {
+  /** `[data-knowledge]` came (it takes no room until it has something to show). */
+  shown: boolean;
+  /** The tabs (desktop) or sections (phone) by id, in the page's order. */
+  tabs: string[];
+  /** US 110 V rows across every tab, and those outside «إصدارات أخرى». */
+  usNotes: number;
+  usOutside: number;
+}
+
+/** What the checks read from the product page, and the one thing they do to it (press a value). */
 export interface ProductPageDriver {
   /** The hero frame's own image (never a thumbnail): decoded width, object-fit, URL; w 0 when the frame shows none. */
   hero(): Promise<{ w: number; fit: string; src: string }>;
@@ -154,9 +191,13 @@ export interface ProductPageDriver {
   requestCta(): Promise<boolean>;
   /** `value`'s control inside `group`'s fieldset; null when the page shows none. */
   chip(group: ImportPayload['groups'][number], value: ImportPayload['groups'][number]['values'][number]): Promise<ChipDriver | null>;
+  /** The values the option groups show pressed (any order). */
+  pressedValues(groups: ImportPayload['groups']): Promise<string[]>;
   /** The thumbnail strip's image URLs. */
   gallery(): Promise<string[]>;
-  /** Lets a click render. */
+  /** Brings the knowledge tabs near the viewport and reads every tab. */
+  knowledge(): Promise<KnowledgeView>;
+  /** Lets a press render. */
   settle(): Promise<void>;
 }
 
@@ -167,27 +208,38 @@ export interface PageCheckInput {
   images: readonly ImportPayload['images'][number][];
   leafName: string;
   allValues: boolean;
+  /** The expected knowledge answer; null skips the tabs check (unknown). */
+  knowledge?: KnowledgeAnswer | null;
+}
+
+type PageCounts = Pick<BrowserCounts, 'values_checked' | 'values_failed' | 'values_not_offered' | 'knowledge_tabs' | 'us_110v_notes'>;
+
+const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.length && new Set(a).size === new Set([...a, ...b]).size;
+
+/** Ids in the groups' order (a selection as the evidence records it). */
+function inGroupOrder(ids: readonly string[], groups: ImportPayload['groups']): string[] {
+  const at = new Map(groups.flatMap((g, gi) => g.values.map((v) => [v.id, gi] as const)));
+  return [...new Set(ids)].filter((id) => at.has(id)).sort((a, b) => (at.get(a) ?? 0) - (at.get(b) ?? 0));
 }
 
 /** The §I.1.7 checks over a page (the real one through Playwright, or a model of it in tests). */
-export async function inspectProductPage(
-  page: ProductPageDriver,
-  input: PageCheckInput
-): Promise<{ checks: Record<string, boolean>; counts: Pick<BrowserCounts, 'values_checked' | 'values_failed' | 'values_not_offered'>; selections: string[][] }> {
+export async function inspectProductPage(page: ProductPageDriver, input: PageCheckInput): Promise<{ checks: Record<string, boolean>; counts: PageCounts; selections: string[][] }> {
   const { payload, media } = input;
   const merge = payload.write_mode === 'merge';
   const checks: Record<string, boolean> = {};
-  const counts = { values_checked: 0, values_failed: 0, values_not_offered: 0 };
+  const counts: PageCounts = { values_checked: 0, values_failed: 0, values_not_offered: 0, knowledge_tabs: 0, us_110v_notes: 0 };
   const selections: string[][] = [];
 
   const hero = await page.hero();
   checks.image_decodes = hero.w > 0;
   checks.image_contain = hero.fit === 'contain';
+  // The request door first: its panel is a lazy chunk, and the text is read once it has drawn.
+  const cta = merge ? false : await page.requestCta();
   const text = await page.text();
   if (!merge) {
     // A merged product keeps its own price and buying controls (§E.2): these hold for an imported product only.
     checks.unpriced_label = text.includes(UNPRICED_AR);
-    checks.request_door = text.includes(REQUEST_AR) || (await page.requestCta());
+    checks.request_door = cta;
     checks.no_buying_control = !BUYING.test(text);
   }
   checks.no_zero_dinar = !ZERO_DINAR.test(text);
@@ -195,19 +247,16 @@ export async function inspectProductPage(
   if (merge) return { checks, counts, selections };
 
   const { groups, variants } = payload;
-  let selection = pageDefaultSelection(payload);
-  let defaultsOk = true;
-  for (const g of groups) {
-    const want = g.values.find((v) => selection.includes(v.id));
-    if (!want) continue;
-    const chip = await page.chip(g, want);
-    if (!chip || !(await chip.pressed())) defaultsOk = false;
-  }
-  checks.default_selection = defaultsOk;
+  const opening = pageDefaultSelection(payload);
+  let selection = inGroupOrder(await page.pressedValues(groups), groups);
+  checks.default_selection = sameSet(selection, opening);
   if (selection.length) selections.push([...selection]);
 
-  let valuesOk = true;
+  let imagesOk = true;
+  let heldOk = true;
+  let marksOk = true;
   let helpersOk = true;
+  let noDeadEnd = true;
   let budget = input.allValues ? Infinity : 12;
   for (const g of groups) {
     if (!SELECTION_KINDS.has(g.kind) || g.values.length < 2) continue;
@@ -215,31 +264,43 @@ export async function inspectProductPage(
       if (budget-- <= 0) break;
       const chip = await page.chip(g, v);
       if (!chip) {
-        valuesOk = false;
+        imagesOk = false;
+        counts.values_failed++;
+        continue;
+      }
+      let failed = false;
+      if (await chip.disabled()) {
+        // A value the page will not take: the dead end §1 row 27 removed. Nothing to press.
+        noDeadEnd = false;
         counts.values_failed++;
         continue;
       }
       const offered = valueOffered(v.id, g.id, selection, groups, variants);
-      if (await chip.disabled()) {
-        // An impossible value with the current selection: disabled with its helper, never clicked (§G.3).
-        counts.values_not_offered++;
-        if (offered) {
-          valuesOk = false;
-          counts.values_failed++;
-        } else if (!(await chip.helper())) helpersOk = false;
-        continue;
+      if ((await chip.notOffered()) === offered) {
+        // The page marks it otherwise than its own rule says for the selection it holds.
+        marksOk = false;
+        failed = true;
       }
       if (!offered) {
-        // The page offers a combination no variant has.
-        valuesOk = false;
-        counts.values_failed++;
-        continue;
+        counts.values_not_offered++;
+        if (!(await chip.helper())) {
+          helpersOk = false;
+          failed = true;
+        }
       }
-      if (!(await chip.pressed())) {
+      // Pressing the chosen value would let it go: it is judged as it stands.
+      const want = (await chip.pressed()) ? selection : pressValue(selection, groups, variants, g.id, v.id);
+      if (want !== selection) {
         await chip.click();
         await page.settle();
       }
-      selection = withValue(selection, groups, g.id, v.id);
+      const held = inGroupOrder(await page.pressedValues(groups), groups);
+      if (!sameSet(held, want)) {
+        heldOk = false;
+        failed = true;
+      }
+      // From here on the page is judged by the selection it HOLDS (its gallery follows that one).
+      selection = held;
       counts.values_checked++;
       const exp = expectedGallery({ groups, variants, images: input.images }, media, selection);
       const heroNow = mediaPath((await page.hero()).src);
@@ -247,14 +308,29 @@ export async function inspectProductPage(
       const heroOk = exp.hero.size === 0 || exp.hero.has(heroNow);
       const clean = !gallery.some((u) => exp.forbidden.has(u)) && !exp.forbidden.has(heroNow);
       if (!heroOk || !clean) {
-        valuesOk = false;
-        counts.values_failed++;
+        imagesOk = false;
+        failed = true;
       }
+      if (failed) counts.values_failed++;
       selections.push([...selection]);
     }
   }
-  checks.selection_images = valuesOk;
+  checks.selection_images = imagesOk;
+  checks.selection_held = heldOk;
+  checks.not_offered_marks = marksOk;
   checks.not_offered_helper = helpersOk;
+  checks.no_dead_end = noDeadEnd;
+
+  // The knowledge tabs follow the selection on screen, else the opening one (Product.tsx knowledgeSelection).
+  if (input.knowledge) {
+    const ids = selection.length ? selection : opening;
+    const expected = knowledgeTabs(input.knowledge, { optionValueIds: ids, variantId: productVariantIdForSelection(variants, { optionValueIds: ids }) }).order;
+    const k = await page.knowledge();
+    counts.knowledge_tabs = k.tabs.length;
+    counts.us_110v_notes = k.usNotes;
+    checks.knowledge_tabs = expected.length === 0 ? k.tabs.length === 0 : k.shown && k.tabs.join(',') === expected.join(',');
+    checks.us_110v_other_versions = k.usOutside === 0;
+  }
   // Each as the page held it: a group with no value stays absent, so the Worker answers SELECTION_REQUIRED for an
   // incomplete one and checks a complete one's eligibility (§I.1.10).
   return { checks, counts, selections };
@@ -268,15 +344,19 @@ class PlaywrightProductPage implements ProductPageDriver {
 
   constructor(private readonly page: PwPage) {}
 
-  /** The gallery section's first box is the hero frame; the thumbnails are buttons in a strip after it. */
-  private frame(): PwLocator {
+  /** The hero frame (`[data-gallery-hero]`); a page without the hook: the gallery section's first box. */
+  private async frame(): Promise<PwLocator> {
+    const hooked = this.page.locator('[data-gallery-hero]');
+    if ((await hooked.count()) > 0) return hooked.first();
     return this.page.locator('section[aria-label]').first().locator(':scope > div').first();
   }
 
   async hero(): Promise<{ w: number; fit: string; src: string }> {
-    const img = this.frame().locator('img').first();
-    // The first read waits for the page to draw its picture; after a click the frame re-renders at once.
-    await img.waitFor({ state: 'attached', timeout: this.heroReads++ === 0 ? 15_000 : 3_000 }).catch(() => {});
+    // The first read waits for the page to draw its frame and picture; after a press the frame re-renders at once.
+    const first = this.heroReads++ === 0;
+    if (first) await this.page.locator('[data-gallery-hero], section[aria-label]').first().waitFor({ state: 'attached', timeout: 15_000 }).catch(() => {});
+    const img = (await this.frame()).locator('img').first();
+    await img.waitFor({ state: 'attached', timeout: first ? 15_000 : 3_000 }).catch(() => {});
     // No picture in the frame (it failed: the page shows its fallback) is a hero that does not decode.
     if ((await img.count()) === 0) return { w: 0, fit: '', src: '' };
     return img
@@ -303,34 +383,50 @@ class PlaywrightProductPage implements ProductPageDriver {
   }
 
   async requestCta(): Promise<boolean> {
-    return (await this.page.locator('[data-price-request-cta]').count()) > 0;
+    // PriceRequestPanel is a lazy chunk: give it the moment it takes to arrive.
+    const cta = this.page.locator('[data-price-request-cta]');
+    await cta.first().waitFor({ state: 'attached', timeout: 10_000 }).catch(() => {});
+    return (await cta.count()) > 0;
+  }
+
+  /** The group's fieldset (`fieldset[data-option-group]`), or the body on a page that does not name it. */
+  private async groupRoot(groupId: string): Promise<PwLocator> {
+    const fieldset = this.page.locator(`fieldset[data-option-group="${cssValue(groupId)}"]`);
+    return (await fieldset.count()) > 0 ? fieldset.first() : this.page.locator('body');
   }
 
   async chip(group: ImportPayload['groups'][number], value: ImportPayload['groups'][number]['values'][number]): Promise<ChipDriver | null> {
-    // Scoped to the group's fieldset when the page names it: a value name repeated in another group never matches.
-    const fieldset = this.page.locator(`fieldset[data-option-group="${cssValue(group.id)}"]`);
-    const scoped = (await fieldset.count()) > 0;
-    const root = scoped ? fieldset.first() : this.page.locator('body');
-    // A colour SWATCH carries its value id and no text (its accessible name is the value's name).
-    const swatch = root.locator(`button[data-swatch="${cssValue(value.id)}"]`).first();
-    if ((await swatch.count()) > 0) return this.driver(swatch, root, true);
+    // Scoped to the group's fieldset: a value name repeated in another group never matches.
+    const root = await this.groupRoot(group.id);
+    // Every chooser control carries its value id (`data-option-value`); a colour SWATCH also `data-swatch`.
+    for (const selector of [`button[data-option-value="${cssValue(value.id)}"]`, `button[data-swatch="${cssValue(value.id)}"]`]) {
+      const hit = root.locator(selector).first();
+      if ((await hit.count()) > 0) return this.driver(hit, root);
+    }
+    // A page without the hooks: a chip by its exact name.
     for (const label of [value.name_ar, value.name_en]) {
       if (!label) continue;
       const chip = root.locator('button.lv-choice').filter({ has: this.page.getByText(label, { exact: true }) }).first();
-      if ((await chip.count()) > 0) return this.driver(chip, root, false);
+      if ((await chip.count()) > 0) return this.driver(chip, root);
     }
     return null;
   }
 
-  private driver(el: PwLocator, root: PwLocator, swatch: boolean): ChipDriver {
+  private driver(el: PwLocator, root: PwLocator): ChipDriver {
     return {
       pressed: async () => (await el.getAttribute('aria-pressed')) === 'true',
+      notOffered: async () => (await el.getAttribute('data-offered')) === 'false',
       disabled: async () => (await el.isDisabled().catch(() => false)) || (await el.getAttribute('aria-disabled')) === 'true',
       helper: async () => {
-        if ((await el.locator('[data-not-offered]').count()) > 0) return true;
-        if (!swatch) return (await el.innerText().catch(() => '')).includes(NOT_OFFERED_AR);
-        const name = `${(await el.getAttribute('aria-label')) ?? ''} ${(await el.getAttribute('title')) ?? ''}`;
-        return name.includes(NOT_OFFERED_AR) || (await root.locator('[data-not-offered-note]').count()) > 0;
+        if ((await el.getAttribute('data-swatch')) === null) {
+          // A chip says it on its own line.
+          const line = el.locator('[data-not-offered]');
+          return (await line.count()) > 0 && (await line.first().innerText().catch(() => '')).includes(NOT_OFFERED_AR);
+        }
+        // A swatch has no text: its accessible name says it, and so does its group's note under the swatches.
+        const name = `${(await el.getAttribute('aria-label')) ?? ''}`;
+        const note = root.locator('[data-not-offered-note]');
+        return name.includes(NOT_OFFERED_AR) && (await note.count()) > 0 && (await note.first().innerText().catch(() => '')).includes(NOT_OFFERED_AR);
       },
       click: async () => {
         await el.scrollIntoViewIfNeeded().catch(() => {});
@@ -339,13 +435,67 @@ class PlaywrightProductPage implements ProductPageDriver {
     };
   }
 
-  gallery(): Promise<string[]> {
-    return this.page
-      .locator('section[aria-label]')
-      .first()
-      .locator('button[aria-pressed] img')
-      .evaluateAll((els) => els.map((e) => (e as HTMLImageElement).currentSrc || (e as HTMLImageElement).src))
+  async pressedValues(groups: ImportPayload['groups']): Promise<string[]> {
+    const ids = await this.page
+      .evaluate(() =>
+        Array.from(document.querySelectorAll('fieldset[data-option-group] button[aria-pressed="true"]')).map((b) => b.getAttribute('data-option-value') || b.getAttribute('data-swatch') || '')
+      )
       .catch(() => [] as string[]);
+    if (!ids.includes('')) return ids;
+    // A pressed control without its id (a page without the hook): ask each value's own control.
+    const out: string[] = [];
+    for (const g of groups) {
+      for (const v of g.values) {
+        const c = await this.chip(g, v);
+        if (c && (await c.pressed())) out.push(v.id);
+      }
+    }
+    return out;
+  }
+
+  async gallery(): Promise<string[]> {
+    const strip = this.page.locator('[data-gallery-strip]');
+    const thumbs = (await strip.count()) > 0 ? strip.first().locator('img') : this.page.locator('section[aria-label]').first().locator('button[aria-pressed] img');
+    return thumbs.evaluateAll((els) => els.map((e) => (e as HTMLImageElement).currentSrc || (e as HTMLImageElement).src)).catch(() => [] as string[]);
+  }
+
+  async knowledge(): Promise<KnowledgeView> {
+    // The tabs load when their slot nears the viewport (IntersectionObserver, 400 px): bring it there.
+    await this.page.evaluate(() => document.querySelector('[data-product-knowledge]')?.scrollIntoView({ block: 'center' })).catch(() => {});
+    await this.page.locator('[data-knowledge]').first().waitFor({ state: 'attached', timeout: 15_000 }).catch(() => {});
+    if ((await this.page.locator('[data-knowledge]').count()) === 0) return { shown: false, tabs: [], usNotes: 0, usOutside: 0 };
+    const read = () =>
+      this.page
+        .evaluate(() => {
+          const us = Array.from(document.querySelectorAll('[data-knowledge] [data-knowledge-note="us_110v"]'));
+          return { us: us.length, outside: us.filter((n) => !n.closest('details[data-knowledge-other]')).length };
+        })
+        .catch(() => ({ us: 0, outside: 0 }));
+    const tabs = this.page.locator('[data-knowledge="tabs"] [role="tab"]');
+    const n = await tabs.count();
+    if (n === 0) {
+      // The phone's sections: one accordion per tab, read as drawn.
+      const ids = await this.page
+        .locator('[data-knowledge="sections"] [data-section]')
+        .evaluateAll((els) => els.map((e) => (e.getAttribute('data-section') ?? '').replace(/^knowledge-/, '')))
+        .catch(() => [] as string[]);
+      const r = await read();
+      return { shown: true, tabs: ids, usNotes: r.us, usOutside: r.outside };
+    }
+    // Only the open tab's panel is mounted: open each one and read it.
+    const ids: string[] = [];
+    let usNotes = 0;
+    let usOutside = 0;
+    for (let i = 0; i < n; i++) {
+      const tab = tabs.nth(i);
+      ids.push((await tab.getAttribute('data-tab')) ?? '');
+      await tab.click({ timeout: 5000 }).catch(() => {});
+      await this.page.waitForTimeout(250);
+      const r = await read();
+      usNotes += r.us;
+      usOutside += r.outside;
+    }
+    return { shown: true, tabs: ids, usNotes, usOutside };
   }
 
   settle(): Promise<void> {
@@ -376,7 +526,7 @@ export class BrowserChecker {
 
   async check(input: BrowserInput): Promise<BrowserResult> {
     const siteHost = new URL(this.siteOrigin).host;
-    const counts: BrowserCounts = { values_checked: 0, values_failed: 0, values_not_offered: 0, blocked_requests: 0, store_requests: 0, page_errors: 0 };
+    const counts: BrowserCounts = { values_checked: 0, values_failed: 0, values_not_offered: 0, knowledge_tabs: 0, us_110v_notes: 0, blocked_requests: 0, store_requests: 0, page_errors: 0 };
     const screenshots: Buffer[] = [];
     const ctx = await this.browser.newContext({ viewport: { width: 1280, height: 1000 }, locale: 'ar-IQ', serviceWorkers: 'block' });
     try {
@@ -418,3 +568,4 @@ export class BrowserChecker {
     }
   }
 }
+

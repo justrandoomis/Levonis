@@ -1177,6 +1177,8 @@ export class Importer {
           images: gallery.images,
           leafName: outcome.leafName,
           allValues: audit,
+          // The knowledge answer VERIFY expected: the tabs the page must draw for it.
+          knowledge: outcome.knowledge ? { ...outcome.knowledge, completeness: null } : null,
           screenshot: audit || w.row.queue_position % 25 === 0,
         });
         w.shots.push(...browser.screenshots);

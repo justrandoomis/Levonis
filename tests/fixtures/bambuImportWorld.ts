@@ -633,7 +633,7 @@ export class World {
       check: async () => ({
         ok: true,
         checks: { image_decodes: true, unpriced_label: true },
-        counts: { values_checked: 2, values_failed: 0, values_not_offered: 0, blocked_requests: 0, store_requests: 0, page_errors: 0 },
+        counts: { values_checked: 2, values_failed: 0, values_not_offered: 0, knowledge_tabs: 2, us_110v_notes: 0, blocked_requests: 0, store_requests: 0, page_errors: 0 },
         selections: [],
         screenshots: [Buffer.from('PNG-SCREENSHOT')],
         ...result,

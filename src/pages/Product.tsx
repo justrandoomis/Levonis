@@ -3412,6 +3412,7 @@ export default function Product() {
                           aria-pressed={selected}
                           aria-label={isOffered ? label : `${label} — ${notOffered}`}
                           title={isOffered ? label : `${label} — ${notOffered}`}
+                          data-option-value={value.id}
                           data-swatch={value.id}
                           data-offered={isOffered ? undefined : 'false'}
                           onClick={choose}
@@ -3453,6 +3454,8 @@ export default function Product() {
                         key={value.id}
                         type="button"
                         aria-pressed={selected}
+                        // The value's id: what the import's browser check finds a chip and reads a selection by.
+                        data-option-value={value.id}
                         data-offered={isOffered ? undefined : 'false'}
                         onClick={choose}
                         className={`lv-choice flex min-h-[48px] items-center gap-2 px-3 py-1.5 text-sm font-bold ${isOffered ? '' : 'opacity-60'}`}
@@ -4217,7 +4220,9 @@ export default function Product() {
           {/* -------------------------------------------------- left column */}
           <div className="min-w-0">
             <section aria-label={s.gallery}>
-              <div className="lv-surface relative w-full h-[min(78vw,340px)] sm:h-[420px] lg:h-[520px] xl:h-[560px] overflow-hidden">
+              {/* `data-gallery-hero` / `data-gallery-strip`: the hooks the import's browser check reads the main picture
+                  and the thumbnails by (scripts/bambu-import/browser.ts) — never a style. */}
+              <div className="lv-surface relative w-full h-[min(78vw,340px)] sm:h-[420px] lg:h-[520px] xl:h-[560px] overflow-hidden" data-gallery-hero>
                 <SafeImage
                   key={activeMedia?.url || 'empty'}
                   src={activeMedia?.url}
@@ -4257,7 +4262,7 @@ export default function Product() {
               </div>
 
               {gallery.length > 1 ? (
-                <div className="mt-3 flex gap-2 overflow-x-auto hide-scrollbar pb-1" aria-label={s.gallery}>
+                <div className="mt-3 flex gap-2 overflow-x-auto hide-scrollbar pb-1" aria-label={s.gallery} data-gallery-strip>
                   {gallery.map((m, i) => (
                     <button
                       key={m.url + i}
