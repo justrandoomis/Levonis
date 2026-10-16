@@ -65,6 +65,15 @@ function seed(raw: DatabaseSync) {
     INSERT INTO product_option_values (id,product_id,group_id,name_en,name_ar,sort,active,stock) VALUES
       ('ov_opt','p_opt','g_opt','1 kg','1 كغ',0,1,52);
 
+    -- A filament sold BOTH ways (on the shelf, and as a pre-order by air or by sea): one cart line per colour
+    -- whatever the route, so the same colour can sit in the cart under another shipping type.
+    INSERT INTO products (id,slug,name,name_ar,price_iqd,status,stock,options,colors,selling_type,sale_types,preorder_transports,images,inventory_mode)
+      VALUES ('p_dual','dual','PLA Dual','بي إل إيه',24000,'active',0,'[]','[]','direct_sale','["direct_sale","pre_order"]',
+              '[{"method":"air","commission_iqd":2000,"active":true},{"method":"sea","commission_iqd":1000,"active":true}]','[]','COLOR');
+    INSERT INTO product_colors (id,product_id,name_en,name_ar,hex,sort,active,stock) VALUES
+      ('d_black','p_dual','Black','أسود','#000000',0,1,100),
+      ('d_white','p_dual','White','أبيض','#FFFFFF',1,1,100);
+
     -- A pre-order product, for a cart of the other shipping type.
     INSERT INTO products (id,slug,name,name_ar,price_iqd,status,stock,options,colors,selling_type,sale_types,preorder_transports,images)
       VALUES ('p_pre','pre','Imported printer','طابعة',500000,'active',0,'[]','[]','pre_order','["pre_order"]',
@@ -527,4 +536,176 @@ test('13. a catalog-only product is 409 PRICE_NOT_AVAILABLE; a members-only offe
   assert.equal(res.status, 409, JSON.stringify(body));
   assert.equal(body.code, 'PRICE_NOT_AVAILABLE');
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM cart_items WHERE user_id = 'u1'"), 0);
+});
+
+// ─────────────────────────────── 14. «empty the cart and add» over the same colour
+
+const dualRows = (raw: DatabaseSync) =>
+  all<Record<string, unknown>>(
+    raw,
+    "SELECT color_id, qty, transport_method, fulfillment_type FROM cart_items WHERE user_id = 'u1' ORDER BY color_id"
+  ).map((r) => [r.color_id, r.qty, r.transport_method, r.fulfillment_type]);
+
+for (const [label, shared] of [
+  ['air → direct sale', { fulfillmentType: 'direct_sale' }],
+  ['air → sea', { fulfillmentType: 'pre_order', transportMethod: 'sea' }],
+] as const) {
+  test(`14. replaceCart when the cart holds the SAME colour under another shipping type (${label}): inCart is what the cart held before the emptying`, async () => {
+    const { raw, app } = setup();
+    // Earlier: 3 Black pre-ordered by air. The cart line's identity has no route, so the page
+    // reads it as «In your cart: 3» for Black and sends that as inCart.
+    const first = await post(app, '/api/cart/items', { productId: 'p_dual', colorId: 'd_black', qty: 3, fulfillmentType: 'pre_order', transportMethod: 'air' });
+    assert.equal(first.status, 200, JSON.stringify(await json(first.clone())));
+    const batch = (replaceCart: boolean) => ({
+      productId: 'p_dual',
+      ...shared,
+      ...(replaceCart ? { replaceCart: true } : {}),
+      lines: [
+        { optionValueIds: [], colorId: 'd_black', qty: 5, inCart: 3 },
+        { optionValueIds: [], colorId: 'd_white', qty: 5, inCart: 0 },
+      ],
+    });
+    const a = await post(app, '/api/cart/items/batch', batch(false));
+    assert.equal((await json(a)).code, 'CART_SHIPPING_CONFLICT');
+    // «أفرغ السلة وأضف»: the same batch, with replaceCart.
+    const b = await post(app, '/api/cart/items/batch', batch(true));
+    const bb = await json(b);
+    assert.equal(b.status, 200, JSON.stringify(bb));
+    const type = 'transportMethod' in shared ? ['sea', 'pre_order'] : ['', 'direct_sale'];
+    assert.deepEqual(dualRows(raw), [
+      ['d_black', 5, ...type],
+      ['d_white', 5, ...type],
+    ]);
+    // The cart was emptied first: each line starts from 0, and nothing is reported capped.
+    assert.deepEqual(
+      bb.added.map((x: Record<string, unknown>) => [x.color_id, x.before, x.after, x.capped]),
+      [
+        ['d_black', 0, 5, false],
+        ['d_white', 0, 5, false],
+      ]
+    );
+  });
+}
+
+test('14. …and a replace whose inCart does NOT match what the cart held is still refused, with nothing emptied', async () => {
+  const { raw, app } = setup();
+  assert.equal((await post(app, '/api/cart/items', { productId: 'p_dual', colorId: 'd_black', qty: 3, fulfillmentType: 'pre_order', transportMethod: 'air' })).status, 200);
+  const before = JSON.stringify(cartRows(raw));
+  const res = await post(app, '/api/cart/items/batch', {
+    productId: 'p_dual',
+    fulfillmentType: 'direct_sale',
+    replaceCart: true,
+    lines: [
+      { optionValueIds: [], colorId: 'd_black', qty: 5, inCart: 0 },
+      { optionValueIds: [], colorId: 'd_white', qty: 5, inCart: 0 },
+    ],
+  });
+  const body = await json(res);
+  assert.equal(res.status, 409, JSON.stringify(body));
+  assert.equal(body.code, 'CART_LINES_CHANGED');
+  assert.deepEqual(body.details.lines, [{ index: 0, in_cart: 3 }]);
+  assert.equal(JSON.stringify(cartRows(raw)), before);
+});
+
+// ───────────────────────────── 15. a shared shelf counts what the cart already holds
+
+test('15. a shared shelf of 52 with Black 30 already in the cart: Black 20 + White 20 is refused, naming the 22 left', async () => {
+  const { raw, app } = setup();
+  assert.equal((await post(app, '/api/cart/items', { productId: 'p_base', colorId: 'b_black', qty: 30, fulfillmentType: 'direct_sale' })).status, 200);
+  const before = JSON.stringify(cartRows(raw));
+  const res = await post(app, '/api/cart/items/batch', {
+    productId: 'p_base',
+    fulfillmentType: 'direct_sale',
+    lines: [
+      { optionValueIds: [], colorId: 'b_black', qty: 20, inCart: 30 },
+      { optionValueIds: [], colorId: 'b_white', qty: 20, inCart: 0 },
+    ],
+  });
+  const body = await json(res);
+  assert.equal(res.status, 400, JSON.stringify(body));
+  assert.equal(body.code, 'QTY_UNAVAILABLE');
+  assert.equal(body.details.shared, true);
+  assert.equal(body.details.available, 22, 'what is left for these colours once the cart is counted');
+  assert.deepEqual(body.details.line_indexes, [0, 1]);
+  assert.equal(JSON.stringify(cartRows(raw)), before, 'nothing written');
+});
+
+test('15. …a ONE-line batch on that shelf counts the cart\'s other colour too', async () => {
+  const { raw, app } = setup();
+  assert.equal((await post(app, '/api/cart/items', { productId: 'p_base', colorId: 'b_black', qty: 30, fulfillmentType: 'direct_sale' })).status, 200);
+  const res = await post(app, '/api/cart/items/batch', {
+    productId: 'p_base',
+    fulfillmentType: 'direct_sale',
+    lines: [{ optionValueIds: [], colorId: 'b_white', qty: 25 }],
+  });
+  const body = await json(res);
+  assert.equal(res.status, 400, JSON.stringify(body));
+  assert.equal(body.code, 'QTY_UNAVAILABLE');
+  assert.equal(body.details.available, 22);
+  assert.deepEqual(body.details.line_indexes, [0]);
+  assert.deepEqual(qtyByColour(raw, 'p_base'), { b_black: 30 });
+  // What fits is added: 22 more on the shelf of 52.
+  const ok = await post(app, '/api/cart/items/batch', { productId: 'p_base', fulfillmentType: 'direct_sale', lines: [{ optionValueIds: [], colorId: 'b_white', qty: 22 }] });
+  assert.equal(ok.status, 200, JSON.stringify(await json(ok.clone())));
+  assert.deepEqual(qtyByColour(raw, 'p_base'), { b_black: 30, b_white: 22 });
+});
+
+test('15. …while a line merging with ITSELF on the shared shelf is still held to the ceiling, never refused', async () => {
+  const { app } = setup();
+  assert.equal((await post(app, '/api/cart/items', { productId: 'p_base', colorId: 'b_black', qty: 30, fulfillmentType: 'direct_sale' })).status, 200);
+  const res = await post(app, '/api/cart/items/batch', { productId: 'p_base', fulfillmentType: 'direct_sale', lines: [{ optionValueIds: [], colorId: 'b_black', qty: 30, inCart: 30 }] });
+  const body = await json(res);
+  assert.equal(res.status, 200, JSON.stringify(body));
+  assert.deepEqual([body.added[0].before, body.added[0].after, body.added[0].capped], [30, 52, true]);
+});
+
+// ──────────────────────────── 16. the single door: a press whose answer was lost
+
+test('16. the single door takes inCart too: a second identical press after a lost answer is refused, 25 stays 25', async () => {
+  const { raw, app } = setup();
+  const press = { productId: 'p_pla', optionValueIds: KG, colorId: 'c_black', qty: 25, fulfillmentType: 'direct_sale', inCart: 0 };
+  const first = await post(app, '/api/cart/items', press);
+  assert.equal(first.status, 200, JSON.stringify(await json(first.clone())));
+  // The answer never reached the page; the customer presses again with what the page believed.
+  const again = await post(app, '/api/cart/items', press);
+  const body = await json(again);
+  assert.equal(again.status, 409, JSON.stringify(body));
+  assert.equal(body.code, 'CART_LINES_CHANGED');
+  assert.equal(body.details.in_cart, 25);
+  assert.deepEqual(qtyByColour(raw), { c_black: 25 });
+  // With the cart re-read the page sends the true figure, and the add merges as it always did.
+  const fresh = await post(app, '/api/cart/items', { ...press, inCart: 25 });
+  assert.equal(fresh.status, 200);
+  assert.deepEqual(qtyByColour(raw), { c_black: 50 });
+  // A page that sends no inCart (an older client) keeps the old behaviour exactly.
+  const old = await post(app, '/api/cart/items', { productId: 'p_pla', optionValueIds: KG, colorId: 'c_black', qty: 1, fulfillmentType: 'direct_sale' });
+  assert.equal(old.status, 200);
+  assert.deepEqual(qtyByColour(raw), { c_black: 51 });
+});
+
+test('16. …and its «empty the cart and add» compares inCart with the cart before the emptying', async () => {
+  const { raw, app } = setup();
+  assert.equal((await post(app, '/api/cart/items', { productId: 'p_dual', colorId: 'd_black', qty: 3, fulfillmentType: 'pre_order', transportMethod: 'air' })).status, 200);
+  const res = await post(app, '/api/cart/items', { productId: 'p_dual', colorId: 'd_black', qty: 5, fulfillmentType: 'direct_sale', inCart: 3, replaceCart: true });
+  assert.equal(res.status, 200, JSON.stringify(await json(res.clone())));
+  assert.deepEqual(dualRows(raw), [['d_black', 5, '', 'direct_sale']]);
+});
+
+test('16. …inCart is read the way the page reads the line (the selection as a set, the colour): an older row whose option_id is not the canonical first id never locks the button', async () => {
+  const { raw, app } = setup();
+  // A row written before option_id was canonical: same selection and colour, option_id ''.
+  raw.exec(`INSERT INTO cart_items (id,user_id,product_id,option_id,option_value_ids,color_id,shipping_method_id,transport_method,fulfillment_type,warranty_plan_id,qty)
+            VALUES ('ci_old','u1','p_pla','','["ov_1kg"]','c_black','','','direct_sale','',4)`);
+  // The page's lineQtyIn counts it: «In your cart: 4».
+  const single = await post(app, '/api/cart/items', { productId: 'p_pla', optionValueIds: KG, colorId: 'c_black', qty: 2, fulfillmentType: 'direct_sale', inCart: 4 });
+  assert.equal(single.status, 200, JSON.stringify(await json(single.clone())));
+  const batch = await post(app, '/api/cart/items/batch', {
+    productId: 'p_pla',
+    fulfillmentType: 'direct_sale',
+    lines: [
+      { optionValueIds: KG, colorId: 'c_black', qty: 1, inCart: 6 },
+      { optionValueIds: KG, colorId: 'c_white', qty: 1, inCart: 0 },
+    ],
+  });
+  assert.equal(batch.status, 200, JSON.stringify(await json(batch.clone())));
 });

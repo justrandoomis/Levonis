@@ -2266,6 +2266,10 @@ cartRoutes.post('/items', async (c) => {
   const transportMethod = parseTransportMethod(body.transportMethod);
   const fulfillmentType = parseFulfillmentType(body.fulfillmentType);
   const warrantyPlanId = str(body.warrantyPlanId, 'warrantyPlanId', { max: 60, required: false });
+  // What the page believes THIS line holds (docs/ux/COLOUR-QUANTITIES.md §3.7),
+  // optional: an older client sends none and keeps the old behaviour exactly.
+  const inCart =
+    body.inCart === undefined || body.inCart === null ? null : int(body.inCart, 'inCart', { min: 0, max: LINE_QTY_MAX });
   const shared: AddShared = { transportMethod, fulfillmentType, warrantyPlanId };
   const line: AddLine = { optionValueIds, colorId, qty };
 
@@ -2304,17 +2308,33 @@ cartRoutes.post('/items', async (c) => {
   // never picked it for. An add that names a DIFFERENT plan than the line
   // holds (including a line with none) is refused, naming the fix; an add that
   // names none keeps the line's plan (the CASE in the upsert).
-  // A cart about to be emptied (`replacing`) holds no line to merge into.
-  const existingLine = replacing.length
-    ? null
-    : await c.env.DB
-        .prepare(
-          `SELECT id, warranty_plan_id FROM cart_items
-            WHERE user_id = ? AND product_id = ? AND option_id = ? AND option_value_ids = ?
-              AND color_id = ? AND shipping_method_id = ''`
-        )
-        .bind(user.id, productId, primaryOption, canonicalJson, colorId)
-        .first<{ id: string; warranty_plan_id: string | null }>();
+  // A cart about to be emptied (`replacing`) holds no line to merge into —
+  // but the line is read all the same: `inCart` is what the page saw BEFORE
+  // the emptying (the same colour may sit there under another shipping type).
+  const colourRows =
+    replacing.length && inCart === null
+      ? []
+      : ((
+          await c.env.DB
+            .prepare(
+              `SELECT id, option_id, option_value_ids, color_id, qty, warranty_plan_id FROM cart_items
+                WHERE user_id = ? AND product_id = ? AND color_id = ? AND shipping_method_id = ''`
+            )
+            .bind(user.id, productId, colorId)
+            .all<{ id: string; option_id: string | null; option_value_ids: string | null; color_id: string | null; qty: number; warranty_plan_id: string | null }>()
+        ).results ?? []);
+  const lineNow = colourRows.find((row) => String(row.option_id ?? '') === primaryOption && String(row.option_value_ids ?? '[]') === canonicalJson) ?? null;
+  // A PRESS WHOSE ANSWER WAS LOST IS SAFE TO PRESS AGAIN. The upsert ADDS the
+  // quantities, so a second press of 50 after a lost answer made 100. When the
+  // page says what it believed the line held, a cart that holds something else
+  // is refused with nothing written, and the page re-reads it.
+  const inCartNow = heldLikeThePage(colourRows, canonical, colorId);
+  if (inCart !== null && inCart !== inCartNow) {
+    throw new HttpError(409, 'Your cart changed since this page read it, so nothing was added.', 'CART_LINES_CHANGED', {
+      in_cart: inCartNow,
+    });
+  }
+  const existingLine = replacing.length ? null : lineNow;
   if (existingLine && warrantyPlanId && warrantyPlanId !== String(existingLine.warranty_plan_id ?? '')) {
     throw conflict(
       'This printer is already in your cart with a different extended-warranty choice — change it from the cart.',
@@ -2380,6 +2400,28 @@ async function emitAddToCart(
     },
     { aggregateId: user.id, actorId: user.id, waitUntil: waitUntilFrom(c) }
   );
+}
+
+/**
+ * WHAT THE PAGE CALLS «THIS LINE» when it sends `inCart` (src/lib/colourQuantities.ts
+ * `lineQtyIn`): every ordinary row of the product with the same selection AS
+ * A SET (the legacy `option_id` when the column is empty) and the same colour,
+ * summed. The guard compares like with like: a row written before `option_id`
+ * was canonical is still «in the cart» to the page, and must be here too, or
+ * the press is refused every time.
+ */
+function heldLikeThePage(
+  rows: ReadonlyArray<{ option_id: string | null; option_value_ids: string | null; color_id: string | null; qty: number }>,
+  canonical: readonly string[],
+  colorId: string
+): number {
+  const want = [...canonical].sort().join(',');
+  return rows.reduce((sum, row) => {
+    const stored = safeParse<unknown>(row.option_value_ids, []);
+    const ids = Array.isArray(stored) && stored.length ? stored.map(String) : row.option_id ? [String(row.option_id)] : [];
+    if ([...ids].sort().join(',') !== want || String(row.color_id ?? '') !== colorId) return sum;
+    return sum + (Number(row.qty) || 0);
+  }, 0);
 }
 
 // ------------------------------------------------------- several colours, one add
@@ -2507,35 +2549,84 @@ cartRoutes.post('/items/batch', async (c) => {
   // 5. ONE scope check for the whole batch: every line shares the route.
   const replacing = await enforceCartScope(c, typeForTransport(transportMethod), body.replaceCart === true);
 
-  // 6. What the cart already holds of these lines — one read, two bound
-  //    parameters, never an IN list.
-  const existing = replacing.length
-    ? []
-    : ((
-        await c.env.DB
-          .prepare(
-            `SELECT id, option_id, option_value_ids, color_id, qty, warranty_plan_id FROM cart_items
-              WHERE user_id = ? AND product_id = ? AND shipping_method_id = ''`
-          )
-          .bind(user.id, productId)
-          .all<{ id: string; option_id: string; option_value_ids: string; color_id: string; qty: number; warranty_plan_id: string | null }>()
-      ).results ?? []);
-  const existingFor = (j: JudgedLine, l: AddLine) =>
-    existing.find(
+  // 6. What the cart already holds of this product — one read, two bound
+  //    parameters, never an IN list. It is read EVEN WHEN THE CART IS ABOUT TO
+  //    BE EMPTIED: the page's `inCart` is what it saw in the cart before the
+  //    press, and «empty the cart and add» over the same colour under another
+  //    shipping type (3 Black by air, now 5 Black on the shelf) must compare
+  //    with those 3 — against an emptied 0 it was refused on every press.
+  const held = (
+    (
+      await c.env.DB
+        .prepare(
+          `SELECT id, option_id, option_value_ids, color_id, qty, warranty_plan_id FROM cart_items
+            WHERE user_id = ? AND product_id = ? AND shipping_method_id = ''`
+        )
+        .bind(user.id, productId)
+        .all<{ id: string; option_id: string; option_value_ids: string; color_id: string; qty: number; warranty_plan_id: string | null }>()
+    ).results ?? []
+  );
+  const heldFor = (j: JudgedLine, l: AddLine) =>
+    held.find(
       (row) =>
         String(row.option_id ?? '') === j.primaryOption &&
         String(row.option_value_ids ?? '[]') === j.canonicalJson &&
         String(row.color_id ?? '') === l.colorId
     ) ?? null;
-  const before = judged.map((j, i) => Number(existingFor(j, lines[i])?.qty ?? 0));
+  const inCartNow = judged.map((j, i) => heldLikeThePage(held, j.canonical, lines[i].colorId));
+  // A cart about to be emptied holds no line to merge into: each line starts from 0.
+  const existingFor = (j: JudgedLine, l: AddLine) => (replacing.length ? null : heldFor(j, l));
+  const before = replacing.length ? judged.map(() => 0) : inCartNow;
 
   // A PRESS WHOSE ANSWER WAS LOST IS SAFE TO PRESS AGAIN. The page sends what
   // it believes each line holds; a second identical press after a lost answer
   // meets the doubled-up cart and is refused instead of adding 50 more
   // (CART_LINES_CHANGED — the store checkout's CART_CHANGED is another door's code).
-  const changed = lines.flatMap((l, i) => (l.inCart !== null && l.inCart !== before[i] ? [{ index: i, in_cart: before[i] }] : []));
+  const changed = lines.flatMap((l, i) => (l.inCart !== null && l.inCart !== inCartNow[i] ? [{ index: i, in_cart: inCartNow[i] }] : []));
   if (changed.length > 0) {
     throw new HttpError(409, 'Your cart changed since this page read it, so nothing was added.', 'CART_LINES_CHANGED', { lines: changed });
+  }
+
+  // 6b. A SHARED SHELF COUNTS WHAT THE CART ALREADY HOLDS ON IT. Step 4 summed
+  //     the batch's own lines; with Black 30 already in the cart, Black 20 +
+  //     White 20 on one shelf of 52 passed it (40) and left a cart of 70 the
+  //     checkout refuses. Here every line of this product that draws on a
+  //     counter — the batch's (merged with what its own line holds) and the
+  //     cart's other lines — is summed. A counter only ONE line draws on is a
+  //     merge with itself, held to the ceiling as the single door holds it
+  //     («set the most, never say no»), never refused here.
+  if (!replacing.length) {
+    const matched = new Set(judged.map((j, i) => heldFor(j, lines[i])?.id).filter(Boolean));
+    const others = held.flatMap((row) => {
+      if (matched.has(row.id)) return [];
+      const stored = safeParse<unknown>(row.option_value_ids, []);
+      const ids = canonicalOptionValueIds(Array.isArray(stored) ? stored : [], String(row.option_id ?? '')).slice(0, 12);
+      const probe: AddLine = { optionValueIds: ids, colorId: String(row.color_id ?? ''), qty: 1 };
+      // Judged at 1 only to find its counters; a line that can no longer be judged names none.
+      const v = judgeLevonisLine(actx, probe, shared);
+      return v.ok ? [{ product_id: productId, qty: Number(row.qty) || 0, stock_targets: lineStockTargets(actx, v.judged, probe, shared).targets }] : [];
+    });
+    const withCart = [
+      ...demandLines.map((d, i) => ({ ...d, qty: d.qty + before[i] })),
+      ...others,
+    ];
+    for (const [, counter] of demandByCounter(withCart)) {
+      if (counter.lines.length < 2 || counter.available === null || counter.needed <= counter.available) continue;
+      const mine = counter.indexes.filter((i) => i < lines.length);
+      if (mine.length === 0) continue;
+      const inCartHere = counter.lines.reduce((sum, l, k) => sum + (counter.indexes[k] < lines.length ? before[counter.indexes[k]] : l.qty), 0);
+      const left = Math.max(0, counter.available - inCartHere);
+      throw badRequest(
+        actx.coarseStock ? 'There is not enough stock for these quantities together' : `Only ${left} more can be added for these colours together`,
+        'QTY_UNAVAILABLE',
+        {
+          ...(actx.coarseStock ? {} : { available: left }),
+          preorder: counter.preorder,
+          shared: true,
+          line_indexes: mine,
+        }
+      );
+    }
   }
   // ONE PLAN PER LINE (the single door's rule, per line).
   if (warrantyPlanId) {
