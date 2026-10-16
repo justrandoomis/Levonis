@@ -1,6 +1,7 @@
 /**
  * THE COMMITTED REVIEWED FILES, READ BY THE WORKER'S OWN PARSER (Bambu import
- * spec §A.3, §A.8, §B.6, §D.2, §E.1; HANDOFF-PLAN §3.5, P0 step 3 e).
+ * spec §A.3, §A.8, §B.6, §D.2, §E.1; HANDOFF-PLAN §3.5, P0 step
+ * 3 e; DECISIONS row 242).
  *
  * data/bambu-import/existing-matches.json, compat-targets.json and
  * taxonomy-map.json were reviewed against the sealed live snapshot (workflow 60
@@ -10,12 +11,12 @@
  *   - the eight bundled texts parse with `parseReviewedBundle` exactly as the
  *     Worker bundles them (and the runner's reader takes the same files and
  *     answers the same write modes, when its file is present);
- *   - the matches file holds ids, a public slug, a decision, a reason code and,
- *     for a merge, the value map — and nothing for an owner-hidden target but
- *     its id (§A.8: no slug, no option ids of a non-active product);
+ *   - the matches file holds ids, a public slug (active targets only), a
+ *     decision, a reason code, the value map, and for merge_publish the owner's
+ *     approval — never a slug for a product that was not active at review (§A.8);
  *   - through the gate (`checkReviewedScope`) with the reviewed P0 manifest: a
- *     merge only into its listed product, a create refused for every listed
- *     merge and hold;
+ *     merge or merge_publish only into its listed product, a create refused for
+ *     every listed source;
  *   - the compat file names no unresolved snapshot member any more, and the
  *     taxonomy map places every manifest row on its reviewed leaf, its new
  *     nodes as `cat_bi_<key>`.
@@ -54,12 +55,19 @@ function committedTexts(): ReviewedTexts {
   for (const k of Object.keys(REVIEWED_FILES) as ReviewedFileKey[]) out[k] = read(DATA, REVIEWED_FILES[k]);
   return out;
 }
-/** The committed files with the reviewed P0 manifest (step 9 copies it to data/; the gate needs its rows). */
+
+/** The committed files with the reviewed P0 manifest (step 9 bundles it in data/; the gate needs its rows). */
 const withP0Manifest = (): ReviewedTexts => ({ ...committedTexts(), manifest: read(P0, 'manifest.json') });
 
-/** The sealed snapshot all three files were reviewed against (workflow 60 run 38863823810). */
+/** The sealed snapshot the three matched files were reviewed against (workflow 60 run 38863823810). */
 const SNAPSHOT_SHA256 = '1215895671756da4011dbdc1f310f95f4543d8d0ad9b0b71f1deb3928557ef8c';
+const APPROVAL = 'DECISIONS row 242';
 const ENTRY_KEYS = ['source_product_id', 'source_handle', 'levonis_product_id', 'levonis_slug', 'decision', 'value_map', 'unmapped_variants', 'reason', 'reviewed_by', 'reviewed_at', 'approval_ref'];
+/** The 14 owner-hidden matches the owner decided to merge and publish (DECISIONS row 242), by their public handles. */
+const PUBLISHED = [
+  'a1', 'a1-mini', 'a2l', 'ams-2-pro', 'ams-ht', 'ams-lite', 'bambu-high-flow-hotend-h2-p2s-x2d', 'bambu-hotend-a1-a2',
+  'h2s', 'p2s', 'pla-matte', 'r1', 'tungsten-carbide-nozzle-h2-p2s', 'x2d',
+];
 
 test('the committed reviewed files parse with the Worker\'s own parser, byte for byte, and name the sealed snapshot they were reviewed against', () => {
   const texts = committedTexts();
@@ -70,11 +78,14 @@ test('the committed reviewed files parse with the Worker\'s own parser, byte for
   assert.equal(b.matches.entries.length, 35);
   const byDecision: Record<string, number> = {};
   for (const e of b.matches.entries) byDecision[e.decision] = (byDecision[e.decision] ?? 0) + 1;
-  assert.deepEqual(byDecision, { merge: 21, hold_owner_hidden: 14 });
-  // The 21 merges account for 239 source variants: 174 mapped by exact names (or the Bambu colour code), 65 not.
-  const merges = b.matches.entries.filter((e) => e.decision === 'merge');
-  assert.equal(merges.reduce((n, e) => n + Object.keys(e.value_map).length, 0), 174);
-  assert.equal(merges.reduce((n, e) => n + e.unmapped_variants.length, 0), 65);
+  assert.deepEqual(byDecision, { merge: 21, merge_publish: 14 });
+  assert.deepEqual(b.matches.entries.filter((e) => e.decision === 'merge_publish').map((e) => e.source_handle).sort(), PUBLISHED);
+  // Source variants accounted for: mapped by the reviewed rule, or unmapped (variant_not_merged at the write).
+  const total = (d: string, f: (e: (typeof b.matches.entries)[number]) => number) => b.matches.entries.filter((e) => e.decision === d).reduce((n, e) => n + f(e), 0);
+  assert.deepEqual(
+    { merge: [total('merge', (e) => Object.keys(e.value_map).length), total('merge', (e) => e.unmapped_variants.length)], merge_publish: [total('merge_publish', (e) => Object.keys(e.value_map).length), total('merge_publish', (e) => e.unmapped_variants.length)] },
+    { merge: [174, 65], merge_publish: [44, 99] }
+  );
   assert.equal(b.taxonomy.snapshot_sha256, SNAPSHOT_SHA256);
   for (const f of ['existing-matches.json', 'compat-targets.json', 'taxonomy-map.json']) {
     assert.equal((JSON.parse(read(DATA, f)) as { snapshot_sha256?: string }).snapshot_sha256, SNAPSHOT_SHA256, f);
@@ -83,9 +94,12 @@ test('the committed reviewed files parse with the Worker\'s own parser, byte for
   assert.equal(b.manifest.rows.length, 0);
 });
 
-test('§A.8 / §E.1: an entry holds ids, a public slug, a decision and a reason code — an owner-hidden target only its id', () => {
+test('§A.8 / §E.1: an entry holds ids, a decision and a reason code; a slug only for a target active at review, the owner\'s approval for merge_publish', () => {
   const raw = JSON.parse(read(DATA, 'existing-matches.json')) as { entries: Array<Record<string, unknown>> };
   const { matches } = parseReviewedBundle(committedTexts());
+  const decisions = readFileSync(join(ROOT, 'docs', 'DECISIONS.md'), 'utf8');
+  assert.match(decisions, /^\| 242 \| \*\*استيراد Bambu — /m, 'the owner\'s decision is DECISIONS row 242');
+  for (const h of PUBLISHED) assert.ok(decisions.split('\n').find((l) => l.startsWith('| 242 |'))!.includes(`\`${h}\``), `row 242 names ${h}`);
   const sources = new Set<string>();
   for (const [i, e] of raw.entries.entries()) {
     const at = `entry ${i} (${String(e.source_handle)})`;
@@ -95,54 +109,54 @@ test('§A.8 / §E.1: an entry holds ids, a public slug, a decision and a reason 
     assert.ok((MATCH_REASONS as readonly string[]).includes(String(e.reason)), at);
     assert.ok(!sources.has(String(e.source_product_id)), `${at}: one entry per source`);
     sources.add(String(e.source_product_id));
+    assert.ok(e.decision === 'merge' || e.decision === 'merge_publish', at);
     if (e.decision === 'merge') {
-      // An active target: its public slug and the value map (active option values and colours only).
+      // Active at review: its public slug.
       assert.match(String(e.levonis_slug), /^[a-z0-9][a-z0-9-]*$/, at);
-      const m = matches.bySourceId.get(String(e.source_product_id))!;
-      const mapped = Object.keys(m.value_map);
-      assert.ok(mapped.length + m.unmapped_variants.length > 0, `${at}: every source variant is accounted for`);
-      for (const id of [...mapped, ...m.unmapped_variants]) assert.match(id, /^\d{1,24}$/, at);
-      assert.equal(new Set([...mapped, ...m.unmapped_variants]).size, mapped.length + m.unmapped_variants.length, `${at}: mapped and unmapped are disjoint`);
+      assert.ok(!('approval_ref' in e), at);
     } else {
-      // Owner-hidden (L-7): the id only — no slug, and no option value or colour id (they spell the hidden options).
-      assert.equal(e.decision, 'hold_owner_hidden', at);
-      for (const k of ['levonis_slug', 'value_map', 'unmapped_variants', 'approval_ref']) assert.ok(!(k in e), `${at}: no ${k}`);
+      // Owner-hidden at review, published by the owner's decision: never a slug (spec §A.8, "only of products active at review time").
+      assert.ok(!('levonis_slug' in e), `${at}: no slug`);
+      assert.equal(e.approval_ref, APPROVAL, at);
     }
+    const m = matches.bySourceId.get(String(e.source_product_id))!;
+    const mapped = Object.keys(m.value_map);
+    assert.ok('value_map' in e && 'unmapped_variants' in e, `${at}: the value map is reviewed`);
+    assert.ok(mapped.length + m.unmapped_variants.length > 0, `${at}: every source variant is accounted for`);
+    for (const id of [...mapped, ...m.unmapped_variants]) assert.match(id, /^\d{1,24}$/, at);
+    assert.equal(new Set([...mapped, ...m.unmapped_variants]).size, mapped.length + m.unmapped_variants.length, `${at}: mapped and unmapped are disjoint`);
   }
 });
 
 test('the reviewed P0 manifest names every source, and the gate allows a merge only into its listed product and refuses every create of a listed source', () => {
-  // Most matched sources are in the curated scope (§F, P0 step 3 g, not committed yet): a stand-in digest per curated
-  // row lets the gate reach the existing-product rules for every one of them.
+  // Most matched sources are in the curated scope (§F, P0 step 3 g; another job writes curated/): a stand-in digest per
+  // curated row lets the gate reach the existing-product rules for every one of them.
   const manifestRows = (JSON.parse(read(P0, 'manifest.json')) as { rows: Array<{ handle: string; curated?: boolean }> }).rows;
   const stand = (h: string) => createHash('sha256').update(`stand-in:${h}`).digest('hex');
   const curated = Object.fromEntries(manifestRows.filter((r) => r.curated).map((r) => [r.handle, stand(r.handle)]));
   const b = parseReviewedBundle({ ...withP0Manifest(), curatedIndex: JSON.stringify({ version: 1, files: curated }) });
-  const counts = { merge_ok: 0, create_refused_merge: 0, create_refused_hold: 0, other_target_refused: 0 };
+  const counts = { merge_ok: 0, merge_publish_ok: 0, create_refused: 0, other_target_refused: 0 };
   for (const m of b.matches.entries) {
     const row = b.manifest.bySourceId.get(m.source_product_id);
     assert.ok(row, `${m.source_handle}: a manifest source`);
     assert.equal(row!.handle, m.source_handle);
-    // A minimal payload: the gate's identity, override and relation checks see nothing to refuse.
+    assert.equal(row!.hold_code, '', `${m.source_handle}: no owner-hidden hold left`);
+    // A minimal payload: the identity rows the identity map gives, no override binding, no relation.
+    const identity = b.identity.get(m.source_handle) ?? {};
+    const specs = (['model', 'series', 'family'] as const).filter((k) => identity[k]).map((k) => ({ key: `identity.${k}`, value_text: identity[k] }));
     const payload = (write_mode: 'create' | 'merge', product_id: string) =>
-      ({ source_product_id: m.source_product_id, handle: m.source_handle, write_mode, product_id, curated_sha256: curated[m.source_handle] ?? '', specs: [], images: [], relations: [], route: row!.currentAllIdRoute }) as unknown as ImportPayload;
+      ({ source_product_id: m.source_product_id, handle: m.source_handle, write_mode, product_id, curated_sha256: curated[m.source_handle] ?? '', specs, images: [], relations: [], route: row!.currentAllIdRoute }) as unknown as ImportPayload;
+    const v = checkReviewedScope(b, payload('merge', m.levonis_product_id));
+    assert.ok(v.ok && v.match === m && v.taxonomy.primary === catalogIdOf(row!.leaf), `${m.source_handle}: the listed merge passes and keeps its reviewed leaf`);
+    counts[m.decision === 'merge' ? 'merge_ok' : 'merge_publish_ok']++;
     const create = checkReviewedScope(b, payload('create', `p_${'0'.repeat(24)}`));
+    assert.ok(!create.ok && create.refusal.reason === 'create_for_listed_merge', m.source_handle);
+    counts.create_refused++;
     const other = checkReviewedScope(b, payload('merge', 'prd_00000000000000000000'));
-    if (m.decision === 'merge') {
-      const v = checkReviewedScope(b, payload('merge', m.levonis_product_id));
-      assert.ok(v.ok && v.match === m && v.taxonomy.primary === catalogIdOf(row!.leaf), `${m.source_handle}: the listed merge passes and keeps its reviewed leaf`);
-      counts.merge_ok++;
-      assert.ok(!create.ok && create.refusal.reason === 'create_for_listed_merge', m.source_handle);
-      counts.create_refused_merge++;
-      assert.ok(!other.ok && other.refusal.reason === 'merge_target_not_listed', m.source_handle);
-    } else {
-      assert.ok(!create.ok && create.refusal.code === 'OWNER_HIDDEN' && create.refusal.reason === 'match_hold_owner_hidden', m.source_handle);
-      counts.create_refused_hold++;
-      assert.ok(!other.ok && other.refusal.reason === 'merge_not_listed', m.source_handle);
-    }
+    assert.ok(!other.ok && other.refusal.reason === 'merge_target_not_listed', m.source_handle);
     counts.other_target_refused++;
   }
-  assert.deepEqual(counts, { merge_ok: 21, create_refused_merge: 21, create_refused_hold: 14, other_target_refused: 35 });
+  assert.deepEqual(counts, { merge_ok: 21, merge_publish_ok: 14, create_refused: 35, other_target_refused: 35 });
 });
 
 test("the runner's reader takes the same files: the same SHA-256 per file, the same combined digest and the same write mode per source", async (t) => {
@@ -154,7 +168,14 @@ test("the runner's reader takes the same files: the same SHA-256 per file, the s
     return;
   }
   const runner = (await import(pathToFileURL(file).href)) as {
-    loadReviewedBundle(dir: string): { sha256: Record<string, string>; matches: Map<string, unknown> };
+    loadReviewedBundle(dir: string): {
+      sha256: Record<string, string>;
+      rows: Array<{ source_product_id: string; handle: string; queue_position: number; hold_code?: string }>;
+      matches: Map<string, unknown>;
+      identity: Record<string, unknown>;
+      overrides: unknown[];
+      curatedIndex: Record<string, string>;
+    };
     bundleDigest(sums: Record<string, string>): string;
     writeModeOf(bundle: unknown, sid: string): { mode: string; productId?: string; publish?: boolean };
   };
@@ -162,11 +183,12 @@ test("the runner's reader takes the same files: the same SHA-256 per file, the s
   const theirs = runner.loadReviewedBundle(DATA);
   for (const k of Object.keys(REVIEWED_FILES) as ReviewedFileKey[]) assert.equal(theirs.sha256[REVIEWED_FILES[k]], ours.sha256[k], REVIEWED_FILES[k]);
   assert.equal(runner.bundleDigest(theirs.sha256), ours.bundleSha256);
+  assert.equal(Object.keys(theirs.identity).length, ours.identity.size);
+  assert.equal(theirs.overrides.length, ours.overrides.length);
+  assert.equal(Object.keys(theirs.curatedIndex).length, ours.curated.size);
   assert.equal(theirs.matches.size, ours.matches.entries.length);
   for (const m of ours.matches.entries) {
-    const mode = runner.writeModeOf(theirs, m.source_product_id);
-    if (m.decision === 'merge') assert.deepEqual(mode, { mode: 'merge', productId: m.levonis_product_id, publish: false }, m.source_handle);
-    else assert.deepEqual(mode, { mode: 'hold' }, m.source_handle);
+    assert.deepEqual(runner.writeModeOf(theirs, m.source_product_id), { mode: 'merge', productId: m.levonis_product_id, publish: m.decision === 'merge_publish' }, m.source_handle);
   }
 });
 
@@ -175,27 +197,26 @@ test('compat-targets.json: no member waits for the snapshot any more, and a fami
   assert.ok(!/resolve_from|step2_snapshot/.test(text), 'every snapshot member resolved');
   const compat = JSON.parse(text) as CompatTargets & { levonis_existing_printers: Record<string, { levonis_product_id: string | null; resolution: string }> };
   const t = reviewedTargets(compat);
-  const handles = parseReviewedBundle(withP0Manifest()).manifest.byHandle;
-  for (const h of t.handles) assert.ok(handles.has(h), h);
+  const b = parseReviewedBundle(withP0Manifest());
+  for (const h of t.handles) assert.ok(b.manifest.byHandle.has(h), h);
   // The live catalogue holds no X1C, X1E, P1P or X1; its P1S is the merge target of the source p1s.
   assert.equal(t.ids.size, 0, 'no relation targets an existing Levonis id directly');
   assert.deepEqual(
     Object.fromEntries(Object.entries(compat.levonis_existing_printers).map(([k, v]) => [k, v.resolution])),
     { X1C: 'not_in_levonis', X1E: 'not_in_levonis', P1P: 'not_in_levonis', P1S: 'merged_source', X1: 'not_in_levonis' }
   );
-  const p1s = parseReviewedBundle(committedTexts()).matches.bySourceId.get(handles.get('p1s')!.source_product_id)!;
+  const p1s = b.matches.bySourceId.get(b.manifest.byHandle.get('p1s')!.source_product_id)!;
   assert.equal(p1s.decision, 'merge');
   assert.equal(compat.levonis_existing_printers.P1S.levonis_product_id, p1s.levonis_product_id);
   // A label whose only target was a missing Levonis model keeps no target: the package keeps it as text.
   for (const label of ['P1P', 'X1', 'X1E']) assert.ok(!compat.labels[label].to && !compat.labels[label].members, label);
 
-  // The canary's "X1 Series and P1 Series": the draft's four unresolved members are gone; every family row waits on a
+  // The canary's "X1 Series and P1 Series": the draft's unresolved members are gone; every family row waits on a
   // manifest handle (refurbished-x1c, p1s, refurbished-p1s).
   const x = page().extraction;
-  const notesOf = (targets: CompatTargets) =>
-    buildImportPayload({ extraction: x, writeMode: 'create', extractionSha256: 'x', targets, retrievedAt: 't' }).payload;
-  const draft = notesOf(JSON.parse(read(P0, 'compat-targets.json')) as CompatTargets);
-  const final = notesOf(compat);
+  const payloadWith = (targets: CompatTargets) => buildImportPayload({ extraction: x, writeMode: 'create', extractionSha256: 'x', targets, retrievedAt: 't' }).payload;
+  const draft = payloadWith(JSON.parse(read(P0, 'compat-targets.json')) as CompatTargets);
+  const final = payloadWith(compat);
   const unresolvable = (p: ImportPayload) => p.notes.filter((n) => n.kind === 'relation_unresolvable').length;
   // X1C, X1E, P1S and P1P stubs, on the product and on its one compatibility value, each read twice (option value and
   // compatibility section): twelve notes in the draft, none now.

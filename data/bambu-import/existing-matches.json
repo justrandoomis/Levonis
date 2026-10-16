@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "status": "REVIEWED (P0 step 3 e) against the sealed live snapshot named by snapshot_sha256. One entry per source. merge: an active Levonis product, value_map by exact names (colours also by the Bambu colour code). hold_owner_hidden: the target is owner-hidden (L-7 default, no owner decision yet); such an entry carries the id only.",
+  "status": "REVIEWED (P0 step 3 e) against the sealed live snapshot named by snapshot_sha256. One entry per source. merge: an active Levonis product. merge_publish: an owner-hidden product the owner decided to merge and publish unpriced (DECISIONS row 242; no slug: it was not active at review). value_map: option values by exact name or equal after case-folding and removing whitespace and - – — · , / ( ); colours by exact name or the Bambu colour code (docs/bambu-import/p0/tools/verify_reviewed.py).",
   "reviewed_by": "p0-step-3e-review",
   "reviewed_at": "2026-10-16",
   "snapshot_sha256": "1215895671756da4011dbdc1f310f95f4543d8d0ad9b0b71f1deb3928557ef8c",
@@ -33,8 +33,27 @@
       "source_product_id": "580876092009701376",
       "source_handle": "ams-2-pro",
       "levonis_product_id": "prd_372ecceb3fcc4a90a89e",
-      "decision": "hold_owner_hidden",
+      "decision": "merge_publish",
+      "value_map": {},
+      "unmapped_variants": [
+        "692955201173307398",
+        "692955201173307403",
+        "692955201173307408",
+        "692955201173307413",
+        "692955201173307418",
+        "692955201173307423",
+        "692955201173307428",
+        "692955201173307433",
+        "692955201173307438",
+        "720832839840628738",
+        "720832839840628743",
+        "738525024395620354",
+        "738525024399814660",
+        "758126084595167234",
+        "758126084595167239"
+      ],
       "reason": "same_model",
+      "approval_ref": "DECISIONS row 242",
       "reviewed_by": "p0-step-3e-review",
       "reviewed_at": "2026-10-16"
     },
@@ -184,8 +203,27 @@
       "source_product_id": "7503970893960",
       "source_handle": "bambu-hotend-a1-a2",
       "levonis_product_id": "prd_543be33251174072a97f",
-      "decision": "hold_owner_hidden",
+      "decision": "merge_publish",
+      "value_map": {},
+      "unmapped_variants": [
+        "737888342695104517",
+        "737888342695104522",
+        "737888342695104527",
+        "737888342695104532",
+        "737888342695104537",
+        "737888342695104542",
+        "737888342695104547",
+        "737888342695104552",
+        "737888342695104557",
+        "737888342695104562",
+        "737888342695104567",
+        "737888342695104572",
+        "737888342695104577",
+        "737888342695104582",
+        "737888342695104587"
+      ],
       "reason": "same_model",
+      "approval_ref": "DECISIONS row 242",
       "reviewed_by": "p0-step-3e-review",
       "reviewed_at": "2026-10-16"
     },
@@ -218,8 +256,22 @@
       "source_product_id": "7528371585160",
       "source_handle": "a1-mini",
       "levonis_product_id": "prd_c7dc934872d648d08dbc",
-      "decision": "hold_owner_hidden",
+      "decision": "merge_publish",
+      "value_map": {
+        "579551171554607116": {
+          "option_value_ids": [
+            "a1-mini-combo"
+          ]
+        },
+        "579551171554607120": {
+          "option_value_ids": [
+            "a1-mini"
+          ]
+        }
+      },
+      "unmapped_variants": [],
       "reason": "same_model",
+      "approval_ref": "DECISIONS row 242",
       "reviewed_by": "p0-step-3e-review",
       "reviewed_at": "2026-10-16"
     },
@@ -227,8 +279,24 @@
       "source_product_id": "7706060161160",
       "source_handle": "a1",
       "levonis_product_id": "prd_e6ece48322114d37a931",
-      "decision": "hold_owner_hidden",
+      "decision": "merge_publish",
+      "value_map": {
+        "579550514255634440": {
+          "option_value_ids": [
+            "a1-combo"
+          ]
+        },
+        "579550514255634444": {
+          "option_value_ids": [
+            "a1"
+          ]
+        }
+      },
+      "unmapped_variants": [
+        "776210262809161737"
+      ],
       "reason": "same_model",
+      "approval_ref": "DECISIONS row 242",
       "reviewed_by": "p0-step-3e-review",
       "reviewed_at": "2026-10-16"
     },
@@ -236,8 +304,24 @@
       "source_product_id": "635402263682289664",
       "source_handle": "h2s",
       "levonis_product_id": "prd_65182590e9284a97a3e2",
-      "decision": "hold_owner_hidden",
+      "decision": "merge_publish",
+      "value_map": {
+        "636696880147419141": {
+          "option_value_ids": [
+            "h2s"
+          ]
+        },
+        "636696880147419145": {
+          "option_value_ids": [
+            "h2s-ams-combo"
+          ]
+        }
+      },
+      "unmapped_variants": [
+        "636696880147419149"
+      ],
       "reason": "same_model",
+      "approval_ref": "DECISIONS row 242",
       "reviewed_by": "p0-step-3e-review",
       "reviewed_at": "2026-10-16"
     },
@@ -245,8 +329,22 @@
       "source_product_id": "664977091363467264",
       "source_handle": "p2s",
       "levonis_product_id": "prd_eb3ed76daf8c4c50ad68",
-      "decision": "hold_owner_hidden",
+      "decision": "merge_publish",
+      "value_map": {
+        "664977091405410307": {
+          "option_value_ids": [
+            "p2s"
+          ]
+        },
+        "664977091405410311": {
+          "option_value_ids": [
+            "p2s-combo"
+          ]
+        }
+      },
+      "unmapped_variants": [],
       "reason": "same_model",
+      "approval_ref": "DECISIONS row 242",
       "reviewed_by": "p0-step-3e-review",
       "reviewed_at": "2026-10-16"
     },
@@ -280,8 +378,16 @@
       "source_product_id": "720069852718190592",
       "source_handle": "x2d",
       "levonis_product_id": "prd_04aa310272f943f3b51b",
-      "decision": "hold_owner_hidden",
+      "decision": "merge_publish",
+      "value_map": {},
+      "unmapped_variants": [
+        "720069852747550724",
+        "720069852747550728",
+        "753859494895067137",
+        "776210262356197378"
+      ],
       "reason": "same_model",
+      "approval_ref": "DECISIONS row 242",
       "reviewed_by": "p0-step-3e-review",
       "reviewed_at": "2026-10-16"
     },
@@ -289,8 +395,27 @@
       "source_product_id": "736733711752556544",
       "source_handle": "a2l",
       "levonis_product_id": "prd_907dea50ea694380bcf6",
-      "decision": "hold_owner_hidden",
+      "decision": "merge_publish",
+      "value_map": {
+        "736733711756750852": {
+          "option_value_ids": [
+            "a2l"
+          ]
+        },
+        "736733711756750856": {
+          "option_value_ids": [
+            "a2l-combo"
+          ]
+        },
+        "758126085396279298": {
+          "option_value_ids": [
+            "a2l-cutting-full-combo"
+          ]
+        }
+      },
+      "unmapped_variants": [],
       "reason": "same_model",
+      "approval_ref": "DECISIONS row 242",
       "reviewed_by": "p0-step-3e-review",
       "reviewed_at": "2026-10-16"
     },
@@ -298,8 +423,13 @@
       "source_product_id": "7688884256904",
       "source_handle": "ams-lite",
       "levonis_product_id": "prd_f533251df4fd4f80ae27",
-      "decision": "hold_owner_hidden",
+      "decision": "merge_publish",
+      "value_map": {},
+      "unmapped_variants": [
+        "577083743931502593"
+      ],
       "reason": "same_model",
+      "approval_ref": "DECISIONS row 242",
       "reviewed_by": "p0-step-3e-review",
       "reviewed_at": "2026-10-16"
     },
@@ -307,8 +437,25 @@
       "source_product_id": "580889722122383360",
       "source_handle": "ams-ht",
       "levonis_product_id": "prd_e21b44ce06194f68b288",
-      "decision": "hold_owner_hidden",
+      "decision": "merge_publish",
+      "value_map": {},
+      "unmapped_variants": [
+        "692926956201689099",
+        "692926956201689104",
+        "692926956201689109",
+        "692926956201689114",
+        "692926956201689119",
+        "692926956201689124",
+        "692926956201689129",
+        "692926956201689134",
+        "692926956201689139",
+        "720832838542053378",
+        "720832838542053383",
+        "738525025149943808",
+        "738525025149943813"
+      ],
       "reason": "same_model",
+      "approval_ref": "DECISIONS row 242",
       "reviewed_by": "p0-step-3e-review",
       "reviewed_at": "2026-10-16"
     },
@@ -316,8 +463,27 @@
       "source_product_id": "777338703507927040",
       "source_handle": "r1",
       "levonis_product_id": "prd_d758fd70cd8048eabdc3",
-      "decision": "hold_owner_hidden",
+      "decision": "merge_publish",
+      "value_map": {
+        "777338703516315651": {
+          "option_value_ids": [
+            "r1"
+          ]
+        },
+        "777368103003684867": {
+          "option_value_ids": [
+            "r1-long-material-bundle"
+          ]
+        },
+        "777368103003684871": {
+          "option_value_ids": [
+            "r1-long-material-rotary-bundle"
+          ]
+        }
+      },
+      "unmapped_variants": [],
       "reason": "same_model",
+      "approval_ref": "DECISIONS row 242",
       "reviewed_by": "p0-step-3e-review",
       "reviewed_at": "2026-10-16"
     },
@@ -325,8 +491,104 @@
       "source_product_id": "6951916929160",
       "source_handle": "pla-matte",
       "levonis_product_id": "prd_b9a297b7686d4e1a993d",
-      "decision": "hold_owner_hidden",
+      "decision": "merge_publish",
+      "value_map": {
+        "40489681780872": {
+          "color_id": "bl-pla-matte-ivory-white"
+        },
+        "40489681813640": {
+          "color_id": "bl-pla-matte-ash-gray"
+        },
+        "40489681846408": {
+          "color_id": "bl-pla-matte-mandarin-orange"
+        },
+        "40489681879176": {
+          "color_id": "bl-pla-matte-sakura-pink"
+        },
+        "40489681911944": {
+          "color_id": "bl-pla-matte-lemon-yellow"
+        },
+        "40489681944712": {
+          "color_id": "bl-pla-matte-charcoal"
+        },
+        "40489681977480": {
+          "color_id": "bl-pla-matte-grass-green"
+        },
+        "40489682010248": {
+          "color_id": "bl-pla-matte-latte-brown"
+        },
+        "40489682043016": {
+          "color_id": "bl-pla-matte-scarlet-red"
+        },
+        "40489682075784": {
+          "color_id": "bl-pla-matte-ice-blue"
+        },
+        "40489682141320": {
+          "color_id": "bl-pla-matte-marine-blue"
+        },
+        "41078280061064": {
+          "color_id": "bl-pla-matte-scarlet-red"
+        },
+        "41078280093832": {
+          "color_id": "bl-pla-matte-marine-blue"
+        },
+        "41078280126600": {
+          "color_id": "bl-pla-matte-charcoal"
+        },
+        "41078280159368": {
+          "color_id": "bl-pla-matte-ivory-white"
+        },
+        "41078280192136": {
+          "color_id": "bl-pla-matte-ash-gray"
+        },
+        "41884207415432": {
+          "color_id": "bl-pla-matte-dark-red"
+        },
+        "41884207972488": {
+          "color_id": "bl-pla-matte-dark-blue"
+        },
+        "41884208529544": {
+          "color_id": "bl-pla-matte-dark-brown"
+        },
+        "41884210233480": {
+          "color_id": "bl-pla-matte-dark-green"
+        },
+        "42259062620296": {
+          "color_id": "bl-pla-matte-desert-tan"
+        },
+        "42984890040456": {
+          "color_id": "bl-pla-matte-mandarin-orange"
+        },
+        "43292383936648": {
+          "color_id": "bl-pla-matte-bone-white"
+        },
+        "43292383969416": {
+          "color_id": "bl-pla-matte-plum"
+        },
+        "43292384002184": {
+          "color_id": "bl-pla-matte-sky-blue"
+        },
+        "43292384034952": {
+          "color_id": "bl-pla-matte-apple-green"
+        },
+        "43292384067720": {
+          "color_id": "bl-pla-matte-dark-chocolate"
+        },
+        "43292384100488": {
+          "color_id": "bl-pla-matte-caramel"
+        },
+        "43292384133256": {
+          "color_id": "bl-pla-matte-terracotta"
+        },
+        "43292384166024": {
+          "color_id": "bl-pla-matte-nardo-gray"
+        }
+      },
+      "unmapped_variants": [
+        "40489682108552"
+      ],
       "reason": "same_model",
+      "approval_ref": "DECISIONS row 242",
       "reviewed_by": "p0-step-3e-review",
       "reviewed_at": "2026-10-16"
     },
@@ -969,8 +1231,30 @@
       "source_product_id": "576603245171335168",
       "source_handle": "bambu-high-flow-hotend-h2-p2s-x2d",
       "levonis_product_id": "prd_04b5f3bc920545c09362",
-      "decision": "hold_owner_hidden",
+      "decision": "merge_publish",
+      "value_map": {},
+      "unmapped_variants": [
+        "763236615601614850",
+        "763236615601614855",
+        "763238932346396674",
+        "763238932346396679",
+        "763238932350590980",
+        "776234881897246720",
+        "776234881897246725",
+        "776234881897246730",
+        "776234881897246735",
+        "776234881897246740",
+        "776234881897246745",
+        "776234881897246750",
+        "776234881897246755",
+        "776234881897246760",
+        "776234881897246765",
+        "776234881897246770",
+        "776234881897246775",
+        "776234881897246780"
+      ],
       "reason": "same_model",
+      "approval_ref": "DECISIONS row 242",
       "reviewed_by": "p0-step-3e-review",
       "reviewed_at": "2026-10-16"
     },
@@ -1026,8 +1310,42 @@
       "source_product_id": "657373128544849920",
       "source_handle": "tungsten-carbide-nozzle-h2-p2s",
       "levonis_product_id": "prd_4c75ab2e37fa48a98140",
-      "decision": "hold_owner_hidden",
+      "decision": "merge_publish",
+      "value_map": {},
+      "unmapped_variants": [
+        "682705527743418372",
+        "682705527743418378",
+        "682705527743418384",
+        "682705527743418390",
+        "682705527743418396",
+        "682705527743418402",
+        "682705527743418408",
+        "682705527743418414",
+        "682705527743418420",
+        "682705527743418426",
+        "682705527743418432",
+        "682705527743418438",
+        "682705527743418444",
+        "682705527743418450",
+        "682705527743418456",
+        "682705527743418462",
+        "682705527743418468",
+        "682705527743418474",
+        "682705527743418480",
+        "682705527743418486",
+        "682705527743418492",
+        "682705527743418498",
+        "682705527743418504",
+        "682705527743418510",
+        "720441565723688960",
+        "720441565723688966",
+        "720441565723688972",
+        "720441565723688978",
+        "720441565723688984",
+        "720441565723688990"
+      ],
       "reason": "same_model",
+      "approval_ref": "DECISIONS row 242",
       "reviewed_by": "p0-step-3e-review",
       "reviewed_at": "2026-10-16"
     },
