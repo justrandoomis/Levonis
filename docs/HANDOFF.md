@@ -7,11 +7,13 @@ force-pushes, or alternate deployment path.
 ## Bambu Lab one-time catalogue import (DECISIONS 239–241, in progress)
 
 > **Resumed 2026-10-15 ≈20:40 UTC.** The resume plan is `docs/bambu-import/HANDOFF-PLAN.md`; the spec and the
-> P0 data are in `docs/bambu-import/`. Landed since: the package follow-ups (live) and step 5 (search aliases and the
-> import stock gate). Steps 6, 7 and 8 are built in local worktrees and land one at a time through `ci/<lane>` and
-> workflow 7. The data steps (re-crawl, sealed snapshot, curated files) wait on this environment's network policy:
-> `us.store.bambulab.com`, `store.bblcdn.com`, `wiki.bambulab.com`, the GitHub artifact host
-> `productionresultssa*.blob.core.windows.net` and `levonis-iq.com` are refused from the sandbox.
+> P0 data are in `docs/bambu-import/`. **All the import code is live (2026-10-16):** the package follow-ups,
+> step 5 (search aliases, the import stock gate), step 6 (the writer and the ops door, `a2d9e73`), step 7 (the
+> knowledge answer and tabs, cards, compare, facets, the import dashboard, `c9265b0`) and step 8 (the runner and
+> every workflow 60 mode, `1431708`), each through `ci/<lane>` and a green workflow 7. The environment's network
+> policy now allows the store, its CDN, the wiki, the GitHub artifact host and levonis-iq.com. In progress: the
+> polite re-crawl, the reviewed data files (the existing-product matches, the owner's merge_publish decision for the
+> 14 hidden Bambu products, DECISIONS row 242), the curated files of the 92 flagship products; then the canary.
 
 The owner's brief of 2026-10-15: import every product of us.store.bambulab.com (1,115 in its sitemap) as a
 native, catalog-only Levonis product, one product at a time with a live check before the next, no price,
@@ -36,10 +38,16 @@ for this import only. Catalog-only visibility and «طلب السعر» (row 240
   (every row a sale can reach carries a number) or «بلا تتبّع (حسب الطلب)» — sold by pre-order without a limit, so it
   needs a pre-order on the product (`IMPORT_STOCK_UNTRACKED_NEEDS_PREORDER`): a direct sale with no recorded stock
   is closed anyway. «نشر» of a visible, unpriced product with no price typed is a content save (it stays visible).
-- **Next (spec §K.2):** step 6 the token-protected ops endpoint
-  and writer; step 7 the product page's knowledge tabs, swatches and gallery; step 8 the runner and the other
-  workflow 60 modes; then the reviewed data files, dry runs, the canary `filament-buffer`, the eight audit
-  classes and the bulk run. Every code step deploys through workflow 7 like any other push.
+- **The door, the knowledge and the runner (steps 6–8, live and idle until a run is opened):**
+  `/api/ops/catalog-import/*` answers one uniform 404 to anything without a run's own token; the owner's read-only
+  dashboard `/api/admin/catalog-import/*` is owner-only. `GET /api/products/:slug/knowledge` serves the knowledge tabs
+  (only live scopes; US 110 V rows under «إصدارات أخرى»). Workflow 60 runs `snapshot`, `preflight`, `open`, `run`
+  (one item at a time, verified on the public site, chained), `close`, `report`, `revoke`. Spec §1 records the
+  deviations of these steps (rows 24–28: cards keep the house 6:5 frame — owner decision pending; one 280 px card
+  height; a not-offered value stays pressable; the product page draws no breadcrumb, so the browser check records it
+  as not applicable and the section is proven by the listings and the Worker's recompute).
+- **Next (spec §K.2):** the reviewed data commit (step 9), the dry runs (step 10), the canary `filament-buffer`, the
+  eight audit classes and the bulk run.
 - **Holds and owner questions with safe defaults:** `cyberbrick-omnidirectional-forklift` (an option name
   read as an order type: "Omni**direct**ional"), `ams-2-pro` (an option value worded as a promotion, shown
   under a reviewed neutral label), «A1 Series» read per product, the Sorani names of the four seeded
