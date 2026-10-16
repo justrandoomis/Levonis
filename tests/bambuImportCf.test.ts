@@ -473,6 +473,13 @@ test('preflight: the live migrations equal the repository, the run is active, an
     // open and preflight refuse while a run is active; run refuses an unknown or closed run.
     assert.match(f.run(['preflight', '--mode', 'open', '--run', '']).stderr, /an import run is already active/);
     assert.match(f.run(['preflight', '--mode', 'run', '--run', RUN_B]).stderr, /is not an active import run/);
+    // The translation memory's loader (I18N-DESIGN §A.4) needs the active run too, and prints the restore point.
+    const tm = f.run(['preflight', '--mode', 'translations', '--run', RUN_A]);
+    assert.equal(tm.status, 0, tm.stderr);
+    assert.match(tm.stdout, new RegExp(`preflight: run ${RUN_A} is active`));
+    assert.match(tm.stdout, /Time Travel bookmark \(restore point\)/);
+    assert.match(f.run(['preflight', '--mode', 'translations', '--run', RUN_B]).stderr, /is not an active import run/);
+    assert.equal(f.run(['preflight', '--mode', 'translations', '--run', '']).status, 2, 'translations needs its run');
     // No bookmark, no write.
     assert.match(f.run(['preflight', '--mode', 'run', '--run', RUN_A], { MOCK_NO_BOOKMARK: '1' }).stderr, /no Time Travel bookmark was returned/);
     // Arguments are validated before anything runs.

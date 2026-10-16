@@ -23,6 +23,8 @@
  *   POST /run/prepare-taxonomy          insert-only nodes, brand, synonyms
  *   POST /run/protect-snapshot          §E.4 fingerprints, before | after
  *   POST /run/finish                    closed | partial (the BLOCKED, WITHDRAWN and still-held items); the token cleared
+ *   POST /run/translations              one committed translations part, proved against the bundled index and row by
+ *                                       row, written in one batch; its products purged (I18N-DESIGN §A.4)
  *   GET  /run/status                    counts by state, current, next, the held items, last verified URL, §H.3 progress
  *
  * Every answer is `private, no-store`; every error `{code, message}` from the
@@ -63,6 +65,7 @@ import { acceptManifest, finishRun, heldItems, helloRecord, migrationsPresent, p
 import { currentAndNext, lastVerifiedUrl, measuredRate, runProgress, stateCounts } from '../lib/catalogImport/report';
 import { ImportWriteRefused, planImportWrite, runImportWrite, type DocumentCheck, type ImportWriteContext } from '../lib/catalogImport/writer';
 import { republishAfterBlock } from '../lib/catalogImport/unpublish';
+import { loadTranslationPart, PART_NAME, purgeTranslatedProducts } from '../lib/catalogImport/translations';
 import { EXPECTED_MIGRATION } from '../lib/schemaVersion';
 
 export const catalogImportOpsRoutes = new Hono<OpsEnv>();
@@ -204,6 +207,24 @@ catalogImportOpsRoutes.post(
   handle(async (c) => {
     await readBody(c);
     return c.json(await finishRun(c.env.DB, c.get('importRun'), bundleOrRefuse()));
+  })
+);
+
+/**
+ * One committed part of the translation memory (docs/bambu-import/I18N-DESIGN.md §A.4): `{ part, text }`, the text
+ * the file's exact bytes. Proved against the BUNDLED index (its SHA-256) and row by row, written in one batch, then
+ * the products whose shown text changed are purged. Counts only in the answer, never text.
+ */
+catalogImportOpsRoutes.post(
+  '/run/translations',
+  handle(async (c) => {
+    const body = await readBody(c);
+    const part = typeof body.part === 'string' ? body.part : '';
+    const text = typeof body.text === 'string' ? body.text : null;
+    if (!PART_NAME.test(part) || part.length > 40 || text === null) throw new OpsRefusal(400, 'IMPORT_BAD_REQUEST');
+    const r = await loadTranslationPart(c.env.DB, c.get('importRun'), part, text, c.get('opsCounter'));
+    const purged = r.skipped ? { products: 0, paths: 0, keys: 0 } : await purgeTranslatedProducts(c.env, c.req.url, r.purge_ids);
+    return c.json({ ...r, purged_products: purged.products });
   })
 );
 

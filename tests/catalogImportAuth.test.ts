@@ -74,7 +74,7 @@ test('every miss answers the same 404 with the same work: no header, a bad, expi
   costs.set('merchant host', await work('merchant host', { host: 'somestore.levonis-iq.com' }));
   assert.deepEqual(new Set(costs.values()), new Set([1]), `every miss costs one statement: ${JSON.stringify([...costs])}`);
   // Each path, GET and POST, without a token.
-  for (const p of ['/manifest', '/items/123/lease', '/items/123/stage', '/run/finish']) await expect404(w, p, { token: null }, `${OPS}${p}`);
+  for (const p of ['/manifest', '/items/123/lease', '/items/123/stage', '/run/finish', '/run/translations']) await expect404(w, p, { token: null }, `${OPS}${p}`);
   for (const p of ['/items/123/readback', '/run/status']) {
     const r = await w.call(`${OPS}${p}`, { token: null });
     assert.equal(r.status, 404);

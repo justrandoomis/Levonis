@@ -54,6 +54,14 @@
 #   withdraw  (confirm=IMPORT-LIVE, run_id, item) an owner-approved withdrawal
 #             of a product the store removed (BLOCKED SOURCE_WITHDRAWN): the
 #             second fetch and the sitemap absence are the evidence.
+#   translations (confirm=IMPORT-LIVE, run_id) the translation memory
+#             (docs/bambu-import/I18N-DESIGN.md §A.4): every committed part of
+#             data/bambu-import/translations/ in index order through the import
+#             door of the active run; the Worker proves each part against the
+#             index it bundles (deployed by workflow 7) and row by row, writes it
+#             in one batch and purges the products it changed. A part already
+#             loaded is skipped. Counts only in the log, never text. After the
+#             bulk run closes, a correction is open, then translations, then close.
 #   revoke    the kill switch: clears catalog_import_runs.token_sha256 of
 #             `run_id`, so every ops path answers 404, and marks the run
 #             stopped (notes = 'kill_switch'). Before migration 0195 there is
@@ -107,7 +115,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'snapshot, preflight, open, run, close, report, dryrun, withdraw or revoke (see the header of this file)'
+        description: 'snapshot, preflight, open, run, close, report, dryrun, withdraw, revoke or translations (see the header of this file)'
         type: choice
         required: true
         options:
@@ -120,8 +128,9 @@ on:
           - dryrun
           - withdraw
           - revoke
+          - translations
       run_id:
-        description: 'catalog_import_runs.id: cir_ followed by 24 lowercase hex characters (run, close, report, withdraw and revoke need it; open creates it)'
+        description: 'catalog_import_runs.id: cir_ followed by 24 lowercase hex characters (run, close, report, withdraw, revoke and translations need it; open creates it)'
         required: false
         default: ''
       max_items:
@@ -150,7 +159,7 @@ on:
         description: 'one-time X25519 public key (43 base64url characters) that seals every artifact: node scripts/bambu-import/seal.mjs --keygen <dir>'
         required: true
       confirm:
-        description: 'IMPORT-LIVE for open, run, close and withdraw'
+        description: 'IMPORT-LIVE for open, run, close, withdraw and translations'
         required: false
         default: ''
 
@@ -195,7 +204,7 @@ jobs:
         run: |
           echo "DEADLINE_EPOCH=$(( $(date +%s) + 330*60 ))" >> "$GITHUB_ENV"
           fail() { echo "::error::$1"; exit 1; }
-          [[ "$IN_MODE" =~ ^(snapshot|preflight|open|run|close|report|dryrun|withdraw|revoke)$ ]] || fail 'mode is not one of the nine modes'
+          [[ "$IN_MODE" =~ ^(snapshot|preflight|open|run|close|report|dryrun|withdraw|revoke|translations)$ ]] || fail 'mode is not one of the ten modes'
           [[ -z "$IN_RUN_ID" || "$IN_RUN_ID" =~ ^cir_[0-9a-f]{24}$ ]] || fail 'run_id is cir_ followed by 24 lowercase hex characters, or empty'
           [[ "$IN_MAX_ITEMS" =~ ^[0-9]{1,4}$ ]] || fail 'max_items is a whole number from 0 to 9999'
           [[ "$IN_RESUME" =~ ^(true|false)$ ]] || fail 'resume is true or false'
@@ -205,10 +214,10 @@ jobs:
           [[ "$IN_SEAL_PUBKEY" =~ ^[A-Za-z0-9_-]{43}$ ]] || fail 'seal_pubkey is a one-time X25519 public key of 43 base64url characters'
           [[ -z "$IN_CONFIRM" || "$IN_CONFIRM" == "IMPORT-LIVE" ]] || fail 'confirm is IMPORT-LIVE or empty'
           case "$IN_MODE" in
-            open|run|close|withdraw) [[ "$IN_CONFIRM" == "IMPORT-LIVE" ]] || fail "mode $IN_MODE writes the live catalogue: confirm must be IMPORT-LIVE" ;;
+            open|run|close|withdraw|translations) [[ "$IN_CONFIRM" == "IMPORT-LIVE" ]] || fail "mode $IN_MODE writes the live catalogue: confirm must be IMPORT-LIVE" ;;
           esac
           case "$IN_MODE" in
-            run|close|report|withdraw|revoke) [[ -n "$IN_RUN_ID" ]] || fail "mode $IN_MODE needs the run_id" ;;
+            run|close|report|withdraw|revoke|translations) [[ -n "$IN_RUN_ID" ]] || fail "mode $IN_MODE needs the run_id" ;;
             open) [[ -z "$IN_RUN_ID" ]] || fail 'open creates a new run: run_id must be empty' ;;
           esac
           if [[ "$IN_MODE" == "withdraw" ]]; then [[ -n "$IN_ITEM" ]] || fail 'withdraw needs the item (a source product id)'; fi
@@ -236,7 +245,7 @@ jobs:
           "$RUNNER_TEMP/browser/node_modules/.bin/playwright" install --with-deps chromium
 
       - name: Live database id (masked), preflight and the Time Travel restore point
-        if: env.IN_MODE == 'preflight' || env.IN_MODE == 'open' || env.IN_MODE == 'run' || env.IN_MODE == 'close' || env.IN_MODE == 'withdraw'
+        if: env.IN_MODE == 'preflight' || env.IN_MODE == 'open' || env.IN_MODE == 'run' || env.IN_MODE == 'close' || env.IN_MODE == 'withdraw' || env.IN_MODE == 'translations'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -264,7 +273,7 @@ jobs:
         run: node scripts/bambu-import/cf.mjs open --token-file "$RUNNER_TEMP/import-token" --run-file "$RUNNER_TEMP/import-run"
 
       - name: Mint the job token (0600 file; only its hash is stored on the run row)
-        if: env.IN_MODE == 'run' || env.IN_MODE == 'close' || env.IN_MODE == 'withdraw'
+        if: env.IN_MODE == 'run' || env.IN_MODE == 'close' || env.IN_MODE == 'withdraw' || env.IN_MODE == 'translations'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -282,6 +291,15 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/browser/node_modules/playwright
         run: node --import tsx scripts/bambu-import/run.ts
 
+      # The translation memory (I18N-DESIGN §A.4): the committed parts through the
+      # import door. It reads the token file and deletes it at once; no Cloudflare
+      # credential exists here. Counts only in the log.
+      - name: Translation memory loader
+        if: env.IN_MODE == 'translations'
+        env:
+          IMPORT_TOKEN_FILE: ${{ runner.temp }}/import-token
+        run: node --import tsx scripts/bambu-import/translations.ts --data data/bambu-import/translations --run "$IN_RUN_ID"
+
       # Step 10 (c): no Cloudflare credential is referenced; the Worker runs locally.
       - name: Dry run against a local Worker (fixture pages, real store images, sealed screenshots)
         if: env.IN_MODE == 'dryrun'
@@ -291,7 +309,7 @@ jobs:
 
       # Whatever happened above: the job's token stops working now.
       - name: Revoke the job token (always, after every mode that minted one)
-        if: always() && (env.IN_MODE == 'open' || env.IN_MODE == 'run' || env.IN_MODE == 'close' || env.IN_MODE == 'withdraw')
+        if: always() && (env.IN_MODE == 'open' || env.IN_MODE == 'run' || env.IN_MODE == 'close' || env.IN_MODE == 'withdraw' || env.IN_MODE == 'translations')
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

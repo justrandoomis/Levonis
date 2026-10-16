@@ -146,7 +146,7 @@ const tr = (en: string, lang: 'ar' | 'ckb') => {
   return lang === 'ar' ? row[1] : row[2];
 };
 
-type Rec = Record<string, any>;
+type Rec = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 async function page(raw: DatabaseSync, opts: { priced?: boolean; db?: D1Database } = {}): Promise<{ status: number; text: string; body: Rec }> {
   const app = stubApp(opts.db ?? asD1(raw), null, (a) => a.route('/api/products', productRoutes), { publishV2: opts.priced ? 'always' : false });
