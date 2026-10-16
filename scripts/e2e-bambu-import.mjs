@@ -157,6 +157,9 @@ export function fixtureBundle({ p0Dir = join(ROOT, 'docs', 'bambu-import', 'p0')
     curatedIndex[row.handle] = sha256(body);
   }
   text['curated/index.json'] = `${JSON.stringify({ files: curatedIndex }, null, 2)}\n`;
+  // The translation memory's bundled index (docs/bambu-import/I18N-DESIGN.md §A.3): the Worker imports it, so the
+  // dry run's tree carries it — empty, as the code release lands it (no part is loaded in a dry run).
+  text['translations/index.json'] = `${JSON.stringify({ version: 1, parts: {} }, null, 2)}\n`;
   return { rows, text };
 }
 
