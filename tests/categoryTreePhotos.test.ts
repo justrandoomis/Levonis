@@ -113,6 +113,24 @@ test('past the availability cap the map still has its photographs, from a short 
   assert.equal(slugOf(bySlug(roots, 'printers').photo!.product_id), 'bambu-lab-h2d');
 });
 
+test('past the cap on a database without 0184 or 0189 (CLAUDE.md rule 2): the first-wave short list still answers, with nothing sellable', async () => {
+  const { app } = world((raw) => {
+    const ins = raw.prepare(
+      `INSERT INTO products (id, slug, name, description, price_iqd, status, category_id, sub_category_id, selling_type, stock, display_order, created_at)
+       VALUES (?, ?, ?, '', 1000, 'active', 'cat_printers', 'cat_printers_fdm', 'direct_sale', 0, 100, '2026-01-01T00:00:00.000Z')`
+    );
+    for (let i = 0; i <= TREE_AVAILABILITY_CAP; i++) ins.run(`prd_fill_${i}`, `fill-${i}`, `Filler ${i}`);
+    raw.exec('PRAGMA foreign_keys = OFF');
+    for (const t of ['product_completeness', 'pricing_v2_sku_results', 'product_pricing_state']) raw.exec(`DROP TABLE IF EXISTS ${t}`);
+  });
+  const res = await get(app, '/api/catalog/tree');
+  assert.equal(res.status, 200, await res.clone().text());
+  const roots = (await json(res)).roots as Node[];
+  assert.ok(roots.every((r) => r.photo?.src.startsWith('/files/products/')), JSON.stringify(roots.map((r) => r.photo)));
+  // Nothing is sellable without 0189, so the shop's order alone: the lowest display_order, then the newest.
+  assert.equal(bySlug(roots, 'printers').available_count, null);
+});
+
 test('the public API\'s sections are described without them', async () => {
   const { raw } = world();
   const { roots } = await buildCatalogTree(asD1(raw), pricingCtxForUser(asD1(raw), null));
@@ -165,5 +183,5 @@ test('the explorer asks for the pool only when the map brought a section no phot
   assert.match(page, /const needsPool = useMemo\(\(\) => bannerRows\(roots, \[\]\)\.some\(\(r\) => !r\.photo\), \[roots\]\);/);
   assert.match(page, /if \(!needsPool\) return;\s+let alive = true;\s+loadPhotoPool\(\)/);
   assert.match(page, /useBannerPhotos\(baseRows, !needsPool \|\| poolSettled\)/);
-  assert.match(readFileSync(join(ROOT, 'worker/routes/catalog.ts'), 'utf8'), /buildCatalogTree\(c\.env\.DB, pricingCtx\(c\), \{ photos: true \}\)/);
+  assert.match(readFileSync(join(ROOT, 'worker/routes/catalog.ts'), 'utf8'), /buildCatalogTree\(c\.env\.DB, pricingCtxForUser\(c\.env\.DB, null\), \{ photos: true \}\)/);
 });

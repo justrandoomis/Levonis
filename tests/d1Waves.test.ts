@@ -13,6 +13,15 @@
  *   /api/home/sections     5 → 4  (8 → 6)      /api/products/:slug    6 → 2  (9 → 5)
  *   storefront resolve     9 → 5                 /:slug/reviews         3 → 2
  *
+ * The category map (`/api/catalog/tree`, speed review 2026-10-16): under
+ * TREE_AVAILABILITY_CAP every card is read for «متوفرة الآن» — 3 waves. Past
+ * the cap it carries one photograph per section from a short list read in
+ * its FIRST wave, beside the catalogs and the memberships: 2 waves (it was 4
+ * — a dependent short list, its rows, then their cards; 1 before it carried
+ * photographs at all). Built with the guest's pricing inputs (the answer is
+ * cached for everyone), a member's miss no longer waits for their tier
+ * (5 → 3 under the cap, 5 → 2 past it).
+ *
  * Also proved: the pricing inputs are read in ONE wave on a cold isolate and
  * from memory on a warm one; an admin write forgets them at once; the
  * shopfront reads the owner's tier once, not twice.
@@ -33,6 +42,7 @@ import { printQuoteRoutes } from '../worker/routes/printQuote';
 import { printRequestRoutes } from '../worker/routes/printRequests';
 import { PRICING_INPUTS_TTL_MS, forgetPricingInputs, pricingInputsFor } from '../worker/lib/membershipBenefits';
 import { compareRoutes } from '../worker/routes/compare';
+import { TREE_AVAILABILITY_CAP, catalogRoutes } from '../worker/routes/catalog';
 
 const ENV = { STORE_ROOT_DOMAIN: 'levonis-iq.com' };
 const HOST = `${SLUG}.levonis-iq.com`;
@@ -46,6 +56,7 @@ const mount: Mount = (a) => {
   a.route('/api/print-quote', printQuoteRoutes);
   a.route('/api/marketplace/print', printRequestRoutes);
   a.route('/api/compare', compareRoutes);
+  a.route('/api/catalog', catalogRoutes);
   a.route('/api', miscRoutes);
 };
 
@@ -89,6 +100,10 @@ const CEILINGS: Array<{ path: string; host?: string; waves: [warm: number, cold:
   // (the relation targets' pictures among them, and the translation memory, 0196 — I18N-DESIGN §A.5).
   // Measured 2 / 2 / 2; the relation path has its own test below.
   { path: `/api/products/${LIVE_PRODUCTS[0].slug}/knowledge`, waves: [2, 2, 2], prepares: 8 },
+  // The category map under TREE_AVAILABILITY_CAP: catalogs, memberships (and the past-the-cap short list,
+  // which answers nothing here) in one wave, then every product, then their cards. The same for a member:
+  // the map is built without the viewer's tier (it was 5 for a member).
+  { path: '/api/catalog/tree', waves: [3, 3, 3], prepares: 16 },
 ];
 
 /**
@@ -193,6 +208,36 @@ test('the knowledge answer with a relation to a VISIBLE target: its picture ride
   const a1 = body.compatibility.compatible.find((c) => c.label === 'Bambu Lab A1')!;
   assert.equal(a1.product?.image, '/files/products/a1/a1-front.webp', 'the visible target is linked with its own primary picture');
   assert.equal(body.compatibility.compatible.length, 2);
+});
+
+/**
+ * PAST TREE_AVAILABILITY_CAP (the Bambu import takes the shop to ~1,142 products): no card is read for the
+ * counts, and each section's photograph comes from a short list read in the map's FIRST wave — so a miss of
+ * the map's edge entry costs one wave more than the bare map, not three (speed review 2026-10-16).
+ */
+const TREE_PAST_CAP = { waves: [2, 2, 2] as const, prepares: 19 };
+
+test('the category map past the availability cap: photographs from a short list in the first wave, cards in the second', async () => {
+  const w = world();
+  const ins = w.raw.prepare(
+    `INSERT INTO products (id, slug, name, description, price_iqd, status, category_id, sub_category_id, selling_type, stock, display_order, created_at)
+     VALUES (?, ?, ?, '', 1000, 'active', 'cat_printers', 'cat_printers_fdm', 'direct_sale', 0, 100, '2026-01-01T00:00:00.000Z')`
+  );
+  for (let i = 0; i <= TREE_AVAILABILITY_CAP; i++) ins.run(`prd_fill_${i}`, `fill-${i}`, `Filler ${i}`);
+  for (const p of LIVE_PRODUCTS) w.raw.prepare('UPDATE products SET images = ? WHERE id = ?').run(JSON.stringify([`/files/products/${p.slug}.webp`]), p.id);
+  const cold = await w.measure('/api/catalog/tree');
+  const warm = await w.measure('/api/catalog/tree');
+  const member = await w.measure('/api/catalog/tree', MEMBER);
+  for (const [name, c, ceiling] of [['warm', warm, TREE_PAST_CAP.waves[0]], ['cold', cold, TREE_PAST_CAP.waves[1]], ['member', member, TREE_PAST_CAP.waves[2]]] as const) {
+    assert.ok(c.waves <= ceiling, `${name}: ${c.waves} waves > ${ceiling}\n${c.sqls.join('\n')}`);
+    assert.ok(c.prepares <= TREE_PAST_CAP.prepares + (name === 'member' ? 5 : 0), `${name}: ${c.prepares} prepares\n${c.sqls.join('\n')}`);
+  }
+  // Not by leaving the photographs off: every section that holds a photographed product still carries one.
+  const body = (await (await get(stubApp(w.db, null, mount, { env: ENV }), '/api/catalog/tree')).json()) as {
+    roots: Array<{ slug: string; available_count: number | null; photo?: { src: string } }>;
+  };
+  assert.ok(body.roots.every((r) => r.available_count === null), 'past the cap');
+  assert.ok(body.roots.every((r) => r.photo?.src.startsWith('/files/products/')), JSON.stringify(body.roots.map((r) => [r.slug, r.photo])));
 });
 
 test('the pricing inputs: one wave cold, no statement warm, forgotten at once by the seam, re-read after the TTL', async () => {
