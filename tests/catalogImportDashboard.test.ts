@@ -22,7 +22,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ROOT } from './fixtures/d1';
 import { LanguageProvider } from '../src/LanguageContext';
-import { Blocked, StateChip, readItems, readRun } from '../src/components/adminImport/CatalogImportDashboard';
+import { Blocked, MoreItems, StateChip, nextItemsPage, readItems, readRun } from '../src/components/adminImport/CatalogImportDashboard';
 import { ITEM_STATES, ITEM_STATE_LABELS, PROGRESS_LABELS, RESUME_INSTRUCTION, RUN_STATE_LABELS, S } from '../src/components/adminImport/catalogImportStrings';
 
 const SRC = readFileSync(join(ROOT, 'src/components/adminImport/CatalogImportDashboard.tsx'), 'utf8');
@@ -122,6 +122,46 @@ test('items: paged by the server’s cursor; a blocked item carries its blocker'
   assert.equal(page.items[0].live_url, '/product/bambu-lab-h2d');
   assert.equal(page.items[1].blocker_code, 'VERIFY_FAILED_PERSISTENT');
   assert.equal(page.items[1].blocker, 'the hero image differs');
+});
+
+test('the step-6 router’s cursor is the next queue position, a NUMBER: «عرض المزيد» pages through a 1,115-item run', () => {
+  // worker/routes/adminCatalogImport.ts (step 6): `next_cursor: more ? Number(last.queue_position) : null`.
+  const rows = Array.from({ length: 50 }, (_, i) => ({ id: `cii_${i + 1}`, handle: `h${i + 1}`, processing_state: 'DISCOVERED', queue_position: i + 1 }));
+  assert.equal(readItems({ items: rows, next_cursor: 50 }).next, '50');
+  assert.equal(readItems({ items: rows, next_cursor: 0 }).next, '0');
+  assert.equal(readItems({ items: rows, next_cursor: null }).next, '', 'the last page');
+  assert.equal(readItems({ items: rows, next_cursor: Number.NaN }).next, '');
+  assert.equal(readItems({ items: rows, cursor: 'c2' }).next, 'c2', 'an opaque string cursor still reads');
+});
+
+test('«عرض المزيد» never fails silently: a refused page is a sentence beside the button, and a press tries again', async () => {
+  const page = { items: [], next: '' };
+  assert.deepEqual(await nextItemsPage(async () => page, '50'), page);
+  let unhandled = 0;
+  const onUnhandled = () => unhandled++;
+  process.on('unhandledRejection', onUnhandled);
+  try {
+    const failed = await nextItemsPage(async () => {
+      throw new Error('500');
+    }, '50');
+    assert.deepEqual(failed, { failed: true });
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(unhandled, 0, 'no rejection goes unheard');
+  } finally {
+    process.off('unhandledRejection', onUnhandled);
+  }
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const html = render(createElement(MoreItems, { busy: false, failed: true, lang, onMore: () => {} }));
+    assert.ok(html.includes(S.loadMore[lang]) && html.includes(S.loadMoreFailed[lang]), html);
+    assert.match(html, /role="alert"/);
+    assert.match(html, /<button[^>]*data-import-more/, 'the button stays, so a press tries again');
+  }
+  assert.doesNotMatch(render(createElement(MoreItems, { busy: false, failed: false, lang: 'ar', onMore: () => {} })), /data-import-more-failed/);
+  assert.match(render(createElement(MoreItems, { busy: true, failed: false, lang: 'ar', onMore: () => {} })), /<button[^>]*disabled=""/, 'one page at a time');
+  // The panel goes through it, and guards a second press while a page is on its way.
+  assert.match(SRC, /nextItemsPage\(\(cursor\) => fetchPage\(cursor\), next\)/);
+  assert.match(SRC, /if \(more === 'busy'\) return;/);
+  assert.doesNotMatch(SRC, /void fetchPage\(next\)\.then/);
 });
 
 // ------------------------------------------------------------------ 4. rendering

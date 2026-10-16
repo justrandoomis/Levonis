@@ -127,6 +127,7 @@ export const S = {
   allStates: t('كل الحالات', 'All states', 'هەموو دۆخەکان'),
   search: t('بحث بالمعرّف أو العنوان', 'Search by handle or title', 'گەڕان بە ناسنامە یان ناونیشان'),
   loadMore: t('عرض المزيد', 'Show more', 'زیاتر پیشان بدە'),
+  loadMoreFailed: t('تعذّر تحميل المزيد. حاول مرة أخرى.', 'Could not load more. Try again.', 'نەتوانرا زیاتر بار بکرێت. دووبارە هەوڵ بدەرەوە.'),
   noItems: t('لا منتجات بهذه الحالة.', 'No products in this state.', 'هیچ بەرهەمێک لەم دۆخەدا نییە.'),
   attempts: t('المحاولات', 'Attempts', 'هەوڵەکان'),
   position: t('الترتيب', 'Position', 'ڕیزبەندی'),

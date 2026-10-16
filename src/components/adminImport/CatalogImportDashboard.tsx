@@ -147,7 +147,41 @@ export function readItems(raw: unknown): { items: ItemView[]; next: string } {
       live_url: safeUrl(i.live_url, ownSite),
     };
   });
-  return { items: items.filter((i) => i.id), next: str(r.next_cursor ?? r.cursor) };
+  return { items: items.filter((i) => i.id), next: cursorOf(r.next_cursor ?? r.cursor) };
+}
+
+/** The server's cursor: an opaque string, or the next item's queue position (step 6 answers a number). */
+const cursorOf = (v: unknown): string => (typeof v === 'number' && Number.isFinite(v) ? String(v) : str(v));
+
+export type ItemsPage = { items: ItemView[]; next: string };
+
+/**
+ * «عرض المزيد»: the next page, or `failed` — never a rejection nobody hears
+ * (a 500, a timeout, a dropped connection leaves the list and its button as
+ * they were, with a sentence beside the button, and a press tries again).
+ */
+export async function nextItemsPage(fetchPage: (cursor: string) => Promise<ItemsPage>, cursor: string): Promise<ItemsPage | { failed: true }> {
+  try {
+    return await fetchPage(cursor);
+  } catch {
+    return { failed: true };
+  }
+}
+
+/** The «عرض المزيد» button, busy while a page is on its way, with the failure said beside it. */
+export function MoreItems({ busy, failed, lang, onMore }: { busy: boolean; failed: boolean; lang: ImportLang; onMore: () => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3" data-import-more-row>
+      <button type="button" className={T.btnSecondary} data-import-more onClick={onMore} disabled={busy} aria-busy={busy || undefined}>
+        {tri(S.loadMore, lang)}
+      </button>
+      {failed ? (
+        <p role="alert" className="text-[13px] text-danger" data-import-more-failed>
+          {tri(S.loadMoreFailed, lang)}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 const isItemState = (s: string): s is ItemState => (ITEM_STATES as string[]).includes(s);
@@ -411,6 +445,7 @@ function ItemsPanel({ runId, lang }: { runId: string; lang: ImportLang }) {
   const [next, setNext] = useState('');
   const [status, setStatus] = useState<'loading' | 'ready' | 'failed' | 'absent'>('loading');
   const [open, setOpen] = useState<string>('');
+  const [more, setMore] = useState<'idle' | 'busy' | 'failed'>('idle');
 
   const fetchPage = useCallback(
     async (cursor: string, signal?: AbortSignal) => {
@@ -427,6 +462,7 @@ function ItemsPanel({ runId, lang }: { runId: string; lang: ImportLang }) {
   useEffect(() => {
     const ac = new AbortController();
     setStatus('loading');
+    setMore('idle');
     fetchPage('', ac.signal)
       .then((r) => {
         if (ac.signal.aborted) return;
@@ -501,19 +537,25 @@ function ItemsPanel({ runId, lang }: { runId: string; lang: ImportLang }) {
         </ul>
       )}
       {status === 'ready' && next ? (
-        <button
-          type="button"
-          className={T.btnSecondary}
-          data-import-more
-          onClick={() => {
-            void fetchPage(next).then((r) => {
+        <MoreItems
+          busy={more === 'busy'}
+          failed={more === 'failed'}
+          lang={lang}
+          onMore={() => {
+            // One page at a time: a second press while one is on its way would append it twice.
+            if (more === 'busy') return;
+            setMore('busy');
+            void nextItemsPage((cursor) => fetchPage(cursor), next).then((r) => {
+              if ('failed' in r) {
+                setMore('failed');
+                return;
+              }
               setItems((cur) => [...cur, ...r.items]);
               setNext(r.next);
+              setMore('idle');
             });
           }}
-        >
-          {tri(S.loadMore, lang)}
-        </button>
+        />
       ) : null}
       {open ? <ItemDetail id={open} lang={lang} onClose={() => setOpen('')} /> : null}
     </section>
