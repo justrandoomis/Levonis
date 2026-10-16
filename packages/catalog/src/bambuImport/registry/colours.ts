@@ -5,7 +5,16 @@
  * gives no facet token; it stays searchable by its own words. No hex is ever
  * derived from a name (§1 row 4, L-1).
  */
-import { tri, type Tri } from './labels';
+import type { Tri } from './labels';
+
+/*
+ * Its own three-word helper, not labels.ts's `tri`: the listing's filters read
+ * this table (facetVocabulary.ts) and the product page's knowledge tabs read
+ * labels.ts, both in lazy chunks. A runtime import here would make labels.ts a
+ * module the two share, which Rollup splits into a sub-1 KB chunk of its own
+ * (tests/motionLazy.test.ts counts them). A type import is erased.
+ */
+const tri = (ar: string, en: string, ckb: string): Tri => ({ ar, en, ckb });
 
 export type BaseColour =
   | 'black' | 'white' | 'grey' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple' | 'pink' | 'brown' | 'beige'
