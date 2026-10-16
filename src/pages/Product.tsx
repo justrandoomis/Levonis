@@ -2038,6 +2038,8 @@ export default function Product() {
         // and no window in which the badge and the note disagree.
         const items = Array.isArray(data.items) ? data.items : [];
         setCartLines(items);
+        // The answer IS the whole cart: the page now knows what every line holds.
+        setCartLinesLoaded(true);
         setShippingConflict(null);
         const chosen = chosenColourOf(product, relations, colorId, optionValueIds);
         if (chosen) {

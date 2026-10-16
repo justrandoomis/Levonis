@@ -58,6 +58,8 @@ test('D5: after a successful add and a Quick Buy success the quantity returns to
   const add = SRC.slice(SRC.indexOf('const postAddToCart = useCallback('), SRC.indexOf('const handleAddToCart'));
   assert.match(add, /if \(chosen\) \{[\s\S]*?setLastAdded\(\{ name: chosen\.name, qty, capped \}\);[\s\S]*?setQty\(1\);/);
   assert.match(add, /const capped = after > 0 && after < before \+ qty \? \{ after \} : null;/, 'a capped merge is said, never silent');
+  // The add's answer is the whole cart: a several-colours add right after it may send inCart.
+  assert.match(add, /setCartLines\(items\);\s*\/\/[^\n]*\n\s*setCartLinesLoaded\(true\);/);
   const quick = SRC.slice(SRC.indexOf('const runQuickBuy = useCallback('), SRC.indexOf('runQuickBuyRef.current = '));
   assert.match(quick, /if \(outcome\.kind === 'added' && chosenColourOf\(product, relations, colorId, optionValueIds\)\) \{\s*\/\/[^\n]*\n\s*setQty\(1\);/);
 });
