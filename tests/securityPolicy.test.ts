@@ -444,6 +444,17 @@ test('THE PAGE: the asset layer serves index.html, so the same policy is written
     // the asset layer with dist/_headers' policy, and every decoy answer carries
     // its own policy (no script at all), `no-store` and `noindex`. The property
     // this test protects is unchanged: the SPA is not moved behind the Worker.
+    //
+    // REVISITED FOR THE CATEGORY MAP AND THE COMMUNITY HOME (speed audit
+    // 2026-10-16): `/categories`, `/categories/*` and `/community` get the head
+    // start `/products` has — the main host's resolve answer, the page's chunk
+    // closure and its first read named in the document (worker/lib/socialPreview.ts
+    // `mainOpeningFor`) — because unlisted, a cold landing waited on resolve,
+    // then the chunks, then the catalogue read, one after another (≈1–1.4 s of
+    // phone LCP). Three named page families, still not the SPA: `/cart`, `/auth`,
+    // every admin screen and every built asset keep their policy from
+    // dist/_headers with the Worker nowhere in the request, and assetWithPreview
+    // keeps the asset's own headers (this CSP included) on these documents.
     for (const route of routes) {
       assert.ok(
         [
@@ -459,6 +470,9 @@ test('THE PAGE: the asset layer serves index.html, so the same policy is written
           '/store-icon/*',
           '/',
           '/products',
+          '/categories',
+          '/categories/*',
+          '/community',
           ...DECOY_WORKER_FIRST,
         ].includes(route),
         `${route} was added to run_worker_first without revisiting this test`
