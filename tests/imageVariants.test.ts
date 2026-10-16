@@ -290,7 +290,9 @@ test('never enlarged: w=1600 of a 1254 px original is a 1254 px copy; a copy wid
   const { bucket, fetchIt } = setup();
   const big = await fetchIt(`/files/${KEY}?w=1600`, AVIF);
   assert.deepEqual(dimsOf(new Uint8Array(await big.arrayBuffer())), { format: 'image/avif', width: 1254, height: 1254 });
-  assert.equal(bucket.objects.get(`variants/v1/${KEY}/w1600.avif`)!.custom!.width, '1254');
+  // Kept ONCE, in the place of the rung that is the picture at its own size (clampRung): ?w=1600 and ?w=1280 are one copy.
+  assert.equal(bucket.objects.get(`variants/v1/${KEY}/w1280.avif`)!.custom!.width, '1254');
+  assert.equal(bucket.objects.has(`variants/v1/${KEY}/w1600.avif`), false);
 
   const liar = imagesDouble('tooWide');
   const bad = setup({ images: liar });
@@ -308,7 +310,9 @@ test('every failure serves the original and stores nothing: no binding, a throw 
     assert.equal(res.status, 200);
     assert.equal(res.headers.get('Content-Type'), 'image/webp');
     assert.deepEqual(new Uint8Array(await res.arrayBuffer()), ORIGINAL);
-    assert.equal(res.headers.get('X-Variant-Source'), null);
+    // Without a binding the original goes as `/files/<key>` sends it; a failed cut says so (and this
+    // data centre keeps it an hour under the copy's address — tests/imageVariantFallback.test.ts).
+    assert.equal(res.headers.get('X-Variant-Source'), images ? 'original' : null);
     assert.deepEqual(bucket.keys('variants/'), [], `${images?.state.mode ?? 'no binding'}: nothing stored`);
   }
 });

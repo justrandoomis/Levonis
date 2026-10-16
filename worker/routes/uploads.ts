@@ -7,13 +7,12 @@ import {
   isConvertibleToWebp,
   negotiateVariantFormat,
   parseVariantWidth,
-  renderImageVariant,
   variantSourceMime,
   webpConversionAvailable,
   type ImageVariantFormat,
   type ImageVariantWidth,
 } from '../lib/imageConvert';
-import { bareEtag, readStoredVariant, scheduleVariantWarm, storeVariant, variantEtag } from '../lib/imageVariants';
+import { bareEtag, clampRung, cutVariant, readStoredVariant, scheduleVariantWarm, storeVariant, storedVariantFormat, variantEtag } from '../lib/imageVariants';
 import { isVariantStoreKey, variantEdgeUrl } from '../lib/variantKeys';
 import { Hono, type Context } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -21,7 +20,7 @@ import { requireAuth, badRequest, forbidden, notFound, oneOf, unavailable } from
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { recordStaffChatFileRead } from './chats';
-import { rasterDimensions, stripWebpMetadata, validRasterDimensions } from '../lib/imageMetadata';
+import { avifDimensions, rasterDimensions, stripWebpMetadata, validRasterDimensions } from '../lib/imageMetadata';
 import { mp4IsFastStart, sniffVideo } from '../lib/videoSniff';
 import { getSetting, type UploadLimits } from '../lib/settings';
 import {
@@ -893,6 +892,9 @@ async function peekStream(stream: ReadableStream<Uint8Array>, n: number): Promis
 /** How long a browser keeps a copy answered from the edge entry of before copies were kept. */
 const LEGACY_COPY_CACHE = 'public, max-age=3600';
 
+/** Enough of an original's first bytes for its size (a JPEG's frame follows up to 64 KB of EXIF). */
+const ORIGINAL_HEAD_BYTES = 64 * 1024;
+
 /**
  * AFTER THE RESPONSE: cut one copy from the stored original and keep it — in
  * R2 (put-if-absent) and in this data centre's edge under the current key.
@@ -919,13 +921,13 @@ async function cutAndKeepCopy(
   const sourceEtag = bareEtag(obj.httpEtag);
   if (!sourceEtag) return;
   const policy = publicMediaCacheControl(key, obj.httpMetadata?.cacheControl);
-  const out = await renderImageVariant(c.env, blob, { width, format });
+  const { outcome: out } = await cutVariant(c.env, async () => blob, { width, format }, { webpFallback: /image\/webp/i.test(c.req.header('Accept') ?? '') });
   if (!out.ok) {
     console.warn('image_variant_failed', JSON.stringify({ reason: out.reason, w: width, fmt: format.slice('image/'.length) }));
     return;
   }
   await storeVariant(c.env, { key, width, format, out, sourceEtag, cacheControl: policy });
-  const headers = variantHeaders(format, variantEtag(sourceEtag, width, format), policy);
+  const headers = variantHeaders(out.mime, variantEtag(sourceEtag, width, out.mime), policy);
   headers.set('Content-Length', String(out.bytes.byteLength));
   await cache.put(cacheKey, new Response(out.bytes, { headers }));
 }
@@ -950,11 +952,17 @@ async function cutAndKeepCopy(
  *   4. cut now from the original by the `IMAGES` binding, answered, and
  *      stored in R2 and the edge after the response.     X-Variant-Source: render
  *
- * A 304 is decided from the ETag before any pixel is touched. NOTHING HERE
- * CAN FAIL FOR THE VISITOR: without the binding, for an animated WebP, an
- * original too large for the binding, or when the binding refuses or answers
- * with anything but a verified copy no wider than asked, the original is
- * served exactly as `/files/<key>` would have — and nothing is stored.
+ * A 304 is decided from the ETag before any pixel is touched. A width past the
+ * picture's own is the picture at its own size (`clampRung`: `?w=1600` of a
+ * 1254 px photo is its `?w=1280`, kept once). A rung the binding cannot encode
+ * in AVIF is cut in WebP at the same size and kept in the AVIF place
+ * (`cutVariant`), so it is asked once, not by every request. NOTHING HERE CAN
+ * FAIL FOR THE VISITOR: without the binding, for an animated WebP, an original
+ * too large for the binding, or when the binding refuses or answers with
+ * anything but a verified copy no wider than asked, the original is served
+ * exactly as `/files/<key>` would have — nothing is stored in R2, and this data
+ * centre keeps that answer under the copy's address for an hour
+ * (X-Variant-Source: original), instead of asking the binding again.
  */
 async function serveImageVariant(
   c: Context<AppContext>,
@@ -974,6 +982,21 @@ async function serveImageVariant(
       // No execution context: serve the copy, skip the cache write.
     }
   };
+  /**
+   * NO COPY COULD BE HAD: the original, exactly as `/files/<key>` sends it —
+   * and kept in this data centre under this copy's address for an hour, so
+   * the next request is an edge hit instead of another failed cut (it used to
+   * ask the binding again, and fetch the original twice, on every request).
+   */
+  const keepOriginalAsCopy = (whole: Response): Response => {
+    const kept = new Response(whole.body, whole);
+    kept.headers.set('Cache-Control', LEGACY_COPY_CACHE);
+    kept.headers.set('X-Variant-Source', 'original');
+    cachePut(kept);
+    return kept;
+  };
+  /** The asker takes this format (a WebP kept in an AVIF place is only for a browser that takes WebP). */
+  const acceptsWebp = (f: ImageVariantFormat): boolean => f !== 'image/webp' || /image\/webp/i.test(c.req.header('Accept') ?? '');
 
   // 1. The edge.
   if (cache) {
@@ -990,9 +1013,14 @@ async function serveImageVariant(
 
   // 2. The copy kept in R2.
   let stale = false;
-  const stored = await readStoredVariant(c.env, key, width, format);
+  const inR2 = await readStoredVariant(c.env, key, width, format);
+  // A WebP kept in the AVIF place, for a browser that takes no WebP: not this asker's copy (and not stale).
+  const stored = inR2 && acceptsWebp(storedVariantFormat(inR2, format)) ? inR2 : null;
+  if (inR2 && !stored) void inR2.body.cancel().catch(() => undefined);
   if (stored) {
     const sourceEtag = stored.customMetadata?.src_etag ?? '';
+    // A rung the binding could not cut in AVIF is kept in WebP in the AVIF place (`cutVariant`): served as what it is.
+    const storedFormat = storedVariantFormat(stored, format);
     let usable = sourceEtag !== '';
     let policy = publicMediaCacheControl(key);
     if (isRewritableMediaKey(key)) {
@@ -1006,7 +1034,7 @@ async function serveImageVariant(
       policy = publicMediaCacheControl(key, head.httpMetadata?.cacheControl);
     }
     if (usable) {
-      const headers = variantHeaders(format, variantEtag(sourceEtag, width, format), policy);
+      const headers = variantHeaders(storedFormat, variantEtag(sourceEtag, width, storedFormat), policy);
       headers.set('Content-Length', String(stored.size));
       if (ifNoneMatch && ifNoneMatch === headers.get('etag')) {
         void stored.body.cancel().catch(() => undefined);
@@ -1069,37 +1097,65 @@ async function serveImageVariant(
     void original.body?.cancel().catch(() => undefined);
     return new Response(null, { status: 304, headers });
   }
-  // More than the binding takes in one call: the original, untouched.
-  if (Number(original.headers.get('Content-Length')) > IMAGES_MAX_INPUT_BYTES || !original.body) return original;
-  let body = original.body as ReadableStream<Uint8Array>;
-  if (sourceMime === 'image/webp') {
-    // An animated WebP keeps its frames: a resize would keep one.
-    const peeked = await peekStream(body, 32);
-    body = peeked.stream;
-    if (isAnimatedWebp(peeked.head)) {
-      const whole = new Response(body, { headers: original.headers });
-      cachePut(whole);
-      return whole;
+  // More than the binding takes in one call: the original, untouched — kept under this copy's address a while.
+  if (Number(original.headers.get('Content-Length')) > IMAGES_MAX_INPUT_BYTES || !original.body) return keepOriginalAsCopy(original);
+  // The original's first bytes: whether it is animated, and how wide it is.
+  const peeked = await peekStream(original.body as ReadableStream<Uint8Array>, ORIGINAL_HEAD_BYTES);
+  // An animated WebP keeps its frames: a resize would keep one.
+  if (sourceMime === 'image/webp' && isAnimatedWebp(peeked.head)) {
+    const whole = new Response(peeked.stream, { headers: original.headers });
+    cachePut(whole);
+    return whole;
+  }
+  const dims = sourceMime === 'image/avif' ? avifDimensions(peeked.head) : rasterDimensions(peeked.head, sourceMime);
+  const sourceWidth = validRasterDimensions(dims) ? dims.width : null;
+  // PAST THE PICTURE'S OWN SIZE the copy is the picture at its own size (`clampRung`): `?w=1600` of a
+  // 1254 px photo is its `?w=1280`, read from R2 when it is kept, cut and kept once when it is not.
+  const rung = clampRung(width, sourceWidth);
+  if (rung !== width) {
+    const kept = await readStoredVariant(c.env, key, rung, format);
+    const keptFormat = kept ? storedVariantFormat(kept, format) : format;
+    if (kept && kept.customMetadata?.src_etag === sourceEtag && acceptsWebp(keptFormat) && !isRewritableMediaKey(key)) {
+      void peeked.stream.cancel().catch(() => undefined);
+      const keptHeaders = variantHeaders(keptFormat, variantEtag(sourceEtag, rung, keptFormat), policy);
+      keptHeaders.set('Content-Length', String(kept.size));
+      if (ifNoneMatch && ifNoneMatch === keptHeaders.get('etag')) {
+        void kept.body.cancel().catch(() => undefined);
+        return new Response(null, { status: 304, headers: keptHeaders });
+      }
+      keptHeaders.set('X-Variant-Source', 'r2');
+      const res = new Response(kept.body, { headers: keptHeaders });
+      cachePut(res);
+      return res;
     }
+    if (kept) void kept.body.cancel().catch(() => undefined);
   }
 
-  const rendered = await renderImageVariant(c.env, body, { width, format });
+  // The first attempt reads the stream already open; a WebP retry reads the original again (its edge copy).
+  let reads = 0;
+  const { outcome: rendered } = await cutVariant(
+    c.env,
+    async () => (reads++ === 0 ? peeked.stream : ((await loadPublicOriginal(c, key, cache))?.body as ReadableStream<Uint8Array> | null) ?? null),
+    { width: rung, format, sourceWidth },
+    { webpFallback: acceptsWebp('image/webp') }
+  );
   if (!rendered.ok) {
     // The picture defeated the converter (or the binding is gone mid-flight):
     // serve the stored file. The first read was consumed by the attempt. No
     // key and no metadata in the log line — a reason, a width and a format.
-    console.warn('image_variant_failed', JSON.stringify({ reason: rendered.reason, w: width, fmt: format.slice('image/'.length) }));
+    console.warn('image_variant_failed', JSON.stringify({ reason: rendered.reason, w: rung, fmt: format.slice('image/'.length) }));
     const again = await loadPublicOriginal(c, key, cache);
     if (!again) throw notFound();
-    return again;
+    return keepOriginalAsCopy(again);
   }
-  headers.set('Content-Length', String(rendered.bytes.byteLength));
-  headers.set('X-Variant-Source', 'render');
-  const res = new Response(rendered.bytes, { headers });
+  const out = variantHeaders(rendered.mime, variantEtag(sourceEtag, rung, rendered.mime), policy);
+  out.set('Content-Length', String(rendered.bytes.byteLength));
+  out.set('X-Variant-Source', 'render');
+  const res = new Response(rendered.bytes, { headers: out });
   if (sourceEtag) {
     try {
       c.executionCtx.waitUntil(
-        storeVariant(c.env, { key, width, format, out: rendered, sourceEtag, cacheControl: policy, replace: stale }).catch((error) => {
+        storeVariant(c.env, { key, width: rung, format, out: rendered, sourceEtag, cacheControl: policy, replace: stale && rung === width }).catch((error) => {
           console.warn('image_variant_store_failed', error instanceof Error ? error.name : 'unknown');
         })
       );
@@ -1109,6 +1165,7 @@ async function serveImageVariant(
   }
   cachePut(res);
   return res;
+
 }
 
 /**

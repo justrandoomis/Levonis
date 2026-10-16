@@ -45,6 +45,7 @@ import {
   variantExtension,
   variantSourceMime,
   type ImageVariantFormat,
+  type VariantOutcome,
 } from './imageConvert';
 import { avifDimensions, rasterDimensions, validRasterDimensions, type RasterDimensions } from './imageMetadata';
 import {
@@ -97,19 +98,75 @@ export function variantMetadata(input: {
   sourceEtag: string;
   width: number;
   format: ImageVariantFormat;
-  out: RasterDimensions;
+  out: RasterDimensions & { mime?: ImageVariantFormat };
   version?: number;
 }): Record<string, string> {
+  // The format of the BYTES: a rung the binding could not cut in AVIF is kept, in WebP, in its AVIF place (`cutVariant`).
+  const bytesFormat = input.out.mime ?? input.format;
   return {
     src: input.key,
     src_etag: input.sourceEtag,
     w: String(input.width),
     width: String(input.out.width),
     height: String(input.out.height),
-    fmt: variantExtension(input.format),
-    q: String(VARIANT_QUALITY[input.format] ?? ''),
+    fmt: variantExtension(bytesFormat),
+    q: String(VARIANT_QUALITY[bytesFormat] ?? ''),
     ver: String(input.version ?? VARIANT_STORE_VERSION),
   };
+}
+
+/** The format of a stored copy's bytes: its `fmt`, else the format of the place it is kept in. */
+export function storedVariantFormat(stored: Pick<R2Object, 'customMetadata'>, slot: ImageVariantFormat): ImageVariantFormat {
+  const fmt = stored.customMetadata?.fmt;
+  return fmt === 'webp' ? 'image/webp' : fmt === 'avif' ? 'image/avif' : fmt === 'jpg' ? 'image/jpeg' : fmt === 'png' ? 'image/png' : slot;
+}
+
+/**
+ * THE RUNG A REQUEST NEEDS FROM AN ORIGINAL THIS WIDE: the one asked for, or —
+ * past the picture's own size — the first rung at or above it (`rungsFor`'s
+ * last), whose copy IS the picture at its own size. `?w=1600` of a 1254 px
+ * photo is its `?w=1280`: the same bytes, kept once. An unknown width clamps nothing.
+ */
+export function clampRung(asked: ImageVariantWidth, sourceWidth: number | null | undefined): ImageVariantWidth {
+  const rungs = rungsFor(sourceWidth);
+  const top = rungs[rungs.length - 1];
+  return top !== undefined && asked > top ? top : asked;
+}
+
+/**
+ * ONE RUNG, IN THE FORMAT ASKED — OR, WHERE THE BINDING CANNOT ENCODE THAT
+ * PICTURE IN AVIF AT THAT SIZE, IN WEBP (speed audit 2026-10-16, «?w=1280 and
+ * ?w=1600 return the untouched original»).
+ *
+ * Seen live: the binding answers no AVIF for a large picture at a large rung —
+ * a 1254² photo at its own size, a 2992² one at 1280 and 1600 — while a
+ * 1920×1080 at 1280 and every rung up to 1080 are fine, and the same rung in
+ * WebP is fine too (89.5 KB against a 146 KB original). The copy was refused,
+ * the ORIGINAL served, nothing kept, and the binding asked again by every
+ * request and every sweep pass, which marked the whole picture unreadable.
+ * Now that rung is cut in WebP at its full size — only the codec changes, never
+ * the pixels the visitor gets — and kept in the AVIF place (`fmt: webp` and its
+ * own Content-Type), so no request and no sweep asks the binding for it again.
+ * `webpFallback` only when the asker takes WebP (every AVIF browser does).
+ *
+ * `source` is called once per attempt: a Blob is read afresh, a stream is
+ * fetched again (the route re-reads the original from its edge copy).
+ */
+export async function cutVariant(
+  env: Pick<Env, 'IMAGES'>,
+  source: () => Promise<Blob | Uint8Array | ReadableStream<Uint8Array> | null>,
+  variant: { width: ImageVariantWidth; format: ImageVariantFormat; sourceWidth?: number | null },
+  options: { webpFallback?: boolean } = {}
+): Promise<{ outcome: VariantOutcome; attempts: number }> {
+  const first = await source();
+  if (!first) return { outcome: { ok: false, reason: 'failed', detail: 'the original is gone' }, attempts: 0 };
+  const outcome = await renderImageVariant(env, first, variant);
+  // Only an answer in the wrong format: a refusal, an HTTP error or a throw (9412, 9422) is the picture's or the binding's.
+  if (outcome.ok || outcome.reason !== 'failed' || !outcome.unencodable || variant.format !== 'image/avif' || !options.webpFallback) return { outcome, attempts: 1 };
+  const again = await source();
+  if (!again) return { outcome, attempts: 1 };
+  const webp = await renderImageVariant(env, again, { ...variant, format: 'image/webp' });
+  return { outcome: webp.ok ? webp : outcome, attempts: 2 };
 }
 
 /** One stored copy, or null when there is none (or the bucket could not be read: the caller cuts instead). */
@@ -140,7 +197,8 @@ export async function storeVariant(
     key: string;
     width: ImageVariantWidth;
     format: ImageVariantFormat;
-    out: { bytes: Uint8Array; width: number; height: number };
+    /** The bytes; `mime` when they are not in the place's own format (a WebP kept in the AVIF place). */
+    out: { bytes: Uint8Array; width: number; height: number; mime?: ImageVariantFormat };
     sourceEtag: string;
     cacheControl: string;
     replace?: boolean;
@@ -152,7 +210,7 @@ export async function storeVariant(
   if (!isSafeMediaKey(vkey)) return false;
   const written = await mediaBucket(env, 'public').put(vkey, input.out.bytes, {
     ...(input.replace ? {} : { onlyIf: { etagDoesNotMatch: '*' } }),
-    httpMetadata: { contentType: input.format, cacheControl: input.cacheControl },
+    httpMetadata: { contentType: input.out.mime ?? input.format, cacheControl: input.cacheControl },
     customMetadata: variantMetadata({ ...input, version }),
   });
   return written !== null;
@@ -269,7 +327,7 @@ export async function warmImageVariants(env: VariantEnv, input: VariantWarmInput
     const worker = async (most = Infinity) => {
       for (let n = 0; n < most && queue.length; n++) {
         const rung = queue.shift()!;
-        const out = await renderImageVariant(env, source, { width: rung, format: 'image/avif', sourceWidth: width });
+        const { outcome: out } = await cutVariant(env, async () => source, { width: rung, format: 'image/avif', sourceWidth: width }, { webpFallback: true });
         if (!out.ok) {
           report.failed += 1;
           console.warn('image_variant_warm_failed', JSON.stringify({ reason: out.reason, w: rung }));
@@ -536,7 +594,11 @@ export async function sweepImageVariants(
             report.transforms += 1;
             inFlight += 1;
             try {
-              const out = await renderImageVariant(env, blob, { width: rung, format: 'image/avif', sourceWidth: width });
+              // A rung the binding cannot cut in AVIF is cut in WebP (`cutVariant`): only a picture it can
+              // cut in NEITHER is the picture's failure — before, the top rung of every large photo marked
+              // the whole picture unreadable and was never made.
+              const { outcome: out, attempts } = await cutVariant(env, async () => blob, { width: rung, format: 'image/avif', sourceWidth: width }, { webpFallback: true });
+              report.transforms += Math.max(0, attempts - 1);
               if (!out.ok) {
                 console.warn('image_variant_sweep_failed', JSON.stringify({ reason: out.reason, w: rung }));
                 // Asked once per picture, however many cuts were in flight.

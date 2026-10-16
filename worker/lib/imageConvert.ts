@@ -602,8 +602,13 @@ export type VariantOutcome =
   | { ok: true; bytes: Uint8Array; mime: ImageVariantFormat; width: number; height: number }
   /** No binding on this deployment: the caller serves the original. */
   | { ok: false; reason: 'unavailable' }
-  /** The binding is there and the image defeated it: the caller serves the original. */
-  | { ok: false; reason: 'failed'; detail: string };
+  /**
+   * The binding is there and the image defeated it: the caller serves the original.
+   * `unencodable`: it answered, with something other than a valid copy in the format
+   * asked — what it does for an AVIF it will not encode (a large picture at a large
+   * rung); the same rung in another format may still be had (imageVariants.ts `cutVariant`).
+   */
+  | { ok: false; reason: 'failed'; detail: string; unencodable?: true };
 
 /**
  * The size of a copy, read from its own bytes — or null when the bytes are not
@@ -659,7 +664,7 @@ export async function renderImageVariant(
       tooLargeMessage: `A copy exceeds the ${VARIANT_MAX_BYTES} byte limit`,
     });
     const dimensions = verifyVariantBytes(bytes, variant.format);
-    if (!dimensions) return { ok: false, reason: 'failed', detail: `the converter returned no valid ${variant.format}` };
+    if (!dimensions) return { ok: false, reason: 'failed', detail: `the converter returned no valid ${variant.format}`, unencodable: true };
     const limit = Math.min(variant.width, variant.sourceWidth && variant.sourceWidth > 0 ? variant.sourceWidth : Infinity);
     if (dimensions.width > limit) {
       return { ok: false, reason: 'failed', detail: `the copy is ${dimensions.width} px wide, over ${limit}` };
