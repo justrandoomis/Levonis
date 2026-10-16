@@ -911,6 +911,34 @@ test('close with end-of-queue holds: the held items are not open work; /run/fini
   }
 });
 
+test('close with two end-of-queue holds: neither is open work, /run/finish closes partial and names both', async () => {
+  const fb = '6945416380552';
+  // Both held and still queued (the queue never reached them).
+  const both = new World({ holds: { 'filament-buffer': 'ORDER_TYPE_WORD', 'ams-2-pro': 'OWNER_HIDDEN' } });
+  try {
+    assert.equal(await both.importer({ mode: 'close' }).main(), 0, both.logLines.join('\n'));
+    assert.ok(both.logLines.some((l) => /run status: 0 complete, 0 blocked, 0 withdrawn, 2 held by the manifest, 0 remaining/.test(l)), both.logLines.join('\n'));
+    assert.equal(callsTo(both, /\/run\/finish$/).length, 1);
+    assert.ok(both.logLines.some((l) => /run finished: state partial/.test(l)));
+    assert.ok(!both.logLines.some((l) => /QUEUE_NOT_EMPTY/.test(l)));
+    const summary = readFileSync(both.summaryFile, 'utf8');
+    assert.match(summary, /- HELD `filament-buffer` ORDER_TYPE_WORD/);
+    assert.match(summary, /- HELD `ams-2-pro` OWNER_HIDDEN/);
+  } finally {
+    both.dispose();
+  }
+  // The Worker's own shape: the first hold blocked at its turn, the second kept queued by the in-flight index.
+  const turn = new World({ items: { [fb]: { state: 'BLOCKED', blocker_code: 'OWNER_HIDDEN' } }, holds: { 'filament-buffer': 'OWNER_HIDDEN', 'ams-2-pro': 'ORDER_TYPE_WORD' } });
+  try {
+    assert.equal(await turn.importer({ mode: 'close' }).main(), 0, turn.logLines.join('\n'));
+    assert.ok(turn.logLines.some((l) => /run status: 0 complete, 1 blocked, 0 withdrawn, 1 held by the manifest, 0 remaining/.test(l)), turn.logLines.join('\n'));
+    assert.ok(turn.logLines.some((l) => /run finished: state partial/.test(l)));
+    assert.match(readFileSync(turn.summaryFile, 'utf8'), /- HELD `ams-2-pro` ORDER_TYPE_WORD/);
+  } finally {
+    turn.dispose();
+  }
+});
+
 test('/lease refuses a queued item while another is in flight (409): the runner reads the status again and goes on, nothing blocks', async () => {
   const first = '6945416380552';
   const w = new World({ items: { [first]: { state: 'RETRYING', last_completed: 'ENRICHING', retry_at: '2026-10-16T07:00:00.000Z', stage_attempts: 1 } } });
