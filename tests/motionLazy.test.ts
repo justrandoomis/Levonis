@@ -107,7 +107,7 @@ const files = () => readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
 const chunk = (re: RegExp) => files().find((f) => re.test(f));
 const initial = () => staticClosure(entryFromHtml(readFileSync(join(DIST, 'index.html'), 'utf8'))!);
 
-test('the animation features are their own lazy chunk, never a static import of the entry; the core stays', () => {
+test('the animation features are their own lazy chunk, never a static import of the entry; nor, now, the core', () => {
   const features = chunk(/^vendor-motion-(?!core-)/);
   const core = chunk(/^vendor-motion-core-/);
   const bundle = chunk(/^motionFeaturesBundle-/);
@@ -117,7 +117,13 @@ test('the animation features are their own lazy chunk, never a static import of 
   const closure = initial();
   assert.equal(closure.has(features!), false, `${features} is in the initial payload — an eager module renders \`motion.*\` (or imports \`useReducedMotion\`) from 'motion/react' again`);
   assert.equal(closure.has(bundle!), false, `${bundle} is a STATIC import of the entry`);
-  assert.ok(closure.has(core!), `${core} is not in the initial payload — the eager primitives no longer use m/AnimatePresence at all?`);
+  // THE CORE LEFT THE FIRST PAINT TOO (speed audit 2026-10-16): the busy
+  // scrim and the update line fade with the Web Animations API
+  // (src/lib/presenceFade.ts), the shell asks for the features through a
+  // dynamic import (src/lib/motionFeaturesPrefetch.ts) and the rails import
+  // their spring on first use (src/lib/motionAnimate.ts) — 31.7 KB gzip off
+  // every first visit. The pages that animate bring it in their own closure.
+  assert.equal(closure.has(core!), false, `${core} is in the initial payload again — an entry module imports from 'motion/react' or 'motion/react-m', or <MotionFeatures> statically`);
   // The lazy bundle must reach the features, or nothing ever animates.
   assert.ok(staticClosure(bundle!).has(features!), 'the features bundle does not import vendor-motion — LazyMotion would load nothing');
   const sizes = { features: gz(join(ASSETS, features!)), core: gz(join(ASSETS, core!)) };
@@ -191,6 +197,25 @@ test('the sources keep the shape: a media query for reduced motion, m.* under <M
       assert.match(src, /<MotionFeatures>/, `${f} renders m.* elements with no <MotionFeatures> provider — they would never animate`);
     }
   }
+  // THE ENTRY'S MODULES CARRY NO ANIMATION LIBRARY (speed audit 2026-10-16).
+  for (const f of ['src/components/ui/AppBusy.tsx', 'src/components/pwa/UpdateReadyToast.tsx', 'src/lib/useRail.ts', 'src/App.tsx', 'src/components/search/LiveSearch.tsx', 'src/lib/motionFeaturesPrefetch.ts']) {
+    const src = read(f);
+    assert.doesNotMatch(src, /^import (?!type\b)[^;]*from 'motion\//m, `${f} imports the animation library — it is in the entry`);
+    assert.doesNotMatch(src, /^import (?!type\b)[^;]*from '[./]*(?:lib\/)?motionFeatures';/m, `${f} imports <MotionFeatures> statically — it would bring the core into the entry`);
+  }
+  assert.match(read('src/lib/motionFeaturesPrefetch.ts'), /void import\('\.\/motionFeatures'\)\s*\.then\(\(mod\) => mod\.preloadMotionFeatures\(\)\)/);
+  assert.match(read('src/App.tsx'), /import \{ preloadMotionFeatures \} from '\.\/lib\/motionFeaturesPrefetch';/);
+  assert.match(read('src/components/search/LiveSearch.tsx'), /import \{ preloadMotionFeatures \} from '\.\.\/\.\.\/lib\/motionFeaturesPrefetch';/);
+  // The rails' spring: a dynamic import on the first press or arrow, from idle after the first screen.
+  const rail = read('src/lib/useRail.ts');
+  assert.match(rail, /loadingSpring \?\?= import\('\.\/motionAnimate'\)/);
+  assert.match(rail, /const cancelIdleSpring = allowsSpeculativeLoads\(\)\s*\? afterCriticalPaint\(/);
+  // The two doors ride with the core (no tiny chunks of their own), and the
+  // dynamic-import helper with React — never swallowed into the core.
+  const vite = read('vite.config.ts');
+  assert.match(vite, /\(\?:motionFeatures\\\.tsx\|motionAnimate\\\.ts\)\$\/\.test\(id\)\) return 'vendor-motion-core';/);
+  assert.match(vite, /if \(\/vite\\\/preload-helper\/\.test\(id\)\) return 'vendor-react';/);
+
   const features = read('src/lib/motionFeatures.tsx');
   assert.match(features, /import\('\.\/motionFeaturesBundle'\)/, 'the features are a dynamic import');
   assert.match(features, /<LazyMotion features=\{loaded \?\? quietLoader\}>/, 'once loaded, the bundle is passed synchronously');
@@ -199,7 +224,7 @@ test('the sources keep the shape: a media query for reduced motion, m.* under <M
   assert.match(features, /function quietLoader\(\): Promise<FeatureBundle> \{\s*return loadMotionFeatures\(\)\.catch\(\(\) => new Promise<FeatureBundle>\(\(\) => \{\}\)\);/, "LazyMotion's loader must not reject (it has no catch)");
   assert.match(features, /export function useMotionFeaturesFailed\(\): boolean \{\s*return React\.useSyncExternalStore\(subscribe, readFailed, readServer\);/);
   assert.match(features, /\.catch\(\(err: unknown\) => \{\s*loading = null;\s*setFailed\(true\);/, 'a failure sets the flag and lets the next mount retry');
-  for (const f of ['src/components/ui/Overlay.tsx', 'src/components/ui/Toast.tsx', 'src/components/ui/AppBusy.tsx', 'src/components/pwa/UpdateReadyToast.tsx', 'src/components/search/LiveSearchPanel.tsx', 'src/components/ui/Note.tsx']) {
+  for (const f of ['src/components/ui/Overlay.tsx', 'src/components/ui/Toast.tsx', 'src/components/search/LiveSearchPanel.tsx', 'src/components/ui/Note.tsx']) {
     const src = read(f);
     assert.match(src, /useMotionFeaturesFailed\(\)/, `${f} does not ask whether the features failed`);
     const initials = [...src.matchAll(/^\s*initial=\{([^\n]*)\}\s*$/gm)].map((m) => m[1]);

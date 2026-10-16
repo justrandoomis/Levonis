@@ -5,7 +5,7 @@ import { useLanguage } from '../../LanguageContext';
 import { api, ApiError, type ApiProduct, type ProductsListResponse } from '../../lib/api';
 import { productMainImage } from '../../lib/productImage';
 import { useTheme } from '../../lib/theme';
-import { preloadMotionFeatures } from '../../lib/motionFeatures';
+import { preloadMotionFeatures } from '../../lib/motionFeaturesPrefetch';
 import SafeImage from '../ui/SafeImage';
 import { Skeleton } from '../ui/Skeleton';
 import { acceptOnChange, acceptOnKey, ghostFor, ghostLayers, liveQuery, stepActive, textDirection } from './ghost';

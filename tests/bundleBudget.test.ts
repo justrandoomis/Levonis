@@ -50,7 +50,7 @@ const KB = 1024;
  * 60 KB, and the budget is re-cut to 120 KB: comfortable headroom for ordinary
  * work, tight enough that re-eagering a page is caught the same day.
  */
-const ENTRY_BUDGET = 72 * KB;
+const ENTRY_BUDGET = 68 * KB; // 72 → 68 (speed audit 2026-10-16: 62.8 KB measured)
 /** §10: any single route chunk. */
 const CHUNK_BUDGET = 250 * KB;
 /**
@@ -71,7 +71,16 @@ const CHUNK_BUDGET = 250 * KB;
  * 1.6 KB) still fits, so the guard is the pair of «never in the initial
  * payload» lists below, which name them; the number catches the next page.
  */
-const INITIAL_BUDGET = 200 * KB;
+/*
+ * SPEED AUDIT 2026-10-16: the animation library's core (`vendor-motion-core`,
+ * 31.7 KB) left the first paint — the busy scrim and the update line fade with
+ * the Web Animations API, the shell asks for the features through a dynamic
+ * import and the rails import their spring on first use. 179.6 KB over four
+ * files before, 148.1 KB over three after; the budget is re-cut to the
+ * measured number plus ~8 %: 160 KB. `vendor-motion-core` is on the
+ * «never in the initial payload» list below.
+ */
+const INITIAL_BUDGET = 160 * KB;
 /** Existing/public stylesheets; the entry's is downloaded before first paint. */
 const CSS_BUDGET = 60 * KB;
 /**
@@ -278,6 +287,8 @@ test('the initial payload — the entry plus everything it STATICALLY imports �
   for (const lazyOnly of [
     'vendor-charts', 'vendor-qr', 'vendor-webgl', 'Bundles', 'BundleDetail', 'BundlesShelf',
     'vendor-icons', 'NotificationBell', 'EmailVerifyBanner', 'CompleteProfileSheet', 'ThemeIntroSheet', 'tierMeta', 'LiveSearchPanel', 'motionFeaturesBundle',
+    // Speed audit 2026-10-16: the core too (see INITIAL_BUDGET).
+    'vendor-motion-core',
   ]) {
     const found = [...seen].find((f) => f.startsWith(`${lazyOnly}-`));
     assert.equal(
@@ -443,6 +454,15 @@ function staticClosure(start: string): Set<string> {
   return seen;
 }
 
+/**
+ * THE PRODUCT PAGE'S OPENING, ALL OF IT (speed audit 2026-10-16): the page's
+ * chunk and everything it statically imports, the shared vendors included —
+ * what a cold landing on /product/:slug downloads before the page renders
+ * (the Worker modulepreloads it, worker/lib/socialPreview.ts). Measured
+ * 257.0 KB after `vendor-motion` (15.7 KB) left it; ~3 % over that.
+ */
+const PRODUCT_OPENING_BUDGET = 265 * KB;
+
 test('opening a product excludes below-fold reviews, closed purchase dialogs, refusal translations, the price-request panel and the knowledge tabs', () => {
   const files = readdirSync(ASSETS).filter((file) => file.endsWith('.js'));
   const product = files.find((file) => file.startsWith('Product-'));
@@ -450,6 +470,12 @@ test('opening a product excludes below-fold reviews, closed purchase dialogs, re
   const opening = staticClosure(product!);
   const bytes = [...opening].reduce((sum, file) => sum + gz(join(ASSETS, file)), 0);
   console.log(`bundle: product opening ${kb(bytes)} gzip (complete static closure)`);
+  assert.ok(bytes <= PRODUCT_OPENING_BUDGET, `the product page's opening is ${kb(bytes)} gzip, over ${kb(PRODUCT_OPENING_BUDGET)}`);
+  // The Worker modulepreloads at most 24 files of a route's closure beyond the entry (socialPreview.ts chunkPreloads):
+  // a 25th is discovered only when its importer has been parsed.
+  const entryClosure = staticClosure(entryFromHtml(readFileSync(join(DIST, 'index.html'), 'utf8'))!);
+  const beyondEntry = [...opening].filter((f) => !entryClosure.has(f));
+  assert.ok(beyondEntry.length <= 24, `the product opening is ${beyondEntry.length} files beyond the entry; the document preloads 24`);
   // «طلب السعر» (DECISIONS row 240) is mounted only for a product or selection with no price: a priced page never pays for it.
   // The Bambu import spec §G.6: the knowledge tabs (specifications, documents …) load near the viewport, never with the page.
   for (const name of ['ReviewSection', 'CheaperElsewhereSheet', 'GiniInstalmentsSheet', 'refusalStrings', 'PriceRequestPanel', 'ProductKnowledgeTabs']) {
@@ -493,7 +519,11 @@ test('the storefront owns at most 47 KB gzip and its complete app payload stays 
   // P4: the speed tab's «ثابت للتطبيق» row (worker/lib/storeSpeed.ts STOREFRONT_FIXED_KB) IS this
   // measurement — the initial payload plus the storefront pages' own closure — so the number a
   // merchant is shown cannot drift from the build by more than 3 KB.
-  const fixedBytes = [...initial].reduce((sum, f) => sum + gz(join(ASSETS, f)), 0) + appTotal;
+  // The animation library's core left the initial payload (speed audit
+  // 2026-10-16) but the store pages still render `m.*`, so it is in their own
+  // closure now: a store visitor downloads it as before, and the figure counts it.
+  const storeCore = vendor.filter((f) => f.startsWith('vendor-motion-core-')).reduce((sum, f) => sum + gz(join(ASSETS, f)), 0);
+  const fixedBytes = [...initial].reduce((sum, f) => sum + gz(join(ASSETS, f)), 0) + appTotal + storeCore;
   assert.ok(fixedBytes <= STOREFRONT_APP_BUDGET,
     `the storefront app payload, including all shared UI, is ${kb(fixedBytes)}, over ${kb(STOREFRONT_APP_BUDGET)}`);
   const fixed = fixedBytes / KB;

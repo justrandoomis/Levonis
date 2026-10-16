@@ -46,10 +46,11 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
-// `animate` alone: the value animator is the small half of the library; the
-// reduced-motion question is a media query (src/lib/motion.ts), not a reason
-// to import the feature bundle before the first paint.
-import { animate } from 'motion/react';
+// The value animator is a chunk of its own (./motionAnimate.ts), asked for on
+// the first press or arrow and from idle — never part of the first download;
+// the reduced-motion question is a media query (src/lib/motion.ts).
+import type { ValueSpring } from './motionAnimate';
+import { afterCriticalPaint, allowsSpeculativeLoads } from './afterCriticalPaint';
 import {
   project,
   nearestSnap,
@@ -59,6 +60,53 @@ import {
   SPRING,
   usePrefersReducedMotion,
 } from './motion';
+
+// --------------------------------------------------------------- the spring
+
+type SpringValue = (from: number, to: number, options: ValueSpring) => { stop: () => void };
+let springValue: SpringValue | null = null;
+let loadingSpring: Promise<SpringValue> | null = null;
+
+/** The animator, fetched once per page; a failed fetch is retried on the next ask. */
+export function loadRailSpring(): Promise<SpringValue> {
+  if (springValue) return Promise.resolve(springValue);
+  loadingSpring ??= import('./motionAnimate')
+    .then((mod) => (springValue = mod.default))
+    .catch((err: unknown) => {
+      loadingSpring = null;
+      throw err;
+    });
+  return loadingSpring;
+}
+
+/**
+ * A spring from wherever the rail is to `to`: at once when the animator is in
+ * memory (the usual case — it is fetched from idle and on the press), else as
+ * soon as it lands, from wherever the rail is THEN. If it cannot be fetched
+ * the rail is set at `to` without the spring: where it lands never depends on
+ * a chunk.
+ */
+function runSpring(from: () => number, to: number, options: ValueSpring, land: (to: number) => void): { stop: () => void } {
+  if (springValue) return springValue(from(), to, options);
+  let stopped = false;
+  let running: { stop: () => void } | null = null;
+  loadRailSpring().then(
+    (spring) => {
+      if (!stopped) running = spring(from(), to, options);
+    },
+    () => {
+      if (stopped) return;
+      land(to);
+      options.onComplete?.();
+    }
+  );
+  return {
+    stop: () => {
+      stopped = true;
+      running?.stop();
+    },
+  };
+}
 
 // --------------------------------------------------------------- direction
 
@@ -225,12 +273,12 @@ export function useRail(options: RailOptions = {}): Rail {
       return;
     }
     animRef.current?.stop();
-    animRef.current = animate(readPos(el, rtl), target, {
+    animRef.current = runSpring(() => readPos(el, rtl), target, {
       type: 'spring',
       bounce: 0,
       duration: SPRING.ui.duration,
       onUpdate: (p: number) => writePos(el, p, rtl),
-    });
+    }, (p) => writePos(el, p, rtl));
   }, []);
 
   const ref = useCallback((node: HTMLDivElement | null) => {
@@ -335,6 +383,8 @@ export function useRail(options: RailOptions = {}): Rail {
     const onPointerDown = (e: PointerEvent) => {
       if (!optsRef.current.drag || e.pointerType !== 'mouse' || e.button !== 0) return;
       if (!isLive()) return;
+      // The release will want the spring; a drag outlasts its fetch.
+      void loadRailSpring().catch(() => {});
       animRef.current?.stop();
       animRef.current = null;
       const rtl = getComputedStyle(el).direction === 'rtl';
@@ -437,7 +487,7 @@ export function useRail(options: RailOptions = {}): Rail {
       // land without bounce; an interior landing keeps the thrown feel.
       const atWall = target <= 0.5 || target >= max - 0.5;
       const spring = atWall ? SPRING.ui : SPRING.momentum;
-      animRef.current = animate(readPos(el, rtl), target, {
+      animRef.current = runSpring(() => readPos(el, rtl), target, {
         type: 'spring',
         bounce: spring.bounce,
         duration: spring.duration,
@@ -450,7 +500,7 @@ export function useRail(options: RailOptions = {}): Rail {
           restoreCssSnap();
           publish();
         },
-      });
+      }, (p) => writePos(el, p, rtl));
     };
 
     const onCancel = (e: PointerEvent) => {
@@ -477,8 +527,16 @@ export function useRail(options: RailOptions = {}): Rail {
     const mo = new MutationObserver(remeasure);
     mo.observe(el, { childList: true, subtree: false });
     remeasure();
+    // From idle, once the first screen is painted (not on a reduced-data
+    // connection): the arrows and a mouse drag then spring at once.
+    const cancelIdleSpring = allowsSpeculativeLoads()
+      ? afterCriticalPaint(() => {
+          void loadRailSpring().catch(() => {});
+        })
+      : () => {};
 
     cleanupRef.current = () => {
+      cancelIdleSpring();
       animRef.current?.stop();
       animRef.current = null;
       ro.disconnect();

@@ -64,16 +64,19 @@
  * spinner. Nothing on this screen is generated, in any of the three languages.
  */
 
-import React, { useEffect, useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
-// `m` + <MotionFeatures>: this layer is mounted at boot on every shell, so it
-// must not make the `motion` proxy (every feature, 46 KB gzip) a static
-// dependency of the first paint — src/lib/motionFeatures.tsx.
-import { AnimatePresence } from 'motion/react';
-import * as Motion from 'motion/react-m';
+// NO ANIMATION LIBRARY (speed audit 2026-10-16). This layer is mounted at boot
+// on every shell, and its `AnimatePresence` + `m.div` alone made the library's
+// core (`vendor-motion-core`, 32 KB gzip) a static dependency of the entry —
+// downloaded and parsed before every first paint for a scrim that is not
+// drawn on one. It fades with the Web Animations API instead
+// (src/lib/presenceFade.ts): the same opacity, the same spring timing, the
+// same cross-fade under reduced motion — and no chunk that can fail to load,
+// so the scrim can never be left invisible over swallowed taps.
 import { useLanguage } from '../../LanguageContext';
 import { useMotion } from '../../lib/motion';
-import { MotionFeatures, useMotionFeaturesFailed } from '../../lib/motionFeatures';
+import { fadeTiming } from '../../lib/presenceFade';
 import { UI_LAYERS } from './overlayLayers';
 import Spinner from './Spinner';
 import { COMMITS, useBusySnapshot, type BusyReason } from '../../lib/busy';
@@ -137,19 +140,19 @@ export const LABELS: Record<BusyReason, Record<'ar' | 'en' | 'ckb', string>> = {
 };
 
 /**
- * HOW THE SCRIM LEAVES, decided at the moment it leaves.
+ * HOW THE SCRIM COMES AND LEAVES — OPACITY ONLY, decided at the moment it leaves.
  *
- * After a quote or a route it fades, as it came. After an ORDER it is simply
- * gone: the page behind it is no longer the checkout but the confirmation,
- * whose character is popping onto its stage and whose confetti is going off on
- * that very frame. A full-screen fade on top of that is a second animation
- * competing with the one the customer is owed, over the one moment the owner
- * called «lagging». Passed through `AnimatePresence`'s `custom`, because a
- * child that is being removed can no longer receive new props.
+ * It fades in on the house `quick` spring's timing (a cross-fade under
+ * reduced motion). After a quote or a route it fades out, as it came. After
+ * an ORDER it is simply gone: the page behind it is no longer the checkout
+ * but the confirmation, whose character is popping onto its stage and whose
+ * confetti is going off on that very frame. A full-screen fade on top of that
+ * is a second animation competing with the one the customer is owed, over the
+ * one moment the owner called «lagging».
  */
 const SCRIM = {
-  shown: { opacity: 1 },
-  hidden: (instant: boolean) => (instant ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0 }),
+  shown: [{ opacity: 0 }, { opacity: 1 }],
+  hidden: [{ opacity: 0 }],
 };
 
 /** Every pointer event that reaches this layer stops here. That is the fix. */
@@ -162,7 +165,6 @@ export default function AppBusy() {
   const { reason, session, opener, ended } = useBusySnapshot();
   const { lang, dir } = useLanguage();
   const m = useMotion();
-  const atRest = useMotionFeaturesFailed();
   const [shown, setShown] = useState(false);
   const [released, setReleased] = useState(false);
   /**
@@ -198,6 +200,36 @@ export default function AppBusy() {
 
   const standsDown = reason === 'route' && introBooting;
   const visible = !idle && shown && !released && !standsDown;
+
+  /**
+   * THE SCRIM STAYS IN THE DOCUMENT FOR ITS EXIT. `present` follows `visible`
+   * in, at once (the scrim swallows taps from its first frame), and out only
+   * when the fade has finished — or at once after an order (`instant`).
+   */
+  const [present, setPresent] = useState(false);
+  if (visible && !present) setPresent(true);
+  const instant = ended === 'order';
+  const scrim = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const el = scrim.current;
+    if (!visible || !el || typeof el.animate !== 'function') return;
+    const fade = el.animate(SCRIM.shown, fadeTiming(m.reduced, 'quick'));
+    return () => fade.cancel();
+  }, [visible, m.reduced]);
+  useEffect(() => {
+    if (visible || !present) return;
+    const el = scrim.current;
+    if (instant || !el || typeof el.animate !== 'function') {
+      setPresent(false);
+      return;
+    }
+    const fade = el.animate(SCRIM.hidden, { ...fadeTiming(m.reduced, 'quick'), fill: 'forwards' });
+    fade.onfinish = () => setPresent(false);
+    return () => {
+      fade.onfinish = null;
+      fade.cancel();
+    };
+  }, [visible, present, instant, m.reduced]);
 
   /**
    * ESCAPE LETS GO. Not because dismissing a wait makes sense, but because a
@@ -252,50 +284,40 @@ export default function AppBusy() {
 
   const label = LABELS[reason ?? 'route'][lang as 'ar' | 'en' | 'ckb'] ?? LABELS[reason ?? 'route'].ar;
 
+  if (!present || (!visible && instant)) return null;
+
   return createPortal(
-    <AnimatePresence custom={ended === 'order'}>
-      {visible && (
-        <MotionFeatures>
-        <Motion.div
-          dir={dir}
-          data-app-busy={reason}
-          role="status"
-          aria-live="polite"
-          aria-busy="true"
-          onPointerDown={swallow}
-          onPointerUp={swallow}
-          onClick={swallow}
-          onContextMenu={swallow}
-          onTouchStart={swallow}
-          // NO BACKDROP BLUR. A full-viewport backdrop filter is re-filtered
-          // on every frame anything beneath it changes — and beneath it, a
-          // page is loading or the character is moving — which on a weak phone
-          // is the most expensive pixel in the app spent on a wait. The 70%
-          // black already says «not now»; the blur added nothing but frames.
-          className="fixed inset-0 flex flex-col items-center justify-center gap-3 bg-onyx/70 cursor-progress"
-          // Above `UI_LAYERS.overlay`, so an open sheet is covered too, and
-          // above `.lv-app-intro` (z-index 121) so the character cannot be
-          // tapped into a journey while the page is unavailable.
-          style={{ zIndex: UI_LAYERS.overlay + 100, touchAction: 'none' }}
-          // OPACITY ONLY. No scale and no travel, in either preference: this
-          // layer appears because something is slow, and a surface that
-          // performs an entrance while the app is stalled is the interface
-          // talking about itself.
-          variants={SCRIM}
-          custom={ended === 'order'}
-          initial={atRest ? false : "hidden"}
-          animate="shown"
-          exit="hidden"
-          transition={m.spring('quick')}
-        >
-          {/* `decorative`, because the sentence below is the status text and
-              two live regions announcing the same wait is one too many. */}
-          <Spinner size="md" delayMs={0} decorative />
-          <span className="text-[13px] font-light text-zinc-300">{label}</span>
-        </Motion.div>
-        </MotionFeatures>
-      )}
-    </AnimatePresence>,
+    <div
+      ref={scrim}
+      dir={dir}
+      data-app-busy={reason}
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      onPointerDown={swallow}
+      onPointerUp={swallow}
+      onClick={swallow}
+      onContextMenu={swallow}
+      onTouchStart={swallow}
+      // NO BACKDROP BLUR. A full-viewport backdrop filter is re-filtered
+      // on every frame anything beneath it changes — and beneath it, a
+      // page is loading or the character is moving — which on a weak phone
+      // is the most expensive pixel in the app spent on a wait. The 70%
+      // black already says «not now»; the blur added nothing but frames.
+      className="fixed inset-0 flex flex-col items-center justify-center gap-3 bg-onyx/70 cursor-progress"
+      // Above `UI_LAYERS.overlay`, so an open sheet is covered too, and
+      // above `.lv-app-intro` (z-index 121) so the character cannot be
+      // tapped into a journey while the page is unavailable. OPACITY ONLY
+      // (SCRIM above): no scale and no travel, in either preference — this
+      // layer appears because something is slow, and a surface that performs
+      // an entrance while the app is stalled is the interface talking about itself.
+      style={{ zIndex: UI_LAYERS.overlay + 100, touchAction: 'none' }}
+    >
+      {/* `decorative`, because the sentence below is the status text and
+          two live regions announcing the same wait is one too many. */}
+      <Spinner size="md" delayMs={0} decorative />
+      <span className="text-[13px] font-light text-zinc-300">{label}</span>
+    </div>,
     document.body
   );
 }
