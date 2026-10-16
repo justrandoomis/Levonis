@@ -714,7 +714,7 @@ function PackingSelection({ value }: { value: string }) {
   return (
     <span data-packing-selection className="mt-2 block rounded-lg border border-border-subtle bg-surface-selected px-3 py-2.5">
       <span className="block text-[11px] font-medium text-text-secondary mb-1">
-        {loc('الخيار واللون المطلوبان', 'Selected option and colour')}
+        {loc('الخيار واللون المطلوبان', 'Selected option and colour', 'هەڵبژاردە و ڕەنگی داواکراو')}
       </span>
       <bdi dir="auto" className="block whitespace-pre-wrap break-words text-[15px] leading-relaxed font-bold text-text-primary">{value}</bdi>
     </span>

@@ -22,12 +22,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  asciiForPrinter,
   escposReceipt,
   iqd,
   renderDeliveryLabel,
   renderLabelSheet,
   renderPurchaseReceipt,
   renderWarrantyReceipt,
+  wrapForPrinter,
   type DeliveryLabelData,
   type PurchaseReceiptData,
   type WarrantyReceiptData,
@@ -268,4 +270,88 @@ test('the column count is respected, so nothing wraps into nonsense', () => {
       assert.ok(printable.length <= cols + 2, `a ${printable.length}-column line at ${cols}: ${printable}`);
     }
   }
+});
+
+// ------------------------------------------- the selection is what is packed
+//
+// docs/ux/COLOUR-QUANTITIES.md §7: three colours of one filament are three
+// different things in the box. The thermal receipt used to print the name and
+// the quantity only, so «x50», «x5» and «x1» of one filament read as the same
+// product three times on the paper the box was packed from.
+
+const COLOURS: PurchaseReceiptData = {
+  ...RECEIPT,
+  lines: [
+    { name: 'PLA Basic', variant: 'With spool — 1 kg / BLACK', qty: 50, unit_iqd: 24_000, line_iqd: 1_200_000 },
+    { name: 'PLA Basic', variant: 'With spool — 1 kg / COLD WHITE', qty: 5, unit_iqd: 24_000, line_iqd: 120_000 },
+    { name: 'PLA Basic', variant: 'With spool — 1 kg / BEIGE', qty: 1, unit_iqd: 24_000, line_iqd: 24_000 },
+  ],
+};
+
+// eslint-disable-next-line no-control-regex
+const printable = (line: string) => line.replace(/\x1b[@aE!][\s\S]?|\x1d[!V][\s\S]{0,2}/g, '');
+
+test('ESC/POS prints every line\'s selection, folded to ASCII, at 32 and 48 columns', () => {
+  for (const cols of [32, 48]) {
+    const raw = escposReceipt(COLOURS, cols);
+    for (const colour of ['BLACK', 'COLD WHITE', 'BEIGE']) {
+      // The words may wrap at 32 columns, so look for the colour word itself.
+      assert.ok(raw.includes(colour.split(' ').pop()!), `${colour} is missing at ${cols} columns`);
+    }
+    assert.ok(!raw.includes('—'), 'the em dash reached the printer');
+    assert.ok(raw.includes('With spool - 1 kg'), 'the dash was not folded to «-»');
+    // The selection sits between the name and the quantity line it belongs to.
+    const lines = raw.split('\n').map(printable);
+    const beige = lines.findIndex((l) => l.includes('BEIGE'));
+    assert.ok(beige > 0 && lines[beige + 1].startsWith('  x1 '), `BEIGE is not followed by its own x1 (${lines[beige + 1]})`);
+    // The selection lines themselves stay inside the roll (the money rows keep the
+    // existing +2 allowance for the control bytes the strip above leaves).
+    for (const l of lines.filter((x) => x.startsWith('  ') && !x.startsWith('  x'))) {
+      assert.ok(l.length <= cols, `a ${l.length}-column selection line at ${cols}: ${l}`);
+    }
+    assert.ok(!raw.includes('(*)'), 'a Latin selection lost no letter and needs no mark');
+  }
+});
+
+test('ESC/POS wraps a long selection at cols - 2 and never cuts a character', () => {
+  const long = 'With spool — 1 kg / Jade White (10100) / Matte finish / Extra long description words';
+  const raw = escposReceipt({ ...COLOURS, lines: [{ ...COLOURS.lines[0], variant: long }] }, 32);
+  const sel = raw
+    .split('\n')
+    .map(printable)
+    .filter((l) => l.startsWith('  ') && !l.startsWith('  x'));
+  assert.ok(sel.length >= 3, 'a long selection wraps onto several lines');
+  for (const l of sel) assert.ok(l.length <= 32, `${l.length} columns: ${l}`);
+  assert.equal(sel.map((l) => l.trim()).join(' '), long.replace('—', '-'), 'every word is printed, in order');
+});
+
+test('ESC/POS marks a selection whose letters it could not print, and says where the full text is', () => {
+  const raw = escposReceipt({ ...COLOURS, lines: [{ ...COLOURS.lines[0], variant: 'مع بكرة — 1 kg / بيج' }] }, 48);
+  assert.ok(raw.includes('- 1 kg / (*)'), raw);
+  assert.ok(raw.includes('(*) full text on the printed receipt'));
+  // RECEIPT's second line is the Arabic «أسود» alone: the line still prints a mark.
+  assert.ok(escposReceipt(RECEIPT).includes('  (*)\n'));
+  assert.ok(!escposReceipt(COLOURS).includes('full text on the printed receipt'));
+});
+
+test('a control character in a stored selection never reaches the printer', () => {
+  const raw = escposReceipt({ ...COLOURS, lines: [{ ...COLOURS.lines[0], variant: 'BLACK\x1dV\x42\x00 tail' }] }, 48);
+  const body = raw.slice(0, -4); // the real cut at the end
+  assert.ok(!body.includes('\x1dV'), 'a cut command was smuggled in through the selection');
+});
+
+test('asciiForPrinter folds the common marks and drops the rest', () => {
+  assert.deepEqual(asciiForPrinter('A – B — C × 2 “q” ‘s’ …  end'), { text: 'A - B - C x 2 "q" \'s\' ... end', dropped: false });
+  assert.deepEqual(asciiForPrinter('Beige ⁨بيج⁩'), { text: 'Beige', dropped: true });
+  assert.deepEqual(wrapForPrinter('aaaa bbbbbbbbbb c', 4), ['aaaa', 'bbbb', 'bbbb', 'bb c']);
+});
+
+test('the HTML receipt prints the selection bold at 11.5px in <bdi>, whole', () => {
+  const html = renderPurchaseReceipt(COLOURS, 'ar');
+  for (const colour of ['BLACK', 'COLD WHITE', 'BEIGE']) {
+    assert.match(html, new RegExp(`<bdi class="sel" style="[^"]*font-size:11\\.5px;font-weight:700[^"]*">With spool — 1 kg / ${colour}</bdi>`));
+  }
+  assert.ok(!/font-size:10px">With spool/.test(html), 'the selection is no longer the 10px footnote');
+  // The money is still the money passed in.
+  assert.ok(html.includes('1,200,000 IQD') && html.includes('734,000 IQD'));
 });

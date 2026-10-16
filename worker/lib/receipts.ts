@@ -277,7 +277,13 @@ export function renderPurchaseReceipt(
     .map(
       (l) =>
         `<tr><td>${escapeHtml(l.name)}${
-          l.variant ? `<br><span style="font-size:10px">${escapeHtml(l.variant)}</span>` : ''
+          // THE SELECTION IS WHAT IS PACKED (docs/ux/COLOUR-QUANTITIES.md §7):
+          // «With spool — 1 kg / BEIGE» on its own line, bold and big enough to
+          // read off a thermal roll, isolated so a Latin colour name keeps its
+          // order inside an Arabic receipt, and never truncated.
+          l.variant
+            ? `<bdi class="sel" style="display:block;font-size:11.5px;font-weight:700;white-space:pre-wrap;overflow-wrap:anywhere">${escapeHtml(l.variant)}</bdi>`
+            : ''
         }${(l.included ?? [])
           .map(
             (k) =>
@@ -592,8 +598,20 @@ export function escposReceipt(data: PurchaseReceiptData, charsPerLine = 48): str
   out += pair('Date', shortDate(data.created_at));
   out += pair('Phone', data.phone);
   out += `${rule}\n`;
+  let dropped = false;
   for (const l of data.lines) {
     out += `${l.name.slice(0, charsPerLine)}\n`;
+    // THE SELECTION, WHOLE (docs/ux/COLOUR-QUANTITIES.md §7). This receipt used
+    // to print the name and the quantity only, so three colours of one filament
+    // read as one product three times on the paper the box was packed from.
+    // The stored selection is wrapped, never cut, and folded to what an
+    // ESC/POS code page prints; letters it cannot print are marked « (*)».
+    if (l.variant && l.variant.trim()) {
+      const folded = asciiForPrinter(l.variant);
+      dropped ||= folded.dropped;
+      const text = folded.dropped ? `${folded.text} (*)`.trim() : folded.text;
+      for (const part of wrapForPrinter(text, charsPerLine - 2)) out += `  ${part}\n`;
+    }
     out += pair(`  x${l.qty}`, iqd(l.line_iqd));
     for (const k of l.included ?? []) {
       out += `  - ${`${k.name}${k.variant ? ` ${k.variant}` : ''} x${k.qty}`.slice(0, charsPerLine - 4)}\n`;
@@ -612,6 +630,64 @@ export function escposReceipt(data: PurchaseReceiptData, charsPerLine = 48): str
   out += `${bigOff}${boldOff}`;
   if (data.due_on_delivery_iqd > 0) out += pair('Due on delivery', iqd(data.due_on_delivery_iqd));
   out += `${rule}\n`;
+  if (dropped) {
+    for (const part of wrapForPrinter('(*) full text on the printed receipt', charsPerLine)) out += `${part}\n`;
+  }
   out += `${center}Thank you\n\n\n${cut}`;
   return out;
+}
+
+/**
+ * TEXT AN ESC/POS CODE PAGE PRINTS. A thermal head prints the printer's code
+ * page and nothing else, so a dash, a «×» or a curly quote from a stored
+ * selection would come out as garbage. The common ones are folded to their
+ * ASCII look-alikes; anything else outside printable ASCII is dropped (a
+ * control character too: a selection must never be able to send a printer
+ * command), and the caller is told so it can mark the line.
+ */
+export function asciiForPrinter(text: string): { text: string; dropped: boolean } {
+  const folded = String(text ?? '')
+    .replace(/[\u2014\u2013\u2012\u2010\u2011\u2212]/g, '-')
+    .replace(/\u00d7/g, 'x')
+    .replace(/[\u2018\u2019\u201a\u201b\u2032]/g, "'")
+    .replace(/[\u201c\u201d\u201e\u201f\u2033]/g, '"')
+    .replace(/\u2026/g, '...')
+    .replace(/[\u00a0\u202f\u2007\u2009\u200a]/g, ' ')
+    // Bidi isolates and marks carry no letter: removing them loses nothing.
+    .replace(/[\u200e\u200f\u2066-\u2069\u202a-\u202e]/g, '');
+  let dropped = false;
+  let out = '';
+  for (const ch of folded) {
+    const code = ch.codePointAt(0)!;
+    if (code >= 0x20 && code <= 0x7e) out += ch;
+    else if (ch === '\n' || ch === '\t') out += ' ';
+    else dropped = true;
+  }
+  return { text: out.replace(/ {2,}/g, ' ').trim(), dropped };
+}
+
+/**
+ * Wraps at word boundaries to `width` columns. Nothing is ever cut: a word
+ * longer than the line is split across lines, every character kept.
+ */
+export function wrapForPrinter(text: string, width: number): string[] {
+  const w = Math.max(1, Math.trunc(width));
+  const lines: string[] = [];
+  let line = '';
+  for (const word of text.split(/ +/).filter(Boolean)) {
+    let rest = word;
+    if (line && line.length + 1 + rest.length <= w) {
+      line += ` ${rest}`;
+      continue;
+    }
+    if (line) lines.push(line);
+    line = '';
+    while (rest.length > w) {
+      lines.push(rest.slice(0, w));
+      rest = rest.slice(w);
+    }
+    line = rest;
+  }
+  if (line) lines.push(line);
+  return lines;
 }

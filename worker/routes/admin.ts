@@ -109,6 +109,7 @@ import {
   renderPurchaseReceipt,
   renderWarrantyReceipt,
 } from '../lib/receipts';
+import { courierItemsSummary } from '../lib/courierSummary';
 import { SHIPPING_TYPE_LABELS } from '../lib/shippingType';
 import { listStatusMap, setStatusMapping, upsertRemoteStatuses } from '../lib/delivery/statusMap';
 import { syncOrderDelivery, sweepDeliveryStatuses } from '../lib/delivery/sync';
@@ -3150,9 +3151,13 @@ adminRoutes.post('/orders/:id/delivery', async (c) => {
   // is a third party: they carry one box holding one bundle, and listing its
   // member products would tell them what is inside it — and would double the
   // count on the waybill.
+  //
+  // AND IT CARRIES THE SELECTION (docs/ux/COLOUR-QUANTITIES.md §7): three
+  // colours of one filament are three different things in the box, and the
+  // stored `option_snapshot` is the authority for which ones were sold.
   const { results: items } = await c.env.DB.prepare(
-    'SELECT name_snapshot, qty FROM order_items WHERE order_id = ? AND bundle_parent_item_id IS NULL'
-  ).bind(id).all<{ name_snapshot: string; qty: number }>();
+    'SELECT name_snapshot, option_snapshot, qty FROM order_items WHERE order_id = ? AND bundle_parent_item_id IS NULL'
+  ).bind(id).all<{ name_snapshot: string; option_snapshot: string | null; qty: number }>();
 
   const res = await driver.createShipment({
     orderId: String(order.id),
@@ -3189,7 +3194,7 @@ adminRoutes.post('/orders/:id/delivery', async (c) => {
      */
     amountIqd: Math.max(0, Number(order.due_on_delivery_iqd) || 0),
     itemCount: (items ?? []).reduce((n, i) => n + Number(i.qty || 0), 0),
-    itemsSummary: (items ?? []).map((i) => `${i.name_snapshot} x${i.qty}`).join(', ').slice(0, 500),
+    itemsSummary: courierItemsSummary(items ?? [], 500),
   });
 
   if (!res.ok) {
