@@ -96,7 +96,12 @@ export type ImagesMode = 'ok' | 'http500' | 'throw9422' | 'wrongFormat' | 'tooWi
 export function imagesDouble(initial: ImagesMode = 'ok') {
   const calls: ImagesCall[] = [];
   const infos: number[] = [];
-  const state = { mode: initial };
+  /**
+   * `avifMaxPixels`: as the live binding behaves (speed audit 2026-10-16), an AVIF
+   * asked for an output larger than this answers in another format — a 1254² photo
+   * at its own size, 1280 and 1600 of a 2992² one — while WebP of the same size works.
+   */
+  const state: { mode: ImagesMode; avifMaxPixels: number | null } = { mode: initial, avifMaxPixels: null };
   const binding = {
     async info(stream: ReadableStream<Uint8Array>) {
       const d = dimsOf(await drain(stream));
@@ -124,7 +129,8 @@ export function imagesDouble(initial: ImagesMode = 'ok') {
           let w = Math.max(1, Math.round(sw * scale));
           const h = Math.max(1, Math.round(sh * scale));
           if (state.mode === 'tooWide') w = (transform.width ?? sw) + 40;
-          const format = state.mode === 'wrongFormat' ? (o.format === 'image/avif' ? 'image/webp' : 'image/avif') : o.format;
+          const overAvif = o.format === 'image/avif' && state.avifMaxPixels !== null && w * h > state.avifMaxPixels;
+          const format = state.mode === 'wrongFormat' || overAvif ? (o.format === 'image/avif' ? 'image/webp' : 'image/avif') : o.format;
           const bytes = build(format, w, h);
           return { response: () => (state.mode === 'http500' ? new Response('no', { status: 500 }) : new Response(bytes as unknown as BodyInit)) };
         },
