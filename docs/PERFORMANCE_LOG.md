@@ -2085,3 +2085,97 @@ grows with the catalogue: an imported Bambu card carries up to 31 gallery entrie
   document preload — three other lanes' files — and an older cached bundle would show no table; measured by
   the audit at −113 ± 58 ms title paint on H2D only.
 - The detail's other legacy aliases (`name`/`name_ku`, `description`/`description_ku`): each under 1 KB.
+
+## 2026-10-16 — speed audit, the product page and the boot code (branch perf/product on 0d8ed43b)
+
+The client half of the speed audit's product-page and boot findings (scratchpad
+`perf/speed-audit-findings.json`: the light-theme lead picture, the product route's
+code before first pixel, the lazy-route blank flash and React 19's 300 ms reveal hold,
+the 239 KB critical payload, `/api/auth/me` and the community gate, the marquee loop).
+No Worker file changed. Six commits:
+
+- **The light theme's lead picture keeps a size** (`src/lib/productGallery.ts`
+  `lightMainImageSize`): its own stored size when the answer carries
+  `light_image_width/height` (the Worker does not send it yet), else its twin's (every
+  live pair is 1254 × 1254), dropped again if the loaded file proves another shape. The
+  drawn square's `sizes` and a srcset that stops at `1254w`, as the dark theme had.
+- **The product opening no longer carries `vendor-motion`** (15.7 KB): `ui/Note.tsx`
+  was its one static importer (the `motion` proxy); an inert note is a plain element.
+- **The session and the gate's question leave with the entry** (`src/lib/bootFetch.ts`):
+  `/api/auth/me` on every page, `/api/community/access` on the gated paths; the access
+  read no longer waits for `/me` (asked under the cookie's key, adopted by the viewer's,
+  never across a sign-in); the gate still draws after the session, so nothing moves.
+- **A route whose code has arrived is shown at once** (`src/lib/routeReveal.ts`): a
+  module in memory renders in the same pass (a thenable that resolves at once); one that
+  lands while a fallback is up is revealed by an ordinary update, not React's throttled
+  retry; the opening page's module is asked for at module evaluation; the product route's
+  fallback is the product page's own loading screen.
+- **The animation library's core leaves the first download**: the busy scrim and the
+  update line fade with the Web Animations API (`src/lib/presenceFade.ts`), the shell asks
+  for the features through a dynamic import, the rails import their spring on first use.
+- **The home's ticker runs only where it is seen and out of a navigation's way**
+  (starts after the first screen, stops off screen and during a `route` wait).
+
+### Bytes (gzip −9, the bundle test's closure walk; `vite build` + `write-asset-headers`)
+
+| | 0d8ed43b | perf/product | gate |
+|---|---|---|---|
+| initial payload | 178.8 KB / 4 files (entry 62.2, react 73.3, motion-core 31.7, i18n 11.6) | **148.3 KB / 3 files** (entry 62.9, react 73.7, i18n 11.6) | INITIAL 200 → **160 KB**; `vendor-motion-core` on the never-initial list |
+| entry chunk | 62.2 KB | 62.9 KB | ENTRY 72 → **68 KB** |
+| `/product/:slug` first visit (complete closure) | 270.8 KB / 28 files | **257.2 KB / 27** (24 beyond the entry = the document's preload cap) | new PRODUCT_OPENING 265 KB; ≤ 24 files beyond the entry |
+| `/products` first visit | 205.4 KB / 16 | **174.8 KB / 15** | — |
+| `/categories/:cat`, a store's home (core moved into their closures) | 243.5 / 244.7 KB | 245.2 / 246.4 KB | — |
+| `/community` while shut (initial only) | 178.8 KB | **148.3 KB** | — |
+| chunks under 1 KB | 45 | 45 | 45 (unchanged) |
+
+### Lab — before (0d8ed43b) / after (this branch), cold, median of 5
+
+Local HTTP/2 replay of live data (scratchpad `perf/plab/server.mts`: the arm's `dist`, the
+documents rewritten exactly as the live Worker does — inline resolve, fetch preload, the
+route's modulepreloads from the arm's manifest, the lead-image rule — and `/api`, `/files`
+replayed from anonymous live GETs with a fixed 120 ms server delay); Playwright 360 × 800
+DPR 3, CPU ×4, Slow-4G 150 ms / 1.6 Mbps, light theme (`perf/plab/drive.mjs`).
+
+| route | FCP | LCP | h1 | lead picture | CLS |
+|---|---|---|---|---|---|
+| `/product/bambu-lab-pla-basic-filament` | 2828 → **2564** | 4240 → **3876** | 3195 → 2988 | `?w=1080` 43.3 KB → `?w=800` 29.9 KB | 0.0165 = |
+| `/product/esun-pla-plus` (opens on a bound picture) | 2808 → **2552** | 3688 → **3448** | 3202 → 2871 | 18.5 KB = | 0.0165 = |
+| `/products` | 2220 → **2008** | 3124 → **2612** | 2656 → 2076 | — | 0.0013 → 0.0037 (see below) |
+| `/` | 2268 → **1828** | 2268 → **1828** | 2038 → 1726 | — | 0.0043 → 0.0023 |
+| `/community` (closed: the card) | 1956 → 1840 | 2244 → **1880** | 2203 → 1846 | — | 0.0013 = |
+| `/categories/printer-accessories` | 1976 → 1852 | 3768 → 3632 | 3095 → 2977 | — | 0.0013 = |
+
+430 × 932 DPR 3, light, median of 3: PLA Basic lead 99.7 KB (the 1254 px original, `?w=1280`)
+→ 43.3 KB (`?w=1080`), LCP 4924 → **4080**; H2D 75.4 → 36.8 KB, LCP 4356 → **3860**. Dark theme,
+360@3 (lead unchanged, 37.2 KB): LCP 4424 → 4156. Filmstrip of a cold product landing: the
+screen under the mascot's bar was empty until ~3.1 s; it is the product skeleton from ~2.5 s.
+In-app home → «تسوّق الآن» → grid painted (5 runs): 197 → 175 ms with the ticker's change alone.
+
+What the numbers say, and what to know:
+
+- `/products` CLS 0.0013 → 0.0037: the grid now paints ~580 ms earlier, before the Latin
+  Cairo subset (requested when the first Latin product name renders) has arrived, and its
+  swap re-lays the card names once (0.0024). The cure is the font, not the grid: preloading
+  `cairo-v31-latin.woff2` on the `/products` document is the document lane's call.
+- A cold product landing now paints before the mascot's chunk is drawn, so its intro
+  arrives more than `BOOT_LATE_MS` after the first paint and the character appears at its
+  dock (AppIntro's own rule for a page that is already showing).
+- Signed-in pages behind `ProtectedRoute` start their code one `/me` round trip earlier;
+  not measured (no sign-in in the lab).
+
+### For the integrator
+
+- The edge lane's light-theme lead preload (`worker/lib/productOpeningLead.ts`,
+  `socialPreview.ts previewFrom`) writes the light picture with no size, as Product.tsx did;
+  with this branch Product.tsx draws it at the primary's size (`lightMainImageSize`), so the
+  Worker's light line must carry the primary row's `width`/`height` too (or send
+  `light_image_width/height`), or the preload and the <img> pick different copies. Its
+  tests pin the old Product.tsx line (`tests/productLeadPreload.test.ts`) and will say so.
+- The edge lane's category and community documents modulepreload the page closures; those
+  closures now contain `vendor-motion-core` (it left the entry), which is what keeps the
+  category page's reveal where it was.
+- Not done here: the mascot's own loop (AppIntro) still runs every frame while docked
+  (pausing it changes what the character visibly does); StockAlertPanel / ConditionPanel /
+  ShippingConflictDialog stay static in the product chunk (≈ 9 KB; the first two would
+  pop in on the products that show them); routes outside the documents the Worker rewrites
+  keep plain `React.lazy` (only cold landings on them meet the 300 ms hold).
