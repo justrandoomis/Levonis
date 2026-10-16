@@ -1,4 +1,4405 @@
 {
-  "version": 1,
-  "labels": {}
+ "version": 1,
+ "status": "REVIEWED (P0 step 3 e): the existing-Levonis members are resolved against the sealed live snapshot named by snapshot_sha256. X1C, X1E, P1P and X1 have no Levonis product: their members are dropped, and the labels P1P, X1 and X1E keep no target (kept as text). P1S resolves through the source p1s, which merges into the Levonis P1S (existing-matches.json).",
+ "reviewed_by": "p0-agent; snapshot members: p0-step-3e-review",
+ "reviewed_at": "2026-10-16",
+ "snapshot_sha256": "1215895671756da4011dbdc1f310f95f4543d8d0ad9b0b71f1deb3928557ef8c",
+ "reason_codes": [
+  "component_concept_not_a_product",
+  "electrical_rating_not_a_target",
+  "family_alias",
+  "family_all_by_source",
+  "family_members_by_source",
+  "family_members_by_subject",
+  "family_members_by_subject_evidence_excl_a1_mini",
+  "family_members_by_subject_evidence_incl_a1_mini",
+  "family_members_in_levonis",
+  "family_members_narrow_default",
+  "family_members_qualified",
+  "generic_term_not_a_product",
+  "levonis_existing_model",
+  "no_target_in_levonis_or_source",
+  "same_model",
+  "same_model_incl_refurbished",
+  "same_model_qualified",
+  "variant_choice_not_a_target"
+ ],
+ "labels": {
+  "R1": {
+   "kind": "printer",
+   "reason": "same_model",
+   "seen": 152,
+   "products": 80,
+   "evidence": [
+    {
+     "handle": "smoke-purifier",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2 Laser/R1"
+    },
+    {
+     "handle": "auto-fire-extinguishing-system",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: R1"
+    },
+    {
+     "handle": "rotary-attachment",
+     "evidence_kind": "option_value",
+     "quote": "Compatible: R1"
+    }
+   ],
+   "to": {
+    "source_handle": "r1"
+   }
+  },
+  "P1 Series": {
+   "kind": "family",
+   "reason": "family_members_in_levonis",
+   "seen": 147,
+   "products": 84,
+   "evidence": [
+    {
+     "handle": "filament-buffer",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1 Series and P1 Series"
+    },
+    {
+     "handle": "filament-buffer",
+     "evidence_kind": "compat_section",
+     "quote": "X1 Series and P1 Series"
+    },
+    {
+     "handle": "glass-cover-plate",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1 Series and P1 Series"
+    }
+   ],
+   "family": "p1_series",
+   "members": [
+    {
+     "source_handle": "p1s"
+    },
+    {
+     "source_handle": "refurbished-p1s"
+    }
+   ]
+  },
+  "X1 Series": {
+   "kind": "family",
+   "reason": "family_members_in_levonis",
+   "seen": 139,
+   "products": 77,
+   "evidence": [
+    {
+     "handle": "front-housing-assembly-x1-series",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1 Series"
+    },
+    {
+     "handle": "front-housing-assembly-x1-series",
+     "evidence_kind": "compat_section",
+     "quote": "X1 Series Exclusive"
+    },
+    {
+     "handle": "filament-buffer",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1 Series and P1 Series"
+    }
+   ],
+   "family": "x1_series",
+   "members": [
+    {
+     "source_handle": "refurbished-x1c"
+    }
+   ]
+  },
+  "X2D": {
+   "kind": "printer",
+   "reason": "same_model",
+   "seen": 134,
+   "products": 77,
+   "evidence": [
+    {
+     "handle": "ams-multicolor-printing",
+     "evidence_kind": "option_value",
+     "quote": "Select the type of printer you plan to use the AMS: X2D"
+    },
+    {
+     "handle": "silicone-sock-for-hotend",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: X2D"
+    },
+    {
+     "handle": "bambu-textured-pei-plate",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: X2D"
+    }
+   ],
+   "to": {
+    "source_handle": "x2d"
+   }
+  },
+  "H2 Series": {
+   "kind": "family",
+   "reason": "family_members_by_source",
+   "seen": 120,
+   "products": 72,
+   "evidence": [
+    {
+     "handle": "bambu-4-in-1-ptfe-adapter",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2 Series/P1 Series/X1 Series"
+    },
+    {
+     "handle": "bambu-4-in-1-ptfe-adapter",
+     "evidence_kind": "compat_section",
+     "quote": "X1 Series/P1 Series/H2 Series/P2S/X2D/A2L"
+    },
+    {
+     "handle": "printer-cable-pack-7-in-1",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2 Series"
+    }
+   ],
+   "family": "h2_series",
+   "members": [
+    {
+     "source_handle": "h2d"
+    },
+    {
+     "source_handle": "h2d-pro"
+    },
+    {
+     "source_handle": "h2s"
+    },
+    {
+     "source_handle": "h2c"
+    },
+    {
+     "source_handle": "refurbished-bambu-lab-h2d-3d-printer"
+    }
+   ]
+  },
+  "A2L": {
+   "kind": "printer",
+   "reason": "same_model",
+   "seen": 118,
+   "products": 64,
+   "evidence": [
+    {
+     "handle": "replacement-filament-cutter",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: A2L"
+    },
+    {
+     "handle": "silicone-sock-for-hotend",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: A2L"
+    },
+    {
+     "handle": "bambu-textured-pei-plate",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: A2L"
+    }
+   ],
+   "to": {
+    "source_handle": "a2l"
+   }
+  },
+  "H2C": {
+   "kind": "printer",
+   "reason": "same_model",
+   "seen": 105,
+   "products": 67,
+   "evidence": [
+    {
+     "handle": "replacement-filament-cutter",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2C"
+    },
+    {
+     "handle": "ams-multicolor-printing",
+     "evidence_kind": "option_value",
+     "quote": "Select the type of printer you plan to use the AMS: H2D/H2C"
+    },
+    {
+     "handle": "bambu-textured-pei-plate",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2C"
+    }
+   ],
+   "to": {
+    "source_handle": "h2c"
+   }
+  },
+  "H2D": {
+   "kind": "family",
+   "reason": "same_model_incl_refurbished",
+   "seen": 94,
+   "products": 64,
+   "evidence": [
+    {
+     "handle": "replacement-filament-cutter",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2D"
+    },
+    {
+     "handle": "ams-multicolor-printing",
+     "evidence_kind": "option_value",
+     "quote": "Select the type of printer you plan to use the AMS: H2D/H2C"
+    },
+    {
+     "handle": "silicone-sock-for-hotend",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2D"
+    }
+   ],
+   "family": "model_h2d",
+   "members": [
+    {
+     "source_handle": "h2d"
+    },
+    {
+     "source_handle": "refurbished-bambu-lab-h2d-3d-printer"
+    }
+   ]
+  },
+  "P2S": {
+   "kind": "family",
+   "reason": "same_model_incl_refurbished",
+   "seen": 92,
+   "products": 82,
+   "evidence": [
+    {
+     "handle": "replacement-filament-cutter",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: P2S"
+    },
+    {
+     "handle": "ams-multicolor-printing",
+     "evidence_kind": "option_value",
+     "quote": "Select the type of printer you plan to use the AMS: P2S"
+    },
+    {
+     "handle": "z-belt",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1 Series & P1 Series & P2S"
+    }
+   ],
+   "family": "model_p2s",
+   "members": [
+    {
+     "source_handle": "p2s"
+    },
+    {
+     "source_handle": "refurbished-bambu-lab-p2s-3d-printer"
+    }
+   ]
+  },
+  "P2 Series": {
+   "kind": "family",
+   "reason": "family_members_by_source",
+   "seen": 59,
+   "products": 59,
+   "evidence": [
+    {
+     "handle": "bambu-3d-effect-plate",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1/P1/A1/P2/X2"
+    },
+    {
+     "handle": "cyberbrick-timelapse-kit",
+     "evidence_kind": "option_value",
+     "quote": "Select your printer series: P2 Series"
+    },
+    {
+     "handle": "extruder-gear-assembly-p2s",
+     "evidence_kind": "compat_section",
+     "quote": "P2 Series"
+    }
+   ],
+   "family": "p2_series",
+   "members": [
+    {
+     "source_handle": "p2s"
+    },
+    {
+     "source_handle": "refurbished-bambu-lab-p2s-3d-printer"
+    }
+   ]
+  },
+  "H2S": {
+   "kind": "printer",
+   "reason": "same_model",
+   "seen": 58,
+   "products": 45,
+   "evidence": [
+    {
+     "handle": "replacement-filament-cutter",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2S"
+    },
+    {
+     "handle": "ams-multicolor-printing",
+     "evidence_kind": "option_value",
+     "quote": "Select the type of printer you plan to use the AMS: H2S"
+    },
+    {
+     "handle": "silicone-sock-for-hotend",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2S"
+    }
+   ],
+   "to": {
+    "source_handle": "h2s"
+   }
+  },
+  "H2C Laser": {
+   "kind": "printer",
+   "reason": "same_model_qualified",
+   "seen": 56,
+   "products": 40,
+   "evidence": [
+    {
+     "handle": "part-cooling-fan-air-duct",
+     "evidence_kind": "compat_section",
+     "quote": "H2C and H2C Laser"
+    },
+    {
+     "handle": "toolhead-to-mc-board-cable-h2d-h2c",
+     "evidence_kind": "compat_section",
+     "quote": "H2C and H2C Laser"
+    },
+    {
+     "handle": "hotend-cooling-fan-air-duct",
+     "evidence_kind": "compat_section",
+     "quote": "H2C and H2C Laser"
+    }
+   ],
+   "to": {
+    "source_handle": "h2c"
+   },
+   "qualifier": "Laser"
+  },
+  "A1 mini": {
+   "kind": "printer",
+   "reason": "same_model",
+   "seen": 53,
+   "products": 31,
+   "evidence": [
+    {
+     "handle": "wifi-antenna-p1-series-and-a1-mini",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: P1 Series and A1 mini"
+    },
+    {
+     "handle": "wifi-antenna-p1-series-and-a1-mini",
+     "evidence_kind": "compat_section",
+     "quote": "P1 Series, A1 mini"
+    },
+    {
+     "handle": "bambu-textured-pei-plate",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: A1 mini"
+    }
+   ],
+   "to": {
+    "source_handle": "a1-mini"
+   }
+  },
+  "AMS HT": {
+   "kind": "ams",
+   "reason": "same_model",
+   "seen": 51,
+   "products": 32,
+   "evidence": [
+    {
+     "handle": "support-for-pa-pet",
+     "evidence_kind": "feature_bullet",
+     "quote": "AMS 2 Pro, AMS HT & AMS compatible"
+    },
+    {
+     "handle": "pc-filament",
+     "evidence_kind": "feature_bullet",
+     "quote": "AMS 2 Pro, AMS HT & AMS Compatible"
+    },
+    {
+     "handle": "abs-filament",
+     "evidence_kind": "feature_bullet",
+     "quote": "AMS 2 Pro, AMS HT & AMS Compatible"
+    }
+   ],
+   "to": {
+    "source_handle": "ams-ht"
+   }
+  },
+  "AMS": {
+   "kind": "ams",
+   "reason": "same_model",
+   "seen": 50,
+   "products": 33,
+   "evidence": [
+    {
+     "handle": "bambu-bus-cable",
+     "evidence_kind": "compat_section",
+     "quote": "For AMS, X1 Series and P1 Series"
+    },
+    {
+     "handle": "support-for-pa-pet",
+     "evidence_kind": "feature_bullet",
+     "quote": "AMS 2 Pro, AMS HT & AMS compatible"
+    },
+    {
+     "handle": "pc-filament",
+     "evidence_kind": "feature_bullet",
+     "quote": "AMS 2 Pro, AMS HT & AMS Compatible"
+    }
+   ],
+   "to": {
+    "source_handle": "ams-multicolor-printing"
+   }
+  },
+  "A1 Series": {
+   "kind": "family",
+   "reason": "family_members_by_subject",
+   "seen": 43,
+   "products": 29,
+   "evidence": [
+    {
+     "handle": "replacement-filament-cutter",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: A1 Series"
+    },
+    {
+     "handle": "ams-multicolor-printing",
+     "evidence_kind": "option_value",
+     "quote": "Select the type of printer you plan to use the AMS: A1 Series"
+    },
+    {
+     "handle": "silicone-sock-for-hotend",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: A1 Series"
+    }
+   ],
+   "family": "a1_series",
+   "default": {
+    "members": [
+     {
+      "source_handle": "a1"
+     },
+     {
+      "source_handle": "refurbished-a1"
+     }
+    ],
+    "reason": "family_members_narrow_default",
+    "applies_to": "a subject page with no evidence either way (listed in subjects_on_default; owner question P0-1)"
+   },
+   "by_subject": {
+    "3d-effect-plate-full-combo": {
+     "basis": "excludes_a1_mini",
+     "reason": "family_members_by_subject_evidence_excl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "3d-effect-plate-full-combo",
+       "evidence_kind": "option_value",
+       "quote": "Compatibility: A1 mini"
+      }
+     ]
+    },
+    "accessory-box-for-a1": {
+     "basis": "excludes_a1_mini",
+     "reason": "family_members_by_subject_evidence_excl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "accessory-box-for-a1",
+       "evidence_kind": "title",
+       "quote": "Accessory Box for A1"
+      },
+      {
+       "handle": "accessory-box-for-a1-mini",
+       "evidence_kind": "title",
+       "quote": "Accessory Box for A1 mini"
+      }
+     ]
+    },
+    "ams-2-pro": {
+     "basis": "excludes_a1_mini",
+     "reason": "family_members_by_subject_evidence_excl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "a1-mini",
+       "evidence_kind": "description_text",
+       "quote": "AMS is incompatible with the A1 mini. If you want a multi-color print using A1 mini, you must use the AMS lite."
+      },
+      {
+       "handle": "ams-2-pro",
+       "evidence_kind": "option_value",
+       "quote": "Select the type of printer you plan to use the AMS 2 Pro: A1 Series"
+      }
+     ]
+    },
+    "ams-ht": {
+     "basis": "excludes_a1_mini",
+     "reason": "family_members_by_subject_evidence_excl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "a1-mini",
+       "evidence_kind": "description_text",
+       "quote": "AMS is incompatible with the A1 mini. If you want a multi-color print using A1 mini, you must use the AMS lite."
+      },
+      {
+       "handle": "ams-ht",
+       "evidence_kind": "option_value",
+       "quote": "Select the type of printer you plan to use the AMS HT: A1 Series"
+      }
+     ]
+    },
+    "ams-hub-a1-series": {
+     "basis": "excludes_a1_mini",
+     "reason": "family_members_by_subject_evidence_excl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "a1-mini",
+       "evidence_kind": "description_text",
+       "quote": "AMS is incompatible with the A1 mini. If you want a multi-color print using A1 mini, you must use the AMS lite."
+      },
+      {
+       "handle": "ams-hub-a1-series",
+       "evidence_kind": "description_text",
+       "quote": "This HUB accessory is specifically designed for A1-series 3D printers, serving as a standardized hub for seamless connectivity and integrated functionality between the AMS, AMS 2 Pro, and AMS HT."
+      }
+     ]
+    },
+    "ams-lite": {
+     "basis": "includes_a1_mini",
+     "reason": "family_members_by_subject_evidence_incl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      },
+      {
+       "source_handle": "a1-mini"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "a1-mini",
+       "evidence_kind": "description_text",
+       "quote": "AMS is incompatible with the A1 mini. If you want a multi-color print using A1 mini, you must use the AMS lite."
+      },
+      {
+       "handle": "ams-lite",
+       "evidence_kind": "option_value",
+       "quote": "Compatibility: A1&A2 Series"
+      }
+     ]
+    },
+    "ams-multicolor-printing": {
+     "basis": "excludes_a1_mini",
+     "reason": "family_members_by_subject_evidence_excl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "a1-mini",
+       "evidence_kind": "description_text",
+       "quote": "AMS is incompatible with the A1 mini. If you want a multi-color print using A1 mini, you must use the AMS lite."
+      },
+      {
+       "handle": "ams-multicolor-printing",
+       "evidence_kind": "option_value",
+       "quote": "Select the type of printer you plan to use the AMS: A1 Series"
+      }
+     ]
+    },
+    "bambu-3d-effect-plate": {
+     "basis": "excludes_a1_mini",
+     "reason": "family_members_by_subject_evidence_excl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "bambu-3d-effect-plate",
+       "evidence_kind": "option_value",
+       "quote": "Compatibility: A1 mini"
+      }
+     ]
+    },
+    "bambu-hotend-a1-a2": {
+     "basis": "includes_a1_mini",
+     "reason": "family_members_by_subject_evidence_incl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      },
+      {
+       "source_handle": "a1-mini"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "bambu-hotend-a1-a2",
+       "evidence_kind": "option_value",
+       "quote": "Printer Model: A1 mini"
+      },
+      {
+       "handle": "bambu-hotend-a1-a2",
+       "evidence_kind": "wiki_link",
+       "quote": "https://wiki.bambulab.com/en/a1-mini/maintenance/toolhead"
+      }
+     ]
+    },
+    "build-plate-combo": {
+     "basis": "excludes_a1_mini",
+     "reason": "family_members_by_subject_evidence_excl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "build-plate-combo",
+       "evidence_kind": "table_text",
+       "quote": "X1C/P1P/P1S/A1/P2S/X2D - 256*256mm"
+      },
+      {
+       "handle": "build-plate-combo",
+       "evidence_kind": "table_text",
+       "quote": "X1C/P1P/P1S/A1/P2S/X2D - 315*295*15mm"
+      }
+     ]
+    },
+    "extruder-unit-a1-series": {
+     "basis": "includes_a1_mini",
+     "reason": "family_members_by_subject_evidence_incl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      },
+      {
+       "source_handle": "a1-mini"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "extruder-unit-a1-series",
+       "evidence_kind": "wiki_link",
+       "quote": "https://wiki.bambulab.com/en/a1-mini/maintenance/extruder-replacement-guide"
+      }
+     ]
+    },
+    "filament-cutter-lever-a1-series": {
+     "basis": "includes_a1_mini",
+     "reason": "family_members_by_subject_evidence_incl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      },
+      {
+       "source_handle": "a1-mini"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "filament-cutter-lever-a1-series",
+       "evidence_kind": "wiki_link",
+       "quote": "https://wiki.bambulab.com/en/a1-mini/maintenance/a1-extruder"
+      }
+     ]
+    },
+    "filament-sensor-base-a1-series": {
+     "basis": "includes_a1_mini",
+     "reason": "family_members_by_subject_evidence_incl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      },
+      {
+       "source_handle": "a1-mini"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "filament-sensor-base-a1-series",
+       "evidence_kind": "wiki_link",
+       "quote": "https://wiki.bambulab.com/en/a1-mini/maintenance/filament-sensor-base-replacement"
+      }
+     ]
+    },
+    "hardened-steel-extruder-gear-assembly-a1-series": {
+     "basis": "includes_a1_mini",
+     "reason": "family_members_by_subject_evidence_incl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      },
+      {
+       "source_handle": "a1-mini"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "hardened-steel-extruder-gear-assembly-a1-series",
+       "evidence_kind": "wiki_link",
+       "quote": "https://wiki.bambulab.com/en/a1-mini/maintenance/a1-extruder"
+      }
+     ]
+    },
+    "hotend-cooling-fan-a1-series": {
+     "basis": "includes_a1_mini",
+     "reason": "family_members_by_subject_evidence_incl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      },
+      {
+       "source_handle": "a1-mini"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "hotend-cooling-fan-a1-series",
+       "evidence_kind": "wiki_link",
+       "quote": "https://wiki.bambulab.com/en/a1-mini/maintenance/hotend-cooling-fan"
+      }
+     ]
+    },
+    "hotend-heating-assembly-a1-series": {
+     "basis": "includes_a1_mini",
+     "reason": "family_members_by_subject_evidence_incl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      },
+      {
+       "source_handle": "a1-mini"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "hotend-heating-assembly-a1-series",
+       "evidence_kind": "wiki_link",
+       "quote": "https://wiki.bambulab.com/en/a1-mini/maintenance/hotend-heating-assembly-replacement"
+      }
+     ]
+    },
+    "part-cooling-fan-a1-series": {
+     "basis": "includes_a1_mini",
+     "reason": "family_members_by_subject_evidence_incl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      },
+      {
+       "source_handle": "a1-mini"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "part-cooling-fan-a1-series",
+       "evidence_kind": "wiki_link",
+       "quote": "https://wiki.bambulab.com/en/a1-mini/maintenance/part-cooling-fan"
+      }
+     ]
+    },
+    "print-head-front-cover-a1-series": {
+     "basis": "includes_a1_mini",
+     "reason": "family_members_by_subject_evidence_incl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      },
+      {
+       "source_handle": "a1-mini"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "print-head-front-cover-a1-series",
+       "evidence_kind": "wiki_link",
+       "quote": "https://wiki.bambulab.com/en/a1-mini/maintenance/toolhead"
+      }
+     ]
+    },
+    "purge-wiper-a1-series": {
+     "basis": "includes_a1_mini",
+     "reason": "family_members_by_subject_evidence_incl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      },
+      {
+       "source_handle": "a1-mini"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "purge-wiper-a1-series",
+       "evidence_kind": "wiki_link",
+       "quote": "https://wiki.bambulab.com/en/a1-mini/purge-wiper-replacement"
+      }
+     ]
+    },
+    "replacement-filament-cutter": {
+     "basis": "includes_a1_mini",
+     "reason": "family_members_by_subject_evidence_incl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      },
+      {
+       "source_handle": "a1-mini"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "replacement-filament-cutter",
+       "evidence_kind": "wiki_link",
+       "quote": "https://wiki.bambulab.com/en/a1-mini/maintenance/filament-cutter-replacement"
+      }
+     ]
+    },
+    "screws-kit-a1-series-and-ams-lite": {
+     "basis": "includes_a1_mini",
+     "reason": "family_members_by_subject_evidence_incl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      },
+      {
+       "source_handle": "a1-mini"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "screws-kit-a1-series-and-ams-lite",
+       "evidence_kind": "table_text",
+       "quote": "A1 mini Heatbed"
+      },
+      {
+       "handle": "screws-kit-a1-series-and-ams-lite",
+       "evidence_kind": "table_text",
+       "quote": "Bottom Plate of A1& A1 mini"
+      },
+      {
+       "handle": "screws-kit-a1-series-and-ams-lite",
+       "evidence_kind": "table_text",
+       "quote": "Purge Unit and the A1 mini Z Cover"
+      }
+     ]
+    },
+    "toolhead-block-a1-series": {
+     "basis": "includes_a1_mini",
+     "reason": "family_members_by_subject_evidence_incl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      },
+      {
+       "source_handle": "a1-mini"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "toolhead-block-a1-series",
+       "evidence_kind": "wiki_link",
+       "quote": "https://wiki.bambulab.com/en/a1-mini/maintenance/a1-mini-com"
+      }
+     ]
+    },
+    "toolhead-board-a1-mini": {
+     "basis": "includes_a1_mini",
+     "reason": "family_members_by_subject_evidence_incl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      },
+      {
+       "source_handle": "a1-mini"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "toolhead-board-a1-mini",
+       "evidence_kind": "option_value",
+       "quote": "Compatibility: A1 mini"
+      },
+      {
+       "handle": "toolhead-board-a1-mini",
+       "evidence_kind": "compat_section",
+       "quote": "A1 Series"
+      }
+     ]
+    },
+    "toolhead-rear-housing-a1-series": {
+     "basis": "includes_a1_mini",
+     "reason": "family_members_by_subject_evidence_incl_a1_mini",
+     "members": [
+      {
+       "source_handle": "a1"
+      },
+      {
+       "source_handle": "refurbished-a1"
+      },
+      {
+       "source_handle": "a1-mini"
+      }
+     ],
+     "evidence": [
+      {
+       "handle": "toolhead-rear-housing-a1-series",
+       "evidence_kind": "wiki_link",
+       "quote": "https://wiki.bambulab.com/en/a1-mini/maintenance/toolhead"
+      }
+     ]
+    }
+   },
+   "subjects_on_default": [
+    "cyberbrick-timelapse-kit",
+    "extruder-motor-a1-series",
+    "filament-sensor-a1-series",
+    "multi-size-hotends-kit",
+    "silicone-sock-for-hotend"
+   ],
+   "usage_evidence": [
+    {
+     "handle": "printer-maintenance-kit",
+     "evidence_kind": "section_title",
+     "quote": "For A1 Series",
+     "section_lines": [
+      "For A1",
+      "For A1 mini"
+     ]
+    },
+    {
+     "handle": "toolhead-board-a1-mini",
+     "evidence_kind": "compat_section",
+     "quote": "A1 Series"
+    },
+    {
+     "handle": "a1-mini",
+     "evidence_kind": "description_text",
+     "quote": "AMS is incompatible with the A1 mini. If you want a multi-color print using A1 mini, you must use the AMS lite."
+    },
+    {
+     "handle": "a1",
+     "evidence_kind": "variant_note",
+     "quote": "To connect AMS 2 Pro unit(s) to A1 series printer, an A1 series AMS Hub (SA013) is required."
+    }
+   ],
+   "resolution": "members = by_subject[subject handle].members if present, else default.members"
+  },
+  "AMS 2 Pro": {
+   "kind": "ams",
+   "reason": "same_model",
+   "seen": 43,
+   "products": 28,
+   "evidence": [
+    {
+     "handle": "support-for-pa-pet",
+     "evidence_kind": "feature_bullet",
+     "quote": "AMS 2 Pro, AMS HT & AMS compatible"
+    },
+    {
+     "handle": "pc-filament",
+     "evidence_kind": "feature_bullet",
+     "quote": "AMS 2 Pro, AMS HT & AMS Compatible"
+    },
+    {
+     "handle": "abs-filament",
+     "evidence_kind": "feature_bullet",
+     "quote": "AMS 2 Pro, AMS HT & AMS Compatible"
+    }
+   ],
+   "to": {
+    "source_handle": "ams-2-pro"
+   }
+  },
+  "H2D Laser": {
+   "kind": "printer",
+   "reason": "same_model_qualified",
+   "seen": 41,
+   "products": 33,
+   "evidence": [
+    {
+     "handle": "part-cooling-fan-air-duct",
+     "evidence_kind": "compat_section",
+     "quote": "H2D and H2D Laser"
+    },
+    {
+     "handle": "toolhead-to-mc-board-cable-h2d-h2c",
+     "evidence_kind": "compat_section",
+     "quote": "H2D and H2D Laser"
+    },
+    {
+     "handle": "hotend-cooling-fan-air-duct",
+     "evidence_kind": "compat_section",
+     "quote": "H2D and H2D Laser"
+    }
+   ],
+   "to": {
+    "source_handle": "h2d"
+   },
+   "qualifier": "Laser"
+  },
+  "AMS lite": {
+   "kind": "ams",
+   "reason": "same_model",
+   "seen": 40,
+   "products": 28,
+   "evidence": [
+    {
+     "handle": "support-for-pa-pet",
+     "evidence_kind": "feature_bullet",
+     "quote": "AMS lite NOT compatible"
+    },
+    {
+     "handle": "pc-filament",
+     "evidence_kind": "feature_bullet",
+     "quote": "AMS lite NOT Compatible"
+    },
+    {
+     "handle": "abs-filament",
+     "evidence_kind": "feature_bullet",
+     "quote": "AMS lite NOT Compatible"
+    }
+   ],
+   "to": {
+    "source_handle": "ams-lite"
+   }
+  },
+  "H2S Laser": {
+   "kind": "printer",
+   "reason": "same_model_qualified",
+   "seen": 36,
+   "products": 24,
+   "evidence": [
+    {
+     "handle": "purge-wiper-h2-series",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2S and H2S Laser"
+    },
+    {
+     "handle": "usb-c-cable-h2-series",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2S and H2S Laser"
+    },
+    {
+     "handle": "cooling-fan-for-hotend-h2",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2S and H2S Laser"
+    }
+   ],
+   "to": {
+    "source_handle": "h2s"
+   },
+   "qualifier": "Laser"
+  },
+  "All AMS Series": {
+   "kind": "family",
+   "reason": "family_members_by_source",
+   "seen": 32,
+   "products": 30,
+   "evidence": [
+    {
+     "handle": "pla-basic-filament",
+     "evidence_kind": "feature_bullet",
+     "quote": "All AMS Series Compatible"
+    },
+    {
+     "handle": "pla-matte",
+     "evidence_kind": "feature_bullet",
+     "quote": "All AMS Series Compatible"
+    },
+    {
+     "handle": "pla-sparkle",
+     "evidence_kind": "feature_bullet",
+     "quote": "All AMS Series Compatible"
+    }
+   ],
+   "family": "ams_series",
+   "members": [
+    {
+     "source_handle": "ams-multicolor-printing"
+    },
+    {
+     "source_handle": "ams-lite"
+    },
+    {
+     "source_handle": "ams-2-pro"
+    },
+    {
+     "source_handle": "ams-ht"
+    }
+   ]
+  },
+  "H2 Series (Laser)": {
+   "kind": "family",
+   "reason": "family_members_qualified",
+   "seen": 30,
+   "products": 16,
+   "evidence": [
+    {
+     "handle": "h2-safety-key",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2 Series (Laser)"
+    },
+    {
+     "handle": "h2-safety-key",
+     "evidence_kind": "compat_section",
+     "quote": "H2 Series (Laser)"
+    },
+    {
+     "handle": "emergency-stop-button",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2 Series (Laser)"
+    }
+   ],
+   "family": "h2_series_laser",
+   "members": [
+    {
+     "source_handle": "h2d"
+    },
+    {
+     "source_handle": "h2s"
+    },
+    {
+     "source_handle": "h2c"
+    }
+   ],
+   "qualifier": "Laser"
+  },
+  "A1": {
+   "kind": "family",
+   "reason": "same_model_incl_refurbished",
+   "seen": 29,
+   "products": 18,
+   "evidence": [
+    {
+     "handle": "bambu-textured-pei-plate",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: A1"
+    },
+    {
+     "handle": "bambu-hotend-a1-a2",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: A1"
+    },
+    {
+     "handle": "toolhead-board-a1-mini",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: A1"
+    }
+   ],
+   "family": "model_a1",
+   "members": [
+    {
+     "source_handle": "a1"
+    },
+    {
+     "source_handle": "refurbished-a1"
+    }
+   ]
+  },
+  "X1C": {
+   "kind": "family",
+   "reason": "same_model_incl_refurbished",
+   "seen": 26,
+   "products": 15,
+   "evidence": [
+    {
+     "handle": "cooling-fan-for-hotend-x1c",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1C"
+    },
+    {
+     "handle": "cooling-fan-for-hotend-x1c",
+     "evidence_kind": "compat_section",
+     "quote": "X1 and X1C (not for X1E)"
+    },
+    {
+     "handle": "thermistor-x1c",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1C"
+    }
+   ],
+   "family": "model_x1c",
+   "members": [
+    {
+     "source_handle": "refurbished-x1c"
+    }
+   ]
+  },
+  "H2 Series (Cutting)": {
+   "kind": "family",
+   "reason": "family_members_qualified",
+   "seen": 14,
+   "products": 7,
+   "evidence": [
+    {
+     "handle": "stronggrip-cutting-mat",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2 Series (Cutting)"
+    },
+    {
+     "handle": "stronggrip-cutting-mat",
+     "evidence_kind": "compat_section",
+     "quote": "H2 Series (Cutting)"
+    },
+    {
+     "handle": "lightgrip-cutting-mat",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2 Series (Cutting)"
+    }
+   ],
+   "family": "h2_series_cutting",
+   "members": [
+    {
+     "source_handle": "h2d"
+    },
+    {
+     "source_handle": "h2s"
+    },
+    {
+     "source_handle": "h2c"
+    }
+   ],
+   "qualifier": "Cutting"
+  },
+  "All Series": {
+   "kind": "family",
+   "reason": "family_all_by_source",
+   "seen": 13,
+   "products": 8,
+   "evidence": [
+    {
+     "handle": "glue-stick-for-build-plate",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: All Series"
+    },
+    {
+     "handle": "glue-stick-for-build-plate",
+     "evidence_kind": "compat_section",
+     "quote": "All Series"
+    },
+    {
+     "handle": "bambu-scraper-3-pcs",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: All Series"
+    }
+   ],
+   "family": "all_bambu_printers",
+   "members": [
+    {
+     "source_handle": "a1"
+    },
+    {
+     "source_handle": "a1-mini"
+    },
+    {
+     "source_handle": "a2l"
+    },
+    {
+     "source_handle": "p1s"
+    },
+    {
+     "source_handle": "p2s"
+    },
+    {
+     "source_handle": "x2d"
+    },
+    {
+     "source_handle": "h2d"
+    },
+    {
+     "source_handle": "h2d-pro"
+    },
+    {
+     "source_handle": "h2s"
+    },
+    {
+     "source_handle": "h2c"
+    },
+    {
+     "source_handle": "refurbished-a1"
+    },
+    {
+     "source_handle": "refurbished-p1s"
+    },
+    {
+     "source_handle": "refurbished-bambu-lab-p2s-3d-printer"
+    },
+    {
+     "source_handle": "refurbished-bambu-lab-h2d-3d-printer"
+    },
+    {
+     "source_handle": "refurbished-x1c"
+    }
+   ]
+  },
+  "P1P": {
+   "kind": "printer",
+   "reason": "no_target_in_levonis_or_source",
+   "seen": 9,
+   "products": 6,
+   "evidence": [
+    {
+     "handle": "p1-series-toolhead-cable",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: P1P"
+    },
+    {
+     "handle": "p1p-enclosure-kit",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: P1P"
+    },
+    {
+     "handle": "rear-panel-p1p",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: P1P"
+    }
+   ]
+  },
+  "X1": {
+   "kind": "printer",
+   "reason": "no_target_in_levonis_or_source",
+   "seen": 8,
+   "products": 8,
+   "evidence": [
+    {
+     "handle": "cooling-fan-for-hotend-x1c",
+     "evidence_kind": "compat_section",
+     "quote": "X1 and X1C (not for X1E)"
+    },
+    {
+     "handle": "thermistor-x1c",
+     "evidence_kind": "compat_section",
+     "quote": "X1 and X1C (not for X1E)"
+    },
+    {
+     "handle": "ceramic-heater-x1c",
+     "evidence_kind": "compat_section",
+     "quote": "X1 and X1C (not for X1E)"
+    }
+   ]
+  },
+  "X1E": {
+   "kind": "printer",
+   "reason": "no_target_in_levonis_or_source",
+   "seen": 8,
+   "products": 8,
+   "evidence": [
+    {
+     "handle": "cooling-fan-for-hotend-x1c",
+     "evidence_kind": "compat_section",
+     "quote": "X1 and X1C (not for X1E)"
+    },
+    {
+     "handle": "thermistor-x1c",
+     "evidence_kind": "compat_section",
+     "quote": "X1 and X1C (not for X1E)"
+    },
+    {
+     "handle": "ceramic-heater-x1c",
+     "evidence_kind": "compat_section",
+     "quote": "X1 and X1C (not for X1E)"
+    }
+   ]
+  },
+  "A2 Series": {
+   "kind": "family",
+   "reason": "family_members_by_source",
+   "seen": 5,
+   "products": 5,
+   "evidence": [
+    {
+     "handle": "ams-multicolor-printing",
+     "evidence_kind": "option_value",
+     "quote": "Select the type of printer you plan to use the AMS: A2 Series"
+    },
+    {
+     "handle": "ams-lite",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: A1&A2 Series"
+    },
+    {
+     "handle": "ams-2-pro",
+     "evidence_kind": "option_value",
+     "quote": "Select the type of printer you plan to use the AMS 2 Pro: A2 Series"
+    }
+   ],
+   "family": "a2_series",
+   "members": [
+    {
+     "source_handle": "a2l"
+    }
+   ]
+  },
+  "X2 Series": {
+   "kind": "family",
+   "reason": "family_members_by_source",
+   "seen": 5,
+   "products": 5,
+   "evidence": [
+    {
+     "handle": "bambu-3d-effect-plate",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1/P1/A1/P2/X2"
+    },
+    {
+     "handle": "cyberbrick-timelapse-kit",
+     "evidence_kind": "option_value",
+     "quote": "Select your printer series: X2 / A2 Series"
+    },
+    {
+     "handle": "filament-cutter-lever-x2d",
+     "evidence_kind": "compat_section",
+     "quote": "X2 Series"
+    }
+   ],
+   "family": "x2_series",
+   "members": [
+    {
+     "source_handle": "x2d"
+    }
+   ]
+  },
+  "P1S": {
+   "kind": "family",
+   "reason": "same_model_incl_refurbished",
+   "seen": 4,
+   "products": 3,
+   "evidence": [
+    {
+     "handle": "activated-carbon-air-filter-x1-p1-series",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1 Series and P1S"
+    },
+    {
+     "handle": "front-glass-door",
+     "evidence_kind": "compat_section",
+     "quote": "X1 Series and P1S"
+    },
+    {
+     "handle": "ap-board-p1s",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: P1S"
+    }
+   ],
+   "family": "model_p1s",
+   "members": [
+    {
+     "source_handle": "p1s"
+    },
+    {
+     "source_handle": "refurbished-p1s"
+    }
+   ]
+  },
+  "H2 Series (Laser & Cutting)": {
+   "kind": "family",
+   "reason": "family_members_qualified",
+   "seen": 4,
+   "products": 2,
+   "evidence": [
+    {
+     "handle": "birds-eye-camera",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2 Series (Laser & Cutting)"
+    },
+    {
+     "handle": "birds-eye-camera",
+     "evidence_kind": "compat_section",
+     "quote": "H2 Series (Laser & Cutting)"
+    },
+    {
+     "handle": "quick-release-lever-unit",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2 Series (Laser & Cutting)"
+    }
+   ],
+   "family": "h2_series_laser_cutting",
+   "members": [
+    {
+     "source_handle": "h2d"
+    },
+    {
+     "source_handle": "h2s"
+    },
+    {
+     "source_handle": "h2c"
+    }
+   ],
+   "qualifier": "Laser & Cutting"
+  },
+  "Smoke Purifier": {
+   "kind": "other",
+   "reason": "same_model",
+   "seen": 4,
+   "products": 2,
+   "evidence": [
+    {
+     "handle": "smoke-purifier-air-filter",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: Smoke Purifier"
+    },
+    {
+     "handle": "smoke-purifier-air-filter",
+     "evidence_kind": "compat_section",
+     "quote": "Smoke Purifier"
+    },
+    {
+     "handle": "smoke-ventilation-pipe-2m",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2 Series(Laser)/Smoke Purifier/Ventilation"
+    }
+   ],
+   "to": {
+    "source_handle": "smoke-purifier"
+   }
+  },
+  "H2C (Right Hotend)": {
+   "kind": "printer",
+   "reason": "same_model_qualified",
+   "seen": 3,
+   "products": 3,
+   "evidence": [
+    {
+     "handle": "silicone-sock-for-hotend",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2C (Right Hotend)"
+    },
+    {
+     "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2C (Right Hotend)"
+    },
+    {
+     "handle": "multi-size-hotends-kit",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2C (Right Hotend)"
+    }
+   ],
+   "to": {
+    "source_handle": "h2c"
+   },
+   "qualifier": "Right Hotend"
+  },
+  "Rotary Attachment": {
+   "kind": "part",
+   "reason": "same_model",
+   "seen": 3,
+   "products": 3,
+   "evidence": [
+    {
+     "handle": "support-module",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: Rotary Attachment"
+    },
+    {
+     "handle": "bambu-bus-cable-4-pin",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: Rotary Attachment"
+    },
+    {
+     "handle": "rotary-attachment-accessory-kit",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: Rotary Attachment"
+    }
+   ],
+   "to": {
+    "source_handle": "rotary-attachment"
+   }
+  },
+  "Bambu Lab Rotary Attachment": {
+   "kind": "part",
+   "reason": "same_model",
+   "seen": 3,
+   "products": 3,
+   "evidence": [
+    {
+     "handle": "support-module",
+     "evidence_kind": "compat_section",
+     "quote": "Bambu Lab Rotary Attachment"
+    },
+    {
+     "handle": "bambu-bus-cable-4-pin",
+     "evidence_kind": "compat_section",
+     "quote": "Bambu Lab Rotary Attachment"
+    },
+    {
+     "handle": "rotary-attachment-accessory-kit",
+     "evidence_kind": "compat_section",
+     "quote": "Bambu Lab Rotary Attachment"
+    }
+   ],
+   "alias_of": "Rotary Attachment",
+   "to": {
+    "source_handle": "rotary-attachment"
+   }
+  },
+  "H2C (Left Hotend)": {
+   "kind": "printer",
+   "reason": "same_model_qualified",
+   "seen": 2,
+   "products": 2,
+   "evidence": [
+    {
+     "handle": "silicone-sock-for-hotend",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2C (Left Hotend)"
+    },
+    {
+     "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2C (Left Hotend)"
+    }
+   ],
+   "to": {
+    "source_handle": "h2c"
+   },
+   "qualifier": "Left Hotend"
+  },
+  "H2C (Left)": {
+   "kind": "printer",
+   "reason": "same_model_qualified",
+   "seen": 2,
+   "products": 2,
+   "evidence": [
+    {
+     "handle": "bambu-hotend-h2-p2s",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2C (Left)"
+    },
+    {
+     "handle": "tungsten-carbide-nozzle-h2-p2s",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2C (Left)"
+    }
+   ],
+   "to": {
+    "source_handle": "h2c"
+   },
+   "qualifier": "Left"
+  },
+  "X1/P1 Non-Combo Printers": {
+   "kind": "family",
+   "reason": "family_members_qualified",
+   "seen": 2,
+   "products": 2,
+   "evidence": [
+    {
+     "handle": "ams-2-pro-upgrade-compatibility-kit",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1/P1 Non-Combo Printers"
+    },
+    {
+     "handle": "ams-ams-ht-upgrade-compatibility-kit",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1/P1 Non-Combo Printers"
+    }
+   ],
+   "family": "x1_p1_non_combo",
+   "members": [
+    {
+     "source_handle": "refurbished-x1c"
+    },
+    {
+     "source_handle": "p1s"
+    },
+    {
+     "source_handle": "refurbished-p1s"
+    }
+   ]
+  },
+  "X2D (Left)": {
+   "kind": "printer",
+   "reason": "same_model_qualified",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "replacement-filament-cutter",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: X2D (Left)"
+    }
+   ],
+   "to": {
+    "source_handle": "x2d"
+   },
+   "qualifier": "Left"
+  },
+  "X2D (Right)": {
+   "kind": "printer",
+   "reason": "same_model_qualified",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "replacement-filament-cutter",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: X2D (Right)"
+    }
+   ],
+   "to": {
+    "source_handle": "x2d"
+   },
+   "qualifier": "Right"
+  },
+  "H2 Laser": {
+   "kind": "family",
+   "reason": "family_alias",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "smoke-purifier",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2 Laser/R1"
+    }
+   ],
+   "family": "h2_series_laser",
+   "members": [
+    {
+     "source_handle": "h2d"
+    },
+    {
+     "source_handle": "h2s"
+    },
+    {
+     "source_handle": "h2c"
+    }
+   ],
+   "qualifier": "Laser"
+  },
+  "H2D Pro": {
+   "kind": "printer",
+   "reason": "same_model",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "h2d-tpu-high-flow-kit",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2D/H2D Pro"
+    }
+   ],
+   "to": {
+    "source_handle": "h2d-pro"
+   }
+  },
+  "H2D/H2S/H2C (Left Hotend)": {
+   "kind": "family",
+   "reason": "family_members_qualified",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "multi-size-hotends-kit",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2D/H2S/H2C (Left Hotend)"
+    }
+   ],
+   "family": "h2_series_left",
+   "members": [
+    {
+     "source_handle": "h2d"
+    },
+    {
+     "source_handle": "h2s"
+    },
+    {
+     "source_handle": "h2c"
+    }
+   ],
+   "qualifier": "Left Hotend"
+  }
+ },
+ "compounds": {
+  "R1": {
+   "atoms": [
+    "R1"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 151,
+   "products": 79,
+   "evidence": [
+    {
+     "handle": "auto-fire-extinguishing-system",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: R1"
+    },
+    {
+     "handle": "rotary-attachment",
+     "evidence_kind": "option_value",
+     "quote": "Compatible: R1"
+    }
+   ]
+  },
+  "X2D": {
+   "atoms": [
+    "X2D"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 116,
+   "products": 66,
+   "evidence": [
+    {
+     "handle": "ams-multicolor-printing",
+     "evidence_kind": "option_value",
+     "quote": "Select the type of printer you plan to use the AMS: X2D"
+    },
+    {
+     "handle": "silicone-sock-for-hotend",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: X2D"
+    }
+   ]
+  },
+  "H2 Series": {
+   "atoms": [
+    "H2 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 110,
+   "products": 65,
+   "evidence": [
+    {
+     "handle": "printer-cable-pack-7-in-1",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2 Series"
+    },
+    {
+     "handle": "printer-cable-pack-7-in-1",
+     "evidence_kind": "compat_section",
+     "quote": "H2 Series"
+    }
+   ]
+  },
+  "A2L": {
+   "atoms": [
+    "A2L"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 106,
+   "products": 57,
+   "evidence": [
+    {
+     "handle": "replacement-filament-cutter",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: A2L"
+    },
+    {
+     "handle": "silicone-sock-for-hotend",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: A2L"
+    }
+   ]
+  },
+  "P2S": {
+   "atoms": [
+    "P2S"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 72,
+   "products": 70,
+   "evidence": [
+    {
+     "handle": "replacement-filament-cutter",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: P2S"
+    },
+    {
+     "handle": "ams-multicolor-printing",
+     "evidence_kind": "option_value",
+     "quote": "Select the type of printer you plan to use the AMS: P2S"
+    }
+   ]
+  },
+  "X1 Series and P1 Series": {
+   "atoms": [
+    "X1 Series",
+    "P1 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 67,
+   "products": 40,
+   "evidence": [
+    {
+     "handle": "filament-buffer",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1 Series and P1 Series"
+    },
+    {
+     "handle": "filament-buffer",
+     "evidence_kind": "compat_section",
+     "quote": "X1 Series and P1 Series"
+    }
+   ]
+  },
+  "P2 Series": {
+   "atoms": [
+    "P2 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 56,
+   "products": 56,
+   "evidence": [
+    {
+     "handle": "cyberbrick-timelapse-kit",
+     "evidence_kind": "option_value",
+     "quote": "Select your printer series: P2 Series"
+    },
+    {
+     "handle": "extruder-gear-assembly-p2s",
+     "evidence_kind": "compat_section",
+     "quote": "P2 Series"
+    }
+   ]
+  },
+  "H2C and H2C Laser": {
+   "atoms": [
+    "H2C",
+    "H2C Laser"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 55,
+   "products": 39,
+   "evidence": [
+    {
+     "handle": "part-cooling-fan-air-duct",
+     "evidence_kind": "compat_section",
+     "quote": "H2C and H2C Laser"
+    },
+    {
+     "handle": "toolhead-to-mc-board-cable-h2d-h2c",
+     "evidence_kind": "compat_section",
+     "quote": "H2C and H2C Laser"
+    }
+   ]
+  },
+  "A1 mini": {
+   "atoms": [
+    "A1 mini"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 46,
+   "products": 30,
+   "evidence": [
+    {
+     "handle": "bambu-textured-pei-plate",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: A1 mini"
+    },
+    {
+     "handle": "bambu-hotend-a1-a2",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: A1 mini"
+    }
+   ]
+  },
+  "H2D and H2D Laser": {
+   "atoms": [
+    "H2D",
+    "H2D Laser"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 39,
+   "products": 31,
+   "evidence": [
+    {
+     "handle": "part-cooling-fan-air-duct",
+     "evidence_kind": "compat_section",
+     "quote": "H2D and H2D Laser"
+    },
+    {
+     "handle": "toolhead-to-mc-board-cable-h2d-h2c",
+     "evidence_kind": "compat_section",
+     "quote": "H2D and H2D Laser"
+    }
+   ]
+  },
+  "A1 Series": {
+   "atoms": [
+    "A1 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 35,
+   "products": 24,
+   "evidence": [
+    {
+     "handle": "replacement-filament-cutter",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: A1 Series"
+    },
+    {
+     "handle": "ams-multicolor-printing",
+     "evidence_kind": "option_value",
+     "quote": "Select the type of printer you plan to use the AMS: A1 Series"
+    }
+   ]
+  },
+  "AMS HT": {
+   "atoms": [
+    "AMS HT"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 35,
+   "products": 18,
+   "evidence": [
+    {
+     "handle": "tpu-85a-tpu-90a",
+     "evidence_kind": "feature_bullet",
+     "quote": "AMS HT Compatible"
+    },
+    {
+     "handle": "ams-ht-top-lid",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: AMS HT"
+    }
+   ]
+  },
+  "H2S and H2S Laser": {
+   "atoms": [
+    "H2S",
+    "H2S Laser"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 34,
+   "products": 22,
+   "evidence": [
+    {
+     "handle": "purge-wiper-h2-series",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2S and H2S Laser"
+    },
+    {
+     "handle": "usb-c-cable-h2-series",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2S and H2S Laser"
+    }
+   ]
+  },
+  "AMS lite": {
+   "atoms": [
+    "AMS lite"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 33,
+   "products": 26,
+   "evidence": [
+    {
+     "handle": "support-for-pa-pet",
+     "evidence_kind": "feature_bullet",
+     "quote": "AMS lite NOT compatible"
+    },
+    {
+     "handle": "pc-filament",
+     "evidence_kind": "feature_bullet",
+     "quote": "AMS lite NOT Compatible"
+    }
+   ]
+  },
+  "All AMS Series": {
+   "atoms": [
+    "All AMS Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 32,
+   "products": 30,
+   "evidence": [
+    {
+     "handle": "pla-basic-filament",
+     "evidence_kind": "feature_bullet",
+     "quote": "All AMS Series Compatible"
+    },
+    {
+     "handle": "pla-matte",
+     "evidence_kind": "feature_bullet",
+     "quote": "All AMS Series Compatible"
+    }
+   ]
+  },
+  "P1 Series": {
+   "atoms": [
+    "P1 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 31,
+   "products": 26,
+   "evidence": [
+    {
+     "handle": "replacement-filament-cutter",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: P1 Series"
+    },
+    {
+     "handle": "silicone-sock-for-hotend",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: P1 Series"
+    }
+   ]
+  },
+  "H2 Series (Laser)": {
+   "atoms": [
+    "H2 Series (Laser)"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 28,
+   "products": 15,
+   "evidence": [
+    {
+     "handle": "h2-safety-key",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2 Series (Laser)"
+    },
+    {
+     "handle": "h2-safety-key",
+     "evidence_kind": "compat_section",
+     "quote": "H2 Series (Laser)"
+    }
+   ]
+  },
+  "AMS 2 Pro": {
+   "atoms": [
+    "AMS 2 Pro"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 26,
+   "products": 13,
+   "evidence": [
+    {
+     "handle": "ams-2-pro-top-lid",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: AMS 2 Pro"
+    },
+    {
+     "handle": "ams-2-pro-top-lid",
+     "evidence_kind": "compat_section",
+     "quote": "AMS 2 Pro"
+    }
+   ]
+  },
+  "H2S": {
+   "atoms": [
+    "H2S"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 22,
+   "products": 22,
+   "evidence": [
+    {
+     "handle": "replacement-filament-cutter",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2S"
+    },
+    {
+     "handle": "ams-multicolor-printing",
+     "evidence_kind": "option_value",
+     "quote": "Select the type of printer you plan to use the AMS: H2S"
+    }
+   ]
+  },
+  "X1 Series": {
+   "atoms": [
+    "X1 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 21,
+   "products": 20,
+   "evidence": [
+    {
+     "handle": "front-housing-assembly-x1-series",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1 Series"
+    },
+    {
+     "handle": "high-resolution-screen",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1 Series"
+    }
+   ]
+  },
+  "H2D and H2C": {
+   "atoms": [
+    "H2D",
+    "H2C"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 21,
+   "products": 21,
+   "evidence": [
+    {
+     "handle": "part-cooling-fan-air-duct",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2D and H2C"
+    },
+    {
+     "handle": "purge-wiper-h2-series",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2D and H2C"
+    }
+   ]
+  },
+  "X1 Series Exclusive": {
+   "atoms": [
+    "X1 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 18,
+   "products": 17,
+   "evidence": [
+    {
+     "handle": "front-housing-assembly-x1-series",
+     "evidence_kind": "compat_section",
+     "quote": "X1 Series Exclusive"
+    },
+    {
+     "handle": "high-resolution-screen",
+     "evidence_kind": "compat_section",
+     "quote": "X1 Series Exclusive"
+    }
+   ]
+  },
+  "AMS": {
+   "atoms": [
+    "AMS"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 18,
+   "products": 18,
+   "evidence": [
+    {
+     "handle": "ams-driven-support-shaft-assembly",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: AMS"
+    },
+    {
+     "handle": "ams-active-support-shaft-assembly",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: AMS"
+    }
+   ]
+  },
+  "H2D": {
+   "atoms": [
+    "H2D"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 17,
+   "products": 17,
+   "evidence": [
+    {
+     "handle": "replacement-filament-cutter",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2D"
+    },
+    {
+     "handle": "silicone-sock-for-hotend",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2D"
+    }
+   ]
+  },
+  "0.2 mm Nozzle": {
+   "atoms": [
+    "0.2 mm Nozzle"
+   ],
+   "not_atoms": [],
+   "relation": "not_compatible_with",
+   "seen": 16,
+   "products": 16,
+   "evidence": [
+    {
+     "handle": "pla-sparkle",
+     "evidence_kind": "feature_bullet",
+     "quote": "0.2 mm Nozzle NOT Compatible"
+    },
+    {
+     "handle": "pla-marble",
+     "evidence_kind": "feature_bullet",
+     "quote": "0.2 mm Nozzle NOT Compatible"
+    }
+   ]
+  },
+  "X1C": {
+   "atoms": [
+    "X1C"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 15,
+   "products": 14,
+   "evidence": [
+    {
+     "handle": "cooling-fan-for-hotend-x1c",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1C"
+    },
+    {
+     "handle": "thermistor-x1c",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1C"
+    }
+   ]
+  },
+  "A1": {
+   "atoms": [
+    "A1"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 15,
+   "products": 15,
+   "evidence": [
+    {
+     "handle": "bambu-textured-pei-plate",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: A1"
+    },
+    {
+     "handle": "bambu-hotend-a1-a2",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: A1"
+    }
+   ]
+  },
+  "H2C": {
+   "atoms": [
+    "H2C"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 14,
+   "products": 13,
+   "evidence": [
+    {
+     "handle": "replacement-filament-cutter",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2C"
+    },
+    {
+     "handle": "bambu-textured-pei-plate",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2C"
+    }
+   ]
+  },
+  "H2D/H2C": {
+   "atoms": [
+    "H2D",
+    "H2C"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 14,
+   "products": 14,
+   "evidence": [
+    {
+     "handle": "ams-multicolor-printing",
+     "evidence_kind": "option_value",
+     "quote": "Select the type of printer you plan to use the AMS: H2D/H2C"
+    },
+    {
+     "handle": "nozzle-blocker-magnet-bracket-h2d-h2c",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2D/H2C"
+    }
+   ]
+  },
+  "Works with Bambu Lab AMS": {
+   "atoms": [
+    "AMS"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 14,
+   "products": 14,
+   "evidence": [
+    {
+     "handle": "ams-driven-support-shaft-assembly",
+     "evidence_kind": "compat_section",
+     "quote": "Works with Bambu Lab AMS"
+    },
+    {
+     "handle": "ams-active-support-shaft-assembly",
+     "evidence_kind": "compat_section",
+     "quote": "Works with Bambu Lab AMS"
+    }
+   ]
+  },
+  "P1 Series Exclusive": {
+   "atoms": [
+    "P1 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 14,
+   "products": 14,
+   "evidence": [
+    {
+     "handle": "ceramic-heater-thermistor-p1p",
+     "evidence_kind": "compat_section",
+     "quote": "P1 Series Exclusive"
+    },
+    {
+     "handle": "cooling-fan-for-hotend-p1p",
+     "evidence_kind": "compat_section",
+     "quote": "P1 Series Exclusive"
+    }
+   ]
+  },
+  "H2 Series (Cutting)": {
+   "atoms": [
+    "H2 Series (Cutting)"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 14,
+   "products": 7,
+   "evidence": [
+    {
+     "handle": "stronggrip-cutting-mat",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2 Series (Cutting)"
+    },
+    {
+     "handle": "stronggrip-cutting-mat",
+     "evidence_kind": "compat_section",
+     "quote": "H2 Series (Cutting)"
+    }
+   ]
+  },
+  "All Series": {
+   "atoms": [
+    "All Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 13,
+   "products": 8,
+   "evidence": [
+    {
+     "handle": "glue-stick-for-build-plate",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: All Series"
+    },
+    {
+     "handle": "glue-stick-for-build-plate",
+     "evidence_kind": "compat_section",
+     "quote": "All Series"
+    }
+   ]
+  },
+  "AMS 2 Pro, AMS HT & AMS": {
+   "atoms": [
+    "AMS 2 Pro",
+    "AMS HT",
+    "AMS"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 12,
+   "products": 12,
+   "evidence": [
+    {
+     "handle": "support-for-pa-pet",
+     "evidence_kind": "feature_bullet",
+     "quote": "AMS 2 Pro, AMS HT & AMS compatible"
+    },
+    {
+     "handle": "pc-filament",
+     "evidence_kind": "feature_bullet",
+     "quote": "AMS 2 Pro, AMS HT & AMS Compatible"
+    }
+   ]
+  },
+  "X1 and X1C (not for X1E)": {
+   "atoms": [
+    "X1",
+    "X1C"
+   ],
+   "not_atoms": [
+    "X1E"
+   ],
+   "relation": "compatible_with",
+   "seen": 8,
+   "products": 8,
+   "evidence": [
+    {
+     "handle": "cooling-fan-for-hotend-x1c",
+     "evidence_kind": "compat_section",
+     "quote": "X1 and X1C (not for X1E)"
+    },
+    {
+     "handle": "thermistor-x1c",
+     "evidence_kind": "compat_section",
+     "quote": "X1 and X1C (not for X1E)"
+    }
+   ]
+  },
+  "A1 Exclusive": {
+   "atoms": [
+    "A1"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 8,
+   "products": 8,
+   "evidence": [
+    {
+     "handle": "bambu-usb-c-cable-a1",
+     "evidence_kind": "compat_section",
+     "quote": "A1 Exclusive"
+    },
+    {
+     "handle": "live-view-camera-a1",
+     "evidence_kind": "compat_section",
+     "quote": "A1 Exclusive"
+    }
+   ]
+  },
+  "X1 Series, P1 Series": {
+   "atoms": [
+    "X1 Series",
+    "P1 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 7,
+   "products": 7,
+   "evidence": [
+    {
+     "handle": "control-board-fan",
+     "evidence_kind": "compat_section",
+     "quote": "X1 Series, P1 Series"
+    },
+    {
+     "handle": "chamber-temperature-regulator-fan",
+     "evidence_kind": "compat_section",
+     "quote": "X1 Series, P1 Series"
+    }
+   ]
+  },
+  "X1/P1 Series": {
+   "atoms": [
+    "X1 Series",
+    "P1 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 6,
+   "products": 6,
+   "evidence": [
+    {
+     "handle": "ams-multicolor-printing",
+     "evidence_kind": "option_value",
+     "quote": "Select the type of printer you plan to use the AMS: X1/P1 Series"
+    },
+    {
+     "handle": "z-axis-tensioner-x1-series-and-p1-series",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1/P1 Series"
+    }
+   ]
+  },
+  "P1P": {
+   "atoms": [
+    "P1P"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 6,
+   "products": 6,
+   "evidence": [
+    {
+     "handle": "p1-series-toolhead-cable",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: P1P"
+    },
+    {
+     "handle": "p1p-enclosure-kit",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: P1P"
+    }
+   ]
+  },
+  "P2S/X2D": {
+   "atoms": [
+    "P2S",
+    "X2D"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 6,
+   "products": 4,
+   "evidence": [
+    {
+     "handle": "spool-holder-p2s-x2d",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: P2S/X2D"
+    },
+    {
+     "handle": "spool-holder-p2s-x2d",
+     "evidence_kind": "compat_section",
+     "quote": "P2S/X2D"
+    }
+   ]
+  },
+  "A1 mini Exclusive": {
+   "atoms": [
+    "A1 mini"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 5,
+   "products": 5,
+   "evidence": [
+    {
+     "handle": "base-housing-a1-mini",
+     "evidence_kind": "compat_section",
+     "quote": "A1 mini Exclusive"
+    },
+    {
+     "handle": "baseplate-a1-mini",
+     "evidence_kind": "compat_section",
+     "quote": "A1 mini Exclusive"
+    }
+   ]
+  },
+  "AMS lite Exclusive": {
+   "atoms": [
+    "AMS lite"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 5,
+   "products": 5,
+   "evidence": [
+    {
+     "handle": "ams-lite-mainboard",
+     "evidence_kind": "compat_section",
+     "quote": "AMS lite Exclusive"
+    },
+    {
+     "handle": "ams-lite-feeder-support",
+     "evidence_kind": "compat_section",
+     "quote": "AMS lite Exclusive"
+    }
+   ]
+  },
+  "H2 Series (Laser & Cutting)": {
+   "atoms": [
+    "H2 Series (Laser & Cutting)"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 4,
+   "products": 2,
+   "evidence": [
+    {
+     "handle": "birds-eye-camera",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2 Series (Laser & Cutting)"
+    },
+    {
+     "handle": "birds-eye-camera",
+     "evidence_kind": "compat_section",
+     "quote": "H2 Series (Laser & Cutting)"
+    }
+   ]
+  },
+  "H2 Series/A2L": {
+   "atoms": [
+    "H2 Series",
+    "A2L"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 4,
+   "products": 3,
+   "evidence": [
+    {
+     "handle": "cutting-essentials-refill-pack",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2 Series/A2L"
+    },
+    {
+     "handle": "cutting-essentials-refill-pack",
+     "evidence_kind": "compat_section",
+     "quote": "H2 Series/A2L"
+    }
+   ]
+  },
+  "A2 Series": {
+   "atoms": [
+    "A2 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 3,
+   "products": 3,
+   "evidence": [
+    {
+     "handle": "ams-multicolor-printing",
+     "evidence_kind": "option_value",
+     "quote": "Select the type of printer you plan to use the AMS: A2 Series"
+    },
+    {
+     "handle": "ams-2-pro",
+     "evidence_kind": "option_value",
+     "quote": "Select the type of printer you plan to use the AMS 2 Pro: A2 Series"
+    }
+   ]
+  },
+  "H2C (Right Hotend)": {
+   "atoms": [
+    "H2C (Right Hotend)"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 3,
+   "products": 3,
+   "evidence": [
+    {
+     "handle": "silicone-sock-for-hotend",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2C (Right Hotend)"
+    },
+    {
+     "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2C (Right Hotend)"
+    }
+   ]
+  },
+  "P1P Exclusive": {
+   "atoms": [
+    "P1P"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 3,
+   "products": 3,
+   "evidence": [
+    {
+     "handle": "rear-panel-p1p",
+     "evidence_kind": "compat_section",
+     "quote": "P1P Exclusive"
+    },
+    {
+     "handle": "ap-board-p1p",
+     "evidence_kind": "compat_section",
+     "quote": "P1P Exclusive"
+    }
+   ]
+  },
+  "A1/A2L": {
+   "atoms": [
+    "A1",
+    "A2L"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 3,
+   "products": 3,
+   "evidence": [
+    {
+     "handle": "touch-screen-a1-a2l",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: A1/A2L"
+    },
+    {
+     "handle": "ams-lite-top-mount-screws-kit",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: A1/A2L"
+    }
+   ],
+   "atoms_reviewed": {
+    "why": "names the A1 model, not the A1 Series",
+    "evidence": [
+     {
+      "handle": "touch-screen-a1-a2l",
+      "evidence_kind": "compat_section",
+      "quote": "A1, A2L"
+     },
+     {
+      "handle": "touch-screen-a1-mini",
+      "evidence_kind": "title",
+      "quote": "Touch Screen - A1 mini"
+     },
+     {
+      "handle": "heatbed-nozzle-wiper-a1-mini",
+      "evidence_kind": "title",
+      "quote": "Heatbed Nozzle Wiper - A1 mini"
+     }
+    ]
+   }
+  },
+  "A1, A2L": {
+   "atoms": [
+    "A1",
+    "A2L"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 3,
+   "products": 3,
+   "evidence": [
+    {
+     "handle": "touch-screen-a1-a2l",
+     "evidence_kind": "compat_section",
+     "quote": "A1, A2L"
+    },
+    {
+     "handle": "ams-lite-top-mount-screws-kit",
+     "evidence_kind": "compat_section",
+     "quote": "A1, A2L"
+    }
+   ]
+  },
+  "A1 Series Exclusive": {
+   "atoms": [
+    "A1 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 3,
+   "products": 3,
+   "evidence": [
+    {
+     "handle": "extruder-motor-a1-series",
+     "evidence_kind": "compat_section",
+     "quote": "A1 Series Exclusive"
+    },
+    {
+     "handle": "toolhead-block-a1-series",
+     "evidence_kind": "compat_section",
+     "quote": "A1 Series Exclusive"
+    }
+   ]
+  },
+  "AMS 2 Pro and AMS HT": {
+   "atoms": [
+    "AMS 2 Pro",
+    "AMS HT"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 3,
+   "products": 2,
+   "evidence": [
+    {
+     "handle": "3520-ams-internal-assist-motor",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: AMS 2 Pro and AMS HT"
+    },
+    {
+     "handle": "3520-ams-internal-assist-motor",
+     "evidence_kind": "compat_section",
+     "quote": "AMS 2 Pro and AMS HT"
+    }
+   ]
+  },
+  "Rotary Attachment": {
+   "atoms": [
+    "Rotary Attachment"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 3,
+   "products": 3,
+   "evidence": [
+    {
+     "handle": "support-module",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: Rotary Attachment"
+    },
+    {
+     "handle": "bambu-bus-cable-4-pin",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: Rotary Attachment"
+    }
+   ]
+  },
+  "Bambu Lab Rotary Attachment": {
+   "atoms": [
+    "Bambu Lab Rotary Attachment"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 3,
+   "products": 3,
+   "evidence": [
+    {
+     "handle": "support-module",
+     "evidence_kind": "compat_section",
+     "quote": "Bambu Lab Rotary Attachment"
+    },
+    {
+     "handle": "bambu-bus-cable-4-pin",
+     "evidence_kind": "compat_section",
+     "quote": "Bambu Lab Rotary Attachment"
+    }
+   ]
+  },
+  "X2D/P2S": {
+   "atoms": [
+    "X2D",
+    "P2S"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 3,
+   "products": 3,
+   "evidence": [
+    {
+     "handle": "purge-chute-x2-p2",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X2D/P2S"
+    },
+    {
+     "handle": "multi-size-hotends-kit",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: X2D/P2S"
+    }
+   ]
+  },
+  "X1 Series and P1S": {
+   "atoms": [
+    "X1 Series",
+    "P1S"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 2,
+   "products": 2,
+   "evidence": [
+    {
+     "handle": "activated-carbon-air-filter-x1-p1-series",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1 Series and P1S"
+    },
+    {
+     "handle": "front-glass-door",
+     "evidence_kind": "compat_section",
+     "quote": "X1 Series and P1S"
+    }
+   ]
+  },
+  "X1 Series & P1 Series & P2S": {
+   "atoms": [
+    "X1 Series",
+    "P1 Series",
+    "P2S"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 2,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "z-belt",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1 Series & P1 Series & P2S"
+    },
+    {
+     "handle": "z-belt",
+     "evidence_kind": "compat_section",
+     "quote": "X1 Series & P1 Series & P2S"
+    }
+   ]
+  },
+  "H2C (Left Hotend)": {
+   "atoms": [
+    "H2C (Left Hotend)"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 2,
+   "products": 2,
+   "evidence": [
+    {
+     "handle": "silicone-sock-for-hotend",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2C (Left Hotend)"
+    },
+    {
+     "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2C (Left Hotend)"
+    }
+   ]
+  },
+  "Works with Bambu AMS": {
+   "atoms": [
+    "AMS"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 2,
+   "products": 2,
+   "evidence": [
+    {
+     "handle": "ams-internal-hub-unit",
+     "evidence_kind": "compat_section",
+     "quote": "Works with Bambu AMS"
+    },
+    {
+     "handle": "ams-internal-hub-motor",
+     "evidence_kind": "compat_section",
+     "quote": "Works with Bambu AMS"
+    }
+   ]
+  },
+  "P1 Series and X1 Series": {
+   "atoms": [
+    "P1 Series",
+    "X1 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 2,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "purge-chute",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: P1 Series and X1 Series"
+    },
+    {
+     "handle": "purge-chute",
+     "evidence_kind": "compat_section",
+     "quote": "P1 Series and X1 Series"
+    }
+   ]
+  },
+  "X1C and P1 Series": {
+   "atoms": [
+    "X1C",
+    "P1 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 2,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "internal-power-supply",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1C and P1 Series"
+    },
+    {
+     "handle": "internal-power-supply",
+     "evidence_kind": "compat_section",
+     "quote": "X1C and P1 Series"
+    }
+   ]
+  },
+  "Smoke Purifier": {
+   "atoms": [
+    "Smoke Purifier"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 2,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "smoke-purifier-air-filter",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: Smoke Purifier"
+    },
+    {
+     "handle": "smoke-purifier-air-filter",
+     "evidence_kind": "compat_section",
+     "quote": "Smoke Purifier"
+    }
+   ]
+  },
+  "H2C (Left)": {
+   "atoms": [
+    "H2C (Left)"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 2,
+   "products": 2,
+   "evidence": [
+    {
+     "handle": "bambu-hotend-h2-p2s",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2C (Left)"
+    },
+    {
+     "handle": "tungsten-carbide-nozzle-h2-p2s",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2C (Left)"
+    }
+   ]
+  },
+  "H2 Series(Laser)/Smoke Purifier/Ventilation": {
+   "atoms": [
+    "H2 Series (Laser)",
+    "Smoke Purifier",
+    "Ventilation"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 2,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "smoke-ventilation-pipe-2m",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2 Series(Laser)/Smoke Purifier/Ventilation"
+    },
+    {
+     "handle": "smoke-ventilation-pipe-2m",
+     "evidence_kind": "compat_section",
+     "quote": "H2 Series(Laser)/Smoke Purifier/Ventilation"
+    }
+   ]
+  },
+  "X1/P1 Non-Combo Printers": {
+   "atoms": [
+    "X1/P1 Non-Combo Printers"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 2,
+   "products": 2,
+   "evidence": [
+    {
+     "handle": "ams-2-pro-upgrade-compatibility-kit",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1/P1 Non-Combo Printers"
+    },
+    {
+     "handle": "ams-ams-ht-upgrade-compatibility-kit",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1/P1 Non-Combo Printers"
+    }
+   ]
+  },
+  "P2S, X2D": {
+   "atoms": [
+    "P2S",
+    "X2D"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 2,
+   "products": 2,
+   "evidence": [
+    {
+     "handle": "screen-fpc-cable-p2s",
+     "evidence_kind": "compat_section",
+     "quote": "P2S, X2D"
+    },
+    {
+     "handle": "air-filter-for-external-exhaust-fan-kit",
+     "evidence_kind": "compat_section",
+     "quote": "P2S, X2D"
+    }
+   ]
+  },
+  "H2 Series/X1 Series/P1 Series/P2S/X2D": {
+   "atoms": [
+    "H2 Series",
+    "X1 Series",
+    "P1 Series",
+    "P2S",
+    "X2D"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 2,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "tpu-feed-assist-module",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2 Series/X1 Series/P1 Series/P2S/X2D"
+    },
+    {
+     "handle": "tpu-feed-assist-module",
+     "evidence_kind": "compat_section",
+     "quote": "H2 Series/X1 Series/P1 Series/P2S/X2D"
+    }
+   ]
+  },
+  "X2 Series": {
+   "atoms": [
+    "X2 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 2,
+   "products": 2,
+   "evidence": [
+    {
+     "handle": "filament-cutter-lever-x2d",
+     "evidence_kind": "compat_section",
+     "quote": "X2 Series"
+    },
+    {
+     "handle": "inner-lining-x2d",
+     "evidence_kind": "compat_section",
+     "quote": "X2 Series"
+    }
+   ]
+  },
+  "For AMS, X1 Series and P1 Series": {
+   "atoms": [
+    "AMS",
+    "X1 Series",
+    "P1 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "bambu-bus-cable",
+     "evidence_kind": "compat_section",
+     "quote": "For AMS, X1 Series and P1 Series"
+    }
+   ]
+  },
+  "X2D (Left)": {
+   "atoms": [
+    "X2D (Left)"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "replacement-filament-cutter",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: X2D (Left)"
+    }
+   ]
+  },
+  "X2D (Right)": {
+   "atoms": [
+    "X2D (Right)"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "replacement-filament-cutter",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: X2D (Right)"
+    }
+   ]
+  },
+  "P1 Series and A1 mini": {
+   "atoms": [
+    "P1 Series",
+    "A1 mini"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "wifi-antenna-p1-series-and-a1-mini",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: P1 Series and A1 mini"
+    }
+   ]
+  },
+  "P1 Series, A1 mini": {
+   "atoms": [
+    "P1 Series",
+    "A1 mini"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "wifi-antenna-p1-series-and-a1-mini",
+     "evidence_kind": "compat_section",
+     "quote": "P1 Series, A1 mini"
+    }
+   ]
+  },
+  "X1 Series and P1 Series Exclusive": {
+   "atoms": [
+    "X1 Series",
+    "P1 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "idler-pulley",
+     "evidence_kind": "compat_section",
+     "quote": "X1 Series and P1 Series Exclusive"
+    }
+   ]
+  },
+  "X1C Exclusive": {
+   "atoms": [
+    "X1C"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "front-cover-x1c",
+     "evidence_kind": "compat_section",
+     "quote": "X1C Exclusive"
+    }
+   ]
+  },
+  "A1&A2 Series": {
+   "atoms": [
+    "A1 Series",
+    "A2 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "ams-lite",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: A1&A2 Series"
+    }
+   ]
+  },
+  "Stainless Steel Nozzles": {
+   "atoms": [
+    "Stainless Steel Nozzles"
+   ],
+   "not_atoms": [],
+   "relation": "not_compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "pla-glow",
+     "evidence_kind": "feature_bullet",
+     "quote": "Stainless Steel Nozzles NOT Compatible"
+    }
+   ]
+  },
+  "0.2 mm nozzles": {
+   "atoms": [
+    "0.2 mm nozzles"
+   ],
+   "not_atoms": [],
+   "relation": "not_compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "pla-glow",
+     "evidence_kind": "feature_bullet",
+     "quote": "0.2 mm nozzles NOT Compatible"
+    }
+   ]
+  },
+  "A2L/X2D/P2S/P1/X1": {
+   "atoms": [
+    "A2L",
+    "X2D",
+    "P2S",
+    "P1 Series",
+    "X1 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "bambu-4-in-1-ptfe-adapter",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: A2L/X2D/P2S/P1/X1"
+    }
+   ]
+  },
+  "H2 Series/P1 Series/X1 Series": {
+   "atoms": [
+    "H2 Series",
+    "P1 Series",
+    "X1 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "bambu-4-in-1-ptfe-adapter",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2 Series/P1 Series/X1 Series"
+    }
+   ]
+  },
+  "X1 Series/P1 Series/H2 Series/P2S/X2D/A2L": {
+   "atoms": [
+    "X1 Series",
+    "P1 Series",
+    "H2 Series",
+    "P2S",
+    "X2D",
+    "A2L"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "bambu-4-in-1-ptfe-adapter",
+     "evidence_kind": "compat_section",
+     "quote": "X1 Series/P1 Series/H2 Series/P2S/X2D/A2L"
+    }
+   ]
+  },
+  "Works with AMS": {
+   "atoms": [
+    "AMS"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "ams-rubber-seal",
+     "evidence_kind": "compat_section",
+     "quote": "Works with AMS"
+    }
+   ]
+  },
+  "A1 Series and AMS lite": {
+   "atoms": [
+    "A1 Series",
+    "AMS lite"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "screws-kit-a1-series-and-ams-lite",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: A1 Series and AMS lite"
+    }
+   ]
+  },
+  "X1/P1/A1/P2/X2": {
+   "atoms": [
+    "X1 Series",
+    "P1 Series",
+    "A1 Series",
+    "P2 Series",
+    "X2 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "bambu-3d-effect-plate",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1/P1/A1/P2/X2"
+    }
+   ]
+  },
+  "X1 Series/P1 Series and AMS": {
+   "atoms": [
+    "X1 Series",
+    "P1 Series",
+    "AMS"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "screws-kit-x1-series-p1-series-and-ams",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1 Series/P1 Series and AMS"
+    }
+   ]
+  },
+  "P1S": {
+   "atoms": [
+    "P1S"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "ap-board-p1s",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: P1S"
+    }
+   ]
+  },
+  "P1S Exclusive": {
+   "atoms": [
+    "P1S"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "ap-board-p1s",
+     "evidence_kind": "compat_section",
+     "quote": "P1S Exclusive"
+    }
+   ]
+  },
+  "AMS 2 Pro, AMS, AMS lite": {
+   "atoms": [
+    "AMS 2 Pro",
+    "AMS",
+    "AMS lite"
+   ],
+   "not_atoms": [],
+   "relation": "not_compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "tpu-85a-tpu-90a",
+     "evidence_kind": "feature_bullet",
+     "quote": "AMS 2 Pro, AMS, AMS lite NOT Compatible"
+    }
+   ]
+  },
+  "H2D Laser and H2S Laser": {
+   "atoms": [
+    "H2D Laser",
+    "H2S Laser"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "power-safety-key-unit",
+     "evidence_kind": "compat_section",
+     "quote": "H2D Laser and H2S Laser"
+    }
+   ]
+  },
+  "H2D/H2S": {
+   "atoms": [
+    "H2D",
+    "H2S"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "toolhead-front-cover-h2-series",
+     "evidence_kind": "compat_section",
+     "quote": "H2D/H2S"
+    }
+   ]
+  },
+  "H2D Laser": {
+   "atoms": [
+    "H2D Laser"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "laser-safety-window",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2D Laser"
+    }
+   ]
+  },
+  "H2S Laser": {
+   "atoms": [
+    "H2S Laser"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "laser-safety-window",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2S Laser"
+    }
+   ]
+  },
+  "H2C Laser": {
+   "atoms": [
+    "H2C Laser"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "laser-safety-window",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2C Laser"
+    }
+   ]
+  },
+  "H2 Laser/R1": {
+   "atoms": [
+    "H2 Laser",
+    "R1"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "smoke-purifier",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2 Laser/R1"
+    }
+   ]
+  },
+  "AMS 2 Pro, AMS HT": {
+   "atoms": [
+    "AMS 2 Pro",
+    "AMS HT"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "bambu-bus-cable-6pin-for-ams-2-pro-and-ams-ht",
+     "evidence_kind": "compat_section",
+     "quote": "AMS 2 Pro, AMS HT"
+    }
+   ]
+  },
+  "X2 / A2 Series": {
+   "atoms": [
+    "X2 Series",
+    "A2 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "cyberbrick-timelapse-kit",
+     "evidence_kind": "option_value",
+     "quote": "Select your printer series: X2 / A2 Series"
+    }
+   ]
+  },
+  "H2 / P1 / X1 Series": {
+   "atoms": [
+    "H2 Series",
+    "P1 Series",
+    "X1 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "cyberbrick-timelapse-kit",
+     "evidence_kind": "option_value",
+     "quote": "Select your printer series: H2 / P1 / X1 Series"
+    }
+   ]
+  },
+  "CyberBrick Time-lapse Kit - ZK005": {
+   "atoms": [
+    "CyberBrick Time-lapse Kit - ZK005"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "cyberbrick-timelapse-kit",
+     "evidence_kind": "option_value",
+     "quote": "Select your printer series: CyberBrick Time-lapse Kit - ZK005"
+    }
+   ]
+  },
+  "Expansion Board Only - XA015": {
+   "atoms": [
+    "Expansion Board Only - XA015"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "cyberbrick-timelapse-kit",
+     "evidence_kind": "option_value",
+     "quote": "Select your printer series: Expansion Board Only - XA015"
+    }
+   ]
+  },
+  "For H2D/H2C": {
+   "atoms": [
+    "H2D",
+    "H2C"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "laser-upgrade-kit",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: For H2D/H2C"
+    }
+   ]
+  },
+  "For H2S": {
+   "atoms": [
+    "H2S"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "laser-upgrade-kit",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: For H2S"
+    }
+   ]
+  },
+  "X1 Series / P1 Series": {
+   "atoms": [
+    "X1 Series",
+    "P1 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "floating-damper-feet",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: X1 Series / P1 Series"
+    }
+   ]
+  },
+  "P2S / X2D": {
+   "atoms": [
+    "P2S",
+    "X2D"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "floating-damper-feet",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: P2S / X2D"
+    }
+   ]
+  },
+  "X1 Series/P1 Series/P2 Series": {
+   "atoms": [
+    "X1 Series",
+    "P1 Series",
+    "P2 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "floating-damper-feet",
+     "evidence_kind": "compat_section",
+     "quote": "X1 Series/P1 Series/P2 Series"
+    }
+   ]
+  },
+  "110~240V": {
+   "atoms": [
+    "110~240V"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "mini-heat-press",
+     "evidence_kind": "feature_bullet",
+     "quote": "110~240V Compatible"
+    }
+   ]
+  },
+  "H2D/H2D Pro": {
+   "atoms": [
+    "H2D",
+    "H2D Pro"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "h2d-tpu-high-flow-kit",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2D/H2D Pro"
+    }
+   ]
+  },
+  "X2D, P2S": {
+   "atoms": [
+    "X2D",
+    "P2S"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "purge-chute-x2-p2",
+     "evidence_kind": "compat_section",
+     "quote": "X2D, P2S"
+    }
+   ]
+  },
+  "H2 Series/P2S/X2D": {
+   "atoms": [
+    "H2 Series",
+    "P2S",
+    "X2D"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "hotend-expansion-kit",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2 Series/P2S/X2D"
+    }
+   ]
+  },
+  "X1/P1/A1/X2/P2": {
+   "atoms": [
+    "X1 Series",
+    "P1 Series",
+    "A1 Series",
+    "X2 Series",
+    "P2 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "3d-effect-plate-full-combo",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1/P1/A1/X2/P2"
+    }
+   ]
+  },
+  "H2D/H2S/H2C (Left Hotend)": {
+   "atoms": [
+    "H2D/H2S/H2C (Left Hotend)"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "multi-size-hotends-kit",
+     "evidence_kind": "option_value",
+     "quote": "Printer Model: H2D/H2S/H2C (Left Hotend)"
+    }
+   ]
+  },
+  "X1/P1/A1 Series": {
+   "atoms": [
+    "X1 Series",
+    "P1 Series",
+    "A1 Series"
+   ],
+   "not_atoms": [],
+   "relation": "compatible_with",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "build-plate-combo",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: X1/P1/A1 Series"
+    }
+   ]
+  }
+ },
+ "reviewed_unresolvable": {
+  "0.2 mm Nozzle": {
+   "reason": "component_concept_not_a_product",
+   "seen": 16,
+   "products": 16,
+   "evidence": [
+    {
+     "handle": "pla-sparkle",
+     "evidence_kind": "feature_bullet",
+     "quote": "0.2 mm Nozzle NOT Compatible"
+    },
+    {
+     "handle": "pla-marble",
+     "evidence_kind": "feature_bullet",
+     "quote": "0.2 mm Nozzle NOT Compatible"
+    },
+    {
+     "handle": "pla-cf",
+     "evidence_kind": "feature_bullet",
+     "quote": "0.2 mm Nozzle NOT Compatible"
+    }
+   ],
+   "reviewed": true
+  },
+  "Ventilation": {
+   "reason": "generic_term_not_a_product",
+   "seen": 2,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "smoke-ventilation-pipe-2m",
+     "evidence_kind": "option_value",
+     "quote": "Compatibility: H2 Series(Laser)/Smoke Purifier/Ventilation"
+    },
+    {
+     "handle": "smoke-ventilation-pipe-2m",
+     "evidence_kind": "compat_section",
+     "quote": "H2 Series(Laser)/Smoke Purifier/Ventilation"
+    }
+   ],
+   "reviewed": true
+  },
+  "Stainless Steel Nozzles": {
+   "reason": "component_concept_not_a_product",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "pla-glow",
+     "evidence_kind": "feature_bullet",
+     "quote": "Stainless Steel Nozzles NOT Compatible"
+    }
+   ],
+   "reviewed": true
+  },
+  "0.2 mm nozzles": {
+   "reason": "component_concept_not_a_product",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "pla-glow",
+     "evidence_kind": "feature_bullet",
+     "quote": "0.2 mm nozzles NOT Compatible"
+    }
+   ],
+   "reviewed": true
+  },
+  "CyberBrick Time-lapse Kit - ZK005": {
+   "reason": "variant_choice_not_a_target",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "cyberbrick-timelapse-kit",
+     "evidence_kind": "option_value",
+     "quote": "Select your printer series: CyberBrick Time-lapse Kit - ZK005"
+    }
+   ],
+   "reviewed": true
+  },
+  "Expansion Board Only - XA015": {
+   "reason": "variant_choice_not_a_target",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "cyberbrick-timelapse-kit",
+     "evidence_kind": "option_value",
+     "quote": "Select your printer series: Expansion Board Only - XA015"
+    }
+   ],
+   "reviewed": true
+  },
+  "110~240V": {
+   "reason": "electrical_rating_not_a_target",
+   "seen": 1,
+   "products": 1,
+   "evidence": [
+    {
+     "handle": "mini-heat-press",
+     "evidence_kind": "feature_bullet",
+     "quote": "110~240V Compatible"
+    }
+   ],
+   "reviewed": true
+  }
+ },
+ "requirement_targets": {
+  "AMS Hub": {
+   "kind": "hub",
+   "to": {
+    "source_handle": "ams-hub"
+   },
+   "reason": "same_model",
+   "code_evidence": "SA002-N harvested for ams-hub",
+   "evidence": [
+    {
+     "handle": "ams-multicolor-printing",
+     "evidence_kind": "description_text",
+     "quote": "To connect multiple AMS units, an AMS Hub(SA002-N), a PTFE Tube Coupler(FAZ006), and a 4-pin Cable(CAB002-N) are required"
+    }
+   ]
+  },
+  "A1 series AMS Hub": {
+   "kind": "hub",
+   "to": {
+    "source_handle": "ams-hub-a1-series"
+   },
+   "reason": "same_model",
+   "evidence": [
+    {
+     "handle": "a1",
+     "evidence_kind": "description_text",
+     "quote": "To connect AMS 2 Pro unit(s) to A1 series printer, an A1 series AMS Hub (SA013) is required"
+    }
+   ]
+  },
+  "Filament Buffer": {
+   "kind": "buffer",
+   "to": {
+    "source_handle": "filament-buffer"
+   },
+   "reason": "same_model",
+   "evidence": [
+    {
+     "handle": "ams-multicolor-printing",
+     "evidence_kind": "description_text",
+     "quote": "To connect a single AMS unit to X1/P1 series printer, a Filament Buffer(SA003), a PTFE Tube Coupler(FAZ006), and a 4-pin Cable(CAB002-N) are required"
+    }
+   ]
+  },
+  "P2S Filament Buffer": {
+   "kind": "buffer",
+   "to": {
+    "source_handle": "filament-buffer-p2s"
+   },
+   "reason": "same_model",
+   "code_evidence": "SA011 harvested for filament-buffer-p2s",
+   "evidence": [
+    {
+     "handle": "ams-ht",
+     "evidence_kind": "description_text",
+     "quote": "To connect one or two AMS HT unit(s) to P2S, a P2S Filament Buffer (SA011) is required"
+    }
+   ]
+  },
+  "PTFE Tube Coupler": {
+   "kind": "part",
+   "to": {
+    "source_handle": "ptfe-tube-coupler"
+   },
+   "reason": "same_model",
+   "evidence": [
+    {
+     "handle": "ams-multicolor-printing",
+     "evidence_kind": "description_text",
+     "quote": "an AMS Hub(SA002-N), a PTFE Tube Coupler(FAZ006), and a 4-pin Cable(CAB002-N) are required"
+    }
+   ]
+  },
+  "4-in-1 PTFE Adapter": {
+   "kind": "part",
+   "to": {
+    "source_handle": "bambu-4-in-1-ptfe-adapter"
+   },
+   "reason": "same_model",
+   "code_evidence": "FAZ013 on the adapter page",
+   "evidence": [
+    {
+     "handle": "ams-multicolor-printing",
+     "evidence_kind": "description_text",
+     "quote": "To connect more than two AMS units, a P2S Filament Buffer (SA011) and 4-in-1 PTFE Adapter(s) (FAZ013-N) are required"
+    }
+   ]
+  },
+  "Bambu Reusable Spool": {
+   "kind": "spool",
+   "to": {
+    "source_handle": "bambu-reusable-spool"
+   },
+   "reason": "same_model",
+   "code_evidence": "RSP001/RSP002 harvested",
+   "evidence": [
+    {
+     "handle": "pla-basic-color-trial-set",
+     "evidence_kind": "description_text",
+     "quote": "For AMS: Use with Bambu Reusable Spool"
+    }
+   ]
+  },
+  "spool": {
+   "kind": "spool",
+   "to": {
+    "source_handle": "bambu-reusable-spool"
+   },
+   "reason": "requirement_generic_to_official_part",
+   "evidence": [
+    {
+     "handle": "abs-filament",
+     "evidence_kind": "description_text",
+     "quote": "Note: The refill needs to be used with a spool"
+    }
+   ]
+  },
+  "Laser Module": {
+   "kind": "laser_module",
+   "to": {
+    "source_handle": "laser-module"
+   },
+   "reason": "same_model",
+   "evidence": [
+    {
+     "handle": "birds-eye-camera",
+     "evidence_kind": "description_text",
+     "quote": "When paired with the H2C, the Birds Eye Camera requires the Laser Module for calibration"
+    }
+   ]
+  },
+  "10W laser modules": {
+   "kind": "laser_module",
+   "to": {
+    "source_handle": "laser-module"
+   },
+   "qualifier": "10 W",
+   "reason": "same_model_qualified",
+   "evidence": [
+    {
+     "handle": "10-w-laser-air-assist-nozzle-and-laser-lens",
+     "evidence_kind": "description_text",
+     "quote": "This laser lens is compatible with 10W laser modules"
+    }
+   ]
+  }
+ },
+ "requirement_unresolvable": {
+  "4-pin Cable(CAB002-N)": {
+   "reason": "ambiguous_target_needs_review",
+   "note_code": "CAB002-N appears on no crawled product page",
+   "evidence": [
+    {
+     "handle": "ams-multicolor-printing",
+     "evidence_kind": "description_text",
+     "quote": "an AMS Hub(SA002-N), a PTFE Tube Coupler(FAZ006), and a 4-pin Cable(CAB002-N) are required"
+    }
+   ]
+  }
+ },
+ "levonis_existing_printers": {
+  "X1C": {
+   "levonis_product_id": null,
+   "resolution": "not_in_levonis"
+  },
+  "X1E": {
+   "levonis_product_id": null,
+   "resolution": "not_in_levonis"
+  },
+  "P1P": {
+   "levonis_product_id": null,
+   "resolution": "not_in_levonis"
+  },
+  "P1S": {
+   "levonis_product_id": "prd_b1e2ff5081a34f3f9389",
+   "resolution": "merged_source",
+   "source_handle": "p1s"
+  },
+  "X1": {
+   "levonis_product_id": null,
+   "resolution": "not_in_levonis"
+  }
+ }
 }
