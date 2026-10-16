@@ -35,7 +35,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildImportPayload, type ImportPayload } from '../packages/catalog/src/bambuImport/payload';
+import { assertImportPayload, buildImportPayload, type ImportPayload } from '../packages/catalog/src/bambuImport/payload';
+import { newWorld as newWriterWorld, rebundle as rebundleWriter, RUN_ID as WRITER_RUN, stage as stageForWriter, write as writerWrite, type World as WriterWorld } from './fixtures/catalogImportWorld';
 import { extractionFingerprint } from '../packages/catalog/src/bambuImport/fingerprint';
 import { fixtureJson, sample, type SampleHandle } from './fixtures/bambu/load';
 import { compareKeysOf, edgeEvidence, expectedKnowledge, Site, verifyPublic, type VerifyContext } from '../scripts/bambu-import/verify';
@@ -43,7 +44,7 @@ import { COMPARE_KEY_FIELDS, comparedFields, knowledgeCellsFor } from '../worker
 import { FILTER_ONLY_FIELDS } from '../worker/lib/templateFamilies';
 import type { HostFetcher } from '../scripts/bambu-import/fetch';
 import { writtenImagesOf, type DocumentCheck, type MediaAnswerRow, type WrittenImage } from '../scripts/bambu-import/opsClient';
-import { collapseContentDuplicates, recomputedGallery, writtenGallery, type GalleryImage, type StoredGalleryRow } from '../scripts/bambu-import/gallery';
+import { collapseContentDuplicates, galleryFromWritten, recomputedGallery, writtenGallery, type GalleryImage, type StoredGalleryRow } from '../scripts/bambu-import/gallery';
 import { pageDefaultSelection } from '../scripts/bambu-import/selection';
 import { RUN_ID, World } from './fixtures/bambuImportWorld';
 import { routeKnowledge, type StoredKnowledgeKnobs } from './fixtures/bambuKnowledgeRoute';
@@ -369,8 +370,8 @@ test('the runner\'s recompute of the collapse (a resume with no written rows) gi
   const { payload, media, written } = a1WithCopies();
   assert.deepEqual(recomputedGallery(payload, media), written, 'A1: the general copies of bound pictures go, nothing else moves');
   assert.deepEqual(recomputedGallery(payload, mediaOf(payload)), payload.images, 'no two pictures alike: the payload\'s gallery');
-  // A general primary whose bytes come back later bound to a value: the general copy goes, the bound copy takes
-  // its position with rule content_duplicate (no representative's variant any more) and the primary.
+  // A general primary whose bytes come back later bound to a value: the general copy goes, the bound copy takes its
+  // position and the primary — a representative keeping its rule and its variant (the package rule, mediaCollapse.ts).
   const row = (id: string, key: string, sort: number, extra: Partial<StoredGalleryRow> = {}): StoredGalleryRow => ({
     id, source_media_id: `m_${id}`, source_url: '', r2_key: key, sort_order: sort, is_primary: false, option_value_id: null, variant_id: null, via_variant_id: null, binding_rule: 'general', alt_en: '', alt_ar: '', alt_ckb: '', ...extra,
   });
@@ -386,7 +387,7 @@ test('the runner\'s recompute of the collapse (a resume with no written rows) gi
   assert.equal(out.collapsed, 3);
   assert.deepEqual(
     out.rows.map((r) => [r.id, r.sort_order, r.is_primary, r.binding_rule, r.via_variant_id]),
-    [['v1', 1, false, 'variant', null], ['g2', 2, false, 'general', null], ['x3', 0, true, 'content_duplicate', null]]
+    [['v1', 1, false, 'variant', null], ['g2', 2, false, 'general', null], ['x3', 0, true, 'representative', 'pv_9']]
   );
   // The rows of ONE entry (a value set: one picture, one row per value) never collapse into each other.
   const set = [row('a', 'k', 0, { is_primary: true, option_value_id: 'ov_a', binding_rule: 'value_set' }), { ...row('b', 'k', 1, { option_value_id: 'ov_b', binding_rule: 'value_set' }), source_media_id: 'm_a' }];
@@ -554,4 +555,69 @@ test('the box as the route draws it: an item with no text is not an item, and a 
   const lost = await verify({ ...l, knowledgeEdit: (a) => ({ ...a, in_the_box: (a.in_the_box as Rec[]).slice(1) }) });
   assert.ok(failed(lost).includes('knowledge'));
   assert.equal(lost.checks.knowledge.counts?.mismatched_box, 1);
+});
+
+// ---------------------------------------------------------------- the runner's gallery IS the writer's (W4)
+
+/** A copy's media row on the canonical's stored object (byte-identical pictures share one content-addressed key). */
+function sameBytes(w: WriterWorld, copy: string, canonical: string): void {
+  const c = w.raw.prepare('SELECT r2_key, width, height, bytes, sha256 FROM catalog_import_media WHERE run_id = ? AND source_media_id = ?').get(WRITER_RUN, canonical) as Record<string, unknown>;
+  w.raw
+    .prepare('UPDATE catalog_import_media SET r2_key = ?, width = ?, height = ?, bytes = ?, sha256 = ? WHERE run_id = ? AND source_media_id = ?')
+    .run(c.r2_key as string, c.width as number, c.height as number, c.bytes as number, c.sha256 as string, WRITER_RUN, copy);
+}
+
+test('W4: the runner\'s gallery is the real writer\'s rows for every moved shape — a representative, a reviewed override, a value copy carrying a variant', async () => {
+  const w = newWriterWorld();
+  // The hotend: one general picture (sort 1) and one entry (sort 2–5: a value row and three representatives) share
+  // the lead's bytes (sort 0); a later value row (sort 6) shares the second general picture's.
+  const s = stageForWriter(w, 'bambu-hotend-a1-a2', {
+    mutate: (p) => {
+      const entry = p.images.filter((i) => i.sort_order >= 2 && i.sort_order <= 5);
+      assert.deepEqual(entry.map((i) => i.binding_rule), ['value', 'representative', 'representative', 'representative']);
+      entry[0].binding_rule = 'reviewed_override';
+      const later = p.images.find((i) => i.sort_order === 6)!;
+      assert.equal(later.binding_rule, 'value');
+      later.via_variant_id = p.variants[0].id;
+    },
+  });
+  const p = s.payload;
+  // The override is a reviewed one (data/bambu-import/media-overrides.json), or the writer refuses it.
+  const override = p.images.find((i) => i.binding_rule === 'reviewed_override')!;
+  rebundleWriter(w, { mediaOverrides: JSON.stringify({ version: 1, overrides: [{ handle: p.handle, resourceFileId: override.source_media_id, valueIds: [override.option_value_id] }] }) });
+  const at = (sort: number) => p.images.find((i) => i.sort_order === sort)!.source_media_id;
+  sameBytes(w, at(2), at(0));
+  sameBytes(w, at(6), at(1));
+  const { result } = await writerWrite(w, s);
+  const media = new Map<string, MediaAnswerRow>(
+    (w.raw.prepare("SELECT source_media_id, r2_key FROM catalog_import_media WHERE run_id = ? AND status = 'stored'").all(WRITER_RUN) as Array<{ source_media_id: string; r2_key: string }>).map((m) => [
+      m.source_media_id,
+      { source_media_id: m.source_media_id, status: 'stored', r2_key: m.r2_key, width: 64, height: 48, error_code: '' },
+    ])
+  );
+  // What the page reads of each row's source variant: the writer's stored image source refs.
+  const storedVia = new Map(
+    (w.raw.prepare("SELECT levonis_id, via_variant_id FROM product_option_source_refs WHERE product_id = ? AND kind = 'image'").all(p.product_id) as Array<{ levonis_id: string; via_variant_id: string }>).map((r) => [r.levonis_id, r.via_variant_id || null])
+  );
+  const shape = (rows: ReadonlyArray<{ id: string; sort_order: number; is_primary: boolean; option_value_id: string | null; variant_id: string | null; binding_rule: string }>) =>
+    rows.map((r) => ({ id: r.id, sort_order: r.sort_order, is_primary: r.is_primary, option_value_id: r.option_value_id, variant_id: r.variant_id, binding_rule: r.binding_rule })).sort((a, b) => (a.id < b.id ? -1 : 1));
+  // The resume path (no /write answer): the runner's recompute is the writer's /write rows, and names what D1 stores.
+  const recomputed = recomputedGallery(p, media);
+  assert.deepEqual(shape(recomputed), shape(result.images));
+  for (const r of recomputed) assert.equal(r.via_variant_id, storedVia.get(r.id) ?? null, `${r.id}: the source variant the page reads`);
+  // This job's own answer gives the same gallery.
+  assert.deepEqual(galleryFromWritten(p, result.images), recomputed);
+  // The shapes, one by one.
+  const row = (sort: number) => recomputed.filter((r) => p.images.find((i) => i.id === r.id)!.sort_order === sort);
+  assert.deepEqual(row(0), [], 'the general lead went: its bound copies hold its place');
+  const moved = recomputed.filter((r) => r.sort_order === 0);
+  assert.deepEqual(moved.map((r) => r.binding_rule).sort(), ['representative', 'representative', 'representative', 'reviewed_override']);
+  for (const r of moved.filter((x) => x.binding_rule === 'representative')) assert.ok(r.via_variant_id, 'a moved representative keeps the variant whose hero it shows (R6)');
+  const copy = recomputed.find((r) => r.id === p.images.find((i) => i.sort_order === 6)!.id)!;
+  assert.deepEqual([copy.sort_order, copy.binding_rule, copy.via_variant_id], [1, 'content_duplicate', null], 'a moved value copy names no variant');
+  assert.equal(recomputed.filter((r) => r.is_primary).length, 1);
+  // The fourth shape — a colour-bound copy — never reaches the writer: an import image names no colour (the allow-list).
+  const coloured = JSON.parse(JSON.stringify(p)) as ImportPayload;
+  (coloured.images[0] as unknown as Record<string, unknown>).color_id = 'col_1';
+  assert.throws(() => assertImportPayload(coloured));
 });
