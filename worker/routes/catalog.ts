@@ -45,6 +45,9 @@ import type { CatalogTreeNode, CategoryPayload } from '@levonis/catalog/discover
 
 export const catalogRoutes = new Hono<AppContext>();
 
+/** src/lib/bootFetch.ts CATALOG_LISTING_HEADER (a test holds them equal). */
+export const CATALOG_LISTING_HEADER = 'X-Catalog-Listing';
+
 /**
  * How many products the tree resolves to count «متوفرة الآن». Availability is
  * proved over each product's option graph (the card's `direct_stock_available`),
@@ -267,7 +270,17 @@ catalogRoutes.get('/:slug', async (c) => {
       related,
       truncated,
     };
-    return c.json(payload);
+    const res = c.json(payload);
+    /**
+     * A DEPARTMENT THAT IS ITS OWN LISTING SAYS SO BEFORE ITS BODY: the
+     * storefront starts the list (`/api/products?category=<slug>&facets=1
+     * &limit=24`, src/lib/bootFetch.ts `primeCategoryOpening`) the moment these
+     * headers arrive, instead of after the page has parsed this answer and
+     * rendered (speed audit 2026-10-16). The canonical slug, URI-encoded (a
+     * slug may be Arabic). Cached with the answer, so a hit says it too.
+     */
+    if (plan.layout === 'listing') res.headers.set(CATALOG_LISTING_HEADER, encodeURIComponent(node.slug));
+    return res;
   };
 
   if (user) {

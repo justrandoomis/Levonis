@@ -16,10 +16,32 @@
  *
  * The tree is viewer-independent and cached by the Worker for everyone; a
  * category page is tier-priced, so its snapshot is only ever this tab's own.
+ *
+ * STARTED EARLY, TAKEN HERE. The tree and a department are often already in
+ * flight when the page asks — started by src/lib/bootFetch.ts with the entry
+ * script on a cold load, or on the press of the link that led here — so a
+ * loader first takes that request (once), and every caller asking while it
+ * settles shares it: the page and a door's prefetch never make two.
  */
 import { api, type ApiProduct, type RequestOptions } from '../api';
+import { CATALOG_TREE_PATH, takePrimedJson } from '../bootFetch';
 import { readPageCache, writePageCache } from '../pageCache';
 import type { CatalogTreeResponse, CategoryPayload } from './types';
+
+const opening = new Map<string, Promise<unknown>>();
+
+/** The request already started for `path` when there is one (taken once, shared while it settles), else a GET. */
+function openingGet<T>(path: string, opts?: RequestOptions): Promise<T> {
+  const shared = opening.get(path);
+  if (shared) return shared as Promise<T>;
+  const primed = takePrimedJson<T>(path, opts?.mascot);
+  if (!primed) return api.get<T>(path, opts);
+  const settled: Promise<T> = primed.finally(() => {
+    if (opening.get(path) === settled) opening.delete(path);
+  });
+  opening.set(path, settled);
+  return settled;
+}
 
 export const TREE_KEY = 'catalog:tree';
 /** The tree is the shop's taxonomy — it moves when the admin edits it, not per visit. */
@@ -32,7 +54,7 @@ export function cachedTree(): CatalogTreeResponse | null {
 }
 
 export async function loadTree(opts?: RequestOptions): Promise<CatalogTreeResponse> {
-  const data = await api.get<CatalogTreeResponse>('/api/catalog/tree', opts);
+  const data = await openingGet<CatalogTreeResponse>(CATALOG_TREE_PATH, opts);
   writePageCache(TREE_KEY, data);
   return data;
 }
@@ -42,7 +64,7 @@ export function cachedCategory(slug: string): CategoryPayload | null {
 }
 
 export async function loadCategory(slug: string, opts?: RequestOptions): Promise<CategoryPayload> {
-  const data = await api.get<CategoryPayload>(`/api/catalog/${encodeURIComponent(slug)}`, opts);
+  const data = await openingGet<CategoryPayload>(`/api/catalog/${encodeURIComponent(slug)}`, opts);
   writePageCache(categoryKey(slug), data);
   return data;
 }

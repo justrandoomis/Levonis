@@ -10,6 +10,8 @@ import CategoryRowBanners from '../components/catalog/CategoryRowBanners';
 import { useBannerPhotos } from '../components/catalog/useBannerPhotos';
 import { cachedTree, loadCategory, loadTree } from '../lib/catalog/data';
 import { resolveListingRoute } from '../lib/catalog/listingModel';
+import { listingFirstPagePath, parseListing } from '../lib/catalog/listingQuery';
+import { primeGet } from '../lib/bootFetch';
 import { nodeDescription, nodeName } from '../lib/catalog/categoryPageModel';
 import { nounKindFor } from '../lib/catalog/copy';
 import { bannerRows } from '../lib/catalog/explorerModel';
@@ -36,6 +38,13 @@ import type { CatalogTreeNode, CatalogTreeResponse } from '../lib/catalog/types'
  * is `/categories/<root>/<slug>` like any sub-section's
  * (worker/lib/catalogPresentation.ts `path`), resolved here by its slug. Not on
  * a root's «all»: that is the whole list, asked for as such.
+ *
+ * THE LIST DOES NOT WAIT FOR THE MAP. It is asked for by the section's slug —
+ * the URL's own word — so it leaves beside the tree instead of after it
+ * (speed audit 2026-10-16: tree 4.5 s → list 4.9–5.8 s on a phone); the
+ * listing (src/components/listing/useListing.ts) takes that request when it
+ * mounts. On a cold load or a press of the link both left earlier still
+ * (src/lib/bootFetch.ts `categoryOpeningPaths`).
  */
 export default function CategoryListing() {
   const { categorySlug = '', subCategorySlug = '' } = useParams();
@@ -46,6 +55,14 @@ export default function CategoryListing() {
   const [fallback, setFallback] = useState<{ node: CatalogTreeNode; root: boolean } | 'missing' | null>(null);
   const [fallbackError, setFallbackError] = useState<unknown>(null);
   const [attempt, setAttempt] = useState(0);
+
+  // While the map loads, the list leaves too — by slug, with the URL's filters.
+  // With the map already here the listing mounts at once and asks for itself.
+  const listSlug = subCategorySlug === 'all' ? categorySlug : subCategorySlug;
+  const listPath = listingFirstPagePath(parseListing(location.search), listSlug);
+  useEffect(() => {
+    if (!tree && listSlug) primeGet(listPath);
+  }, [tree, listPath, listSlug]);
 
   const load = useCallback(() => {
     setTreeError(null);
@@ -127,7 +144,8 @@ export default function CategoryListing() {
   }
 
   const scope: ListingScope = {
-    category: node.id,
+    // By slug: the request that left beside the map is this one.
+    category: node.slug,
     title: nodeName(node, lang),
     description: nodeDescription(node, lang),
     kind: nounKindFor(node.product_type, node.is_printer_catalog),

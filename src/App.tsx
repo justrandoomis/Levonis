@@ -11,7 +11,7 @@ import NavigationRouter from './components/NavigationRouter';
 import { StoreProvider, useStore } from './StoreContext';
 import ChunkBoundary from './components/ChunkBoundary';
 import { afterCriticalPaint, allowsSpeculativeLoads } from './lib/afterCriticalPaint';
-import { INLINE_RESOLVE_ID, navigationDataPath, primeGet, readInlineJson } from './lib/bootFetch';
+import { INLINE_RESOLVE_ID, navigationCategoryOpening, navigationDataPath, primeGet, readInlineJson } from './lib/bootFetch';
 import { prefetchable, routeReveal } from './lib/routeReveal';
 import { ProductDetailSkeleton } from './components/ui/Skeleton';
 /**
@@ -248,6 +248,10 @@ function useIdlePrefetch() {
         const path = navigationDataPath(href, window.location.origin);
         if (path) primeGet(path);
       }
+      // A category page's reads, on the press only: a catalogue door's own
+      // prefetch (src/lib/catalog/prefetch.ts) takes them up in the same
+      // event, so a second start on `click` would be a second request.
+      if (e.type === 'pointerdown') navigationCategoryOpening(href, window.location.origin);
     };
     const detach = () => {
       document.removeEventListener('pointerdown', onIntent, true);

@@ -62,5 +62,18 @@ export function listingApiQuery(
   return encodePairs(pairs);
 }
 
+/** «عرض المزيد» pages (§7 item 9): 24 per page, a button, never an endless scroll. */
+export const LISTING_PAGE_SIZE = 24;
+
+/**
+ * A section's FIRST request for one state: its first page and the facet
+ * counts. One function for the listing (src/components/listing/useListing.ts)
+ * and for everything that starts that request early (the page beside its map,
+ * a door's prefetch) — the same URL, or the early answer is not taken.
+ */
+export function listingFirstPagePath(state: ListingState, category: string | null): string {
+  return `/api/products?${listingApiQuery(state, { category: category ?? undefined, limit: LISTING_PAGE_SIZE, facets: true })}`;
+}
+
 /** A fresh default state (the frozen constant must not be mutated). */
 export const emptyListing = (): ListingState => ({ ...DEFAULT_LISTING, brands: [], fits: [], specs: {} });

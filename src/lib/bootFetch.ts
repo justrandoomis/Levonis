@@ -40,7 +40,7 @@
  * unit tests, a server render) the module does nothing.
  */
 import { api, ApiError, DEFAULT_TIMEOUT_MS } from './api';
-import { beginRequestFeedback } from './mascotRequest';
+import { beginRequestFeedback, type MascotFeedback } from './mascotRequest';
 import { requestErrorText } from './requestErrorText';
 
 export const RESOLVE_PATH = '/api/storefront/resolve';
@@ -98,6 +98,88 @@ export function navigationDataPath(href: string, origin: string): string | null 
     return null;
   }
 }
+/**
+ * THE CATEGORY PAGES' FIRST READS, BY URL (speed audit 2026-10-16: the
+ * category pages were the slowest in the audit, ~6 s on a phone, because each
+ * read waited for the one before it: route chunk → catalogue → listing →
+ * pictures). Every one of these is answerable from the URL alone, so they
+ * start with the entry script on a cold load, and on the press of a link in
+ * the app — overlapping the route chunk instead of following it:
+ *
+ *   /categories             the map                 /api/catalog/tree
+ *   /categories/<cat>       the department          /api/catalog/<cat>
+ *   /categories/<cat>/<sub> the map, and the list   /api/catalog/tree +
+ *                           by its slug              /api/products?category=<sub>&facets=1&limit=24
+ *
+ * The list is asked for BY SLUG (the Worker resolves a slug as well as an id,
+ * worker/routes/products.ts `listCatalogProducts`), so it no longer waits for
+ * the map to turn the slug into an id; only a URL without a query (the
+ * default list) is started here — a filtered one starts from its page.
+ *
+ * A DEPARTMENT THAT IS ITS OWN LISTING says so on its answer's headers
+ * (`X-Catalog-Listing: <slug>`, worker/routes/catalog.ts), so its list starts
+ * the moment those headers arrive rather than after the page has rendered.
+ */
+export const CATALOG_TREE_PATH = '/api/catalog/tree';
+const MAIN_HOSTS = ['levonis-iq.com', 'www.levonis-iq.com'];
+export const CATALOG_LISTING_HEADER = 'X-Catalog-Listing';
+
+/** What src/components/listing/useListing.ts asks first for a category's default list (a test holds them equal). */
+export function categoryListingPath(slug: string): string {
+  return `/api/products?category=${encodeURIComponent(slug).replace(/%2C/gi, ',')}&facets=1&limit=24`;
+}
+
+const segment = (raw: string | undefined): string | null => {
+  if (raw === undefined) return null;
+  try {
+    const s = decodeURIComponent(raw);
+    return s && !/[/\\?#]/.test(s) ? s : null;
+  } catch {
+    return null;
+  }
+};
+
+/** The reads a `/categories…` URL makes first; [] for any other path. */
+export function categoryOpeningPaths(pathname: string, search = ''): string[] {
+  const m = /^\/categories(?:\/([^/]+))?(?:\/([^/]+))?\/?$/.exec(pathname);
+  if (!m) return [];
+  if (m[1] === undefined) return [CATALOG_TREE_PATH];
+  const cat = segment(m[1]);
+  if (!cat) return [];
+  if (m[2] === undefined) return [`/api/catalog/${encodeURIComponent(cat)}`];
+  const sub = segment(m[2]);
+  if (!sub) return [];
+  const plain = new URLSearchParams(search).toString() === '';
+  return plain ? [CATALOG_TREE_PATH, categoryListingPath(sub === 'all' ? cat : sub)] : [CATALOG_TREE_PATH];
+}
+
+/** Start a category URL's first reads, and a listing department's list on its answer's headers. */
+export function primeCategoryOpening(pathname: string, search = '', start: (path: string) => void = primeGet): string[] {
+  const paths = categoryOpeningPaths(pathname, search);
+  for (const path of paths) start(path);
+  const department = paths.length === 1 && paths[0] !== CATALOG_TREE_PATH ? primed.get(paths[0]) : undefined;
+  if (department && new URLSearchParams(search).toString() === '') {
+    department
+      .then((res) => {
+        const slug = segment(res.headers.get(CATALOG_LISTING_HEADER) ?? undefined);
+        if (slug) start(categoryListingPath(slug));
+      })
+      .catch(() => undefined);
+  }
+  return paths;
+}
+
+/** A press on a same-origin link into the catalogue map, on the main site: its first reads. */
+export function navigationCategoryOpening(href: string, origin: string, start: (path: string) => void = primeGet): string[] {
+  try {
+    const url = new URL(href, origin);
+    if (url.origin !== new URL(origin).origin || !MAIN_HOSTS.includes(url.hostname)) return [];
+    return primeCategoryOpening(url.pathname, url.search, start);
+  } catch {
+    return [];
+  }
+}
+
 /** The id of the data block `worker/index.ts` writes into a rewritten document. */
 export const INLINE_RESOLVE_ID = 'lv-resolve';
 
@@ -118,12 +200,12 @@ export function clearPrimedRequests(): void {
 }
 
 /** Consumed once, never a page cache. A session change while it settles forces a fresh GET. */
-export function takePrimedJson<T>(path: string): Promise<T> | null {
+export function takePrimedJson<T>(path: string, mascot?: MascotFeedback): Promise<T> | null {
   const response = takePrimed(path);
   if (!response) return null;
   return (async () => {
     let epoch = sessionEpoch;
-    let answer = settleJson<T>(path, response);
+    let answer = settleJson<T>(path, response, mascot);
     for (;;) {
       try {
         const data = await answer;
@@ -134,7 +216,7 @@ export function takePrimedJson<T>(path: string): Promise<T> | null {
       epoch = sessionEpoch;
       // The ordinary in-flight coalescer is keyed by URL. An old-session
       // request for this URL may still be pending, so explicitly bypass it.
-      answer = api.get<T>(path, { signal: new AbortController().signal });
+      answer = api.get<T>(path, { signal: new AbortController().signal, mascot });
     }
   })();
 }
@@ -185,8 +267,8 @@ export function takePrimed(path: string): Promise<Response> | null {
  * out for every non-2xx or `success:false` body, a network failure for an
  * aborted or unreachable request, and the mascot's request feedback around it.
  */
-export async function settleJson<T>(path: string, response: Promise<Response>): Promise<T> {
-  const feedback = beginRequestFeedback('GET', path);
+export async function settleJson<T>(path: string, response: Promise<Response>, mascot?: MascotFeedback): Promise<T> {
+  const feedback = beginRequestFeedback('GET', path, mascot);
   try {
     let res: Response;
     try {
@@ -243,9 +325,13 @@ export function bootRequests(
     }
     if (isCommunityGatedPath(pathname)) started.push(COMMUNITY_ACCESS_PATH);
   }
+  for (const path of started) start(path);
+  if ((hostname === 'levonis-iq.com' || hostname === 'www.levonis-iq.com') && inline?.kind !== 'merchant') {
+    started.push(...primeCategoryOpening(pathname, search, start));
+  }
   // Last: the page's own opening reads go out first; the session follows on every page.
   started.push(AUTH_ME_PATH);
-  for (const path of started) start(path);
+  start(AUTH_ME_PATH);
   return started;
 }
 

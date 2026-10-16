@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api, isAborted, type ApiProduct, type ProductsListResponse } from '../../lib/api';
 import { readPageCache, writePageCache } from '../../lib/pageCache';
-import { listingApiQuery, parseListing, serializeListing } from '../../lib/catalog/listingQuery';
+import { takePrimedJson } from '../../lib/bootFetch';
+import { LISTING_PAGE_SIZE, listingApiQuery, listingFirstPagePath, parseListing, serializeListing } from '../../lib/catalog/listingQuery';
 import type { FacetSet, ListingState } from '../../lib/catalog/types';
 
 /** «عرض المزيد» pages (§7 item 9): 24 per page, a button, never an endless scroll. */
-export const PAGE_SIZE = 24;
+export const PAGE_SIZE = LISTING_PAGE_SIZE;
 
 export interface ListingSnapshot {
   products: ApiProduct[];
@@ -33,6 +34,13 @@ export interface ListingSnapshot {
  * page «عرض المزيد» loaded), so coming back paints the same list at the same
  * length at once — which is what lets the app restore the scroll offset — and
  * the refresh behind it keeps the extra pages.
+ *
+ * A category's list is asked for by its SLUG (the page passes the section's
+ * slug as `category`; the Worker resolves either), so the same request can
+ * start before the page knows the section's id — with the entry script, on
+ * the press of the link, or beside the map (src/lib/bootFetch.ts
+ * `categoryOpeningPaths`). When one did, this takes it instead of asking
+ * again.
  */
 export function useListing(category: string | null) {
   const location = useLocation();
@@ -47,11 +55,8 @@ export function useListing(category: string | null) {
     [navigate]
   );
 
-  const query = useMemo(
-    () => listingApiQuery(state, { category: category ?? undefined, limit: PAGE_SIZE, facets: true }),
-    [state, category]
-  );
-  const cacheKey = `listing:${query}`;
+  const path = useMemo(() => listingFirstPagePath(state, category), [state, category]);
+  const cacheKey = `listing:${path.slice('/api/products?'.length)}`;
 
   const [data, setData] = useState<ListingSnapshot | null>(() => readPageCache<ListingSnapshot>(cacheKey));
   const [loading, setLoading] = useState(!data);
@@ -68,9 +73,10 @@ export function useListing(category: string | null) {
     setError(null);
     setMore('idle');
     const ctrl = new AbortController();
-    api
-      .get<ProductsListResponse>(`/api/products?${query}`, { signal: ctrl.signal })
+    (takePrimedJson<ProductsListResponse>(path) ?? api.get<ProductsListResponse>(path, { signal: ctrl.signal }))
       .then((res) => {
+        // A request started early cannot be cancelled; its answer is simply not ours any more.
+        if (ctrl.signal.aborted) return;
         const fresh = res.products ?? [];
         // Keep the pages «عرض المزيد» had loaded, so the list keeps its length.
         const seen = new Set(fresh.map((p) => p.id));
@@ -93,7 +99,7 @@ export function useListing(category: string | null) {
         if (!ctrl.signal.aborted) setLoading(false);
       });
     return () => ctrl.abort();
-  }, [cacheKey, query, attempt]);
+  }, [cacheKey, path, attempt]);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
