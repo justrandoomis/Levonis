@@ -74,7 +74,7 @@ const CategoryHero = forwardRef<HTMLElement, {
           crop={photo.productPhoto}
           frame={false}
           size={band ? 1200 : 480}
-          sizes={band ? IMAGE_SIZES.full : IMAGE_SIZES.cropBanner}
+          sizes={band ? IMAGE_SIZES.full : compact ? IMAGE_SIZES.cropHeroCompact : IMAGE_SIZES.cropHeroFull}
           eager
           className={`lv-hero-blend -z-10 ${
             band ? 'inset-y-0 -inset-x-4 sm:-inset-x-6 lg:inset-x-0' : 'inset-y-0 -end-4 w-[42%] sm:-end-6 sm:w-[38%] lg:end-0 lg:w-[34%]'

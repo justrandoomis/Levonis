@@ -30,8 +30,9 @@ import { IMAGE_SIZES } from '../../../packages/contracts/src/imageSizes';
  * SMALL COPIES (owner 2026-10-13). Both the `<source>` and the `<img>` carry
  * the `srcset` of the server's copies (packages/contracts/src/imageSizing.ts)
  * and `sizes` — the `cropBanner` preset unless the caller knows better — so a
- * 230 px phone banner downloads the 800 px copy, not a 1254–1600 px original
- * (measured: `/categories` on a phone went from 512 KB of pictures to ~180).
+ * 205 px phone banner downloads the 640 px copy, not a 1254–1600 px original
+ * (measured: `/categories` on a phone went from 512 KB of pictures to ~180,
+ * then ~160 once the phone clause followed the drawn box).
  * A GIF or any other source keeps its own file.
  *
  * A failed load removes the picture; the banner under it is already a
