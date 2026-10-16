@@ -45,6 +45,32 @@ import { requestErrorText } from './requestErrorText';
 
 export const RESOLVE_PATH = '/api/storefront/resolve';
 export const HOME_PATH = '/api/home';
+/**
+ * WHOSE SESSION THIS IS, ASKED WITH THE ENTRY (speed audit 2026-10-16).
+ * `AuthProvider` sent it from its mount effect — after every chunk had been
+ * parsed and React had mounted — and three things wait for it: the community
+ * gate, the guarded routes (`ProtectedRoute` draws its fallback until the
+ * session is known, so a signed-in cart did not even ask for its page's code
+ * before this answer), and the reads keyed on the viewer. It depends on
+ * nothing React computes, so it leaves here, on every page; `AuthContext`
+ * takes it once (`takePrimedJson`, whose epoch guard re-asks if the session
+ * changes while it settles). `private, no-store` on the server: nothing caches it.
+ */
+export const AUTH_ME_PATH = '/api/auth/me';
+/**
+ * «IS LEVO COMMUNITY OPEN TO ME?» on the pages the gate wraps
+ * (src/App.tsx `CommunityGate`): the whole body of those pages is that
+ * answer, and the server answers it from the cookie the request carries — the
+ * same cookie /api/auth/me reads — so it need not wait for /me either
+ * (src/pages/community/access.tsx takes it). Measured live (phone, Slow-4G,
+ * ×4 CPU): /me then the access read then the card, one after another; priming
+ * both took the card's LCP from 2.98 to 2.45 s.
+ */
+export const COMMUNITY_ACCESS_PATH = '/api/community/access';
+/** The main site's paths behind `CommunityGate` (src/App.tsx), which read COMMUNITY_ACCESS_PATH before anything else. */
+export function isCommunityGatedPath(pathname: string): boolean {
+  return /^\/(?:community(?:\/.*)?|u\/[^/]+\/?|requests(?:\/[^/]+)?\/?|followed-stores\/?)$/i.test(pathname);
+}
 export function productsOpeningPath(search = ''): string {
   const query = new URLSearchParams(search);
   const params = new URLSearchParams();
@@ -78,6 +104,11 @@ export const INLINE_RESOLVE_ID = 'lv-resolve';
 const primed = new Map<string, Promise<Response>>();
 const deadlines = new WeakMap<Promise<Response>, { finish: () => void; cancel: () => void }>();
 let sessionEpoch = 0;
+
+/** Bumped by every `clearPrimedRequests`: an answer asked under another number was asked for another session. */
+export function primedSessionEpoch(): number {
+  return sessionEpoch;
+}
 
 /** Authentication changed: an opening answer from the earlier session is unusable. */
 export function clearPrimedRequests(): void {
@@ -210,7 +241,10 @@ export function bootRequests(
     if (/^\/product\/[^/]+\/?$/.test(pathname)) {
       try { started.push(`/api/products/${decodeURIComponent(pathname.split('/')[2])}`); } catch { /* invalid route encoding */ }
     }
+    if (isCommunityGatedPath(pathname)) started.push(COMMUNITY_ACCESS_PATH);
   }
+  // Last: the page's own opening reads go out first; the session follows on every page.
+  started.push(AUTH_ME_PATH);
   for (const path of started) start(path);
   return started;
 }

@@ -33,6 +33,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Wrench } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
+import { COMMUNITY_ACCESS_PATH, primedSessionEpoch, takePrimedJson } from '../../lib/bootFetch';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
 import { ErrorState } from '../../components/ui/AsyncStates';
@@ -57,15 +58,36 @@ export function communityAccessOf(body: unknown): CommunityAccess | null {
   return { closed: b.closed, admin: b.admin === true, may_enter: b.may_enter };
 }
 
-/** GET /api/community/access — public, answers while it is shut; a guest's answer is edge-cached, a member's never. */
+/**
+ * GET /api/community/access — public, answers while it is shut; a guest's
+ * answer is edge-cached, a member's never. On a gated page the request left
+ * with the entry (src/lib/bootFetch.ts `COMMUNITY_ACCESS_PATH`) and is taken
+ * here once.
+ */
 export async function fetchCommunityAccess(): Promise<CommunityAccess> {
-  const access = communityAccessOf(await api.get<unknown>('/api/community/access'));
+  const primed = takePrimedJson<unknown>(COMMUNITY_ACCESS_PATH);
+  const access = communityAccessOf(await (primed ?? api.get<unknown>(COMMUNITY_ACCESS_PATH)));
   if (!access) throw new Error('community access: unreadable body');
   return access;
 }
 
+/**
+ * THE KEY OF AN ANSWER ASKED BEFORE /api/auth/me HAS SAID WHOSE SESSION THIS
+ * IS (speed audit 2026-10-16). The question used to wait for the session —
+ * /me, then this read, then the page, one round trip after another on a
+ * phone. But the server answers it from the cookie the request carries, the
+ * same cookie /me reads, so an answer asked under this key IS the answer for
+ * whoever /me then names: it is adopted under that viewer's key instead of
+ * asked again — unless a sign-in or sign-out happened in between
+ * (`primedSessionEpoch`, bumped by every one of them), when it is dropped and
+ * the viewer's own question is asked as before. The maintenance card of a
+ * guest therefore cannot survive into the session of a member who signs in.
+ */
+export const COMMUNITY_SESSION_KEY = '\u0000session';
+const SESSION_KEY = COMMUNITY_SESSION_KEY;
+
 /** The in-flight or settled answer for one viewer. Cleared when the viewer changes. */
-let cache: { key: string; promise: Promise<CommunityAccess> } | null = null;
+let cache: { key: string; epoch: number; promise: Promise<CommunityAccess> } | null = null;
 
 /**
  * How long a FAILED answer is still shared by the components of one page
@@ -82,18 +104,29 @@ export function resetCommunityAccessCache() {
   cache = null;
 }
 
+/** The shared answer for `key` (a viewer's id, 'guest', or COMMUNITY_SESSION_KEY). Exported for the tests. */
+export function communityAccessFor(key: string): Promise<CommunityAccess> {
+  return accessFor(key);
+}
+
 function accessFor(key: string): Promise<CommunityAccess> {
   if (cache && cache.key === key) return cache.promise;
+  if (cache && cache.key === SESSION_KEY && key !== SESSION_KEY && cache.epoch === primedSessionEpoch()) {
+    // The cookie's own answer, asked before /me named the viewer: theirs.
+    cache = { ...cache, key };
+    return cache.promise;
+  }
   const promise = fetchCommunityAccess().catch((e: unknown) => {
     // A failed answer must not be remembered for long: a component that asks
     // later must retry rather than inherit a stale failure. It IS remembered
-    // for the rest of this page load's burst (see FAILURE_SHARED_MS).
+    // for the rest of this page load's burst (see FAILURE_SHARED_MS) — under
+    // whichever viewer's key it was adopted by meanwhile.
     setTimeout(() => {
-      if (cache && cache.key === key && cache.promise === promise) cache = null;
+      if (cache && cache.promise === promise) cache = null;
     }, FAILURE_SHARED_MS);
     throw e;
   });
-  cache = { key, promise };
+  cache = { key, epoch: primedSessionEpoch(), promise };
   return promise;
 }
 
@@ -104,36 +137,38 @@ function accessFor(key: string): Promise<CommunityAccess> {
  */
 export function useCommunityAccess(): { access: CommunityAccess | null; error: unknown; reload: () => void } {
   const { user, isLoaded } = useAuth();
-  const key = isLoaded ? user?.id ?? 'guest' : '';
-  const [access, setAccess] = useState<CommunityAccess | null>(null);
-  const [error, setError] = useState<unknown>(null);
+  // Asked at once — never as a GUEST before the session is known (that would
+  // show the maintenance card to an allow-listed member for as long as the
+  // first answer took), but as the cookie's own question (SESSION_KEY), which
+  // the viewer's key then adopts.
+  const key = isLoaded ? user?.id ?? 'guest' : SESSION_KEY;
+  const [answer, setAnswer] = useState<{ promise: Promise<CommunityAccess> | null; access: CommunityAccess | null; error: unknown }>(
+    { promise: null, access: null, error: null }
+  );
   const [nonce, setNonce] = useState(0);
   const reload = useCallback(() => {
     resetCommunityAccessCache();
-    setAccess(null);
-    setError(null);
+    setAnswer({ promise: null, access: null, error: null });
     setNonce((n) => n + 1);
   }, []);
   useEffect(() => {
-    // Nothing is asked until the session is known. Asking as a guest and then
-    // again as the user would show the maintenance card to an allow-listed
-    // member for as long as the first answer took to arrive.
-    if (key === '') return;
     let alive = true;
-    setAccess(null);
-    setError(null);
-    accessFor(key)
+    const promise = accessFor(key);
+    // An adopted answer is the SAME promise: what it already said stays on
+    // screen (no blank frame between the cookie's key and the viewer's).
+    setAnswer((current) => (current.promise === promise ? current : { promise, access: null, error: null }));
+    promise
       .then((a) => {
-        if (alive) setAccess(a);
+        if (alive) setAnswer((current) => (current.promise === promise ? { promise, access: a, error: null } : current));
       })
       .catch((e: unknown) => {
-        if (alive) setError(e);
+        if (alive) setAnswer((current) => (current.promise === promise ? { promise, access: null, error: e } : current));
       });
     return () => {
       alive = false;
     };
   }, [key, nonce]);
-  return { access, error, reload };
+  return { access: answer.access, error: answer.error, reload };
 }
 
 /**
@@ -227,7 +262,13 @@ export function CommunityGate({
    */
   closedExtra?: React.ReactNode;
 }) {
+  const { isLoaded } = useAuth();
   const { access, error, reload } = useCommunityAccess();
+  // The verdict can arrive before the session does (both leave with the
+  // entry): the page still waits for the session, so what is drawn — the
+  // card's sign-in button, the page's own reads — knows who is looking from
+  // its first frame, and nothing moves when /me lands.
+  if (!isLoaded) return <>{fallback ?? null}</>;
   if (error !== null) return <ErrorState error={error} onRetry={reload} />;
   if (!access) return <>{fallback ?? null}</>;
   if (!access.may_enter) {
