@@ -565,7 +565,21 @@ test('verification: a stale public answer is purged again and waited for, then V
     const nextRead = w.calls.filter((c) => c.at > purge2);
     assert.ok(nextRead.length > 0);
     assert.ok(w.logLines.some((l) => /a stale answer; purge again and wait 180 s/.test(l)), 's-maxage + 60 s');
+    assert.equal(w.logLines.filter((l) => /verify v1: ok no \(HTTP 200\)/.test(l)).length, 2, 'the failed check is named in each round');
     assert.equal(w.outputs.blocked, 'true');
+  } finally {
+    w.dispose();
+  }
+});
+
+test('verification: a browser check that fails is named in the log each round; COMPLETE is never sent', async () => {
+  const w = new World({ handles: ['filament-buffer'] });
+  try {
+    await w.importer({}, w.browser({ ok: false, checks: { image_decodes: true, no_zero_dinar: false } })).main();
+    assert.equal(w.item('filament-buffer').blocker_code, 'VERIFY_FAILED_PERSISTENT');
+    assert.equal(callsTo(w, /\/complete$/).length, 0);
+    assert.equal(w.logLines.filter((l) => /verify browser_no_zero_dinar: ok no \(HTTP -\)/.test(l)).length, 2, w.logLines.join('\n'));
+    assert.ok(!w.logLines.some((l) => /verify browser_image_decodes/.test(l)), 'only the failed ones');
   } finally {
     w.dispose();
   }

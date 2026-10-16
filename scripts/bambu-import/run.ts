@@ -1236,6 +1236,9 @@ export class Importer {
       }
       const passed = Object.values(outcome.checks).filter((c) => c.ok).length;
       this.log.item(w.row.queue_position, w.row.handle, 'VERIFYING_LIVE', 'verify_done', { passed, total: Object.keys(outcome.checks).length });
+      // Which ones failed, by name, every round: the sealed report keeps only the last round's outcome.
+      for (const [check, c] of Object.entries(outcome.checks)) if (!c.ok) this.log.item(w.row.queue_position, w.row.handle, 'VERIFYING_LIVE', 'verify_check', { check, ok: false, status: c.status ?? null });
+      for (const [check, ok] of Object.entries(browser?.checks ?? {})) if (!ok) this.log.item(w.row.queue_position, w.row.handle, 'VERIFYING_LIVE', 'verify_check', { check: `browser_${check}`, ok: false, status: null });
       w.verify = outcome;
       w.browser = browser;
       const allOk = outcome.ok && browser !== null && browser.ok;
