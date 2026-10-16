@@ -258,17 +258,14 @@ test('permissions: contents read at the top and on the import job; actions write
     assert.doesNotMatch(run(step), /\bnpm\b|\bnode\b|scripts\/|\.\/|\$\{\{/, 'no repository code, and no expression in its script');
     assert.ok(!Object.keys(envOf(step)).some((k) => k.startsWith('CLOUDFLARE_')));
   }
+  // The chain dispatches only when EVERY clause holds (§J.5): the whole condition, exactly — a clause joined by
+  // `||`, or a status function that runs it after a failed, cancelled or blocked import, is a different file.
   const when = String(CHAIN.if);
-  for (const part of [
-    "needs.import.result == 'success'",
-    "needs.import.outputs.more == 'true'",
-    "needs.import.outputs.blocked != 'true'",
-    "inputs.mode == 'run'",
-    'inputs.chain',
-    'fromJSON(inputs.chain_count) < 12',
-  ]) {
-    assert.ok(when.includes(part), `the chain condition holds ${part}`);
-  }
+  assert.equal(
+    when,
+    "${{ needs.import.result == 'success' && needs.import.outputs.more == 'true' && needs.import.outputs.blocked != 'true' && inputs.mode == 'run' && inputs.chain && inputs.max_items == '0' && fromJSON(inputs.chain_count) < 12 }}"
+  );
+  assert.doesNotMatch(when, /\|\||always\(|cancelled\(|failure\(|success\(\)/, 'a conjunction, under the implicit success() only');
   assert.deepEqual(map(IMPORT.outputs, 'import outputs'), {
     more: '${{ steps.run.outputs.more }}',
     blocked: '${{ steps.run.outputs.blocked }}',
@@ -278,7 +275,13 @@ test('permissions: contents read at the top and on the import job; actions write
 });
 
 test('concurrency, the 350-minute timeout and the 330-minute deadline', () => {
-  assert.deepEqual(WF.concurrency, { group: 'bambu-import', 'cancel-in-progress': false });
+  // One import job at a time; the kill switch (mode=revoke) alone in a group of its own, so it runs AT ONCE
+  // beside the job it stops, and a chain job's dispatch (a newer pending run of `bambu-import`) can never
+  // cancel it while it waits.
+  assert.deepEqual(WF.concurrency, {
+    group: "${{ inputs.mode == 'revoke' && format('bambu-import-revoke-{0}', github.run_id) || 'bambu-import' }}",
+    'cancel-in-progress': false,
+  });
   assert.equal(IMPORT['timeout-minutes'], 350);
   assert.equal(IMPORT['runs-on'], 'ubuntu-latest');
   assert.deepEqual(WF.defaults, { run: { shell: 'bash' } });
@@ -295,6 +298,7 @@ test('inputs reach the shell only through the job env, and no run script holds a
   // Every `inputs.` in the file is one of those env lines, or the chain job's condition and step env.
   const uses = ACTIVE.filter((line) => /\binputs\./.test(line));
   assert.deepEqual(uses.map((line) => line.trim()), [
+    `group: ${String(map(WF.concurrency, 'concurrency').group)}`,
     ...INPUTS.map((input) => `${envName(input)}: \${{ inputs.${input} }}`),
     `if: ${String(CHAIN.if)}`,
     'COUNT: ${{ inputs.chain_count }}',
@@ -338,9 +342,20 @@ test('CLOUDFLARE_* only in the step env of steps that run cf.mjs, and those step
     assert.equal(keys.length, cloudflare.length, 'nothing else in a credentialed step env');
   }
   assert.equal(IMPORT.env && Object.keys(map(IMPORT.env, 'env')).some((k) => k.startsWith('CLOUDFLARE_')), false);
-  // The only secrets the workflow reads are those two.
+  // The only secrets the workflow reads are those two, and only through the step env lines checked above: every
+  // active line that names `secrets` in any case or form (`toJSON(secrets)`, `secrets['…']`, `format()`-built
+  // keys, a lower-case name) is one of them, so no step can hand every secret to the importer or the dry run.
   const secrets = new Set([...TEXT.matchAll(/secrets\.([A-Z_]+)/g)].map((m) => m[1]));
   assert.deepEqual([...secrets].sort(), ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN']);
+  const secretLines = ACTIVE.filter((line) => /\bsecrets\b/i.test(line)).map((line) => line.trim());
+  const cloudflareKeys = STEPS.flatMap((s) => Object.keys(envOf(s)).filter((k) => k.startsWith('CLOUDFLARE_')));
+  assert.equal(secretLines.length, cloudflareKeys.length, 'one `secrets` line per CLOUDFLARE_ step env key, nothing else');
+  for (const line of secretLines) assert.match(line, /^(CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID): \$\{\{ secrets\.\1 \}\}$/);
+  // The internet-facing steps: exactly these environment keys, nothing a later edit could slip a secret into.
+  const importer = STEPS.find((s) => s.id === 'run')!;
+  assert.deepEqual(Object.keys(envOf(importer)).sort(), ['IMPORT_OUT_DIR', 'IMPORT_RUN_FILE', 'IMPORT_TOKEN_FILE', 'PLAYWRIGHT_MODULE']);
+  const dryrun = STEPS.find((s) => /e2e-bambu-import\.mjs/.test(run(s)))!;
+  assert.deepEqual(envOf(dryrun), { PLAYWRIGHT_MODULE: '${{ runner.temp }}/browser/node_modules/playwright' });
   // npm ci, which runs package install scripts, sees no credential.
   const install = STEPS.find((s) => /^npm ci\b/.test(run(s)));
   assert.ok(install && Object.keys(envOf(install)).length === 0);
@@ -563,6 +578,16 @@ test('the validation step refuses every malformed or hostile input, and never ec
   assert.equal(bash(script, { ...GOOD, IN_MODE: 'withdraw', IN_RUN_ID: RUN, IN_CONFIRM: 'IMPORT-LIVE' }).status, 1, 'withdraw without the item');
   assert.equal(bash(script, { ...GOOD, IN_MODE: 'open', IN_RUN_ID: RUN, IN_CONFIRM: 'IMPORT-LIVE' }).status, 1, 'open with a run_id');
   assert.equal(bash(script, { ...GOOD, IN_MODE: 'snapshot', IN_CONFIRM: 'IMPORT-LIVE' }).status, 0, 'a read may carry the phrase');
+  // A bounded run (the canary, an audit class: max_items 1) never chains into unbounded jobs (§K.4 review first).
+  const chained = { ...GOOD, IN_MODE: 'run', IN_RUN_ID: RUN, IN_CONFIRM: 'IMPORT-LIVE', IN_CHAIN: 'true' };
+  for (const max of ['1', '25', '00', '9999']) {
+    const r = bash(script, { ...chained, IN_MAX_ITEMS: max });
+    assert.equal(r.status, 1, `chain with max_items ${max}`);
+    assert.match(r.stdout, /^::error::chain runs only with max_items 0/m);
+  }
+  assert.equal(bash(script, { ...chained, IN_MAX_ITEMS: '0' }).status, 0, 'chain with max_items 0');
+  assert.equal(bash(script, { ...chained, IN_CHAIN: 'false', IN_MAX_ITEMS: '1' }).status, 0, 'a bounded run without chain');
+  assert.equal(bash(script, { ...GOOD, IN_CHAIN: 'true', IN_MAX_ITEMS: '1' }).status, 0, 'chain means nothing outside mode run');
   assert.ok(!existsSync(marker), 'no input was ever evaluated');
 });
 

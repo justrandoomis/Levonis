@@ -598,6 +598,41 @@ test('revoke --run-file: no file means no token was minted (exit 0, no call); a 
   }
 });
 
+test('revoke ignores the job deadline: run in always() after the importer used its time, it still clears the token', () => {
+  // The importer may end a minute before DEADLINE_EPOCH (§A.7 rule 1 keeps no reserve for the steps after it),
+  // an owner may cancel late, or the job may overrun: the token is revoked anyway, and the job stays green.
+  for (const [deadline, how] of [
+    [deadlineIn(-5), 'five minutes past the deadline'],
+    [String(Math.floor(Date.now() / 1000) + 30), '30 s before the deadline'],
+    ['not-a-time', 'a malformed DEADLINE_EPOCH'],
+  ] as const) {
+    for (const viaFile of [true, false]) {
+      const f = fixture();
+      try {
+        withRun(f, 'running');
+        const runFile = join(f.dir, 'tmp', 'import-run');
+        writeFileSync(runFile, `${RUN_A}\n`);
+        const r = f.run(viaFile ? ['revoke', '--run-file', runFile] : ['revoke', '--run', RUN_A], { DEADLINE_EPOCH: deadline });
+        assert.equal(r.status, 0, `${how} (${viaFile ? '--run-file' : '--run'}): ${r.stderr}`);
+        assert.equal(f.query<{ token_sha256: string }>(`SELECT token_sha256 FROM catalog_import_runs WHERE id = '${RUN_A}'`)[0].token_sha256, '', how);
+        assert.ok(f.calls().length >= 3, 'wrangler was reached');
+      } finally {
+        f.dispose();
+      }
+    }
+  }
+  // Every other mode keeps the deadline: a snapshot a minute before it is still refused before any call.
+  const g = fixture();
+  try {
+    const r = g.run(['snapshot', '--seal', g.keys.publicKey, '--out', g.out], { DEADLINE_EPOCH: deadlineIn(1) });
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /the job deadline is less than two minutes away/);
+    assert.deepEqual(g.calls(), []);
+  } finally {
+    g.dispose();
+  }
+});
+
 test('report: the run ledger sealed in memory; counts by state in the log, nothing else', () => {
   const f = fixture();
   try {

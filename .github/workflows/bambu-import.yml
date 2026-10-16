@@ -38,8 +38,11 @@
 #             `before`. The token is revoked at the end of the job.
 #   run       (confirm=IMPORT-LIVE, run_id) the queue, ONE product at a time:
 #             max_items (0 = until the deadline), resume (continue a BLOCKED
-#             product once its cause is fixed), chain (dispatch the next job
-#             when this one stops at its deadline, at most 12 in a row).
+#             product once its cause is fixed), chain (only with max_items 0:
+#             dispatch the next job when this one ends with items left and
+#             none BLOCKED — its deadline or a parked wait — at most 12 in a
+#             row). A bounded job (the canary, an audit class) never chains:
+#             it is reviewed (§K.4) before the next one is dispatched.
 #   close     (confirm=IMPORT-LIVE, run_id) the end-of-run audit (§I.3), the
 #             protected snapshot `after`, /run/finish (closed or partial),
 #             the old token now answers 404, the sealed close report.
@@ -53,7 +56,12 @@
 #             second fetch and the sitemap absence are the evidence.
 #   revoke    the kill switch: clears catalog_import_runs.token_sha256 of
 #             `run_id`, so every ops path answers 404. Before migration 0195
-#             there is no run table: a notice, and green.
+#             there is no run table: a notice, and green. It runs in a
+#             concurrency group of its own, AT ONCE, beside a running import
+#             job: that job's next ops call answers 404, it stops blocked and
+#             dispatches no chain. A chain job that dispatched a moment before
+#             the kill switch ran mints a fresh token for its own job: cancel
+#             that run in the Actions UI too (its always() step revokes it).
 #
 # Every job that writes starts with the preflight step and its restore point,
 # mints a fresh token into a 0600 file that only the importer step reads (and
@@ -86,7 +94,9 @@
 #     is sealed in the job to the dispatch's one-time X25519 key, and only
 #     `*.sealed` files are uploaded (kept 3 days).
 #   - One import job at a time (concurrency bambu-import), 350 minutes at most,
-#     with an absolute deadline at 330 minutes that the scripts honour.
+#     with an absolute deadline at 330 minutes that the scripts honour. The
+#     kill switch (mode=revoke) alone is outside that group, so it never waits
+#     behind the job it stops and a chain's dispatch never cancels it.
 name: 60 - Bambu one-time import (writes live D1/R2 catalogue, no deployment)
 
 on:
@@ -120,7 +130,7 @@ on:
         required: false
         default: false
       chain:
-        description: 'dispatch the next job when this one stops at its deadline'
+        description: 'max_items 0 only: dispatch the next job when this one ends with items left and none blocked (its deadline, a parked wait)'
         type: boolean
         required: false
         default: false
@@ -144,7 +154,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: bambu-import
+  group: ${{ inputs.mode == 'revoke' && format('bambu-import-revoke-{0}', github.run_id) || 'bambu-import' }}
   cancel-in-progress: false
 
 defaults:
@@ -198,6 +208,7 @@ jobs:
             open) [[ -z "$IN_RUN_ID" ]] || fail 'open creates a new run: run_id must be empty' ;;
           esac
           if [[ "$IN_MODE" == "withdraw" ]]; then [[ -n "$IN_ITEM" ]] || fail 'withdraw needs the item (a source product id)'; fi
+          if [[ "$IN_MODE" == "run" && "$IN_CHAIN" == "true" ]]; then [[ "$IN_MAX_ITEMS" == "0" ]] || fail 'chain runs only with max_items 0: a bounded job is reviewed before the next one'; fi
           echo "inputs valid: mode $IN_MODE"
 
       - uses: actions/checkout@v4
@@ -305,7 +316,7 @@ jobs:
   # here again. Nothing is ever scheduled: a stopped chain is resumed by hand.
   chain:
     needs: import
-    if: ${{ needs.import.result == 'success' && needs.import.outputs.more == 'true' && needs.import.outputs.blocked != 'true' && inputs.mode == 'run' && inputs.chain && fromJSON(inputs.chain_count) < 12 }}
+    if: ${{ needs.import.result == 'success' && needs.import.outputs.more == 'true' && needs.import.outputs.blocked != 'true' && inputs.mode == 'run' && inputs.chain && inputs.max_items == '0' && fromJSON(inputs.chain_count) < 12 }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

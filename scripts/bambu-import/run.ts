@@ -119,6 +119,8 @@ export function configFromEnv(env: NodeJS.ProcessEnv, root: string): RunConfig {
   if (!/^[0-9]{1,4}$/.test(maxItems)) throw new ConfigError('max_items is not a whole number');
   const chainCount = env.IN_CHAIN_COUNT ?? '0';
   if (!/^([0-9]|1[0-2])$/.test(chainCount)) throw new ConfigError('chain_count is not 0 to 12');
+  // A bounded job (the canary, an audit class) is reviewed before the next one (§K.4): it never chains.
+  if (mode === 'run' && env.IN_CHAIN === 'true' && Number(maxItems) !== 0) throw new ConfigError('chain runs only with max_items 0');
   const item = env.IN_ITEM ?? '';
   if (item && !/^[0-9]{1,20}$/.test(item)) throw new ConfigError('item is not a source product id');
   const sealKey = env.IN_SEAL_PUBKEY ?? '';

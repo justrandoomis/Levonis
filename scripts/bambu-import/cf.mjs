@@ -22,6 +22,8 @@
  *       catalog_import_runs table and no token: a notice, and exit 0. With
  *       --run-file (the always() step after a mode that minted a token): no
  *       file means no token was minted in this job — a notice, and exit 0.
+ *       The revoke never refuses for the job deadline: it is what must still
+ *       run after the importer used its time (see openContext).
  *   node scripts/bambu-import/cf.mjs preflight --mode <mode> --run <run id or ''>
  *       Every job that writes starts here (§A.1, §K.2 step 11): the live
  *       migration count and last name equal the repository's, the 0195 table
@@ -246,11 +248,17 @@ function writeConfig(context, uuid) {
   writeFileSync(context.config, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
 }
 
-function openContext(env, log) {
+/**
+ * `honourDeadline: false` is the revoke's: it runs in workflow 60's always() step after the importer has used
+ * its time, after a late cancel or after an overrun, and it must clear the token whatever the clock says. It is
+ * bounded by CALL_LIMIT_MS per wrangler call (four calls) and by the job's 350-minute timeout, which the
+ * 330-minute deadline leaves 20 minutes before (TOKEN_TAIL_MS), never by DEADLINE_EPOCH.
+ */
+function openContext(env, log, { honourDeadline = true } = {}) {
   if (!env.CLOUDFLARE_API_TOKEN || !env.CLOUDFLARE_ACCOUNT_ID) {
     throw new CfError("CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are not in this step's environment");
   }
-  const deadline = parseDeadline(env.DEADLINE_EPOCH);
+  const deadline = honourDeadline ? parseDeadline(env.DEADLINE_EPOCH) : null;
   if (deadline !== null && deadline - Date.now() < DEADLINE_MARGIN_MS * 2) throw new CfError('the job deadline is less than two minutes away');
   const childEnv = { ...env, WRANGLER_WRITE_LOGS: 'false', WRANGLER_SEND_METRICS: 'false' };
   // The database is named here; an inherited environment never chooses another one.
@@ -627,7 +635,7 @@ export function main(argv, { env = process.env, log = console.log, error = conso
   }
   let context;
   try {
-    context = openContext(env, log);
+    context = openContext(env, log, { honourDeadline: parsed.mode !== 'revoke' });
     switch (parsed.mode) {
       case 'snapshot':
         return snapshot(context, parsed);
