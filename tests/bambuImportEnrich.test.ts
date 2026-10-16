@@ -21,7 +21,7 @@ import { Deadline } from '../scripts/bambu-import/deadline';
 import { HostFetcher, ImportStop } from '../scripts/bambu-import/fetch';
 import { resolveTracker } from '../scripts/bambu-import/tracker';
 import { wikiSpecRows } from '../scripts/bambu-import/wiki';
-import { curatedGate, enrich, mergeCurated } from '../scripts/bambu-import/enrich';
+import { curatedGate, curatedWeight, enrich, mergeCurated } from '../scripts/bambu-import/enrich';
 import { flattenTree, knowledgeFacts, resolveSection, siteFacts, isPublicSpec } from '../scripts/bambu-import/verify';
 
 const T0 = Date.parse('2026-10-16T08:00:00.000Z');
@@ -238,4 +238,32 @@ test('verification adapters: the knowledge answer of §G.1, publicRelations, the
   assert.equal(isPublicSpec({ key: 'package.volume_m3', group: 'logistics', visibility: 'public' }), false, 'CBM never reaches customers');
   assert.equal(isPublicSpec({ key: 'manufacturer_terms.warranty_note', group: 'manufacturer_terms', visibility: 'public' }), false);
   assert.equal(isPublicSpec({ key: 'printing.speed', group: 'printing', visibility: 'owner' }), false);
+});
+
+test('curated weights are written the way the package writes every weight: grams in value_num, the text as published', () => {
+  // The package's own rows (specs.ts publishedWeight): «31 kg» → 31000 g, text «31 kg».
+  assert.deepEqual(curatedWeight(31, 'kg', 'Net Weight 31 kg'), { grams: 31000, text: '31 kg' });
+  // The quote states the same weight in its own unit: the text is the quote's («1 kg» for 1000 g).
+  assert.deepEqual(curatedWeight(1000, 'g', 'Net weight: 1 kg'), { grams: 1000, text: '1 kg' });
+  // The quote says nothing of it: the curated value in its own unit.
+  assert.deepEqual(curatedWeight(500, 'g', 'Spool weight'), { grams: 500, text: '500 g' });
+  assert.equal(curatedWeight(3, 'MPa', ''), null, 'not a weight');
+
+  const payload = payloadOf('filament-buffer');
+  const copy: ImportPayload = JSON.parse(JSON.stringify(payload));
+  mergeCurated(
+    copy,
+    {
+      specs: [
+        { key: 'product.net_weight', scope: { kind: 'product' }, value: 0.12, unit: 'kg', status: 'verified', confidence: 'official_doc', source_kind: 'manual', locator: 'p.3', quote: 'Net weight 120 g' },
+        { key: 'package.weight', scope: { kind: 'product' }, value: 0.2, unit: 'kg', status: 'verified', confidence: 'official_doc', source_kind: 'manual', locator: 'p.3', quote: 'Package 0.2 kg' },
+      ],
+    },
+    'c'.repeat(64)
+  );
+  const net = copy.specs.find((s) => s.key === 'product.net_weight' && s.scope_kind === 'product' && s.region === '')!;
+  assert.deepEqual([net.value_num, net.unit, net.value_text], [120, 'g', '120 g'], 'grams, and the quote\'s own words');
+  const pack = copy.specs.find((s) => s.key === 'package.weight' && s.scope_kind === 'product' && s.region === '')!;
+  assert.deepEqual([pack.value_num, pack.unit, pack.value_text], [200, 'g', '0.2 kg'], 'never «0.2 kg» stored as 0.2 g, never «200 g» for a published «0.2 kg»');
+  assert.doesNotThrow(() => assertImportPayload(JSON.parse(JSON.stringify(copy))));
 });

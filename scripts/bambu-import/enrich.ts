@@ -33,6 +33,7 @@ import { join } from 'node:path';
 import { H } from '@levonis/catalog/bambuImport/hash';
 import { collapseWs, hostOf, keptLinkUrl } from '@levonis/catalog/bambuImport/normalize';
 import { DOCUMENT_HOSTS, DOCUMENT_TITLES, documentKindOf } from '@levonis/catalog/bambuImport/registry/documents';
+import { findWeights, publishedWeight, weightToG, type Measure } from '@levonis/catalog/bambuImport/logistics';
 import { specKey } from '@levonis/catalog/bambuImport/registry/specKeys';
 import type { ProductType } from '@levonis/catalog/bambuImport/registry/types';
 import { scrubProse } from '@levonis/catalog/bambuImport/sentences';
@@ -128,6 +129,21 @@ function scopeOf(payload: ImportPayload, scope: unknown): { kind: PayloadSpec['s
   return null;
 }
 
+/**
+ * A curated weight the way the package writes every weight (specs.ts, §B.7, §G.2): the number in GRAMS
+ * (`value_num`, unit `g`) and the text AS PUBLISHED (`publishedWeight`: «31 kg», «1 kg»). The published form is the
+ * quote's own when the quote states the same weight («Net weight: 1 kg» for 1000 g), else the curated value in its
+ * own unit. Null when the unit is not a weight or the weight is not plausible (then the value is kept as written).
+ */
+export function curatedWeight(value: number, unit: string, quote: string): { grams: number; text: string } | null {
+  const own = weightToG(value, unit);
+  if (!own) return null;
+  const quoted = findWeights(quote)
+    .map((w) => weightToG(w.value, w.written))
+    .find((m): m is Measure => !!m && m.value === own.value);
+  return { grams: own.value, text: publishedWeight(quoted ?? own) };
+}
+
 function valueFields(value: unknown, unit: string): Pick<PayloadSpec, 'data_type' | 'value_text' | 'value_num' | 'value_num_max' | 'value_bool' | 'value_list'> | null {
   const empty = { value_text: '', value_num: null, value_num_max: null, value_bool: null, value_list: [] as Array<string | number> };
   if (typeof value === 'number' && Number.isFinite(value)) return { ...empty, data_type: 'number', value_num: value, value_text: `${value}${unit ? ` ${unit}` : ''}` };
@@ -176,8 +192,13 @@ export function mergeCurated(payload: ImportPayload, file: Rec, sha256: string):
     const reg = specKey(raw.key);
     const scope = scopeOf(payload, raw.scope);
     const region = typeof raw.region === 'string' && REGIONS.has(raw.region) ? (raw.region as PayloadSpec['region']) : '';
-    const unit = typeof raw.unit === 'string' ? raw.unit.slice(0, 20) : reg?.unit ?? '';
-    const values = valueFields(raw.value, unit);
+    const writtenUnit = typeof raw.unit === 'string' ? raw.unit.slice(0, 20) : reg?.unit ?? '';
+    // A weight key (the registry stores it in grams) takes the package's weight rule: grams, the text as published.
+    const weight = reg?.unit === 'g' && typeof raw.value === 'number' && Number.isFinite(raw.value) ? curatedWeight(raw.value, writtenUnit, String(raw.quote ?? '')) : null;
+    const unit = weight ? 'g' : writtenUnit;
+    const values = weight
+      ? { data_type: 'number', value_text: weight.text, value_num: weight.grams, value_num_max: null, value_bool: null, value_list: [] as Array<string | number> }
+      : valueFields(raw.value, unit);
     const status = typeof raw.status === 'string' && STATUSES.has(raw.status) ? raw.status : 'unverified';
     const confidence = typeof raw.confidence === 'string' && raw.confidence in RANK ? raw.confidence : 'official_doc';
     const sourceKind = typeof raw.source_kind === 'string' && SOURCE_KINDS.has(raw.source_kind) ? raw.source_kind : 'curated';
