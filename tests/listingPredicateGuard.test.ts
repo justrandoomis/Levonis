@@ -229,7 +229,9 @@ const EXPECTED_CALLS: Record<string, { visible: number; sellable: number; states
   'worker/routes/cart.ts': { visible: 0, sellable: 2, states: 0 },
   // `loadAddProduct`: SELLABLE, and «still shown? then 409 PRICE_NOT_AVAILABLE» — for the single and the batch add.
   'worker/lib/cartAdd.ts': { visible: 1, sellable: 1, states: 0 },
-  'worker/routes/catalog.ts': { visible: 2, sellable: 2, states: 0 },
+  // +1 VISIBLE, +1 SELLABLE flag: past TREE_AVAILABILITY_CAP the map's per-section photographs read the
+  // visible products in the shop's order, priced first (speed audit 2026-10-16) — the same question as the counts.
+  'worker/routes/catalog.ts': { visible: 3, sellable: 3, states: 0 },
   'worker/routes/communityFavorites.ts': { visible: 1, sellable: 1, states: 0 },
   'worker/routes/communityPosts.ts': { visible: 3, sellable: 0, states: 0 },
   'worker/routes/communitySearch.ts': { visible: 2, sellable: 0, states: 0 },

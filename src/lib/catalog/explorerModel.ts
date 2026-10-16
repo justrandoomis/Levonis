@@ -13,8 +13,10 @@
  *     chips, no grid of tiles;
  *   - the photograph is the admin's banner — the theme on screen first,
  *     then the screen's size — else the section's card pictures by the same
- *     rule (src/lib/catalog/sectionPictures.ts), else a representative
- *     product — available now first, never the same product on two rows
+ *     rule (src/lib/catalog/sectionPictures.ts), else the product photograph
+ *     the map itself picked for the section (`treePhoto`, worker/routes/
+ *     catalog.ts `assignTreePhotos`), else a representative product from a
+ *     pool — available now first, never the same product on two rows
  *     (`authoredPhoto`);
  *   - the call to action is «استكشف» where the section opens onto sections of
  *     its own, «تسوق الآن» where it is a list.
@@ -138,6 +140,19 @@ export function authoredPhoto(node: SectionPictureFields): BannerPhoto | null {
   return sources ? { ...sources, productPhoto: false, productId: null } : null;
 }
 
+/**
+ * The product photograph the MAP picked for a section (`GET /api/catalog/tree`
+ * carries one per section since the speed audit of 2026-10-16), or null — an
+ * answer cached before it, a department page's own nodes, a section with no
+ * photographed product.
+ */
+export function treePhoto(node: Pick<CatalogTreeNode, 'photo'>): BannerPhoto | null {
+  const p = node.photo;
+  if (!p || typeof p.src !== 'string' || !p.src) return null;
+  const light = typeof p.light_src === 'string' ? p.light_src.trim() : '';
+  return { src: p.src, productPhoto: true, productId: typeof p.product_id === 'string' ? p.product_id : null, ...(light ? { lightSrc: light } : {}) };
+}
+
 /** Would `/categories/<node>` draw shelves (true) or be the listing itself (false)? */
 export function drawsShelves(node: Pick<CatalogTreeNode, 'children' | 'product_count'>): boolean {
   const kids = (node.children ?? []).filter((c) => c.product_count > 0).length;
@@ -153,11 +168,11 @@ export interface BannerRow {
 /**
  * The banner rows for a list of sections — the explorer's roots, a category's
  * children, a sub-section's own children. Only sections that hold products, in
- * the order given (the admin's `sort`). The admin's picture wins; else a
- * product photograph from `pool`, available now first and never the same
- * product on two rows. `avoid` names products already on screen (the page
- * hero's): skipped while another candidate exists, used rather than leave a
- * row bare.
+ * the order given (the admin's `sort`). The admin's picture wins; else the
+ * map's own pick (`treePhoto`); else a product photograph from `pool`,
+ * available now first and never the same product on two rows. `avoid` names
+ * products already on screen (the page hero's): skipped while another
+ * candidate exists, used rather than leave a row bare.
  */
 export function bannerRows(
   nodes: readonly CatalogTreeNode[],
@@ -169,6 +184,15 @@ export function bannerRows(
   // Authored pictures first, so a product photograph is never borrowed for a
   // row that already has its own.
   const photos = new Map<string, BannerPhoto | null>(shown.map((n) => [n.id, authoredPhoto(n)]));
+  // The map's own picks next: already one per section, never a sibling's
+  // while another exists — and never borrowed again from the pool below.
+  for (const n of shown) {
+    if (photos.get(n.id)) continue;
+    const picked = treePhoto(n);
+    if (!picked) continue;
+    photos.set(n.id, picked);
+    if (picked.productId) used.add(picked.productId);
+  }
   for (const n of shown) {
     if (photos.get(n.id)) continue;
     const photo = representativePhoto(n, pool, new Set([...used, ...avoid])) ?? representativePhoto(n, pool, used);

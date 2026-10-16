@@ -54,6 +54,15 @@ export interface CatalogTreeNode {
   /** The banner for a PHONE, dark and light (0149); optional as above. */
   hero_mobile_image_url?: string;
   hero_light_mobile_image_url?: string;
+  /**
+   * A product photograph this section's banner may borrow — the map's own
+   * pick, one per section and never one a sibling took while another exists
+   * (worker/routes/catalog.ts `assignTreePhotos`). Optional: absent from an
+   * answer cached before it, from the public API's sections, from a
+   * department page's own nodes, and from a section with no photographed
+   * product; the client then borrows the old way.
+   */
+  photo?: { src: string; light_src?: string; product_id: string };
   /** Active, non-composition products here or anywhere below. */
   product_count: number;
   /** Of those, how many sell direct with units available now. `null` when the

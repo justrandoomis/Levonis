@@ -30,12 +30,16 @@ import type { CatalogTreeResponse } from '../lib/catalog/types';
  * the stack only while they have stock (owner default Q10). Nothing empty is
  * ever drawn.
  *
- * PHOTOGRAPHS ARRIVE SECOND. The tree carries the admin's own pictures; a
- * section without one borrows a product photograph (available now first, never
- * the same product twice) from one shared read of the catalogue, and a section
- * that read did not cover asks for its own four. The banners are drawn — words,
- * counts and all — before any photograph lands, and each picture fades into a
- * box whose size never changes.
+ * PHOTOGRAPHS COME WITH THE MAP. The tree carries the admin's own pictures
+ * and, for a section without one, the product photograph the map picked for
+ * it (available now first, never the same product twice — worker/routes/
+ * catalog.ts `assignTreePhotos`), so the first banner's picture — the page's
+ * largest paint — is requested the moment the 3 KB map lands (speed audit
+ * 2026-10-16: it waited for a 50-product pool, 27 KB on the wire, 160 KB of
+ * JSON). Only a section the map has no photograph for still borrows from that
+ * shared read, and one it did not cover asks for its own four. The banners
+ * are drawn — words, counts and all — before any photograph lands, in boxes
+ * whose size never changes.
  *
  * STATES: banner-shaped skeletons (one per row) while the tree loads; the
  * last snapshot with a quiet note if a refresh fails; `ErrorState` with retry
@@ -69,13 +73,24 @@ export default function CategoriesExplorer() {
     void load();
   }, [load]);
 
-  // Photographs and the two conditional banners: after the map, never before it.
+  const roots = useMemo(() => tree?.roots ?? [], [tree]);
+  // The shared pool only for a section the map brought no photograph for.
+  const needsPool = useMemo(() => bannerRows(roots, []).some((r) => !r.photo), [roots]);
   useEffect(() => {
+    if (!needsPool) return;
     let alive = true;
     loadPhotoPool()
       .then((p) => alive && setPool(p))
       .catch(() => undefined)
       .finally(() => alive && setPoolSettled(true));
+    return () => {
+      alive = false;
+    };
+  }, [needsPool]);
+
+  // The two conditional banners: after the map, never before it.
+  useEffect(() => {
+    let alive = true;
     fetchGradedStock({ mascot: 'silent' })
       .then((used) => alive && setExtras((x) => ({ ...x, used: used as ApiProduct[] })))
       .catch(() => undefined);
@@ -88,10 +103,9 @@ export default function CategoriesExplorer() {
     };
   }, []);
 
-  const roots = useMemo(() => tree?.roots ?? [], [tree]);
   const baseRows = useMemo(() => bannerRows(roots, pool), [roots, pool]);
-  // A section the shared pool did not cover asks for its own photographs.
-  const rows = useBannerPhotos(baseRows, poolSettled);
+  // A section neither the map nor the shared pool covered asks for its own photographs.
+  const rows = useBannerPhotos(baseRows, !needsPool || poolSettled);
 
   const title = loc('كل الفئات', 'All categories');
   // OWNER: Sorani to be written by hand (every loc() in this page without a third argument).

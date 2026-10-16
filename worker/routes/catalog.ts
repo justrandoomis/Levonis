@@ -116,26 +116,158 @@ async function cached(c: Context<AppContext>, key: Request, cacheControl: string
   return res;
 }
 
-/** Ids of active, non-composition products with direct units available now. */
+/**
+ * Ids of active, non-composition products with direct units available now —
+ * and, while it read them, every one of those products in the order a banner
+ * borrows a photograph in (available now, then priced, then the shop's own
+ * order) with its card (for `assignTreePhotos`). Both null past the cap.
+ */
 async function availableProductIds(
   db: D1Database,
   ctxPromise: Promise<PricingCtx>,
   ids: string[],
   idx: CatalogIndex
-): Promise<Set<string> | null> {
-  if (ids.length === 0) return new Set();
-  if (ids.length > TREE_AVAILABILITY_CAP) return null;
+): Promise<{ available: Set<string> | null; ordered: Array<{ id: string; card: Record<string, unknown> }> | null }> {
+  if (ids.length === 0) return { available: new Set(), ordered: [] };
+  if (ids.length > TREE_AVAILABILITY_CAP) return { available: null, ordered: null };
   // VISIBLE with each row's SELLABLE flag (DECISIONS row 240): a catalog-only card claims no stock.
   const L = await listing(db);
   const { results } = await db.prepare(
-    `SELECT *, ${L.sellableFlag('products')} AS sellable_now FROM products WHERE ${L.visible('products')} AND composition = '' AND id IN (SELECT value FROM json_each(?))`
+    `SELECT *, ${L.sellableFlag('products')} AS sellable_now FROM products WHERE ${L.visible('products')} AND composition = '' AND id IN (SELECT value FROM json_each(?))
+      ORDER BY sellable_now DESC, display_order ASC, created_at DESC`
   )
     .bind(JSON.stringify(ids))
     .all<Record<string, unknown>>();
   const cards = await resolveProductCards(db, results ?? [], await ctxPromise, idx, 'flag');
   const out = new Set<string>();
   for (const [id, card] of cards) if (Number(card.direct_stock_available ?? 0) > 0) out.add(id);
-  return out;
+  // A stable partition: available now first, each group in the SQL order.
+  const ordered = [...cards].map(([id, card]) => ({ id, card }));
+  ordered.sort((a, b) => Number(out.has(b.id)) - Number(out.has(a.id)));
+  return { available: out, ordered };
+}
+
+// ----------------------------------------------------------- one photograph per section
+
+/** A section's borrowed photograph on the map: a product's lead picture, and its light-theme twin. */
+export interface TreePhoto {
+  src: string;
+  light_src?: string;
+  product_id: string;
+}
+
+/**
+ * The picture a CARD leads with — src/lib/productImage.ts `productPrimaryImage`
+ * on the server's own card (its explicit primary, else the first published
+ * image, else the first media by order), and the card's light-theme main image
+ * (0138). Read off the card, never the row: the card is what the storefront
+ * draws, after the relational image overlay.
+ */
+export function cardLeadPhoto(card: Record<string, unknown>): { src: string; light?: string } | null {
+  const media = Array.isArray(card.media) ? (card.media as Array<{ url?: unknown; primary?: unknown; order?: unknown }>) : [];
+  const url = (m: { url?: unknown } | undefined) => (m && typeof m.url === 'string' ? m.url : '');
+  let src = url(media.find((m) => m?.primary && url(m)));
+  if (!src && Array.isArray(card.images)) src = (card.images as unknown[]).find((u): u is string => typeof u === 'string' && u.length > 0) ?? '';
+  if (!src) src = url([...media].filter((m) => url(m)).sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))[0]);
+  if (!src) return null;
+  const light = typeof card.light_image === 'string' ? card.light_image.trim() : '';
+  return light && light !== src ? { src, light } : { src };
+}
+
+/**
+ * ONE PHOTOGRAPH PER SECTION, ON THE MAP ITSELF (speed audit 2026-10-16: the
+ * explorer's banners — the page's largest paint — waited for a 50-product
+ * pool, 27 KB on the wire and 160 KB of JSON, after the 3 KB map).
+ *
+ * The explorer's rule (src/lib/catalog/explorerModel.ts `bannerRows`), per
+ * group of sibling sections in the admin's order: the first product of the
+ * section's subtree in `ordered` that has a photograph and that an earlier
+ * sibling did not take; a product a sibling took only when the section has no
+ * other. The client still prefers the admin's own banner, and a section with
+ * no `photo` still borrows one the old way.
+ */
+export function assignTreePhotos(
+  roots: CatalogTreeNode[],
+  ordered: readonly string[],
+  memberOf: (productId: string) => ReadonlySet<string> | undefined,
+  photoOf: (productId: string) => { src: string; light?: string } | null
+): void {
+  const group = (nodes: CatalogTreeNode[]) => {
+    const used = new Set<string>();
+    for (const n of nodes) {
+      let fresh: string | null = null;
+      let taken: string | null = null;
+      for (const id of ordered) {
+        if (!memberOf(id)?.has(n.id) || !photoOf(id)) continue;
+        if (!used.has(id)) {
+          fresh = id;
+          break;
+        }
+        taken ??= id;
+      }
+      const pick = fresh ?? taken;
+      if (pick) {
+        used.add(pick);
+        const p = photoOf(pick)!;
+        n.photo = { src: p.src, product_id: pick, ...(p.light ? { light_src: p.light } : {}) };
+      }
+      group(n.children ?? []);
+    }
+  };
+  group(roots);
+}
+
+/** Past TREE_AVAILABILITY_CAP: how many products per section are read for their photograph. */
+export const TREE_PHOTO_SHORTLIST = 3;
+
+/**
+ * The map's photographs when the catalogue is past TREE_AVAILABILITY_CAP and
+ * no card was read for the counts: the products in the shop's order (priced
+ * first), the first few of each section, and only those resolved to cards.
+ */
+async function treePhotosByShortlist(
+  db: D1Database,
+  ctxPromise: Promise<PricingCtx>,
+  roots: CatalogTreeNode[],
+  byProduct: Map<string, Set<string>>,
+  idx: CatalogIndex
+): Promise<void> {
+  const L = await listing(db);
+  const { results } = await db.prepare(
+    `SELECT id, ${L.sellableFlag('products')} AS sellable_now FROM products WHERE ${L.visible('products')} AND composition = '' AND id IN (SELECT value FROM json_each(?))
+      ORDER BY sellable_now DESC, display_order ASC, created_at DESC`
+  )
+    .bind(JSON.stringify([...byProduct.keys()]))
+    .all<{ id: string; sellable_now: unknown }>();
+  const ordered = (results ?? []).map((r) => String(r.id));
+  const sellable = new Map((results ?? []).map((r) => [String(r.id), r.sellable_now]));
+  const onMap = new Set<string>();
+  const walk = (nodes: CatalogTreeNode[]) => nodes.forEach((n) => (onMap.add(n.id), walk(n.children ?? [])));
+  walk(roots);
+  const seats = new Map<string, number>();
+  const shortlist: string[] = [];
+  for (const id of ordered) {
+    let wanted = false;
+    for (const cat of byProduct.get(id) ?? []) {
+      if (!onMap.has(cat) || (seats.get(cat) ?? 0) >= TREE_PHOTO_SHORTLIST) continue;
+      seats.set(cat, (seats.get(cat) ?? 0) + 1);
+      wanted = true;
+    }
+    if (wanted) shortlist.push(id);
+  }
+  if (shortlist.length === 0) return;
+  // Already read VISIBLE above; each row keeps the SELLABLE flag it was read with there.
+  const rows = (
+    (
+      await db.prepare(`SELECT * FROM products WHERE id IN (SELECT value FROM json_each(?))`)
+        .bind(JSON.stringify(shortlist))
+        .all<Record<string, unknown>>()
+    ).results ?? []
+  ).map((r) => ({ ...r, sellable_now: sellable.get(String(r.id)) }));
+  const cards = await resolveProductCards(db, rows, await ctxPromise, idx, 'flag');
+  const photos = new Map<string, { src: string; light?: string } | null>();
+  for (const [id, card] of cards) photos.set(id, cardLeadPhoto(card));
+  assignTreePhotos(roots, shortlist, (id) => byProduct.get(id), (id) => photos.get(id) ?? null);
 }
 
 /**
@@ -145,14 +277,24 @@ async function availableProductIds(
  */
 export async function buildCatalogTree(
   db: D1Database,
-  ctxPromise: Promise<PricingCtx>
+  ctxPromise: Promise<PricingCtx>,
+  /** `photos`: one borrowed photograph per section (`assignTreePhotos`) — the storefront's map; the public API describes sections without them. */
+  opts: { photos?: boolean } = {}
 ): Promise<{ roots: CatalogTreeNode[]; totals: { products: number; available: number | null } }> {
   const [records, memberships] = await Promise.all([loadCatalogRecords(db), loadMemberships(db)]);
   const idx = indexCatalogs(records);
   const byProduct = membershipByProduct(memberships, idx);
-  const available = await availableProductIds(db, ctxPromise, [...byProduct.keys()], idx);
+  const { available, ordered } = await availableProductIds(db, ctxPromise, [...byProduct.keys()], idx);
   const counts = rollUpCounts(byProduct, available);
   const roots = buildTree(idx, counts, available !== null);
+  if (opts.photos) {
+    if (ordered) {
+      const photos = new Map(ordered.map((o) => [o.id, cardLeadPhoto(o.card)]));
+      assignTreePhotos(roots, ordered.map((o) => o.id), (id) => byProduct.get(id), (id) => photos.get(id) ?? null);
+    } else {
+      await treePhotosByShortlist(db, ctxPromise, roots, byProduct, idx);
+    }
+  }
   // Totals over what the explorer SHOWS: products under an active root.
   const shownRoots = new Set(roots.map((r) => r.id));
   let products = 0;
@@ -167,7 +309,7 @@ export async function buildCatalogTree(
 
 catalogRoutes.get('/tree', (c) =>
   cached(c, treeCacheKey(c.req.url), TREE_CACHE, async () =>
-    c.json({ success: true, ...(await buildCatalogTree(c.env.DB, pricingCtx(c))) })
+    c.json({ success: true, ...(await buildCatalogTree(c.env.DB, pricingCtx(c), { photos: true })) })
   )
 );
 
