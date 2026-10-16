@@ -10,13 +10,16 @@
  *     its refusal of any Cloudflare credential, the fixture bundle it builds,
  *     the run row, the store stand-in (a picture of its own per CDN path, so
  *     the Worker's collapse of byte-identical images does not fold every
- *     gallery into one) and the pass conditions.
+ *     gallery into one), the pass conditions, and the importer run as a child
+ *     that does not block the process serving that stand-in.
  *
  * Run: node --import tsx --test tests/bambuImportTools.test.ts
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -26,7 +29,7 @@ import { freshDb } from './fixtures/app';
 import { main as candidatesMain, matchCandidates, materialTokens, modelTokens, slugOverlap, tablesOf, manifestEntries } from '../scripts/bambu-import/match-candidates';
 import { loadReviewedBundle } from '../scripts/bambu-import/discover';
 // @ts-expect-error - plain ESM script (the local dry run), no types
-import { fixtureBundle, judge, parseArgs, refuseCredentials, runRowSql, storeAnswer, standInPng, FIXTURE_HANDLES } from '../scripts/e2e-bambu-import.mjs';
+import { fixtureBundle, judge, parseArgs, refuseCredentials, runChild, runRowSql, storeAnswer, standInPng, FIXTURE_HANDLES } from '../scripts/e2e-bambu-import.mjs';
 
 const SNAPSHOT = {
   format: 'levonis-bambu-snapshot/1',
@@ -172,4 +175,22 @@ test('the dry run: arguments, no Cloudflare credential, the fixture bundle, the 
   assert.deepEqual(judge(good), []);
   assert.deepEqual(judge({ ...good, products: [{ id: 'p', price_iqd: 1000, stock: 3 }] }), ['p: a price', 'p: stock is set']);
   assert.deepEqual(judge({ ...good, rerunWrites: 4, guardEvents: 1 }), ['1 guard hits', 'a full re-run wrote 4 rows']);
+});
+
+test('the dry run: the importer runs beside the store stand-in — the child reaches a server this process serves', async () => {
+  const server = createServer((_req, res) => res.end('stand-in answered'));
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+  const { port } = server.address() as AddressInfo;
+  try {
+    const script = `fetch('http://127.0.0.1:${port}/products/x').then((r) => r.text()).then((t) => { process.stdout.write(t); process.stderr.write('done'); })`;
+    const r = await runChild(process.execPath, ['-e', script], { cwd: ROOT, env: { PATH: process.env.PATH }, timeoutMs: 8_000 });
+    assert.deepEqual([r.status, r.signal, r.stdout, r.stderr], [0, null, 'stand-in answered', 'done']);
+    const killed = await runChild(process.execPath, ['-e', 'setTimeout(() => {}, 60_000)'], { cwd: ROOT, env: {}, timeoutMs: 200 });
+    assert.deepEqual([killed.status, killed.signal], [null, 'SIGTERM']);
+    const missing = await runChild(join(ROOT, 'no-such-binary'), [], { cwd: ROOT, env: {}, timeoutMs: 1_000 });
+    assert.equal(missing.status, null);
+    assert.match(missing.stderr, /ENOENT/);
+  } finally {
+    server.close();
+  }
 });

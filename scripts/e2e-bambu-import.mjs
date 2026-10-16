@@ -48,7 +48,7 @@
  * PLAYWRIGHT_MODULE, KEEP_DEV=1.
  */
 import { createRequire } from 'node:module';
-import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { cpSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -210,6 +210,41 @@ export function judge({ items, products, refs, guardEvents, rerunWrites }) {
   return failures;
 }
 
+/**
+ * A child process run WITHOUT blocking this one. The store and CDN stand-in
+ * the importer talks to, and the pipe that drains `wrangler dev`'s output, are
+ * served by THIS process's event loop: a synchronous spawn would starve them,
+ * and every store request of the importer would end STORE_UNREACHABLE.
+ * Resolves with the exit status (null when killed at `timeoutMs`), the signal
+ * and both outputs.
+ */
+export function runChild(command, argv, { cwd, env, timeoutMs }) {
+  return new Promise((resolveRun) => {
+    let stdout = '';
+    let stderr = '';
+    let done = false;
+    const finish = (status, signal) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      resolveRun({ status, signal, stdout, stderr });
+    };
+    const child = spawn(command, argv, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const timer = setTimeout(() => child.kill('SIGTERM'), timeoutMs);
+    child.stdout.setEncoding('utf8').on('data', (c) => {
+      stdout += c;
+    });
+    child.stderr.setEncoding('utf8').on('data', (c) => {
+      stderr += c;
+    });
+    child.on('error', (e) => {
+      stderr += `${e instanceof Error ? e.message : String(e)}\n`;
+      finish(null, null);
+    });
+    child.on('close', (status, signal) => finish(status, signal));
+  });
+}
+
 // ------------------------------------------------------------------ the run
 
 async function run() {
@@ -305,13 +340,12 @@ async function run() {
 
     // 4. The importer: open, then run until the queue is empty, then a full re-run.
     const seal = args.seal || (await import('./bambu-import/seal.mjs')).generateSealKeys().publicKey;
-    const importer = (mode, tokenFile) => {
+    const importer = async (mode, tokenFile) => {
       const outputs = join(WORK, `outputs-${mode}-${randomBytes(3).toString('hex')}`);
       writeFileSync(outputs, '');
-      const result = spawnSync(process.execPath, ['--import', 'tsx', join(ROOT, 'scripts/bambu-import/run.ts')], {
+      const result = await runChild(process.execPath, ['--import', 'tsx', join(ROOT, 'scripts/bambu-import/run.ts')], {
         cwd: ROOT,
-        encoding: 'utf8',
-        timeout: 60 * 60_000,
+        timeoutMs: 60 * 60_000,
         env: {
           PATH: process.env.PATH,
           HOME: process.env.HOME,
@@ -337,7 +371,7 @@ async function run() {
       writeFileSync(join(WORK, `importer-${mode}.log`), `${result.stdout}\n${result.stderr}`);
       return { status: result.status, outputs: readFileSync(outputs, 'utf8') };
     };
-    const opened = importer('open', first.file);
+    const opened = await importer('open', first.file);
     check('mode open: hello, manifest, taxonomy, protected snapshot', opened.status === 0);
     const rowCount = () => {
       const r = new DatabaseSync(dbFile, { readOnly: true });
@@ -356,10 +390,10 @@ async function run() {
       w.close();
       return t.file;
     };
-    const ran = importer('run', setToken());
+    const ran = await importer('run', setToken());
     check('mode run: the queue ran to its end', ran.status === 0 && /more=false/.test(ran.outputs) && /blocked=false/.test(ran.outputs), ran.outputs);
     const before = rowCount();
-    const again = importer('run', setToken());
+    const again = await importer('run', setToken());
     const rerunWrites = rowCount() - before;
     check('a full re-run: nothing left to do', again.status === 0 && /more=false/.test(again.outputs));
 
