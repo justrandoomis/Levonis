@@ -110,7 +110,7 @@ import BidiText from '../components/ui/BidiText';
 import { scriptDir } from '../lib/bidi';
 
 /**
- * A chooser chip's label (an option or colour name, English by §7): its direction from its script, so a
+ * The label of a chooser chip (an option or colour name, English by §7): its direction from its script, so a
  * truncated name ellipsizes at its own end — «X1 Series and P1 Se…», never «… Series and P1 Series» — and
  * it aligns with the RTL column (I18N-DESIGN §B.1 rules 6 and 7).
  */
@@ -4390,7 +4390,7 @@ export default function Product() {
             <div className="mt-6 space-y-3 max-w-[68ch]">
               <Section title={s.description} icon={<FileText aria-hidden="true" className="w-5 h-5 text-text-secondary" />} defaultOpen>
                 {description ? (
-                  // Mixed Arabic/Sorani and English, line by line, each line's direction from its script (I18N-DESIGN §B).
+                  // Mixed Arabic/Sorani and English, line by line, the direction of each line from its script (I18N-DESIGN §B).
                   <BidiText as="p" multiline className="text-sm text-text-secondary leading-relaxed" text={description} />
                 ) : (
                   <p className="text-sm text-text-muted">{s.noDescription}</p>
