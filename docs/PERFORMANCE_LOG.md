@@ -2021,3 +2021,67 @@ forced-colours `.lv-button` line and switch knob/fill rules, `scroll-padding-bot
 `border-gold/40`, and the forced-colours Highlight frame on the chosen gallery picture. Removed — the
 `focus-visible:ring-gold`, `focus-within:ring-gold`, `peer-focus-visible:ring-gold` and `ring-gold/70` focus
 utilities (their `ring-focus` twins were already in the sheet, or are now) and `hover:bg-gold/15`.
+
+## 2026-10-16 — speed audit, payload lane: a card carries its picture; the spec table is sent once
+
+Two confirmed causes of the 2026-10-16 speed audit (findings 7 and 21: card galleries; finding 24: the
+printer detail's spec table twice). Code: `worker/lib/cardGallery.ts`, `cardShape` and
+`publicSpecifications` in `worker/routes/products.ts`. No client code, no query, no D1 statement changed
+(tests/d1Waves.test.ts green); the product page's own answer keeps the whole gallery.
+
+### Bytes — the live answers, anonymous GETs 2026-10-16, before and with the new code applied
+
+Recorded with `curl -H 'Accept-Encoding: br'`; "after" is the same JSON passed through the lane's real
+functions (`cardGallery` on every card, `publicSpecifications`' rule on the detail) and re-compressed with
+brotli quality 4, which reproduces the live wire within 1.1 % on all eleven answers.
+
+| Answer | JSON before → after | On the wire before (live) → after |
+|---|--:|--:|
+| `/api/products?limit=50` (`/products`, preloaded by the document) | 171,557 → 27,121 | 26,635 → 5,620 |
+| `/api/products?sort=available&limit=50` (the `/categories` photo pool) | 171,605 → 27,169 | 26,672 → 5,658 |
+| `/api/products?category=cat_materials_fdm&facets=1&limit=24` (a listing) | 117,917 → 20,308 | 18,514 → 4,399 |
+| `/api/home` | 45,249 → 23,121 | 9,449 → 6,031 |
+| `/api/catalog/printing-materials` | 60,155 → 17,695 | 9,705 → 3,358 |
+| `/api/products?search=pla&limit=6` (live search, per query) | 57,674 → 5,965 | 9,156 → 1,365 |
+| `/api/products/bambu-lab-h2d` | 237,416 → 193,648 | 34,279 → 30,271 |
+| `/api/products/bambu-lab-h2c` | 252,234 → 205,251 | 36,689 → 32,351 |
+| `/api/products/bambu-lab-p1s` | 160,505 → 134,278 | 25,769 → 23,254 |
+
+97 live cards checked: `productPrimaryImage`, `productMainImage` (both themes), `photoOf`, `images[0]` and the
+public API's `cardImage` (url, size, alt texts) pick the same picture before and after. The card keeps id, url,
+primary, order, width, height and the three alt texts of its one picture (0.7 KB on the wire of the 50-card
+answer against url + primary alone, kept so the public API v1 card image does not change). The audit's "≈ 33 KB" for the spec table
+counted each copy compressed on its own; inside the answer brotli already shares most of the duplicate, so
+dropping it is worth 2.4–4.2 KB per printer, as both skeptics measured.
+
+### Display time — a replay lab, both arms interleaved
+
+`scratchpad/perf/payload-lab/` (server.mts, drive.mjs after the category lane's lab): one `npm run build` of
+this branch served over HTTP/2 as levonis-iq.com; `/api` and `/files` replayed from one recording of the live
+answers, each API answered after 250 ms (an edge hit); the after arm applies the lane's code to the recorded
+answers. Chromium 360×800 DPR 3, CPU ×4, Slow-4G (150 ms, 1.6 Mbit/s), a cold context per visit, 8 + 8 runs
+per route. The machine's load average was ≈ 10 on 4 cores during the run (other work), so single runs are
+noisy; paired differences (after − before, by run) with their standard error:
+
+| Route | Key answer finished | FCP | First image requested | LCP |
+|---|--:|--:|--:|--:|
+| `/products` | −694 ± 16 ms (1,467 → 776, median) | −107 ± 43 ms | −197 ± 125 ms | −117 ± 114 ms (median 2,990 → 2,932) |
+| `/categories/printing-materials/fdm-materials` | −185 ± 93 ms | −25 ± 39 ms | −167 ± 114 ms | −173 ± 142 ms (median 4,948 → 4,900) |
+| `/categories` | −254 ± 79 ms | −36 ± 52 ms | −215 ± 90 ms | **−219 ± 88 ms** (median 3,654 → 3,380) |
+| `/product/bambu-lab-h2d` | −75 ± 15 ms | +1 ± 69 ms | +27 ± 164 ms | +89 ± 164 ms (noise) |
+
+On `/products` the 26 KB answer shared the link with the route's JavaScript; it now arrives 0.7 s sooner and
+the first paint follows ≈ 0.1 s sooner. `/categories` borrows its banner photographs from the 50-card pool, so
+the pool's 21 KB were on the LCP chain. The spec-table change is too small to see in display time (≈ 4 KB);
+moving `spec_groups` off the critical detail answer is the change that would be (see below). On a cache
+miss (server 1.0–1.6 s) the bytes hide behind the wait and the gain shrinks to noise, as one of the audit's
+skeptics measured; on ordinary 4G (10 Mbit/s and more) every number above is ≈ 20 ms or less. The saving
+grows with the catalogue: an imported Bambu card carries up to 31 gallery entries.
+
+### Not changed here
+
+- `spec_groups` itself (≈ 22 KB brotli of the H2D detail, three languages, drawn only when «المواصفات» is
+  opened). Deferring it needs a new cached endpoint, the product page fetching it near the viewport, and the
+  document preload — three other lanes' files — and an older cached bundle would show no table; measured by
+  the audit at −113 ± 58 ms title paint on H2D only.
+- The detail's other legacy aliases (`name`/`name_ku`, `description`/`description_ku`): each under 1 KB.
