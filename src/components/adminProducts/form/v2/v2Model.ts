@@ -27,6 +27,7 @@
  * Pure: no React, no request.
  */
 import type { ProductDimensionsV2 } from '../../../../lib/productTypes';
+import { toAscii, typingUsd } from './usdTyping';
 
 export type V2Method = 'cost' | 'usd';
 export type V2Scope = 'product' | 'option' | 'color' | 'sku';
@@ -232,16 +233,8 @@ export function cleanUsd(text: string, opts: { signed?: boolean; zero?: boolean 
   return m[1] === '-' ? `-${body}` : body;
 }
 
-/** What a dollar input lets through while typing: digits, one dot, two decimals, and (signed) one leading sign. */
-export function typingUsd(raw: string, signed = false): string {
-  let t = toAscii(raw).replace(signed ? /[^\d.+-]/g : /[^\d.]/g, '');
-  if (signed) {
-    const sign = /^[+-]/.exec(t)?.[0] ?? '';
-    t = sign + t.replace(/[+-]/g, '');
-  }
-  const [head, ...rest] = t.split('.');
-  return rest.length ? `${head}.${rest.join('').slice(0, 2)}` : head;
-}
+/** What a dollar input lets through while typing (./usdTyping.ts, a leaf module `UsdInput` shares). */
+export { typingUsd };
 
 /** Whole dinars as typed (Arabic-Indic digits are digits; every separator is dropped): null when empty. */
 export function wholeIqd(raw: string, signed = false): number | null {
@@ -254,13 +247,6 @@ export function wholeIqd(raw: string, signed = false): number | null {
   return neg ? -n : n;
 }
 
-function toAscii(s: string): string {
-  return s
-    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
-    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
-    .replace(/٫/g, '.')
-    .replace(/٬/g, ',');
-}
 
 // ------------------------------------------------------------- the draft --
 
