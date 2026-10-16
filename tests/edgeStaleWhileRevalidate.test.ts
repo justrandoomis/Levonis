@@ -187,9 +187,10 @@ test('a stale listing inside the declared window is served at once, rebuilt behi
     assert.equal(stale.headers.get('Cache-Control'), ANONYMOUS_CACHE_CONTROL, 'the route\'s own header, unchanged');
     assert.equal(stale.headers.get('Age'), '200', 'counted from the build, so no browser can stretch it');
     assert.equal(stale.headers.get(STORED_AT_HEADER), null, 'the internal stamp never leaves');
-    assert.deepEqual(w.refreshes, ['/api/products?limit=50'], 'one background refresh of the canonical URL');
+    assert.deepEqual(w.refreshes, [], 'the rebuild starts only after the answer has gone (one turn of the event loop)');
 
     await settle();
+    assert.deepEqual(w.refreshes, ['/api/products?limit=50'], 'one background refresh of the canonical URL');
     const next = await get(w.guest, path);
     assert.equal(await nameIn(next.clone()), 'Renamed after the copy', 'the refresh stored the new body');
     assert.equal(next.headers.get('Age'), '0');
@@ -207,6 +208,7 @@ test('past s-maxage + stale-while-revalidate the copy is never served: the guest
     advance(721);
     const res = await get(w.guest, path);
     assert.equal(await nameIn(res), 'Changed long ago');
+    await settle();
     assert.deepEqual(w.refreshes, [], 'built inline, no background work');
   });
 });
@@ -218,6 +220,7 @@ test('a late-fresh copy is served and rebuilt behind it, so a key read once a mi
     await settle();
     advance(30);
     await get(w.guest, '/api/home');
+    await settle();
     assert.deepEqual(w.refreshes, [], 'young: nothing to do');
     // Read every 90 s for ten minutes: every read is a hit, never a build on the visitor's time.
     for (let i = 0; i < 7; i += 1) {
@@ -242,12 +245,13 @@ test('a route that declares no stale window — the catalogue tree, a category p
     advance(200);
     const late = await get(w.guest, '/api/catalog/tree');
     assert.equal(late.headers.get('Age'), '200');
-    assert.deepEqual(w.refreshes, ['/api/catalog/tree'], 'past half its life: refreshed behind the answer');
     await settle();
+    assert.deepEqual(w.refreshes, ['/api/catalog/tree'], 'past half its life: refreshed behind the answer');
     advance(301);
     w.refreshes.length = 0;
     const expired = await get(w.guest, '/api/catalog/tree');
     assert.equal(expired.headers.get('Age'), null, 'past its s-maxage: built inline, not served stale');
+    await settle();
     assert.deepEqual(w.refreshes, []);
 
     const page = await get(w.guest, '/api/catalog/printers');
@@ -280,6 +284,7 @@ test('a purge retires every copy of the path in its colo — the parameterised l
     assert.equal(await nameIn(listing), 'Repriced by the owner', 'a 10-second-old copy of a parameterised key is retired too');
     const page = await get(w.guest, `/api/products/${SLUG}`);
     assert.equal(await nameIn(page), 'Repriced by the owner');
+    await settle();
     assert.deepEqual(w.refreshes, []);
     // A copy built AFTER the purge is a normal copy again.
     await settle();
@@ -326,8 +331,8 @@ test('one refresh per key at a time, and none without a dispatcher: then a stale
     await settle();
     advance(200);
     await Promise.all([get(w.guest, '/api/home'), get(w.guest, '/api/home'), get(w.guest, '/api/home')]);
-    assert.equal(w.refreshes.length, 1, 'three stale hits, one rebuild');
     await settle();
+    assert.equal(w.refreshes.length, 1, 'three stale hits, one rebuild');
   });
   await withCaches(async () => {
     const w = world({ dispatcher: false });
@@ -354,6 +359,7 @@ test('a session never reads a shared copy, stale or fresh', async () => {
     assert.equal(member.headers.get('Cache-Control'), 'private, no-store');
     const cookie = await get(w.guest, '/api/products?limit=50', { Cookie: `${SESSION_COOKIE_NAME}=x` });
     assert.equal(await nameIn(cookie), 'Member sees the truth', 'a bare session cookie is not a guest either');
+    await settle();
     assert.deepEqual(w.refreshes, []);
     assert.equal(answers.store.size, 1, 'and neither touched the store');
   });
