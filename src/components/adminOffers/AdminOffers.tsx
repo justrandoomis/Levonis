@@ -19,6 +19,8 @@ import {
   btnPrimary,
 } from '../adminProducts/form/formUi';
 import ProductPicker from '../adminProducts/form/ProductPicker';
+import { UsdInput } from '../adminProducts/form/v2/v2Ui';
+import { baghdadInputToZoned, isoToBaghdadInput } from '../../lib/offerTime';
 
 /**
  * SPECIAL OFFERS — one panel for the ONE promotion model
@@ -68,6 +70,11 @@ const STRINGS = {
     modeFixed: 'سعر ثابت',
     modePercent: 'خصم بالنسبة',
     modeIqd: 'خصم بالدينار',
+    modeUsd: 'سعر بعد الخصم ($)',
+    usdPrice: 'السعر بعد الخصم ($) — للمنتج كله',
+    editInForm: 'عدّل في نموذج المنتج',
+    models: (n: number) => `${n} موديلات`,
+    tz: 'بتوقيت بغداد',
     priceIqd: 'السعر',
     percent: 'النسبة',
     discountIqd: 'قيمة الخصم',
@@ -108,6 +115,11 @@ const STRINGS = {
     modeFixed: 'Fixed price',
     modePercent: 'Percent off',
     modeIqd: 'Amount off',
+    modeUsd: 'Price after discount ($)',
+    usdPrice: 'Price after discount ($) — whole product',
+    editInForm: 'Edit in the product form',
+    models: (n: number) => `${n} models`,
+    tz: 'Baghdad time',
     priceIqd: 'Price',
     percent: 'Percent',
     discountIqd: 'Amount off',
@@ -148,6 +160,11 @@ const STRINGS = {
     modeFixed: 'نرخی جێگیر',
     modePercent: 'داشکاندن بە ڕێژە',
     modeIqd: 'داشکاندن بە دینار',
+    modeUsd: 'نرخی دوای داشکاندن ($)',
+    usdPrice: 'نرخی دوای داشکاندن ($) — هەموو بەرهەمەکە',
+    editInForm: 'لە فۆڕمی بەرهەمەکەدا دەستکاری بکە',
+    models: (n: number) => `${n} مۆدێل`,
+    tz: 'بە کاتی بەغدا',
     priceIqd: 'نرخ',
     percent: 'ڕێژە',
     discountIqd: 'بڕی داشکاندن',
@@ -186,6 +203,8 @@ interface OfferRow {
   updated_at: string | null;
   /** The clean start (addendum A.5): last saved before the new pricing — not applied until saved again. */
   suspended?: boolean;
+  /** A dollar sale price's set (0197, docs/ux/PRODUCT-DISCOUNT.md §7): '' = the whole product, else one per model. */
+  offer_usd_prices?: Array<{ model_id: string; usd: string }>;
   product: { id: string; name: string; slug: string; composition: string; status: string };
   redeemed: number;
   /** Slots given back by a genuine cancellation (§17 decision 4). They no
@@ -227,9 +246,20 @@ const blank = (subjectId: string): OfferRow => ({
 });
 
 /** `datetime-local` wants `YYYY-MM-DDTHH:mm`; the server speaks ISO with an
- *  explicit Z. Converted at the boundary, never stored half-converted. */
-const toLocalInput = (iso: string | null): string => (iso ? iso.slice(0, 16) : '');
-const toIso = (local: string): string | null => (local ? new Date(local).toISOString() : null);
+ *  explicit Z. Converted at the boundary through BAGHDAD time (src/lib/offerTime.ts, F4) — the stored
+ *  instant used to be printed as if it were local, so 12:00 in Baghdad read 09:00. */
+const toLocalInput = (iso: string | null): string => isoToBaghdadInput(iso);
+const toIso = (local: string): string | null => baghdadInputToZoned(local);
+
+/** The list line of a dollar sale: «$500.00» or «$500.00 · 2 موديلات». */
+const usdLine = (o: Pick<OfferRow, 'offer_usd_prices'>, models: (n: number) => string): string => {
+  const set = o.offer_usd_prices ?? [];
+  if (!set.length) return '$';
+  // Several models: the lowest price leads, the «يبدأ من» of the set (§7: «$500.00 · 2 موديلات»).
+  const low = set.reduce((a, b) => (Number(b.usd) < Number(a.usd) ? b : a));
+  const first = `$${low.usd}`;
+  return set.length > 1 || low.model_id !== '' ? `${first} · ${models(set.length)}` : first;
+};
 
 export default function AdminOffers() {
   const { lang, dir, loc } = useLanguage();
@@ -244,6 +274,8 @@ export default function AdminOffers() {
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [newId, setNewId] = useState('');
+  /** The tab's own whole-product dollar input; null = untouched (the stored set is kept, §7). */
+  const [usdDraft, setUsdDraft] = useState<string | null>(null);
   const seq = useRef(0);
 
   const load = useCallback(async () => {
@@ -291,6 +323,11 @@ export default function AdminOffers() {
           active: editing.active,
           max_per_user: editing.max_per_user,
           max_global: editing.max_global,
+          // The dollar set travels only when THIS tab's own input changed it (§7): the product form's
+          // per-model prices are kept by a save that does not name them.
+          ...(editing.offer_price_mode === 'fixed_usd' && usdDraft !== null ? { offer_usd_prices: [{ model_id: '', usd: usdDraft }] } : {}),
+          // D12: the stamp this tab read (null = it saw no row) — a save over someone else's is refused.
+          expected_updated_at: editing.offer_id ? editing.updated_at : null,
         }
       );
       // Warnings stay visible AFTER a successful save (§11.3): the sentence
@@ -298,10 +335,23 @@ export default function AdminOffers() {
       // still not what the owner meant.
       setWarnings(res.warnings ?? []);
       setNote(s.saved);
+      setUsdDraft(null);
+      if (res.offer) setEditing({ ...editing, ...res.offer });
       await load();
     } catch (e) {
-      const body = (e as { details?: { errors?: Issue[] }; message?: string }) ?? {};
+      const body = (e as { code?: string; details?: { errors?: Issue[] }; message?: string }) ?? {};
       setIssues(body.details?.errors ?? [{ code: 'ERROR', message: body.message ?? String(e) }]);
+      // Someone else saved this row (the product form's card, another tab): reload it and keep the
+      // sentence on screen; the typed draft stays so it can be re-applied.
+      if (body.code === 'SPECIAL_OFFER_CHANGED') {
+        try {
+          const fresh = await api.get<{ offer: OfferRow | null }>(`/api/admin/offers/${editing.subject_id}`);
+          if (fresh.offer) setEditing({ ...editing, updated_at: fresh.offer.updated_at, offer_id: fresh.offer.offer_id });
+        } catch {
+          /* the sentence is already on screen */
+        }
+        await load();
+      }
     } finally {
       setBusy(false);
     }
@@ -391,6 +441,7 @@ export default function AdminOffers() {
           disabled={!newId.trim()}
           onClick={() => {
             setEditing(blank(newId.trim()));
+            setUsdDraft(null);
             setIssues([]);
             setWarnings([]);
             setNote(null);
@@ -415,6 +466,7 @@ export default function AdminOffers() {
               type="button"
               onClick={() => {
                 setEditing(o);
+                setUsdDraft(null);
                 setIssues([]);
                 setWarnings([]);
                 setNote(null);
@@ -443,20 +495,24 @@ export default function AdminOffers() {
                   <span className="text-gold">{o.required_tiers.join(' · ').toUpperCase()}</span>
                 )}
                 {o.offer_price_mode && (
-                  <span className="inline-flex items-center gap-1">
+                  <span className="inline-flex items-center gap-1" data-offer-price-line>
                     <PercentIcon className="h-3 w-3" aria-hidden />
-                    {o.offer_price_mode === 'discount_percent'
-                      ? `${o.discount_percent ?? 0}%`
-                      : o.offer_price_mode === 'fixed'
-                        ? `${o.offer_price_iqd ?? 0}`
-                        : `-${o.discount_iqd ?? 0}`}
+                    <bdi dir={o.offer_price_mode === 'fixed_usd' ? 'auto' : 'ltr'}>
+                      {o.offer_price_mode === 'discount_percent'
+                        ? `${o.discount_percent ?? 0}%`
+                        : o.offer_price_mode === 'fixed'
+                          ? `${o.offer_price_iqd ?? 0}`
+                          : o.offer_price_mode === 'fixed_usd'
+                            ? usdLine(o, s.models)
+                            : `-${o.discount_iqd ?? 0}`}
+                    </bdi>
                   </span>
                 )}
                 {(o.starts_at || o.ends_at) && (
                   <span className="inline-flex items-center gap-1">
                     <CalendarClock className="h-3 w-3" aria-hidden />
                     <bdi dir="ltr" className="tabular-nums">
-                      {(o.starts_at ?? '—').slice(0, 10)} → {(o.ends_at ?? '—').slice(0, 10)}
+                      {isoToBaghdadInput(o.starts_at).slice(0, 10) || '—'} → {isoToBaghdadInput(o.ends_at).slice(0, 10) || '—'}
                     </bdi>
                   </span>
                 )}
@@ -500,6 +556,7 @@ export default function AdminOffers() {
           {note && <Banner kind="ok">{note}</Banner>}
 
           <SectionCard n={1} ar="الجدولة" en={STRINGS.en.schedule} open onToggle={() => {}}>
+            <p className="mb-2 text-[11px] text-text-muted">{s.tz}</p>
             <Grid cols={2}>
               <Field ar="يبدأ في" en={STRINGS.en.startsAt}>
                 <TextInput
@@ -581,8 +638,28 @@ export default function AdminOffers() {
                   <option value="fixed">{s.modeFixed}</option>
                   <option value="discount_percent">{s.modePercent}</option>
                   <option value="discount_iqd">{s.modeIqd}</option>
+                  <option value="fixed_usd">{s.modeUsd}</option>
                 </Select>
               </Field>
+              {editing.offer_price_mode === 'fixed_usd' && (editing.offer_usd_prices ?? []).some((p) => p.model_id !== '') && usdDraft === null ? (
+                /* Per-model dollar prices live in the product form's card (§6); listed here, read-only. */
+                <div className="min-w-0 text-[12px] text-text-secondary" data-offer-usd-models>
+                  <p className="tabular-nums" dir="ltr">
+                    {(editing.offer_usd_prices ?? []).map((p) => `$${p.usd}`).join(' · ')}
+                  </p>
+                  <a className="text-[12px] font-bold underline" href={`/admin?tab=products&edit=${encodeURIComponent(editing.subject_id)}&section=3`}>
+                    {s.editInForm}
+                  </a>
+                </div>
+              ) : editing.offer_price_mode === 'fixed_usd' ? (
+                <Field ar="السعر بعد الخصم ($)" en={STRINGS.en.usdPrice}>
+                  <UsdInput
+                    value={usdDraft ?? (editing.offer_usd_prices ?? []).find((p) => p.model_id === '')?.usd ?? ''}
+                    onChange={(v) => setUsdDraft(v)}
+                    label={s.usdPrice}
+                  />
+                </Field>
+              ) : null}
               {editing.offer_price_mode === 'fixed' && (
                 <Field ar="السعر" en={STRINGS.en.priceIqd}>
                   <Money
