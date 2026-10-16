@@ -19,7 +19,9 @@
  * `c.env.DB` (and the writer, when called without one): every `first`, `all`,
  * `run` and `raw` of a statement prepared through it counts one, a `batch`
  * counts its length, an `exec` one. The statements it hands out are its own
- * wrappers; `batch` unwraps them before the real binding sees them.
+ * wrappers; `batch` unwraps them before the real binding sees them. It is
+ * registered as a view of the binding (d1Count.ts `registerD1View`), so the
+ * event bus treats it as the binding it wraps.
  *
  * `packedInserts` is how the writer keeps the side tables inside that budget
  * (owner-questions §E.4: one statement per side row put `pla-basic-filament`
@@ -30,6 +32,7 @@
  * triggers fire per row, exactly as with one statement each.
  */
 import { D1_INVOCATION_STATEMENT_LIMIT } from '../quarterHourBudget';
+import { registerD1View } from '../d1Count';
 
 /** Kept free under D1's 1,000 for anything a counter could miss. */
 export const IMPORT_RESERVE = 100;
@@ -112,6 +115,9 @@ export function countingD1(inner: D1Database): CountedD1 {
       return typeof v === 'function' ? (v as (...a: unknown[]) => unknown).bind(target) : v;
     },
   });
+  // The bus must still see the binding behind the view (d1Count.ts `d1Base`, DECISIONS row 212): with
+  // EVENT_BUS_ENABLED the save's ProductAdded outbox row and the audits' dual write are planned as on the raw binding.
+  registerD1View(db as D1Database, inner);
   return { db: db as D1Database, counter };
 }
 

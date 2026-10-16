@@ -9,15 +9,20 @@
  * the English, never a copy of the Arabic. Imported prose is marked `imported`
  * in translation_meta and every product_translations row is `review_needed`,
  * whatever the dictionary covered; the authored registry labels (spec labels,
- * the official-specifications group) keep their reviewed ar/ckb.
+ * the official-specifications group) keep their reviewed ar/ckb. Spec VALUES
+ * are imported prose: what the dictionary renders, never approved, never kept
+ * in English when the dictionary knows the word, and the internal family code
+ * is never a row of the table.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { complete, newWorld, stage, write, type World } from './fixtures/catalogImportWorld';
+import { complete, count, newWorld, stage, write, type World } from './fixtures/catalogImportWorld';
 import type { SampleHandle } from './fixtures/bambu/load';
 import { parseProductRow } from '../worker/lib/productModel';
 import { localizableSlots } from '../worker/lib/translationSlots';
 import { ckbNotCopy, OFFICIAL_SPEC_GROUP } from '../worker/lib/catalogImport/writer';
+import { localizeRespectingAuthored } from '../worker/lib/productPersistence';
+import { translateText } from '../worker/lib/translate/index';
 
 const ARABIC = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 const HANDLES: SampleHandle[] = ['ams-2-pro-feeder-unit', 'a1', 'pla-basic-filament', 'h2d', 'bambu-hotend-a1-a2', 'bambu-textured-pei-plate', 'build-plate-combo', 'refurbished-bambu-lab-h2d-3d-printer', 'h2c'];
@@ -87,15 +92,63 @@ test('imported prose is marked imported and every translation row is review_need
       assert.equal(official.title_ar, OFFICIAL_SPEC_GROUP.title_ar);
       assert.equal(official.title_ckb, OFFICIAL_SPEC_GROUP.title_ckb);
       assert.equal(doc.translation_meta[`spec_group:${official.id}:title`]?.ckb?.status, 'approved');
-      for (const r of official.rows) {
-        assert.equal(r.value_ar, r.value_en, 'values are language-neutral');
-        assert.equal(r.value_ckb, r.value_en);
-      }
     }
   }
   // Every option group the registry knows carries its authored Arabic and Sorani names.
   const unnamed = w.raw.prepare("SELECT COUNT(*) AS n FROM product_option_groups WHERE kind NOT IN ('', 'other') AND (name_ar = '' OR name_ckb = '')").get() as { n: number };
   assert.equal(unnamed.n, 0);
+});
+
+test('spec values: what the local dictionary renders (never kept in English when it knows the word), imported, never approved — and an owner save keeps it so', async () => {
+  const w = await written();
+  let covered = 0;
+  let uncovered = 0;
+  const seen = new Map<string, { ar: string; ckb: string }>();
+  for (const row of w.raw.prepare('SELECT * FROM products').all() as Array<Record<string, unknown>>) {
+    const doc = parseProductRow(row);
+    const official = doc.spec_groups.find((g) => g.id === OFFICIAL_SPEC_GROUP.id);
+    if (!official) continue;
+    for (const r of official.rows) {
+      const key: string = `spec:${official.id}:${r.id}:value`;
+      for (const lang of ['ar', 'ckb'] as const) assert.equal(doc.translation_meta[key]?.[lang]?.status, 'imported', `${doc.slug} ${r.label_en} ${lang}`);
+      const ar = translateText(r.value_en, 'ar');
+      const ckb = translateText(r.value_en, 'ckb');
+      if (ar.status === 'machine') {
+        covered++;
+        assert.equal(r.value_ar, ar.text, `${doc.slug} ${r.label_en}: the dictionary's Arabic`);
+        assert.equal(r.value_ckb, ckbNotCopy(ar.text, ckb.text), `${doc.slug} ${r.label_en}: the dictionary's Sorani (row 183)`);
+      } else uncovered++;
+      seen.set(r.value_en, { ar: r.value_ar, ckb: r.value_ckb });
+    }
+    // The owner's next save (the form path, adminProducts.ts): no imported value becomes approved, the dictionary's
+    // text stays, and every value it does not cover is listed for the owner to translate.
+    const next = parseProductRow(row);
+    const saved = localizeRespectingAuthored(next, parseProductRow(row));
+    const after = next.spec_groups.find((g) => g.id === OFFICIAL_SPEC_GROUP.id)!;
+    for (const r of after.rows) {
+      const key: string = `spec:${after.id}:${r.id}:value`;
+      assert.notEqual(next.translation_meta[key]?.ar?.status, 'approved', `${doc.slug} ${r.label_en} after a save`);
+      if (translateText(r.value_en, 'ar').status === 'machine') assert.equal(r.value_ar, translateText(r.value_en, 'ar').text);
+      else assert.ok(saved.review_needed.includes(key), `${doc.slug} ${r.label_en}: listed for review`);
+    }
+  }
+  assert.ok(covered > 20 && uncovered > 0, `${covered} covered, ${uncovered} not`);
+  assert.deepEqual(seen.get('Supported'), { ar: 'مدعوم', ckb: 'پشتگیریکراو' }, 'H2D door sensor: the dictionary, not the English word');
+});
+
+test('the internal product_family code is never a row of the specification table; it stays a spec value for the facet', async () => {
+  const w = await written();
+  for (const row of w.raw.prepare('SELECT * FROM products').all() as Array<Record<string, unknown>>) {
+    const doc = parseProductRow(row);
+    const family = (w.raw.prepare("SELECT value_text FROM product_spec_values WHERE product_id = ? AND canonical_key = 'identity.family'").get(doc.id) as { value_text: string } | undefined)?.value_text;
+    for (const g of doc.spec_groups) {
+      for (const r of g.rows) {
+        assert.notEqual(r.label_en, 'Family', `${doc.slug}: no Family row`);
+        if (family) assert.notEqual(r.value_en, family, `${doc.slug}: the code ${family} is not shown`);
+      }
+    }
+  }
+  assert.ok(count(w.raw, "SELECT COUNT(*) AS n FROM product_spec_values WHERE canonical_key = 'identity.family'") >= 3, 'printers, filament, AMS keep the row (facet mirror)');
 });
 
 test('the guard itself: an Arabic ckb that copies the ar becomes empty; Latin text and real Sorani pass through', () => {

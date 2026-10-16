@@ -7,7 +7,11 @@
  *      `assertImportPayload` — and the writer, which runs it first, writes nothing.
  *   2. The writer: with the validator bypassed (the test-only seam), the same
  *      payloads write a product at its defaults — the writer builds the document
- *      from defaults and never forwards an unknown key.
+ *      from defaults and never forwards an unknown key: every key injected at
+ *      every depth at once reaches no bound parameter (a nested object the writer
+ *      serialises, such as a spec's checked sources, is projected field by field;
+ *      no column trigger can see inside the JSON text of an unguarded table, so
+ *      this layer is the one that covers it).
  *   3. The database: with the validator bypassed AND a statement that forwards
  *      the injected value spliced into the batch (what a writer bug would do),
  *      the 0195 guard triggers abort the whole batch with
@@ -99,6 +103,35 @@ test('layer 1 — the writer runs the validator first: a refused payload writes 
     await assert.rejects(() => plan(w, staged, { payload: inject(staged.payload, path, key, 1) }), (e: unknown) => e instanceof ImportPayloadRefused);
   }
   assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM products'), 0);
+});
+
+test('layer 2 — validator bypassed: every key at every depth of the A1 at once, and no injected value reaches a bound parameter', async () => {
+  const w = newWorld();
+  const s = stage(w, 'a1');
+  const SENTINEL = 987654321;
+  const dirty = structuredClone(s.payload) as unknown as Record<string, unknown>;
+  const at = depths(s.payload);
+  assert.ok(at.some((p) => p.includes('checked_sources')) && at.some((p) => p.includes('value_list')), 'nested spec objects are reached');
+  let injected = 0;
+  for (const path of at) {
+    let o: Record<string, unknown> = dirty;
+    for (const p of path) o = o[p] as Record<string, unknown>;
+    for (const key of FUZZ_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(o, key)) continue; // a field the payload really has keeps its value
+      o[key] = SENTINEL;
+      injected++;
+    }
+  }
+  assert.ok(injected > 4000, `${injected} keys injected`);
+  setWriting(w, s.itemId, dirty as unknown as ImportPayload);
+  for (const mode of ['stage', 'write'] as const) {
+    const { plan: p } = await plan(w, s, { mode, payload: dirty, skipAllowList: true });
+    const leaks: string[] = [];
+    for (const st of p.statements as unknown as Array<{ sql?: string; values?: unknown[] }>) {
+      if ((st.values ?? []).some((v) => v === SENTINEL || (typeof v === 'string' && v.includes(String(SENTINEL))))) leaks.push(String(st.sql ?? '').replace(/\s+/g, ' ').slice(0, 70));
+    }
+    assert.deepEqual(leaks, [], `${mode}: a statement binds an injected value`);
+  }
 });
 
 /** Statements that forward an injected value into each guarded column or protected table. */

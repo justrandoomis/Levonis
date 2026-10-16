@@ -16,8 +16,12 @@
  * from what the generator prints, and when any table or column named here is
  * missing from the schema every migration builds.
  *
- * Plain data only: the generator imports this file with Node's own type
- * stripping, so it imports nothing and uses no TypeScript-only runtime syntax.
+ * Plain data and two pure SQL-text helpers only: the generator imports this
+ * file with Node's own type stripping, so it imports nothing and uses no
+ * TypeScript-only runtime syntax. The helpers are the ONE spelling of "a
+ * guarded column left at its default" and "the money a JSON array column
+ * carries": the generated triggers, the writer's per-write fingerprint and its
+ * money-default probe all read them (§E.4).
  */
 
 /** The `ops_guards.id` that arms every guard trigger below. */
@@ -151,10 +155,11 @@ const ROW_STOCK: readonly GuardedColumn[] = [
  * dimension, while their DO UPDATE keeps all three, so the INSERT's NEW row
  * differs from the stored one on every merge that changes nothing. The one
  * write that judgement used to catch on top — a REPLACE that resets an
- * existing row to the defaults — is refused differently: no write path names
+ * existing row to the defaults — is kept out differently: no write path names
  * these tables with REPLACE (tests/catalogImportGuards.test.ts reads the
- * sources), and §E.4's per-write fingerprint compares every money, stock,
- * reserved and package column before and after inside the same batch.
+ * sources, and that is what prevents it), and §E.4's per-write fingerprint,
+ * read before and after inside the same batch, would DETECT one after the
+ * commit (before_fp_equal false: the item is blocked, nothing refused).
  *
  * `product_colors` is guarded although the spec names three tables: a create
  * sends no colours, but a merge re-upserts an existing product's colour rows
@@ -217,3 +222,39 @@ export const STOCK_DECISION_GUARD = {
   refusedOnInsert: ['tracked', 'untracked'] as readonly string[],
   frozenColumns: ['stock_decision', 'stock_decided_by', 'stock_decided_at'] as readonly string[],
 };
+
+/**
+ * `ref.name` differs from the column's insert default (`ref` is `NEW`, `OLD`
+ * or a table name).
+ */
+export function nonDefaultSql(col: GuardedColumn, ref: string): string {
+  switch (col.insertDefault) {
+    case 'null':
+      return `${ref}.${col.name} IS NOT NULL`;
+    case 'zero':
+      return `${ref}.${col.name} IS NOT 0`;
+    case 'zero_or_null':
+      return `COALESCE(${ref}.${col.name}, 0) <> 0`;
+    case 'empty_object':
+      return `${ref}.${col.name} IS NOT '{}'`;
+    case 'empty_array':
+      return `${ref}.${col.name} IS NOT '[]'`;
+    default:
+      throw new Error(`unknown insertDefault ${String(col.insertDefault)} for ${col.name}`);
+  }
+}
+
+/**
+ * The money a JSON array column carries, as one comparable value: the sorted
+ * multiset of its object elements' money tuples (`jsonElementMoney`). NULL for
+ * an empty array, a non-array or invalid JSON — the same on both sides of a
+ * save that keeps every fee, whatever the text.
+ */
+export function jsonElementMoneySql(col: GuardedColumn, ref: string): string {
+  const tuple = (col.jsonElementMoney ?? []).join(" || '|' || ");
+  return (
+    `(SELECT group_concat(m, ',') FROM (SELECT ${tuple} AS m` +
+    ` FROM json_each(CASE WHEN json_valid(${ref}.${col.name}) THEN ${ref}.${col.name} ELSE '[]' END ) j` +
+    ` WHERE j.type = 'object' ORDER BY m))`
+  );
+}

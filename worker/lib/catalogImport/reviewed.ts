@@ -223,6 +223,10 @@ class Reader {
     if (opts.pattern && !opts.pattern.test(s)) this.fail(path, 'not the expected shape');
     return s;
   }
+  bool(v: Json, path: string): boolean {
+    if (typeof v !== 'boolean') this.fail(path, 'expected true or false');
+    return v as boolean;
+  }
   int(v: Json, path: string): number {
     if (typeof v !== 'number' || !Number.isInteger(v)) this.fail(path, 'expected a whole number');
     return v as number;
@@ -266,7 +270,8 @@ function parseManifest(text: string): ReviewedBundle['manifest'] {
   r.arr(root.rows, '$.rows').forEach((raw, i) => {
     const p = `$.rows[${i}]`;
     const o = r.obj(raw, p);
-    const spid = r.str(String(o.source_product_id ?? ''), `${p}.source_product_id`, { pattern: SOURCE_ID });
+    // A JSON string, never a number: 665 of the 1,115 ids are above 2^53, and JSON.parse has already rounded a bare one.
+    const spid = r.str(o.source_product_id, `${p}.source_product_id`, { pattern: SOURCE_ID });
     const handle = r.str(o.handle, `${p}.handle`, { max: 300 });
     const pos = r.int(o.queue_position, `${p}.queue_position`);
     if (pos < 1) r.fail(`${p}.queue_position`, 'must be 1 or more');
@@ -296,7 +301,7 @@ function parseManifest(text: string): ReviewedBundle['manifest'] {
       currentAllIdRoute: r.str(o.currentAllIdRoute ?? '', `${p}.currentAllIdRoute`, { max: 200, empty: true }),
       leaf: typeof o.leaf === 'string' ? o.leaf : '',
       also: Array.isArray(o.also) ? o.also.map((a, j) => r.str(a, `${p}.also[${j}]`, { max: 80 })) : [],
-      curated: o.curated === true,
+      curated: o.curated === undefined ? false : r.bool(o.curated, `${p}.curated`),
       hold_code: r.oneOf(o.hold_code ?? '', `${p}.hold_code`, HOLD_CODES),
       sku_codes: sku as Record<string, string>,
       value_labels: labels as unknown as Record<string, ReviewedValueLabelRow>,
@@ -411,7 +416,8 @@ function parseMatches(text: string): ReviewedBundle['matches'] {
     const p = `$.entries[${i}]`;
     const o = r.obj(raw, p);
     r.only(o, p, MATCH_KEYS);
-    const spid = r.str(String(o.source_product_id ?? ''), `${p}.source_product_id`, { pattern: SOURCE_ID });
+    // A JSON string, never a number (a rounded id would key the entry under another source, silently).
+    const spid = r.str(o.source_product_id, `${p}.source_product_id`, { pattern: SOURCE_ID });
     if (bySourceId.has(spid)) r.fail(`${p}.source_product_id`, 'duplicate source id');
     const decision = r.oneOf(o.decision, `${p}.decision`, MATCH_DECISIONS);
     const valueMap: Record<string, ValueMapEntry> = {};
@@ -436,7 +442,7 @@ function parseMatches(text: string): ReviewedBundle['matches'] {
       decision,
       value_map: valueMap,
       unmapped_variants: (o.unmapped_variants === undefined ? [] : r.arr(o.unmapped_variants, `${p}.unmapped_variants`)).map((x, j) =>
-        r.str(String(x ?? ''), `${p}.unmapped_variants[${j}]`, { pattern: SOURCE_ID })
+        r.str(x, `${p}.unmapped_variants[${j}]`, { pattern: SOURCE_ID })
       ),
       reason: r.oneOf(o.reason, `${p}.reason`, MATCH_REASONS),
       reviewed_by: r.str(o.reviewed_by, `${p}.reviewed_by`, { max: 120 }),

@@ -58,6 +58,8 @@ export interface World {
   manifestRows: Array<Record<string, unknown>>;
   matches: Array<Record<string, unknown>>;
   queue: number;
+  /** The reviewed compat-targets file, when a test fills in existing Levonis ids (the step-2 snapshot); else the fixture's. */
+  compat?: CompatTargets;
 }
 
 const sha = (b: Uint8Array | string) => createHash('sha256').update(b).digest('hex');
@@ -83,14 +85,14 @@ export function manifestRowOf(x: Extraction, queue: number): Record<string, unkn
   };
 }
 
-export function bundleTexts(world: Pick<World, 'manifestRows' | 'matches'>, extra: Partial<ReviewedTexts> = {}): ReviewedTexts {
+export function bundleTexts(world: Pick<World, 'manifestRows' | 'matches' | 'compat'>, extra: Partial<ReviewedTexts> = {}): ReviewedTexts {
   const empty = emptyReviewedTexts();
   return {
     ...empty,
     manifest: JSON.stringify({ version: 1, source: 'bambu_us', rows: world.manifestRows }),
     taxonomyMap: readFileSync(join(P0, 'taxonomy-map.json'), 'utf8'),
     existingMatches: JSON.stringify({ version: 1, entries: world.matches }),
-    compatTargets: JSON.stringify(fixtureJson('compat-targets.json')),
+    compatTargets: JSON.stringify(world.compat ?? fixtureJson('compat-targets.json')),
     identityMap: readFileSync(join(P0, 'identity-map.json'), 'utf8'),
     ...extra,
   };
@@ -156,7 +158,7 @@ export interface Staged {
 
 /** A fixture's payload as the runner builds it (the P0 manifest row and identity entry, the compat targets). */
 export function buildFor(
-  world: Pick<World, 'queue'>,
+  world: Pick<World, 'queue' | 'compat'>,
   handle: SampleHandle | Extraction,
   opts: { writeMode?: 'create' | 'merge'; mergeProductId?: string } = {}
 ): { payload: ImportPayload; extraction: Extraction; row: Record<string, unknown> } {
@@ -170,7 +172,7 @@ export function buildFor(
     extractionSha256: extractionFingerprint(x),
     manifestRow: row as never,
     identity: identity ? { model: identity.model, series: identity.series, family: identity.family } : null,
-    targets: fixtureJson<CompatTargets>('compat-targets.json'),
+    targets: world.compat ?? fixtureJson<CompatTargets>('compat-targets.json'),
     retrievedAt: '2026-10-15T00:00:00.000Z',
   });
   return { payload: built.payload, extraction: x, row };

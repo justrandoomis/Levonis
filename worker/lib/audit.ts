@@ -47,6 +47,16 @@ function contextFor(db: D1Database, correlationId?: string): AuditContext | null
 }
 
 /**
+ * How many statements one `audit()` sends on this binding: the legacy row alone with the bus off, or its batch of
+ * three with the bus on (audit_log, the detail row, the AuditRecorded outbox row). For a caller that budgets its
+ * whole invocation (the catalogue import, §A.5); it builds and sends nothing.
+ */
+export function auditStatementCount(db: D1Database): number {
+  const handle = busFor(db);
+  return handle && eventsEnabled(handle.env) ? 3 : 1;
+}
+
+/**
  * The statements an audited mutation appends to ITS OWN batch, so a sensitive
  * write cannot succeed unaudited. Callers that have no batch use `audit()`.
  */

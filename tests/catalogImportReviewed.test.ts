@@ -100,6 +100,34 @@ test('a malformed file is refused with the file and the JSON path, never half-re
   assert.throws(() => parseReviewedBundle({ ...emptyReviewedTexts(), searchSynonyms: undefined as never }), ReviewedBundleInvalid);
 });
 
+test('a source id is a JSON string, never a number (a bare 18-digit id is already rounded); curated is a boolean; a source id appears once', () => {
+  const row = { source_product_id: '581025672328126464', handle: 'a', queue_position: 1, canonical_url: 'https://a', type: 't' };
+  const entry = { source_product_id: '581025672328126464', source_handle: 'a', levonis_product_id: 'p_x', decision: 'hold_owner_hidden', reason: 'same_model', reviewed_by: 'r', reviewed_at: 'd' };
+  const manifest = (rows: unknown[]) => JSON.stringify({ version: 1, source: 'bambu_us', rows });
+  const matches = (entries: unknown[]) => JSON.stringify({ version: 1, entries });
+  // The control: quoted, as every draft writes them.
+  const ok = parseReviewedBundle({ ...emptyReviewedTexts(), manifest: manifest([row]), existingMatches: matches([entry]) });
+  assert.ok(ok.matches.bySourceId.has('581025672328126464'));
+  // The same files with the id unquoted: JSON.parse reads 581025672328126500, so nothing may be keyed by it.
+  const bare = (text: string) => text.replace('"581025672328126464"', '581025672328126464');
+  const cases: Array<[Partial<ReviewedTexts>, string, string]> = [
+    [{ manifest: bare(manifest([row])) }, 'manifest.json', '$.rows[0].source_product_id'],
+    [{ existingMatches: bare(matches([entry])) }, 'existing-matches.json', '$.entries[0].source_product_id'],
+    [{ existingMatches: matches([{ ...entry, unmapped_variants: ['1'] }]).replace('["1"]', '[776210262809161737]') }, 'existing-matches.json', '$.entries[0].unmapped_variants[0]'],
+    [{ manifest: manifest([{ ...row, curated: 'true' }]) }, 'manifest.json', '$.rows[0].curated'],
+    [{ manifest: manifest([row, { ...row, handle: 'b', queue_position: 2 }]) }, 'manifest.json', '$.rows[1].source_product_id'],
+    [{ existingMatches: matches([entry, { ...entry }]) }, 'existing-matches.json', '$.entries[1].source_product_id'],
+  ];
+  for (const [over, file, path] of cases) {
+    assert.throws(
+      () => parseReviewedBundle({ ...emptyReviewedTexts(), ...over }),
+      (e: unknown) => e instanceof ReviewedBundleInvalid && e.file === file && e.path === path,
+      `${file} ${path}`
+    );
+  }
+  assert.equal(parseReviewedBundle({ ...emptyReviewedTexts(), manifest: manifest([{ ...row, curated: true }]) }).manifest.rows[0].curated, true);
+});
+
 test('the runner\'s spellings: the combined digest, the curated index shapes and the override entries read alike on both sides', () => {
   // scripts/bambu-import/discover.ts `bundleDigest`: SHA-256 over "<file> <sha256>\n", the files sorted by name.
   const b = parseReviewedBundle(emptyReviewedTexts());

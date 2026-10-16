@@ -58,7 +58,9 @@ import { relationRowId } from '@levonis/catalog/bambuImport/relations';
 import { H, sha256Hex } from '@levonis/catalog/bambuImport/hash';
 import { canonicalJson } from '@levonis/catalog/bambuImport/fingerprint';
 import { specKey } from '@levonis/catalog/bambuImport/registry/specKeys';
+import { colourFacet } from '@levonis/catalog/bambuImport/registry/colours';
 import { HttpError } from '../http';
+import { auditStatementCount } from '../audit';
 import { comboKey } from '../inventory';
 import { newId } from '../crypto';
 import {
@@ -95,7 +97,7 @@ import { localizableSlots } from '../translationSlots';
 import { hashSource, TRANSLATION_VERSION } from '../translate';
 import { fieldsFor, flatFields } from '../templateFamilies';
 import type { Env } from '../types';
-import { GUARDED_ROW_TABLES, IMPORT_GUARD_ID, IMPORT_GUARD_REFUSAL } from './protectedTables';
+import { GUARDED_ROW_TABLES, IMPORT_GUARD_ID, IMPORT_GUARD_REFUSAL, jsonElementMoneySql, nonDefaultSql, type GuardedColumn } from './protectedTables';
 import { countingD1, IMPORT_INVOCATION_LIMIT, packedInserts, type InvocationCounter } from './budget';
 import { newImportProductDoc } from './doc';
 import {
@@ -314,9 +316,15 @@ export interface ImportWriteResult {
   created: boolean;
   merged: boolean;
   counts: WrittenCounts;
-  /** Merge: the protected fingerprints before and after are equal; null for a create. */
+  /**
+   * Merge: the protected fingerprints before and after are equal (read inside the batch, compared after its commit;
+   * a JSON array of money by its fee tuples, as the guard trigger compares it); null for a create.
+   */
   before_fp_equal: boolean | null;
-  /** Create: every money, stock and package column of the new rows is at its default; null for a merge. */
+  /**
+   * Create: every guarded money, stock and package column (GUARDED_ROW_TABLES) of the new product and of its value,
+   * variant and colour rows is at its default, and the stock decision is 'not_configured'; null for a merge.
+   */
   after_money_default: boolean | null;
   /** verifyApplied's mismatches against this payload's plan, right after the commit (-1: the readback could not run). */
   readback_mismatches: number;
@@ -357,7 +365,8 @@ interface MediaRow {
  * Gallery entries whose stored WebP has the SAME object key collapse into the
  * earliest position (§C.4 step 1), recomputed here from the item's own media
  * rows: when any copy is bound, the general copies go and the bound rows of a
- * later copy take the earliest position with rule `content_duplicate`; when
+ * later copy take the earliest position — with rule `content_duplicate`, except
+ * a representative (its via variant kept) and a reviewed override; when
  * none is, only the earliest general row stays. Rows of ONE gallery entry
  * (a value set) are never collapsed. Exactly one primary is kept.
  */
@@ -386,7 +395,16 @@ export function collapseContentDuplicates(rows: readonly ImportImageRow[]): { ro
           continue;
         }
         seen.add(binding);
-        if (r.source_media_id !== canonical) changed.set(r.id, { sort_order: earliest, binding_rule: 'content_duplicate', via_variant_id: '' });
+        if (r.source_media_id === canonical) continue;
+        // A representative keeps its rule and the variant whose hero it shows (R6: the page drops it on a clashing
+        // selection), and a reviewed override its rule, as the package's own planMedia places them; only a binding
+        // inherited from the copy (value, variant, value set) becomes 'content_duplicate'. Either way it moves first.
+        changed.set(
+          r.id,
+          r.binding_rule === 'representative' || r.binding_rule === 'reviewed_override'
+            ? { sort_order: earliest }
+            : { sort_order: earliest, binding_rule: 'content_duplicate', via_variant_id: '' }
+        );
       }
     } else {
       const keep = group.find((r) => r.source_media_id === canonical && r.sort_order === earliest) ?? group[0];
@@ -423,17 +441,26 @@ export function importSearchAliases(
 
 // ---------------------------------------------------------------- the fingerprints (§E.4)
 
-const colsOf = (table: string): string[] => {
+const guardedColumns = (table: string): GuardedColumn[] => {
   const t = GUARDED_ROW_TABLES.find((x) => x.table === table)!;
-  return [...t.money, ...t.stock, ...t.package].map((c) => c.name);
+  return [...t.money, ...t.stock, ...t.package];
 };
+
+/**
+ * A fingerprint column: the value itself; a JSON array of money (warranty plans, pre-order routes) by the guard
+ * trigger's own tuple multiset (protectedTables.ts jsonElementMoneySql), never its text — the save path
+ * re-serialises those columns on every save (a legacy `{name, price_iqd}` plan, a route without `active`) and
+ * that moves no fee, so a merge that the trigger lets through reads the same before and after.
+ */
+const fingerprintColumns = (table: string): string[] =>
+  guardedColumns(table).map((c) => (c.jsonElementMoney ? `${jsonElementMoneySql(c, table)} AS ${c.name}` : c.name));
 
 /** One table per statement, never a UNION chain (§A.5). Each binds the product id once. */
 export const FINGERPRINT_QUERIES: ReadonlyArray<{ table: string; sql: string }> = [
-  { table: 'products', sql: `SELECT id, ${colsOf('products').join(', ')} FROM products WHERE id = ?` },
-  { table: 'product_option_values', sql: `SELECT id, ${colsOf('product_option_values').join(', ')} FROM product_option_values WHERE product_id = ? ORDER BY id` },
-  { table: 'product_colors', sql: `SELECT id, ${colsOf('product_colors').join(', ')} FROM product_colors WHERE product_id = ? ORDER BY id` },
-  { table: 'product_variants', sql: `SELECT id, ${colsOf('product_variants').join(', ')} FROM product_variants WHERE product_id = ? ORDER BY id` },
+  { table: 'products', sql: `SELECT id, ${fingerprintColumns('products').join(', ')} FROM products WHERE id = ?` },
+  { table: 'product_option_values', sql: `SELECT id, ${fingerprintColumns('product_option_values').join(', ')} FROM product_option_values WHERE product_id = ? ORDER BY id` },
+  { table: 'product_colors', sql: `SELECT id, ${fingerprintColumns('product_colors').join(', ')} FROM product_colors WHERE product_id = ? ORDER BY id` },
+  { table: 'product_variants', sql: `SELECT id, ${fingerprintColumns('product_variants').join(', ')} FROM product_variants WHERE product_id = ? ORDER BY id` },
   { table: 'product_option_fulfillment', sql: 'SELECT * FROM product_option_fulfillment WHERE product_id = ? ORDER BY id' },
   { table: 'product_option_transports', sql: 'SELECT * FROM product_option_transports WHERE product_id = ? ORDER BY id' },
   { table: 'product_pricing_state', sql: 'SELECT * FROM product_pricing_state WHERE product_id = ?' },
@@ -447,19 +474,23 @@ export const FINGERPRINT_QUERIES: ReadonlyArray<{ table: string; sql: string }> 
   { table: 'price_history', sql: 'SELECT COUNT(*) AS n, MAX(id) AS last FROM price_history WHERE product_id = ?' },
 ];
 
-/** The new product's money, stock, package and stock-decision probe (§A.5): one statement. */
-const MONEY_PROBE_SQL = `SELECT
-  (SELECT COUNT(*) FROM products WHERE id = ?1 AND price_iqd = 0 AND prime_price_iqd IS NULL AND pro_price_iqd IS NULL
-      AND original_price_iqd IS NULL AND product_cost_iqd IS NULL AND COALESCE(direct_surcharge_iqd, 0) = 0
-      AND stock IS NULL AND stock_reserved = 0 AND low_stock_threshold IS NULL
-      AND net_weight_g IS NULL AND width_mm IS NULL AND depth_mm IS NULL AND height_mm IS NULL
-      AND package_weight_g IS NULL AND package_width_mm IS NULL AND package_depth_mm IS NULL AND package_height_mm IS NULL
-      AND warranty_plans = '[]' AND preorder_transports = '[]') AS product_ok,
-  (SELECT COUNT(*) FROM product_option_values WHERE product_id = ?1 AND (regular_price_iqd IS NOT NULL OR prime_price_iqd IS NOT NULL
-      OR pro_price_iqd IS NOT NULL OR cost_iqd IS NOT NULL OR stock IS NOT NULL OR low_stock_threshold IS NOT NULL)) AS values_bad,
-  (SELECT COUNT(*) FROM product_variants WHERE product_id = ?1 AND (regular_price_iqd IS NOT NULL OR prime_price_iqd IS NOT NULL
-      OR pro_price_iqd IS NOT NULL OR cost_iqd IS NOT NULL OR stock IS NOT NULL OR low_stock_threshold IS NOT NULL)) AS variants_bad,
+/** Any guarded column of `table` away from its insert default (the generated triggers' own expressions). */
+const anyNonDefault = (table: string) => guardedColumns(table).map((c) => nonDefaultSql(c, table)).join(' OR ');
+const GUARDED_CHILD_TABLES = GUARDED_ROW_TABLES.map((t) => t.table).filter((t) => t !== 'products');
+
+/**
+ * The new product's money, stock, package and stock-decision probe (§A.5): one statement, generated from the one
+ * list (GUARDED_ROW_TABLES), so every guarded column of the product and of its value, variant and colour rows is
+ * read — never a hand-kept subset.
+ */
+export const MONEY_PROBE_SQL = `SELECT
+  (SELECT COUNT(*) FROM products WHERE id = ?1 AND NOT (${anyNonDefault('products')})) AS product_ok,
+  ${GUARDED_CHILD_TABLES.map((t) => `(SELECT COUNT(*) FROM ${t} WHERE product_id = ?1 AND (${anyNonDefault(t)})) AS ${t}_bad`).join(',\n  ')},
   (SELECT COUNT(*) FROM product_source_refs WHERE product_id = ?1 AND stock_decision = 'not_configured') AS stock_decision_ok`;
+
+/** The probe's row read as "every money, stock and package column of the new rows is at its default". */
+export const moneyProbeAtDefault = (p: Record<string, unknown>): boolean =>
+  Number(p.product_ok) === 1 && Number(p.stock_decision_ok) === 1 && GUARDED_CHILD_TABLES.every((t) => Number(p[`${t}_bad`]) === 0);
 
 // ---------------------------------------------------------------- reads
 
@@ -509,6 +540,7 @@ async function hasV2Results(db: D1Database, productId: string): Promise<boolean>
   }
 }
 
+/** One statement (STAGE_MEDIA_READS: /stage adds it to its estimate, so the two totals agree). */
 async function loadMedia(db: D1Database, runId: string, sourceProductId: string): Promise<Map<string, MediaRow>> {
   const { results } = await db
     .prepare('SELECT source_media_id, status, r2_key, width, height, bytes FROM catalog_import_media WHERE run_id = ? AND source_product_id = ?')
@@ -589,22 +621,33 @@ const valueOf = (s: PayloadSpec): string => {
   return '';
 };
 
-/** The official-specifications group: registry labels in three languages, language-neutral values. */
+/**
+ * Keys the specification TABLE never shows: `identity.family` is the internal product_family code (identity-map.json,
+ * "internal, from the type"), written to product_spec_values for the facet mirror only (§C.1, §G.5) — step 7's
+ * knowledge tab hides the same key (NOT_DISPLAYED_KEYS).
+ */
+const NOT_IN_SPEC_TABLE: ReadonlySet<string> = new Set(['identity.family']);
+
+/**
+ * The official-specifications group: registry labels in three languages (authored, kept as reviewed); every value
+ * left to the local dictionary like any imported prose (§1 row 16, §C.8: what the dictionary renders, status
+ * imported / review_needed — never authored, so a word it knows is never kept in English and a later save may
+ * still bring a newer dictionary term).
+ */
 export function officialSpecGroup(specs: readonly PayloadSpec[], skipLabels: ReadonlySet<string> = new Set()): { group: SpecGroupV2 | null; overrides: TranslationOverrides } {
   const overrides: TranslationOverrides = {};
   const rows: SpecRowV2[] = [];
   for (const s of specs) {
-    if (!mirrorable(s)) continue;
+    if (!mirrorable(s) || NOT_IN_SPEC_TABLE.has(s.key)) continue;
     const value = valueOf(s);
     if (!value) continue;
     const def = specKey(s.key);
     const label = def ? def.labels : { en: s.original_label || s.key, ar: '', ckb: '' };
     if (skipLabels.has(label.en.toLowerCase())) continue;
     const id = `sr_${s.id.replace(/^sv_/, '')}`;
-    rows.push({ id, label_en: label.en, label_ar: label.ar, label_ckb: ckbNotCopy(label.ar, label.ckb), value_en: value, value_ar: value, value_ckb: value, unit: '', order: rows.length });
-    // Authored registry labels and language-neutral values stay as they are (an x.* label is left to the dictionary).
+    rows.push({ id, label_en: label.en, label_ar: label.ar, label_ckb: ckbNotCopy(label.ar, label.ckb), value_en: value, value_ar: '', value_ckb: '', unit: '', order: rows.length });
+    // Authored registry labels stay as they are (an x.* label is left to the dictionary).
     if (def) overrides[`spec:${OFFICIAL_SPEC_GROUP.id}:${id}:label`] = { ar: label.ar, ckb: ckbNotCopy(label.ar, label.ckb) };
-    overrides[`spec:${OFFICIAL_SPEC_GROUP.id}:${id}:value`] = { ar: value, ckb: value };
   }
   if (!rows.length) return { group: null, overrides: {} };
   overrides[`spec_group:${OFFICIAL_SPEC_GROUP.id}:title`] = { ar: OFFICIAL_SPEC_GROUP.title_ar, ckb: OFFICIAL_SPEC_GROUP.title_ckb };
@@ -627,6 +670,41 @@ export function specFieldMirror(specs: readonly PayloadSpec[], family: 'devices'
     if (f.type === 'select' && !(f.options ?? []).includes(v)) continue;
     v = v.slice(0, 2000);
     out[fieldId] = v;
+  }
+  return out;
+}
+
+/**
+ * The spool group's value as the `spool_type` field's own option words, read by the same rules as the listing's
+ * spool facet (packages/catalog discovery spoolToken): refill / no spool → Refill, cardboard → Cardboard, spool →
+ * With spool; anything else says nothing (never guessed).
+ */
+export function spoolOptionOf(value: string): 'Refill' | 'Cardboard' | 'With spool' | null {
+  const t = value.trim().toLowerCase();
+  if (/\brefill\b|\bno spool\b|\bwithout spool\b/.test(t)) return 'Refill';
+  if (/\bcardboard\b/.test(t)) return 'Cardboard';
+  if (/\bspool\b/.test(t)) return 'With spool';
+  return null;
+}
+
+/**
+ * The facet mirrors an option group carries (§C.6 "Facet mirrors", §G.5), for the fields the product's branch
+ * declares: `color_name` = the colour group's base colours (registry/colours.ts), `spool_type` = the spool group's
+ * option words. Both are multi-valued facets joined by ' | ' (a filament sold as refill and with a spool is both),
+ * so `spool_type` is the one select written outside its single-option rule.
+ */
+export function optionFacetMirror(groups: ImportPayload['groups'], family: 'devices' | 'materials' | null, slugs: string[]): Record<string, string> {
+  if (!family) return {};
+  const declared = new Set(flatFields(fieldsFor(family, slugs)).map((f) => f.id));
+  const out: Record<string, string> = {};
+  const valuesOf = (kind: string) => groups.filter((g) => g.kind === kind).flatMap((g) => g.values.map((v) => v.name_en));
+  if (declared.has('color_name')) {
+    const colours = colourFacet(valuesOf('color'));
+    if (colours) out.color_name = colours.slice(0, 2000);
+  }
+  if (declared.has('spool_type')) {
+    const words = [...new Set(valuesOf('spool').map(spoolOptionOf).filter((w): w is NonNullable<typeof w> => !!w))];
+    if (words.length) out.spool_type = words.join(' | ');
   }
   return out;
 }
@@ -853,6 +931,13 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
     if (!hasRows && (legacy.options.length > 0 || legacy.colors.length > 0)) {
       throw new ImportWriteRefused('IMPORT_REVIEWED_SCOPE_REFUSED', 'REVIEWED_SCOPE_REFUSED', 409, 'merge_target_legacy_structure');
     }
+    // The same for a gallery kept only in products.images (§E.2: the owner's pictures are never hidden, reordered or
+    // replaced): the first appended row would switch the page to rows only and take the hero, and the owner's next
+    // form save would rewrite the JSON from those rows. Refused, whatever rows the options have, until the owner
+    // saves the product once in the form (which turns the JSON into rows) and the item is retried.
+    if (storedRel.images.length + storedRel.quarantined_images.length === 0 && legacy.media.length > 0) {
+      throw new ImportWriteRefused('IMPORT_REVIEWED_SCOPE_REFUSED', 'REVIEWED_SCOPE_REFUSED', 409, 'merge_target_legacy_gallery');
+    }
     mapping = mergeMapping(payload, match!, storedRel);
     images = mergeImages(images, mapping, storedRel);
   }
@@ -927,6 +1012,10 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
     for (const r of results ?? []) existingTargets.add(String(r.id));
   }
   const relations: ImportPayload['relations'] = [];
+  // One row per 0194 ux_prel key (and per id): a second row on a key would be dropped by ON CONFLICT DO NOTHING
+  // while its printer fit and its count were still written, so it is never planned, and the report says so.
+  const relationSeen = new Map<string, string>();
+  const relationKeyOf = (r: ImportPayload['relations'][number]) => JSON.stringify([r.scope_kind, r.scope_id, r.relation, r.target_source_handle, r.target_family, r.target_label]);
   for (const r of payload.relations) {
     const scope = mapScope(r.scope_kind, r.scope_id);
     if (!scope) {
@@ -952,6 +1041,15 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
         targetLabel: r.target_label,
       });
     }
+    const key = relationKeyOf(next);
+    const target = `${next.state}:${next.target_product_id ?? ''}`;
+    const prior = relationSeen.get(key) ?? relationSeen.get(`id:${next.id}`);
+    if (prior !== undefined) {
+      // The same row twice (two scopes mapped onto one) is one row; another target on the same key is reported.
+      if (prior !== target) conflicts.push({ kind: 'relation_unresolvable', field: `${next.relation}:duplicate_key` });
+      continue;
+    }
+    relationSeen.set(key, target).set(`id:${next.id}`, target);
     relations.push(next);
   }
 
@@ -991,24 +1089,30 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
 
   // 9. The document and the relations wire body.
   const contentBlocks = contentBlocksOf(payload, storedAux);
+  // An imported step carries no image or video, so one without a body would be an empty numbered card (a section
+  // whose only content was media, titled by its nav label): never written. Ids keep the source position.
   const usageGuide: UsageGuideV2 = {
     official_url: payload.product.usage_official_url,
-    steps: payload.product.usage_steps.map((s, i) => ({
-      id: `us_${H(`${productId}:usage:${i}`)}`,
-      kind: 'usage' as const,
-      title: s.title_en.slice(0, 200),
-      body: s.body_en.slice(0, 2000),
-      title_ar: '',
-      title_ckb: '',
-      body_ar: '',
-      body_ckb: '',
-      images: [],
-      video_url: '',
-      link_url: payload.product.usage_official_url,
-      order: i,
-    })),
+    steps: payload.product.usage_steps
+      .map((s, i) => ({ s, i }))
+      .filter(({ s }) => s.body_en.trim() !== '')
+      .map(({ s, i }, order) => ({
+        id: `us_${H(`${productId}:usage:${i}`)}`,
+        kind: 'usage' as const,
+        title: s.title_en.slice(0, 200),
+        body: s.body_en.slice(0, 2000),
+        title_ar: '',
+        title_ckb: '',
+        body_ar: '',
+        body_ckb: '',
+        images: [],
+        video_url: '',
+        link_url: payload.product.usage_official_url,
+        order,
+      })),
   };
-  const specFields = specFieldMirror(specs, tax.template_family, tax.slugs);
+  // The spec rows' mirrors first (a spec row of the field wins), then the option groups' facet mirrors.
+  const specFields = { ...optionFacetMirror(payload.groups, tax.template_family, tax.slugs), ...specFieldMirror(specs, tax.template_family, tax.slugs) };
   const filled: string[] = [];
   let doc: ProductDoc;
   let prev: ProductDoc | null = null;
@@ -1242,7 +1346,7 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
     values: dedupeBy(specs, (s) => `${s.key}|${s.scope_kind}|${s.scope_id}|${s.region}`).map((s) => [
       s.id, productId, s.key, s.group, s.scope_kind, s.scope_id, s.region, s.data_type, s.original_label, s.original_value.slice(0, 1000),
       s.value_text, s.value_num, s.value_num_max, s.value_bool, s.valueListJson, s.unit, s.status, s.confidence, s.source_kind, specSourceRef(s, canonicalUrl), s.source_title,
-      s.source_locator.slice(0, 200), s.source_excerpt.slice(0, 200), retrievedAt, s.test_method, s.test_condition, s.derived_from, s.missing_reason, JSON.stringify(s.checked_sources),
+      s.source_locator.slice(0, 200), s.source_excerpt.slice(0, 200), retrievedAt, s.test_method, s.test_condition, s.derived_from, s.missing_reason, checkedSourcesJson(s.checked_sources),
       s.visibility, s.conflict, s.sort, runId,
     ]),
   });
@@ -1369,9 +1473,11 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
   statements.push(db.prepare('DELETE FROM ops_guards WHERE id = ?').bind(IMPORT_GUARD_ID));
 
   // 14. The budget: the whole invocation (§A.5).
-  const postCommit = 2 /* catalog_import.write audit */ + (save.relations ? 2 : 0) + (save.detachedMedia.length ? 3 : 0) + (merge ? 1 : 0) + READBACK_STATEMENTS;
+  // Each post-commit audit costs what audit() sends on THIS binding (one statement, or three with the event bus on).
+  const perAudit = auditStatementCount(db);
+  const postCommit = perAudit /* catalog_import.write */ + (save.relations ? perAudit : 0) + (save.detachedMedia.length ? 2 + perAudit : 0) + (merge ? 1 : 0) + READBACK_STATEMENTS;
   const estimate: ImportWriteEstimate = {
-    reads: ctx.counter.count + (input.mode === 'stage' ? stageMediaEstimate(images) : 0),
+    reads: ctx.counter.count + (input.mode === 'stage' ? STAGE_MEDIA_READS + stageMediaEstimate(images) : 0),
     batch: statements.length,
     postCommit,
     total: 0,
@@ -1404,6 +1510,8 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
 
 /** Media verification's statements per distinct gallery object in /stage, where nothing is verified yet: PRAGMA, upsert, read, deferral. */
 export const STAGE_MEDIA_PER_OBJECT = 4;
+/** The write's own read of the item's media rows (loadMedia: one statement), which /stage does not spend. */
+export const STAGE_MEDIA_READS = 1;
 function stageMediaEstimate(images: ImportImageRow[]): number {
   return new Set(images.map((i) => i.r2_key)).size * STAGE_MEDIA_PER_OBJECT;
 }
@@ -1459,13 +1567,16 @@ function mergeImages(rows: ImportImageRow[], mapping: MergeMapping, rel: Relatio
     if (existingIds.has(r.id) || existingBindings.has(key) || seen.has(key)) continue;
     seen.add(key);
     const bound = !!(binding.option_value_id || binding.variant_id || binding.color_id);
+    // A representative names the variant whose hero it shows (0194, R6): the merged product's own variant, through
+    // the value map. One that maps to no existing variant (only a value or a colour) is a plain value binding.
+    const via = bound && r.binding_rule === 'representative' ? (mapping.variants.get(r.via_variant_id)?.variantId ?? '') : '';
     out.push({
       ...r,
       ...binding,
       sort_order: next++,
       is_primary: !hasPrimary && out.length === 0,
-      binding_rule: bound ? r.binding_rule : 'general',
-      via_variant_id: bound && r.binding_rule === 'representative' ? r.via_variant_id : '',
+      binding_rule: !bound ? 'general' : r.binding_rule === 'representative' && !via ? 'value' : r.binding_rule,
+      via_variant_id: via,
     });
   }
   return out;
@@ -1520,14 +1631,22 @@ function wireImage(i: ImportImageRow, alt: { en: string; ar: string; ckb: string
   };
 }
 
-/** Content blocks (§C.5): text with its section title as the first line, images on their stored objects, YouTube embeds. */
+/**
+ * Content blocks (§C.5): text with its section title as the first line — ONCE per section, as the source shows it
+ * (the package splits a section's text around each image or video, every piece carrying the section's title) —
+ * images on their stored objects, YouTube embeds.
+ */
 function contentBlocksOf(payload: ImportPayload, stored: (id: string) => MediaRow | null): ContentBlockV2[] {
   const out: ContentBlockV2[] = [];
+  let shown = '';
   for (const b of payload.content_blocks) {
     const base = { id: b.id, order: out.length, body_ar: '', body_ckb: '', caption_ar: '', caption_en: '', caption_ckb: '', alt_ar: '', alt_en: '', alt_ckb: '', url: '', media_key: '' };
     if (b.kind === 'text') {
-      const body = b.title_en && !b.body_en.startsWith(b.title_en) ? `${b.title_en}\n${b.body_en}` : b.body_en;
-      if (body.trim()) out.push({ ...base, kind: 'text', body_en: body.slice(0, 20000) });
+      const heading = b.title_en ? JSON.stringify([b.section_path, b.title_en]) : '';
+      const body = b.title_en && heading !== shown && !b.body_en.startsWith(b.title_en) ? `${b.title_en}\n${b.body_en}` : b.body_en;
+      if (!body.trim()) continue;
+      if (heading) shown = heading;
+      out.push({ ...base, kind: 'text', body_en: body.slice(0, 20000) });
     } else if (b.kind === 'image') {
       const m = stored(b.source_media_id);
       if (m) out.push({ ...base, kind: 'image', body_en: '', url: `/files/${m.r2_key}`, media_key: m.r2_key, alt_en: b.alt_en, alt_ar: b.alt_ar, alt_ckb: ckbNotCopy(b.alt_ar, b.alt_ckb) });
@@ -1585,6 +1704,14 @@ function sourceRefStatement(
         : head
     )
     .bind(...values);
+}
+
+/**
+ * A spec row's checked sources as stored: each entry projected to its three allow-listed fields (§C.10 layer 2),
+ * like every other nested payload object the writer serialises — never the object as it arrived.
+ */
+function checkedSourcesJson(sources: PayloadSpec['checked_sources']): string {
+  return JSON.stringify(sources.map((c) => ({ kind: String(c.kind ?? ''), url: String(c.url ?? ''), title: String(c.title ?? '') })));
 }
 
 function dedupeBy<T>(xs: readonly T[], key: (x: T) => string): T[] {
@@ -1672,7 +1799,7 @@ export async function runImportWrite(ctx: ImportWriteContext, plan: ImportWriteP
     beforeEqual = digest === digestOf(after);
   } else {
     const p = rowsAt(plan.layout.probe)[0] ?? {};
-    moneyDefault = Number(p.product_ok) === 1 && Number(p.values_bad) === 0 && Number(p.variants_bad) === 0 && Number(p.stock_decision_ok) === 1;
+    moneyDefault = moneyProbeAtDefault(p);
   }
   // Post-commit (§A.4 step 8): never turns the committed write into a failure.
   await postCommitProductSave(ctx.db, plan.save, [

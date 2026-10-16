@@ -225,7 +225,11 @@ export function buildRelations(inp: RelationInputs): RelationResult {
     const base = { ...scope, relation, targetSource: '' as const, targetSourceHandle: '', targetFamily: '', targetLabel: shown || label, evidenceKind: ev, evidenceText: evText };
     const one = (ref: TargetRef, kind: TargetKind, family: string): boolean => {
       if (ref.levonis_product_id) {
-        push({ ...base, targetKind: kind, targetProductId: ref.levonis_product_id, targetFamily: family, state: 'resolved' }, label);
+        // 0194's ux_prel has no target_product_id: two existing Levonis members of one family ("X1 Series" → X1C,
+        // X1E) would share every key column. The member's own token keeps each row distinct; target_source stays
+        // '', so the incoming resolution (target_source 'bambu_us' only) never reads it, and no customer sees it.
+        const memberKey = family ? `levonis:${ref.levonis_product_id}` : '';
+        push({ ...base, targetKind: kind, targetProductId: ref.levonis_product_id, targetSourceHandle: memberKey, targetFamily: family, state: 'resolved' }, label);
         return true;
       }
       if (ref.source_handle) {

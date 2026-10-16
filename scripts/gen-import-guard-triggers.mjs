@@ -29,6 +29,8 @@ import {
   IMPORT_GUARD_REFUSAL,
   PROTECTED_TABLES,
   STOCK_DECISION_GUARD,
+  jsonElementMoneySql,
+  nonDefaultSql,
 } from '../worker/lib/catalogImport/protectedTables.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -54,37 +56,9 @@ export function schemaBefore(root = ROOT, target = TARGET_MIGRATION) {
   return out;
 }
 
-function nonDefault(col, ref) {
-  switch (col.insertDefault) {
-    case 'null':
-      return `${ref}.${col.name} IS NOT NULL`;
-    case 'zero':
-      return `${ref}.${col.name} IS NOT 0`;
-    case 'zero_or_null':
-      return `COALESCE(${ref}.${col.name}, 0) <> 0`;
-    case 'empty_object':
-      return `${ref}.${col.name} IS NOT '{}'`;
-    case 'empty_array':
-      return `${ref}.${col.name} IS NOT '[]'`;
-    default:
-      throw new Error(`unknown insertDefault ${col.insertDefault} for ${col.name}`);
-  }
-}
-
-/**
- * The money a JSON array column carries, as one comparable value: the sorted
- * multiset of its object elements' money tuples (`jsonElementMoney`). NULL for
- * an empty array, a non-array or invalid JSON — the same on both sides of a
- * save that keeps every fee, whatever the text.
- */
-function jsonMoney(col, ref) {
-  const tuple = col.jsonElementMoney.join(" || '|' || ");
-  return (
-    `(SELECT group_concat(m, ',') FROM (SELECT ${tuple} AS m` +
-    ` FROM json_each(CASE WHEN json_valid(${ref}.${col.name}) THEN ${ref}.${col.name} ELSE '[]' END ) j` +
-    ` WHERE j.type = 'object' ORDER BY m))`
-  );
-}
+// The one spelling of both (protectedTables.ts): the writer's fingerprint and money probe read the same.
+const nonDefault = nonDefaultSql;
+const jsonMoney = jsonElementMoneySql;
 
 function changed(col) {
   return col.jsonElementMoney ? `${jsonMoney(col, 'NEW')} IS NOT ${jsonMoney(col, 'OLD')}` : `NEW.${col.name} IS NOT OLD.${col.name}`;
