@@ -315,6 +315,9 @@ function scheduleRefresh(c: Context<AppContext>, cache: Cache, key: Request): bo
   const request = new Request(refreshUrlOf(key), { method: 'GET', headers });
   refreshRequests.add(request);
   const work = (async () => {
+    // AFTER the answer has gone: one turn of the event loop first, so the rebuild's own
+    // work (it shares this isolate's one thread) never sits in front of the copy just served.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
     const res = await dispatch(request, c.env, executionCtxOf(c));
     // The answer is not read by anyone: release its body.
     await res.body?.cancel().catch(() => undefined);
