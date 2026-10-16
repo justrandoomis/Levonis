@@ -31,6 +31,7 @@ import { COST_REFUSALS, isCostRefusalCode } from '../../packages/contracts/src/c
 import { DATA_FILE_REFUSALS, isDataFileRefusalCode } from '../../packages/contracts/src/dataFileRefusals';
 import { COMPLETENESS_REFUSALS, isCompletenessRefusalCode } from '../../packages/contracts/src/completenessRefusals';
 import { MONEY_AUTHORITY_REFUSALS, isMoneyAuthorityCode } from '../../packages/contracts/src/moneyAuthority';
+import { OFFER_DISCOUNT_REFUSALS, OFFER_DISCOUNT_WARNINGS } from '../../packages/contracts/src/offerRefusals';
 
 export interface RefusalStrings {
   ar: string;
@@ -1901,6 +1902,10 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'Suspicious activity was detected and this access has been blocked. If you believe this is a mistake, contact us and quote the reference.',
     ckb: 'چالاکییەکی گوماناوی دەستنیشان کرا و ئەم دەستگەیشتنە قەدەغە کرا. ئەگەر پێت وایە ئەمە هەڵەیە، پەیوەندیمان پێوە بکە و ژمارەی ئاماژەکە بنێرە.',
   },
+  // ---- the product form's «تخفيض السعر» and the special-offers tab (docs/ux/PRODUCT-DISCOUNT.md §5.8):
+  // the dollar sale price, the lost update and the two warnings, from the door's own contract ----
+  ...OFFER_DISCOUNT_REFUSALS,
+  ...OFFER_DISCOUNT_WARNINGS,
   // ---- the pricing programme's refusal contract (S1, master plan §6.1) -----
   ...COST_REFUSALS,
   // ---- «ملف بيانات المنتج», the product data file's round trip (2026-10-10) --

@@ -423,8 +423,10 @@ export const purgeCatalogueAfterWrite: MiddlewareHandler<AppContext> = async (c,
   await next();
   if (c.req.method === 'GET' || c.req.method === 'HEAD' || c.req.method === 'OPTIONS') return;
   if (c.res.status >= 300) return;
-  // A V2 pricing preview (V2-3b) is a POST that writes nothing: nothing to purge.
-  if (/\/pricing\/preview$/.test(new URL(c.req.url).pathname)) return;
+  // A V2 pricing preview (V2-3b) and an offer preview (docs/ux/PRODUCT-DISCOUNT.md §5.2) are POSTs
+  // that write nothing: nothing to purge.
+  const path = new URL(c.req.url).pathname;
+  if (/\/pricing\/preview$/.test(path) || /^\/api\/admin\/offers\/[^/]+\/preview$/.test(path)) return;
   const slug = c.get('catalogueSlug') ?? (await catalogueSlugFromPath(c));
   await afterCatalogueWrite(c, slug ? [slug] : []);
 };
