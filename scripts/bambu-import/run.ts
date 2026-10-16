@@ -102,6 +102,17 @@ const HELLO_EVERY = 50;
 /** The wait before the run status is read again after /lease refused a queued item (another one is in flight). */
 const LEASE_CLASH_WAIT_MS = 30_000;
 /** The Worker's lease is 15 minutes; the runner renews it before 10 have passed since the last item call. */
+/**
+ * Catalog-only is live when the public context document (worker/lib/publicApi/meta.ts,
+ * GET /api/public/v1/context) counts the priced products: `content.products_priced`, a number.
+ * The document is the answer itself, with no `data` envelope.
+ */
+export function catalogOnlyLive(doc: unknown): boolean {
+  if (!doc || typeof doc !== 'object') return false;
+  const content = (doc as Record<string, unknown>).content;
+  return !!content && typeof content === 'object' && typeof (content as Record<string, unknown>).products_priced === 'number';
+}
+
 export const LEASE_KEEP_MS = 10 * 60_000;
 /** A transition outside a stage's retries: this many tries (30 s × 2^k apart) before the item is left to the next job. */
 const TRANSITION_ATTEMPTS = 4;
@@ -541,8 +552,7 @@ export class Importer {
   /** mode=preflight: the public half (cf.mjs did the database half): catalog-only is live. */
   async preflight(): Promise<number> {
     const a = await this.site.read('GET', '/api/public/v1/context');
-    const content = a.json && typeof a.json.data === 'object' && a.json.data ? ((a.json.data as Record<string, unknown>).content as Record<string, unknown> | undefined) : undefined;
-    const priced = a.status === 200 && typeof content?.products_priced === 'number';
+    const priced = a.status === 200 && catalogOnlyLive(a.json);
     this.log.info('preflight', { priced });
     return priced ? 0 : 1;
   }

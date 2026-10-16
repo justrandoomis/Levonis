@@ -610,7 +610,8 @@ export class World {
 
   private site(method: string, u: URL): Response {
     const p = u.pathname;
-    if (p === '/api/public/v1/context') return json(200, { data: { content: { products: 10, products_priced: 4 } } });
+    // The live document's own shape (worker/lib/publicApi/meta.ts): no `data` envelope.
+    if (p === '/api/public/v1/context') return json(200, { name: 'Levonis', content: { products: 10, products_priced: 4 } });
     if (p === '/api/catalog/tree') {
       const node = (id: string, slug: string, parent: string, name_en: string, name_ar: string, children: Rec[] = []) => ({ id, slug, parent_id: parent, name_en, name_ar, name_ckb: '', product_count: 1, children });
       return json(200, {

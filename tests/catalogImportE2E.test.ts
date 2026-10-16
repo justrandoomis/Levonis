@@ -43,6 +43,7 @@ import { HostFetcher } from '../scripts/bambu-import/fetch';
 import { Deadline as RunnerDeadline } from '../scripts/bambu-import/deadline';
 import { writtenGallery } from '../scripts/bambu-import/gallery';
 import { NOT_APPLICABLE } from '../scripts/bambu-import/browser';
+import { catalogOnlyLive } from '../scripts/bambu-import/run';
 import { writtenDocumentsOf, type DocumentCheck as RunnerDocumentCheck, type MediaAnswerRow, type WrittenImage } from '../scripts/bambu-import/opsClient';
 import { createHash } from 'node:crypto';
 
@@ -677,6 +678,21 @@ test('the runner\'s own VERIFY over the real routes (§I.1): H2D, PLA Basic and 
   } finally {
     restoreFetch();
   }
+});
+
+test('preflight reads the real public context: catalog-only is live by the document\'s own content.products_priced, with no data envelope', async () => {
+  const w = opsWorld();
+  let now = Date.now();
+  const fakeClock = { now: () => now, sleep: async (ms: number) => void (now += ms) };
+  const fetcher = new HostFetcher({ fetch: (url, init) => w.fetch(url, init), clock: fakeClock, deadline: new RunnerDeadline(now + 3600_000, fakeClock), siteOrigin: 'https://levonis-iq.com' });
+  const site = new Site('https://levonis-iq.com', fetcher, () => 0);
+  const a = await site.read('GET', '/api/public/v1/context');
+  assert.equal(a.status, 200);
+  assert.equal(catalogOnlyLive(a.json), true, 'the live document carries content.products_priced');
+  // The shape the runner used to expect, and a document without the count, are not proof.
+  assert.equal(catalogOnlyLive({ data: { content: { products_priced: 3 } } }), false);
+  assert.equal(catalogOnlyLive({ content: { products: 3 } }), false);
+  assert.equal(catalogOnlyLive(null), false);
 });
 
 test('with no open run every ops path is the uniform 404', async () => {
