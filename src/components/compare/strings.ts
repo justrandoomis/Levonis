@@ -59,6 +59,8 @@ export interface CompareStrings {
   narrowGroup: string;
   narrowGroupNote: string;
   missing: string;
+  /** «طريقة الاختبار» under a value the manufacturer measured (the Bambu import spec §G.2, §G.5). */
+  testMethod: string;
   notScored: string;
   tieRow: string;
   informational: string;
@@ -139,6 +141,7 @@ const ar: CompareStrings = {
   narrowGroup: 'ما تنطبق على الكل',
   narrowGroupNote: 'هذه المجموعة مسجلة لجهاز دون غيره، فما تُقرأ الفراغات فيها على أنها ضعف.',
   missing: 'غير مذكور',
+  testMethod: 'طريقة الاختبار',
   notScored: 'غير محتسب',
   tieRow: 'متعادل',
   informational: 'للعلم فقط',
@@ -217,6 +220,7 @@ const en: CompareStrings = {
   narrowGroup: 'Not applicable to all',
   narrowGroupNote: 'This group is recorded for one machine and not the other, so a blank here is not a weakness.',
   missing: 'Not stated',
+  testMethod: 'Test method',
   notScored: 'Not scored',
   tieRow: 'Level',
   informational: 'For information',
@@ -295,6 +299,7 @@ const ckb: CompareStrings = {
   narrowGroup: 'بۆ هەمووان نییە',
   narrowGroupNote: 'ئەم کۆمەڵەیە تەنها بۆ یەک ئامێر تۆمار کراوە، بۆیە خانەی بەتاڵ لێرەدا لاوازی نییە.',
   missing: 'نەوتراوە',
+  testMethod: 'ڕێگای تاقیکردنەوە',
   notScored: 'ناژمێردرێت',
   tieRow: 'یەکسان',
   informational: 'تەنها بۆ زانیاری',

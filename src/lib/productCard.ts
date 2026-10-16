@@ -34,6 +34,24 @@ export interface CardExtras {
   low_stock_threshold?: number | null;
   /** Open box / used / refurbished — `CARD_FIELDS` carries it (see api.ts). */
   condition?: import('./condition').ConditionEntry | null;
+  /**
+   * The Bambu import spec §G.5: the section the product is filed in, in three
+   * languages, and ≤ 4 key values (≤ 40 characters each) from its spec mirrors —
+   * absent rather than empty when there is nothing to say.
+   */
+  section_name?: { ar: string; en: string; ckb: string } | null;
+  key_specs?: string[] | null;
+}
+
+/**
+ * THE CARD'S ONE MUTED LINE (spec §G.5): the section, then the key values —
+ * «طابعات FDM · 256 × 256 × 256 mm · Enclosed». Empty when the server sent
+ * neither, so a card without them is drawn exactly as before.
+ */
+export function cardKnowledgeLine(p: Pick<CardExtras, 'section_name' | 'key_specs'>, lang: 'ar' | 'en' | 'ckb'): { section: string; specs: string[] } | null {
+  const section = p.section_name ? (p.section_name[lang] || p.section_name.en || '').trim() : '';
+  const specs = Array.isArray(p.key_specs) ? p.key_specs.filter((x) => typeof x === 'string' && x.trim() !== '').slice(0, 4) : [];
+  return section || specs.length ? { section, specs } : null;
 }
 
 export type CardProduct = ApiProduct & CardExtras;

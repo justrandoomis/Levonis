@@ -133,8 +133,13 @@ function Cell({
   return (
     <div role="cell" className="min-w-0">
       {value.missing ? (
-        <span data-price-status={unpriced ? 'unpriced' : undefined} className="text-[12.5px] leading-5 text-text-muted">
-          {unpriced ? UNPRICED_TEXT[lang] : s.missing}
+        <span
+          data-price-status={unpriced ? 'unpriced' : undefined}
+          data-state={value.state}
+          className="text-[12.5px] leading-5 text-text-muted"
+        >
+          {/* The knowledge model says WHY there is no value (spec §G.5) — never a blank, never 0. */}
+          {unpriced ? UNPRICED_TEXT[lang] : value.state_label ? value.state_label[lang] : s.missing}
         </span>
       ) : (
         <span className={`inline-flex max-w-full items-center gap-1.5 text-[13px] leading-5 [overflow-wrap:anywhere] ${won ? 'font-extrabold text-text-primary' : 'font-medium text-text-secondary'}`}>
@@ -146,6 +151,16 @@ function Cell({
           </span>
         </span>
       )}
+      {!value.missing && value.state === 'unverified' && value.state_label ? (
+        <span className="mt-0.5 block text-[11px] font-semibold text-text-muted" data-state="unverified">
+          {value.state_label[lang]}
+        </span>
+      ) : null}
+      {!value.missing && value.test_method ? (
+        <span className="mt-0.5 block text-[11px] text-text-muted" data-test-method>
+          {s.testMethod}: <bdi>{value.test_method}</bdi>
+        </span>
+      ) : null}
       {delta ? (
         delta.cheapest ? (
           <span className="mt-0.5 block text-[11px] font-bold text-success">{ls.cheapest}</span>

@@ -12,7 +12,7 @@ import AvailabilityLine from '../product/AvailabilityLine';
 import CompareToggle from '../compare/CompareToggle';
 import { useLanguage } from '../../LanguageContext';
 import { conditionKindLabel } from '../../lib/condition';
-import { cardHref, cardName, compareTypeOf, type CardProduct } from '../../lib/productCard';
+import { cardHref, cardKnowledgeLine, cardName, compareTypeOf, type CardProduct } from '../../lib/productCard';
 import { isUnpriced } from '../../lib/priceStatus';
 
 /**
@@ -137,6 +137,7 @@ function CompactCard({
   const hasSale = priced && displayPrice != null && regularPrice != null && displayPrice < regularPrice;
   const type = compareToggle ? compareTypeOf(p) : null;
   const condition = p.condition?.kind ? conditionKindLabel(p.condition.kind, lang) : '';
+  const line = cardKnowledgeLine(p, lang === 'en' || lang === 'ckb' ? lang : 'ar');
 
   return (
     <div
@@ -187,6 +188,18 @@ function CompactCard({
         >
           {name}
         </h3>
+        {/* The section and the key values (spec §G.5): one muted line, the values as LTR islands. */}
+        {line ? (
+          <p className="mt-0.5 truncate text-[11px] leading-4 text-text-muted" data-card-knowledge>
+            {line.section}
+            {line.specs.map((v, i) => (
+              <React.Fragment key={i}>
+                {line.section || i > 0 ? ' · ' : ''}
+                <bdi>{v}</bdi>
+              </React.Fragment>
+            ))}
+          </p>
+        ) : null}
         <div className="mt-1.5">
           <CardPrice p={p} density="compact" />
         </div>

@@ -60,6 +60,15 @@ export interface CompareValue {
   items?: string[];
   /** The value in the reader's language when the store's dictionary holds all of it. */
   i18n?: { ar?: string; ckb?: string };
+  /**
+   * THE KNOWLEDGE MODEL ANSWERED THIS CELL (the Bambu import spec §G.5): its status, the
+   * state's words instead of a blank («غير متوفر في المصادر التي رُوجعت» …) or beside an
+   * unverified value, the unit it is stated in and the manufacturer's test method.
+   */
+  state?: 'verified' | 'unverified' | 'not_found' | 'not_published' | 'not_applicable' | 'unknown';
+  state_label?: { ar: string; en: string; ckb: string };
+  unit?: string;
+  test_method?: string;
 }
 
 export interface CompareRow {
