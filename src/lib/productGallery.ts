@@ -210,3 +210,66 @@ export function galleryForSelection<T extends GalleryMedia>(
   ).map(({ r }) => r.item);
   return dedupeByUrl(ranked);
 }
+
+/** A picture's stored size, as the media JSON carries it (`product_images.width/height`). */
+export interface StoredSize {
+  width?: number | null;
+  height?: number | null;
+}
+
+const positive = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : null);
+
+/**
+ * THE SIZE THE LIGHT THEME'S MAIN IMAGE IS DRAWN FROM (migration 0138; speed
+ * audit 2026-10-16).
+ *
+ * In the light theme the primary's slot shows `light_image`, another file. It
+ * used to be swapped in with NO size, so the lead picture lost both halves of
+ * its small copy: `sizes` fell back to the gallery FRAME's width
+ * (PRODUCT_GALLERY_SIZES, `calc(100vw - 58px)` on a phone) instead of the
+ * square actually drawn, and the srcset ran on to `?w=1280` and `?w=1600`
+ * instead of stopping at the stored width. Measured live: a 360 px phone at
+ * DPR 3 fetched the 1080 copy where the 800 covers the drawn picture; a 430 px
+ * one, an iPad and a desktop fetched the ORIGINAL (77–141 KB against a
+ * 34–52 KB copy), about 0.6 s of phone LCP on Slow-4G. The dark theme, which
+ * keeps the primary's size, was right all along.
+ *
+ * In order of trust:
+ *   1. the light file's OWN stored size, when the product answer carries it
+ *      (`light_image_width` / `light_image_height`);
+ *   2. otherwise the primary's stored size — the light image is the
+ *      primary's twin for the other ground (MainImagesPair.tsx), and every
+ *      live pair is the same 1254 × 1254 picture — UNLESS the page has seen
+ *      the light file itself and its shape is not the primary's
+ *      (`observedAspect`): then no size at all, exactly the old behaviour,
+ *      which over-asks but is never blurred.
+ */
+export function lightMainImageSize(
+  primary: StoredSize | null | undefined,
+  own?: StoredSize | null,
+  observedAspect?: number | null
+): { width: number | null; height: number | null } {
+  const ownW = positive(own?.width);
+  const ownH = positive(own?.height);
+  if (ownW && ownH) return { width: ownW, height: ownH };
+  const w = positive(primary?.width);
+  const h = positive(primary?.height);
+  if (!w || !h) return { width: null, height: null };
+  const seen = positive(observedAspect);
+  if (seen && Math.abs(seen / (w / h) - 1) > LIGHT_ASPECT_TOLERANCE) return { width: null, height: null };
+  return { width: w, height: h };
+}
+
+/** How far the light file's measured shape may stray from the primary's (2 %: a re-encode's rounding, never a different picture). */
+export const LIGHT_ASPECT_TOLERANCE = 0.02;
+
+/** The gallery for the light theme: the primary's slot shows `light`, at `size` (lightMainImageSize). */
+export function withLightMainImage<T extends { url: string; width?: number | null; height?: number | null }>(
+  ordered: readonly T[],
+  primaryUrl: string | undefined,
+  light: string,
+  size: { width: number | null; height: number | null }
+): T[] {
+  if (!light || !primaryUrl) return [...ordered];
+  return ordered.map((m) => (m.url === primaryUrl ? { ...m, url: light, width: size.width, height: size.height } : m));
+}
