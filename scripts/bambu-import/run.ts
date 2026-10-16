@@ -1320,7 +1320,7 @@ export class Importer {
       write: w.write ?? null,
       gallery: w.gallery ? { source: w.gallery.source, rows: w.gallery.images.length, payload_images: w.payload?.images.length ?? 0 } : null,
       verify: w.verify ?? null,
-      browser: w.browser ? { ok: w.browser.ok, checks: w.browser.checks, counts: w.browser.counts } : null,
+      browser: w.browser ? { ok: w.browser.ok, checks: w.browser.checks, counts: w.browser.counts, selections: w.browser.selections, not_applicable: w.browser.not_applicable } : null,
     });
     w.shots.forEach((shot, i) => this.seal(`${name}-shot-${i + 1}.png`, shot));
     w.shots = [];

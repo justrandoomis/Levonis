@@ -38,6 +38,8 @@ import { ExtractGate, localOnlyFetch, stageAfter } from '../scripts/bambu-import
 import { reviewedDifferences } from '../scripts/bambu-import/discover';
 import { expectedFacts } from '../scripts/bambu-import/verify';
 import type { MediaAnswerRow } from '../scripts/bambu-import/opsClient';
+// @ts-expect-error - plain ESM helper, no types
+import { unsealBuffer } from '../scripts/bambu-import/seal.mjs';
 
 const MIN = 60_000;
 const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
@@ -1105,10 +1107,14 @@ test('the breadcrumb travels as not applicable (§1 row 28): in the evidence bes
   const w = new World({ handles: ['filament-buffer'] });
   try {
     assert.equal(await w.importer().main(), 0, w.logLines.join('\n'));
-    const browser = (callsTo(w, /\/complete$/)[0].body!.edge_evidence as { checks: { browser: { ok: boolean; checks: Record<string, boolean>; not_applicable?: Record<string, string> } } }).checks.browser;
+    const browser = (callsTo(w, /\/complete$/)[0].body!.edge_evidence as { checks: { browser: { ok: boolean; checks: Record<string, boolean>; selections?: string[][]; not_applicable?: Record<string, string> } } }).checks.browser;
     assert.equal(browser.ok, true);
     assert.deepEqual(browser.not_applicable, { breadcrumb: 'the product page draws no breadcrumb' });
     assert.equal('breadcrumb' in browser.checks, false);
+    // The owner's record says so too: the sealed item report carries it beside the checks and the selections.
+    const report = JSON.parse(unsealBuffer(w.keys.privateKeyPem, w.sealed.find((x) => x.name === 'item-0001.json')!.bytes).toString('utf8'));
+    assert.deepEqual(report.browser.not_applicable, { breadcrumb: 'the product page draws no breadcrumb' });
+    assert.deepEqual(report.browser.selections, browser.selections);
   } finally {
     w.dispose();
   }
