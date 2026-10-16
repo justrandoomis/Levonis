@@ -37,20 +37,26 @@ export interface CardExtras {
   /**
    * The Bambu import spec §G.5: the section the product is filed in, in three
    * languages, and ≤ 4 key values (≤ 40 characters each) from its spec mirrors —
-   * absent rather than empty when there is nothing to say.
+   * a value's own text, or a fact worded in three languages («هيكل مغلق»,
+   * «حتى 16 لونًا») — absent rather than empty when there is nothing to say.
    */
   section_name?: { ar: string; en: string; ckb: string } | null;
-  key_specs?: string[] | null;
+  key_specs?: Array<string | { ar: string; en: string; ckb: string }> | null;
 }
 
 /**
  * THE CARD'S ONE MUTED LINE (spec §G.5): the section, then the key values —
- * «طابعات FDM · 256 × 256 × 256 mm · Enclosed». Empty when the server sent
- * neither, so a card without them is drawn exactly as before.
+ * «طابعات FDM · 256 × 256 × 256 mm · هيكل مغلق», a worded fact in the
+ * reader's language. Null when the server sent neither; the card still keeps
+ * the line's row, so every compact card is one height (ProductCard.tsx).
  */
 export function cardKnowledgeLine(p: Pick<CardExtras, 'section_name' | 'key_specs'>, lang: 'ar' | 'en' | 'ckb'): { section: string; specs: string[] } | null {
   const section = p.section_name ? (p.section_name[lang] || p.section_name.en || '').trim() : '';
-  const specs = Array.isArray(p.key_specs) ? p.key_specs.filter((x) => typeof x === 'string' && x.trim() !== '').slice(0, 4) : [];
+  const specs = (Array.isArray(p.key_specs) ? p.key_specs : [])
+    .map((x) => (typeof x === 'string' ? x : x && typeof x === 'object' ? x[lang] || x.en || '' : ''))
+    .map((x) => (typeof x === 'string' ? x.trim() : ''))
+    .filter((x) => x !== '')
+    .slice(0, 4);
   return section || specs.length ? { section, specs } : null;
 }
 

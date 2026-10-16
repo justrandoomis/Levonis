@@ -7,10 +7,17 @@
  *                               the taxonomy the listing routes already hold
  *                               (worker/lib/catalogPresentation.ts
  *                               `catalogIndexFor`, memoised per isolate)
- *   key_specs    string[]       ≤ 4 values of ≤ 40 characters, read from the
+ *   key_specs    (string | Tri)[]  ≤ 4 values of ≤ 40 characters, read from the
  *                               row's `spec_fields` — the mirrors the import
  *                               writes — for the registry keys flagged
- *                               `cardKeyFor` the product's type
+ *                               `cardKeyFor` the product's type, then the
+ *                               shop's own fields §G.5 names that the registry
+ *                               has no key for (`CARD_FIELDS`: a printer's
+ *                               enclosure and colours, a plate's size and
+ *                               surface). A value is the shop's language-neutral
+ *                               text; a yes/no or a count is no value on its own,
+ *                               so it is WORDED in three languages ({ar, en, ckb}:
+ *                               «هيكل مغلق», «حتى 16 لونًا»).
  *
  * NO NEW QUERY (tests/d1Waves.test.ts): `spec_fields` is on the row the card was
  * built from and the taxonomy is already in memory. Both are absent rather than
@@ -25,7 +32,7 @@
 import { SPEC_KEYS, type SpecKey } from '@levonis/catalog/bambuImport/registry/specKeys';
 import type { ProductType } from '@levonis/catalog/bambuImport/registry/types';
 import { allTemplateGroups, type ProductTypeId, type TemplateField } from '../templateFamilies';
-import { readCompareValue } from '../compareSpecs';
+import { readBoolean, readCompareValue, readNumber } from '../compareSpecs';
 import { productTypeOf, type CatalogIndex } from '../catalogPresentation';
 import type { Tri } from './labels';
 
@@ -70,15 +77,61 @@ export function cardKeysFor(type: ProductTypeId | null): SpecKey[] {
 
 const fieldOf = (id: string): TemplateField => FIELDS.get(id) ?? { id, label_ar: id, label_en: id, type: 'text' };
 
-/** The card's key values: ≤ 4, each ≤ 40 characters, in the registry's order. */
-export function cardKeySpecs(specFields: Record<string, unknown> | null | undefined, type: ProductTypeId | null): string[] {
+/** One key value: the shop's language-neutral text, or a fact worded in three languages. */
+export type KeySpec = string | Tri;
+
+/**
+ * The shop's own fields §G.5 names for a card that the registry has no key for
+ * (the Bambu store publishes no «Enclosure» row and states colours only in
+ * prose): read after the registry's card keys, each only when the product
+ * carries it.
+ */
+export const CARD_FIELDS: Readonly<Partial<Record<ProductTypeId, readonly string[]>>> = {
+  printer: ['enclosed', 'max_colors'],
+  parts: ['plate_size', 'plate_surface'],
+  accessory: ['plate_size', 'plate_surface'],
+};
+
+const ENCLOSED: Tri = { ar: 'هيكل مغلق', en: 'Enclosed', ckb: 'لەشی داخراو' };
+const OPEN_FRAME: Tri = { ar: 'هيكل مفتوح', en: 'Open frame', ckb: 'چوارچێوەی کراوە' };
+
+/** `max_colors` is the ceiling with every AMS / expansion unit (worker/lib/multicolor.ts): «up to». */
+function coloursUpTo(n: number): Tri {
+  if (n === 1) return { ar: 'لون واحد', en: 'Single colour', ckb: 'یەک ڕەنگ' };
+  const ar = n === 2 ? 'حتى لونين' : n % 100 >= 3 && n % 100 <= 10 ? `حتى ${n} ألوان` : `حتى ${n} لونًا`;
+  return { ar, en: `Up to ${n} colours`, ckb: `تا ${n} ڕەنگ` };
+}
+
+/** A field whose bare value means nothing on a card, worded; undefined for every other field. */
+function wordedKeySpec(field: string, raw: string): Tri | null | undefined {
+  if (field === 'enclosed') {
+    const b = readBoolean(raw);
+    return b === 1 ? ENCLOSED : b === 0 ? OPEN_FRAME : null;
+  }
+  if (field === 'max_colors') {
+    const n = readNumber(raw);
+    return n !== null && Number.isInteger(n) && n >= 1 && n <= 999 ? coloursUpTo(n) : null;
+  }
+  return undefined;
+}
+
+const sameSpec = (a: KeySpec, b: KeySpec) => (typeof a === 'string' || typeof b === 'string' ? a === b : a.en === b.en);
+const fits = (v: KeySpec) =>
+  typeof v === 'string' ? v !== '' && v.length <= KEY_SPEC_MAX_CHARS : [v.ar, v.en, v.ckb].every((x) => x !== '' && x.length <= KEY_SPEC_MAX_CHARS);
+
+/** The card's key values: ≤ 4, each ≤ 40 characters — the registry's card keys, then `CARD_FIELDS`. */
+export function cardKeySpecs(specFields: Record<string, unknown> | null | undefined, type: ProductTypeId | null): KeySpec[] {
   if (!specFields || typeof specFields !== 'object') return [];
-  const out: string[] = [];
-  for (const k of cardKeysFor(type)) {
-    const raw = specFields[k.templateField as string];
+  const fields = [...cardKeysFor(type).map((k) => k.templateField as string), ...(type ? CARD_FIELDS[type] ?? [] : [])];
+  const out: KeySpec[] = [];
+  for (const field of [...new Set(fields)]) {
+    const raw = specFields[field];
     if (raw === null || raw === undefined || typeof raw === 'object') continue;
-    const shown = readCompareValue(fieldOf(k.templateField as string), String(raw).replace(/\s+/g, ' ').trim()).text.trim();
-    if (!shown || shown.length > KEY_SPEC_MAX_CHARS || out.includes(shown)) continue;
+    const text = String(raw).replace(/\s+/g, ' ').trim();
+    if (!text) continue;
+    const worded = wordedKeySpec(field, text);
+    const shown: KeySpec | null = worded === undefined ? readCompareValue(fieldOf(field), text).text.trim() : worded;
+    if (!shown || !fits(shown) || out.some((x) => sameSpec(x, shown))) continue;
     out.push(shown);
     if (out.length >= KEY_SPECS_MAX) break;
   }

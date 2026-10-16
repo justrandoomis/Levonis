@@ -12,8 +12,8 @@
  *  - the compare toggle is a SIBLING of the link, only for comparable types;
  *  - the availability is inside the link's text, so it is in its name.
  *
- * The card's 262 px height is measured in the browser harness
- * (scripts/e2e-home-v2-shots.mjs, «every compact card is 6:5 photo + 119 px»).
+ * The card's 280 px height is measured in the browser harness
+ * (scripts/e2e-home-v2-shots.mjs, «every compact card is 6:5 photo + 137 px»).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

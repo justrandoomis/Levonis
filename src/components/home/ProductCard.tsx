@@ -30,7 +30,8 @@ import { isUnpriced } from '../../lib/priceStatus';
  *  compact — the owner's brief: «بطاقتان في الصف في الجوال، تقليل الحجم العام
  *    قليلًا، تقليل المسافات الداخلية بشكل مدروس، الحفاظ على صورة المنتج واضحة،
  *    السعر بارزًا، حالة التوفر واضحة، اسم المنتج line-clamp ومنسقًا بشكل أنيق».
- *    262 px tall at 174 px wide (it was 274–298), and that height is FIXED:
+ *    280 px tall at 174 px wide (it was 274–298; 262 before the knowledge
+ *    line), and that height is FIXED:
  *      photo    6:5, top-anchored (the studio photographs letter the model
  *               name in the top fifth and the shop's address in the bottom
  *               sixth, so a top-anchored 6:5 keeps the machine and its name
@@ -38,6 +39,10 @@ import { isUnpriced } from '../../lib/priceStatus';
  *      body     9 / 10 / 10 padding;
  *      name     12.5/17 semibold, two lines reserved (the part before the
  *               first « / », the full name in `title`);
+ *      line     11/16 muted, one row RESERVED even when empty: the section
+ *               and the key values (the Bambu import spec §G.5) — a card the
+ *               server sent no line for is the same height as one it did, so
+ *               a rail never stairsteps and the skeleton never shifts;
  *      price    one row, 15 px 800 tabular — the strongest thing on the card;
  *      member   one row, reserved even when empty;
  *      stock    one row pinned to the bottom, a dot AND a word.
@@ -188,18 +193,26 @@ function CompactCard({
         >
           {name}
         </h3>
-        {/* The section and the key values (spec §G.5): one muted line, the values as LTR islands. */}
-        {line ? (
-          <p className="mt-0.5 truncate text-[11px] leading-4 text-text-muted" data-card-knowledge>
-            {line.section}
-            {line.specs.map((v, i) => (
-              <React.Fragment key={i}>
-                {line.section || i > 0 ? ' · ' : ''}
-                <bdi>{v}</bdi>
-              </React.Fragment>
-            ))}
-          </p>
-        ) : null}
+        {/* The section and the key values (spec §G.5): one muted line, the values as LTR islands —
+            its row kept even when empty, so every compact card is one height. */}
+        <p
+          className="mt-0.5 h-4 truncate text-[11px] leading-4 text-text-muted"
+          data-card-line
+          data-card-knowledge={line ? '' : undefined}
+          aria-hidden={line ? undefined : true}
+        >
+          {line ? (
+            <>
+              {line.section}
+              {line.specs.map((v, i) => (
+                <React.Fragment key={i}>
+                  {line.section || i > 0 ? ' · ' : ''}
+                  <bdi>{v}</bdi>
+                </React.Fragment>
+              ))}
+            </>
+          ) : null}
+        </p>
         <div className="mt-1.5">
           <CardPrice p={p} density="compact" />
         </div>

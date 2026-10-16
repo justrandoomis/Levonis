@@ -72,7 +72,8 @@
    near (§12). The intrinsic size is the compact card's fixed 262 px. */
 .lv-cv {
   content-visibility: auto;
-  contain-intrinsic-size: auto 262px;
+  /* The compact card at 174 px wide: 6:5 photo + 137 px body (ProductCard.tsx). */
+  contain-intrinsic-size: auto 280px;
 }
 .lv-cv-row {
   content-visibility: auto;

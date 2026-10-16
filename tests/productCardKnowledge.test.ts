@@ -2,9 +2,12 @@
  * THE CARD'S KNOWLEDGE LINE (the Bambu import spec §G.5 «Cards»; the brief's §9;
  * worker/lib/knowledge/cards.ts): `section_name {ar, en, ckb}` and `key_specs`
  * (≤ 4 values of ≤ 40 characters, from the row's `spec_fields` mirrors of the
- * registry keys flagged `cardKeyFor` the product's type), on every card whose
- * route already resolves the card's type from the taxonomy — with no query of
- * its own (tests/d1Waves.test.ts holds the waves).
+ * registry keys flagged `cardKeyFor` the product's type, then the shop's own
+ * fields §G.5 names — a printer's enclosure and colours, a plate's size and
+ * surface — a yes/no or a count WORDED in three languages), on every card whose
+ * route already resolves the card's type from the taxonomy, and on the home
+ * page's cards — with no query of its own on a warm isolate
+ * (tests/d1Waves.test.ts holds the waves).
  *
  * Run: node --import tsx --test tests/productCardKnowledge.test.ts
  */
@@ -12,10 +15,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { asD1, freshDb, get, json, stubApp } from './fixtures/app';
 import { seedLiveCatalog, P } from './fixtures/liveCatalog';
-import { productRoutes } from '../worker/routes/products';
+import { homeRoutes, productRoutes } from '../worker/routes/products';
 import { catalogRoutes } from '../worker/routes/catalog';
 import { printerFinderRoutes } from '../worker/routes/printerFinder';
-import { cardKeySpecs, cardKeysFor, sectionNameOf, KEY_SPEC_MAX_CHARS, KEY_SPECS_MAX } from '../worker/lib/knowledge/cards';
+import { cardKeySpecs, cardKeysFor, sectionNameOf, CARD_FIELDS, KEY_SPEC_MAX_CHARS, KEY_SPECS_MAX } from '../worker/lib/knowledge/cards';
+import { allTemplateGroups } from '../worker/lib/templateFamilies';
 import { indexCatalogs, loadCatalogRecords } from '../worker/lib/catalogPresentation';
 import { SPEC_KEYS } from '../packages/catalog/src/bambuImport/registry/specKeys';
 import { leaks } from './fixtures/costlyProduct';
@@ -27,6 +31,7 @@ function world() {
   seedLiveCatalog(raw);
   const db = asD1(raw);
   const app = stubApp(db, null, (a) => {
+    a.route('/api/home', homeRoutes);
     a.route('/api/products', productRoutes);
     a.route('/api/catalog', catalogRoutes);
     a.route('/api/printer-finder', printerFinderRoutes);
@@ -46,6 +51,31 @@ test('the card keys come from the registry flags, per storefront type, one per m
   // Every key a type returns is flagged for one of its import types — no key is invented here.
   for (const t of ['printer', 'filament', 'parts', 'accessory', 'laser', 'laser_material'] as const) {
     for (const k of cardKeysFor(t)) assert.ok(SPEC_KEYS.find((s) => s.key === k.key)?.cardKeyFor?.length, `${t}: ${k.key}`);
+  }
+});
+
+const ENCLOSED = { ar: 'هيكل مغلق', en: 'Enclosed', ckb: 'لەشی داخراو' };
+const OPEN_FRAME = { ar: 'هيكل مفتوح', en: 'Open frame', ckb: 'چوارچێوەی کراوە' };
+const upTo = (n: number, ar: string) => ({ ar, en: `Up to ${n} colours`, ckb: `تا ${n} ڕەنگ` });
+
+test('§G.5’s card facts: a printer’s build volume, enclosure and colours; a plate’s size and surface — worded where a bare value means nothing', () => {
+  // The shop's own fields beside the registry's keys: real template fields, each only when the product carries it.
+  const fields = new Set(allTemplateGroups().flatMap((g) => g.fields.map((f) => f.id)));
+  for (const list of Object.values(CARD_FIELDS)) for (const f of list ?? []) assert.ok(fields.has(f), f);
+  assert.deepEqual(cardKeySpecs({ build_volume: '256 x 256 x 256', enclosed: 'Yes', max_colors: '16' }, 'printer'), ['256 × 256 × 256 mm', ENCLOSED, upTo(16, 'حتى 16 لونًا')]);
+  assert.deepEqual(cardKeySpecs({ build_volume: '256 x 256 x 256', enclosed: 'No', max_colors: '4' }, 'printer'), ['256 × 256 × 256 mm', OPEN_FRAME, upTo(4, 'حتى 4 ألوان')]);
+  assert.deepEqual(cardKeySpecs({ max_colors: '1' }, 'printer'), [{ ar: 'لون واحد', en: 'Single colour', ckb: 'یەک ڕەنگ' }]);
+  assert.deepEqual(cardKeySpecs({ max_colors: '2' }, 'printer'), [upTo(2, 'حتى لونين')]);
+  // An unreadable yes/no or count says nothing rather than a guess.
+  assert.deepEqual(cardKeySpecs({ build_volume: '180 x 180 x 180', enclosed: 'N/A', max_colors: 'many' }, 'printer'), ['180 × 180 × 180 mm']);
+  // A plate (storefront type «parts»): its size and its surface.
+  assert.deepEqual(cardKeySpecs({ plate_size: '257 x 257', plate_surface: 'Textured PEI' }, 'parts'), ['257 × 257 mm', 'Textured PEI']);
+  assert.deepEqual(cardKeySpecs({ plate_size: '257 x 257', plate_surface: 'Textured PEI' }, 'accessory'), ['257 × 257 mm', 'Textured PEI']);
+  // Every worded value: three languages, each ≤ 40 characters, the Sorani never the Arabic.
+  for (const v of [ENCLOSED, OPEN_FRAME, ...cardKeySpecs({ max_colors: '25' }, 'printer')]) {
+    if (typeof v === 'string') continue;
+    for (const x of [v.ar, v.en, v.ckb]) assert.ok(x && x.length <= KEY_SPEC_MAX_CHARS, x);
+    assert.notEqual(v.ckb, v.ar);
   }
 });
 
@@ -69,7 +99,7 @@ test('the values: the compare engine’s own reading, ≤ 4 of ≤ 40 characters
   // A printer's own nozzle material is never a card key of a printer.
   assert.deepEqual(cardKeySpecs({ build_volume: '180 x 180 x 180', nozzle_material: 'Stainless steel', nozzle_diameter: '0.4' }, 'printer'), ['180 × 180 × 180 mm']);
   for (const t of ['printer', 'filament', 'parts'] as const) {
-    const fields = Object.fromEntries(SPEC_KEYS.filter((k) => k.templateField).map((k) => [k.templateField, '12']));
+    const fields = { ...Object.fromEntries(SPEC_KEYS.filter((k) => k.templateField).map((k) => [k.templateField, '12'])), enclosed: 'Yes', max_colors: '12', plate_size: '12 x 12', plate_surface: 'Other' };
     assert.ok(cardKeySpecs(fields, t).length <= KEY_SPECS_MAX);
   }
 });
@@ -95,12 +125,19 @@ test('the listing: every card names its section, and the printers and the filame
   assert.ok(cards.length >= 14);
   for (const c of cards) assert.ok(c.section_name && c.section_name.ar && c.section_name.en && c.section_name.ckb, `${c.slug}: no section name`);
   const by = (slug: string) => cards.find((c) => c.slug === slug)!;
-  assert.deepEqual(by('bambu-lab-p1s').key_specs, ['256 × 256 × 256 mm']);
-  assert.deepEqual(by('bambu-lab-h2d').key_specs, ['325 × 320 × 325 mm (Single nozzle)']);
+  // Every printer of the live catalogue states its enclosure and colours: the card says them (§G.5).
+  assert.deepEqual(by('bambu-lab-p1s').key_specs, ['256 × 256 × 256 mm', ENCLOSED, upTo(16, 'حتى 16 لونًا')]);
+  assert.deepEqual(by('bambu-lab-h2d').key_specs, ['325 × 320 × 325 mm (Single nozzle)', ENCLOSED, upTo(25, 'حتى 25 لونًا')]);
+  for (const c of cards.filter((x) => x.compare_type === 'printer')) assert.ok((c.key_specs ?? []).length >= 2, `${c.slug}: ${JSON.stringify(c.key_specs)}`);
   assert.deepEqual(by('bambu-lab-pla-matte-1kg').key_specs, ['PLA', '1.75 mm', '1,000 g']);
   // A product with no spec carries no key line at all (absent, never []).
   assert.equal('key_specs' in by('levo-switch-blue-3pin'), false);
-  for (const c of cards) for (const v of c.key_specs ?? []) assert.ok(typeof v === 'string' && v.length <= KEY_SPEC_MAX_CHARS, `${c.slug}: ${v}`);
+  for (const c of cards) {
+    for (const v of c.key_specs ?? []) {
+      const words = typeof v === 'string' ? [v] : [v.ar, v.en, v.ckb];
+      assert.ok(words.every((x: unknown) => typeof x === 'string' && x !== '' && x.length <= KEY_SPEC_MAX_CHARS), `${c.slug}: ${JSON.stringify(v)}`);
+    }
+  }
   assert.deepEqual(leaks(cards.map((c) => ({ key_specs: c.key_specs, section_name: c.section_name }))), []);
 });
 
@@ -109,11 +146,33 @@ test('the catalog page and the printer finder carry the same line (one helper, b
   const page = await json(await get(app, '/api/catalog/printers'));
   const fromPage = (page.shelves as Array<{ products: Card[] }>).flatMap((s) => s.products).find((c) => c.id === P.P1S);
   assert.ok(fromPage, JSON.stringify(Object.keys(page)));
-  assert.deepEqual(fromPage.key_specs, ['256 × 256 × 256 mm']);
+  assert.deepEqual(fromPage.key_specs, ['256 × 256 × 256 mm', ENCLOSED, upTo(16, 'حتى 16 لونًا')]);
   assert.equal(fromPage.section_name.en, 'FDM Printers');
   const finder = await json(await get(app, '/api/printer-finder?use=business&tech=fdm&budget=1250000-2500000&sale=any&prio=speed,colors&level=intermediate'));
   const card = (finder.results as Array<{ card: Card }>)[0]?.card;
   assert.ok(card, JSON.stringify(finder).slice(0, 300));
-  assert.deepEqual(card.key_specs, ['256 × 256 × 260 mm (Main nozzle)'], 'the X2D leads the finder');
+  assert.deepEqual(card.key_specs?.[0], '256 × 256 × 260 mm (Main nozzle)', 'the X2D leads the finder');
+  assert.deepEqual(card.key_specs?.slice(1), [ENCLOSED, upTo(25, 'حتى 25 لونًا')]);
   assert.equal(card.section_name.en, 'FDM Printers');
+});
+
+test('the home page’s cards carry the same line as the listing’s: «الكل» and a section’s tab draw one card', async () => {
+  const { app } = world();
+  const home = await json(await get(app, '/api/home'));
+  const latest = home.latest as Card[];
+  assert.ok(latest.length > 0);
+  const listed = (await json(await get(app, '/api/products?limit=50'))).products as Card[];
+  let compared = 0;
+  for (const h of latest) {
+    const l = listed.find((x) => x.id === h.id);
+    if (!l) continue;
+    assert.deepEqual([h.section_name, h.key_specs], [l.section_name, l.key_specs], h.slug);
+    compared++;
+  }
+  assert.ok(compared >= 5, `${compared} cards on both`);
+  const shelves = await json(await get(app, '/api/home/sections'));
+  for (const c of [...shelves.best_sellers, ...shelves.flash_deals, ...shelves.filament, ...shelves.super_deals] as Card[]) {
+    const l = listed.find((x) => x.id === c.id);
+    if (l) assert.deepEqual([c.section_name, c.key_specs], [l.section_name, l.key_specs], `shelf ${c.slug}`);
+  }
 });

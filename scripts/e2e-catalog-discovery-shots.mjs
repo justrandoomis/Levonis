@@ -23,7 +23,8 @@
  *
  * Besides the pictures it asserts what a picture cannot show at a glance: no
  * horizontal scroll, no button inside a card's link, every compact card 6:5 +
- * 119 px, and every control at least 44 px tall (or `.lv-hit`).
+ * 137 px (the knowledge line's row reserved), and every control at least 44 px
+ * tall (or `.lv-hit`).
  */
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -261,8 +262,8 @@ async function shoot(browser, { width, theme, lang }, scenes) {
     });
     check(`${name}: no horizontal scroll`, facts.overflow <= 1, `overflow ${facts.overflow}px`);
     check(`${name}: no control nested in a link`, facts.nested === 0, String(facts.nested));
-    const offBy = facts.cards.map(([w, h]) => Math.abs(h - (w * 5) / 6 - 119));
-    if (facts.cards.length) check(`${name}: compact cards are 6:5 + 119 px (±4)`, offBy.every((d) => d <= 4), facts.cards.map(([w, h]) => `${w.toFixed(0)}×${h.toFixed(0)}`).slice(0, 6).join(', '));
+    const offBy = facts.cards.map(([w, h]) => Math.abs(h - (w * 5) / 6 - 137));
+    if (facts.cards.length) check(`${name}: compact cards are 6:5 + 137 px (±4)`, offBy.every((d) => d <= 4), facts.cards.map(([w, h]) => `${w.toFixed(0)}×${h.toFixed(0)}`).slice(0, 6).join(', '));
     check(`${name}: every control ≥ 44 px tall`, facts.small.length === 0, facts.small.slice(0, 8).join(' | '));
 
     if (scene.viewport || scene.act === 'filters' || scene.act === 'sort') {

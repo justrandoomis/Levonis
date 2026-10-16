@@ -4733,6 +4733,9 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
   };
   // The display currency's rate (FX plan §8): the one public FX figure, in the first wave.
   const displayRatePromise = getPublicDisplayRate(c.env.DB);
+  // The taxonomy the cards' knowledge line names its section from (the Bambu import spec §G.5): memoised per
+  // isolate, in the first wave, so «الكل» draws the same card as a section's tab (/api/products) does.
+  const cardIndexPromise = catalogIndexFor(db).catch(() => null);
   const [settings, discounted, latest, openBoxRows, categories, brands, ctx, display] = await Promise.all([
     settingsPromise,
     /**
@@ -4833,6 +4836,10 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
     displayRatePromise,
   ]);
   logServedByRegion(c, latest.meta);
+  const cardIndex = await cardIndexPromise;
+  /** An ordinary product's card gains its knowledge line (§G.5); a composition card never does. */
+  const withLine = (card: Record<string, unknown>, row: Record<string, unknown>) =>
+    cardIndex && String(row.composition ?? '') === '' ? withCardKnowledge(card, row, cardIndex) : card;
 
   // Normalize on the way OUT as well as on the way in: rows written before
   // lib/homeContent.ts existed never went through the validator, and the
@@ -4910,8 +4917,9 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
     for (const r of refRows ?? []) referencePrices.set(String(r.id), Number(r.price_iqd) || 0);
   }
   const openBoxCards = openBoxRows.map((p) => {
-    const card = cardShape(
-      publicWithDisplayPrice(p, ctx, { sellable: true }, homeViews.get(String(p.id)), undefined, offerFor(p.id), homePooled.has(String(p.id)))
+    const card = withLine(
+      cardShape(publicWithDisplayPrice(p, ctx, { sellable: true }, homeViews.get(String(p.id)), undefined, offerFor(p.id), homePooled.has(String(p.id)))),
+      p
     );
     const condition = parseConditionDoc(p.condition_doc);
     const reference = condition?.new_product_id ? referencePrices.get(condition.new_product_id) : undefined;
@@ -4923,11 +4931,14 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
     success: true,
     settings: safeSettings,
     discounted: discounted.results.map((p) =>
-      cardShape(publicWithDisplayPrice(p, ctx, { sellable: true }, homeViews.get(String(p.id)), undefined, offerFor(p.id), homePooled.has(String(p.id))))
+      withLine(cardShape(publicWithDisplayPrice(p, ctx, { sellable: true }, homeViews.get(String(p.id)), undefined, offerFor(p.id), homePooled.has(String(p.id)))), p)
     ),
     latest: latestRows.map((p) =>
-      cardShape(
-        publicWithDisplayPrice(p, ctx, { sellable: sellableNowOf(p) }, homeViews.get(String(p.id)), undefined, offerFor(p.id), homePooled.has(String(p.id)))
+      withLine(
+        cardShape(
+          publicWithDisplayPrice(p, ctx, { sellable: sellableNowOf(p) }, homeViews.get(String(p.id)), undefined, offerFor(p.id), homePooled.has(String(p.id)))
+        ),
+        p
       )
     ),
     // Already filtered to catalogs that hold something, at both levels —
@@ -5001,6 +5012,8 @@ async function homeSections(c: Context<AppContext>): Promise<Response> {
   const filamentRootPromise = c.env.DB
     .prepare("SELECT id FROM catalogs WHERE slug IN ('printing-materials','fdm-materials') AND active = 1 ORDER BY parent_id IS NOT NULL LIMIT 1")
     .first<{ id: string }>();
+  // The cards' knowledge line (§G.5) names the section from the taxonomy: memoised, in the first wave.
+  const cardIndexPromise = catalogIndexFor(c.env.DB).catch(() => null);
 
   const [bestIds, dealIds, filamentPool, featured, ctx] = await Promise.all([
     bestSellerIds(c.env.DB),
@@ -5031,24 +5044,24 @@ async function homeSections(c: Context<AppContext>): Promise<Response> {
     degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(c.env.DB, rows.map((r) => String(r.id))), new Set<string>()),
   ]);
 
+  const cardIndex = await cardIndexPromise;
   const cardById = new Map<string, Record<string, unknown>>();
   for (const p of rows) {
     const id = String(p.id);
-    cardById.set(
-      id,
-      cardShape(
-        publicWithDisplayPrice(
-          p,
-          ctx,
-          // Every shelf here is read through the SELLABLE predicate (homeShelves.ts, rule R4).
-          { sellable: true },
-          views.get(id),
-          undefined,
-          offers.get(offerKey(subjectOf(id))),
-          pooled.has(id)
-        )
+    const card = cardShape(
+      publicWithDisplayPrice(
+        p,
+        ctx,
+        // Every shelf here is read through the SELLABLE predicate (homeShelves.ts, rule R4).
+        { sellable: true },
+        views.get(id),
+        undefined,
+        offers.get(offerKey(subjectOf(id))),
+        pooled.has(id)
       )
     );
+    // The same knowledge line as the listing's card (§G.5); never on a composition card.
+    cardById.set(id, cardIndex && String(p.composition ?? '') === '' ? withCardKnowledge(card, p, cardIndex) : card);
   }
   // `IN (...)` does not preserve the ranking each query established, so the
   // order is re-applied from the id lists rather than read off the rows.

@@ -117,8 +117,13 @@ test('the new card fields are there, and say what the row says', async () => {
   assert.equal(root.category.path, '/categories/printers');
   const pla = (await json(await get(app, '/api/products?category=cat_materials'))).products[0];
   assert.equal(pla.compare_type, 'filament');
-  // The card's knowledge line (§G.5): the section it is filed in and the registry's card keys for its type.
-  assert.deepEqual(x2d.key_specs, ['256 × 256 × 260 mm (Main nozzle)']);
+  // The card's knowledge line (§G.5): the section it is filed in, the registry's card keys for its type, then
+  // the printer's enclosure and colours worded in three languages (worker/lib/knowledge/cards.ts CARD_FIELDS).
+  assert.deepEqual(x2d.key_specs, [
+    '256 × 256 × 260 mm (Main nozzle)',
+    { ar: 'هيكل مغلق', en: 'Enclosed', ckb: 'لەشی داخراو' },
+    { ar: 'حتى 25 لونًا', en: 'Up to 25 colours', ckb: 'تا 25 ڕەنگ' },
+  ]);
   assert.equal(x2d.section_name.en, 'FDM Printers');
   assert.deepEqual(pla.key_specs, ['PLA', '1.75 mm', '1,000 g']);
   // No listing parameter → no listing envelope.

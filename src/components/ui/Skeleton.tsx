@@ -59,9 +59,9 @@ export function SkeletonGroup({
 /**
  * Mirrors the storefront product card (src/components/home/ProductCard.tsx).
  * `regular`: square image, two title lines, one price line. `compact`: the
- * compact card's exact geometry — 6:5 photo in its 4 px tray, 34 px name box, the price row,
- * the member row and the availability row — so the real card replaces it
- * without a single pixel of shift (262 px tall at 174 px wide).
+ * compact card's exact geometry — 6:5 photo in its 4 px tray, 34 px name box, the knowledge
+ * line's row, the price row, the member row and the availability row — so the real card
+ * replaces it without a single pixel of shift (280 px tall at 174 px wide).
  */
 export function ProductCardSkeleton({
   className = '',
@@ -82,6 +82,10 @@ export function ProductCardSkeleton({
           <div className="flex h-[34px] flex-col justify-center gap-1.5">
             <Skeleton className="h-3 w-full" />
             <Skeleton className="h-3 w-2/3" />
+          </div>
+          {/* The knowledge line's row (spec §G.5), reserved on every compact card. */}
+          <div className="mt-0.5 flex h-4 items-center">
+            <Skeleton className="h-2.5 w-3/4" />
           </div>
           <div className="mt-1.5 flex h-5 items-center">
             <Skeleton className="h-3.5 w-24" />

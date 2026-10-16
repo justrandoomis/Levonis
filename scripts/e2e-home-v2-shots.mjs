@@ -179,12 +179,13 @@ async function shoot(browser, { width, lang }) {
   check(`${name}: sections in the owner's order`, JSON.stringify(seen) === JSON.stringify(expected), seen.join(' → '));
   check(`${name}: no «features» strip between hero and categories`, !facts.sections.includes('services') || facts.sections.indexOf('services') > facts.sections.indexOf('categories_bento'));
   check(`${name}: no horizontal scroll`, facts.overflow <= 1, `overflow ${facts.overflow}px`);
-  // THE COMPACT CARD'S HEIGHT IS FIXED: a 6:5 photograph plus a 119 px body
-  // (262 px at 174 px wide, 242 px on the 148 px rail), whatever the name's
+  // THE COMPACT CARD'S HEIGHT IS FIXED: a 6:5 photograph plus a 137 px body
+  // (280 px at 174 px wide, 260 px on the 148 px rail; the knowledge line's
+  // row is reserved on every card — the Bambu import spec §G.5), whatever the name's
   // length and whether a member line is drawn — so a rail never stairsteps.
-  const offBy = facts.cards.map(([w, h]) => Math.abs(h - (w * 5) / 6 - 119));
+  const offBy = facts.cards.map(([w, h]) => Math.abs(h - (w * 5) / 6 - 137));
   check(
-    `${name}: every compact card is 6:5 photo + 119 px (±4)`,
+    `${name}: every compact card is 6:5 photo + 137 px (±4)`,
     facts.cards.length > 0 && offBy.every((d) => d <= 4),
     facts.cards.map(([w, h]) => `${w.toFixed(1)}×${h.toFixed(1)}`).join(', ')
   );

@@ -181,7 +181,7 @@ Mockup 1 shows the home rail, the grid, the anatomy, and before/after.
 
 | Part | Spec |
 |---|---|
-| Card | `bg-surface`, 1 px `border-border-subtle`, radius 14, `overflow:hidden`. Height 262 px at 174 wide (fixed by the fixed name box), down from 274 to 298. |
+| Card | `bg-surface`, 1 px `border-border-subtle`, radius 14, `overflow:hidden`. Height 280 px at 174 wide (fixed by the fixed name box and the knowledge line's reserved row, Bambu import spec §G.5; it was 262 before that line), down from 274 to 298. |
 | Media | `aspect-ratio: 6/5` (174×145) on `bg-charcoal`. `object-fit: cover; object-position: 50% 4%`. The shop's studio photographs letter the model name in the top fifth and the shop address in the bottom sixth, so a 6:5 box anchored to the top keeps the machine and its lettered name whole and drops only the address line. No hover zoom on touch. |
 | Compare toggle | Top inline-start. 30 px visual, 44 px hit (`.lv-hit`). `bg-[rgb(14_16_19/.52)]` with blur and an ivory icon. When on, an ivory fill, ink icon, and the scale icon swaps to a ✓. `aria-pressed`, label «أضف X إلى المقارنة» / «أزل X من المقارنة». **Shown only for comparable types** (`compare_type` ∈ printer, laser, filament) and only where `compareToggle` is true (listings, category shelves, finder, home «أحدث المنتجات»). |
 | Offer badge | Top inline-end: the existing `OfferBadge` «SALE», 18 px tall. A scheduled-offer countdown stays at bottom-start, unchanged. |
@@ -192,7 +192,7 @@ Mockup 1 shows the home rail, the grid, the anatomy, and before/after.
 | Availability | Pinned to the bottom (`margin-top:auto`), 11/15, weight 700, dot plus word. **«متوفر الآن»** in `text-success` with a 6 px filled dot and a 3 px halo. The quantity sits at the inline-end in 10.5 muted: «5 قطع», or «بقي 2» in `text-warning` when ≤ 2 (the shop's low-stock threshold, when set, replaces 2). **«طلب مسبق»** in `text-warning` with a hollow dot. **«غير متوفر»** in muted with a grey dot. It replaces `DirectStockEdge` inside compact cards. |
 | Hidden in compact | Second member teaser, brand line (the name already starts with the brand), any description. |
 
-States: skeleton (`ProductCardSkeleton` gets a `compact` shape with the same 262 px, so there is no layout shift), missing image (`SafeImage` monogram on charcoal), locked bundle card (unchanged `compositionCard`), and graded/used (a small «مستعمل» chip under the name, from `condition`).
+States: skeleton (`ProductCardSkeleton` gets a `compact` shape with the same 280 px, so there is no layout shift), missing image (`SafeImage` monogram on charcoal), locked bundle card (unchanged `compositionCard`), and graded/used (a small «مستعمل» chip under the name, from `condition`).
 
 Accessibility: the whole card is one link. The compare toggle is a sibling `button` positioned over the media, **not nested in the anchor**. The card is a `div` wrapper holding a stretched `a` and the button. The availability is inside the link text (for example «متوفر الآن، 5 قطع»), so a screen reader hears it.
 
@@ -583,7 +583,7 @@ Future optimisation (not needed at 14 or 1,400 products): a `products.spec_facet
 - `pageCache` snapshots for the explorer, category pages and listings (key = normalised URL), so back navigation paints instantly (the pattern from `Home.tsx` and `Products.tsx`).
 - Prefetch the category chunk and data on `pointerdown` or `focus` of bento tiles, explorer banners and «عرض الكل» links.
 - Images: `SafeImage` with explicit `width` and `height` (no CLS), `loading="lazy"` except the first 4 grid cards and the hero (`fetchpriority="high"`), and `sizes` for 148/174 px.
-- Long grids use `content-visibility: auto; contain-intrinsic-size: 262px` per card row. Rails render at most 10 cards.
+- Long grids use `content-visibility: auto; contain-intrinsic-size: 280px` per card row. Rails render at most 10 cards.
 - Facet counts are debounced (200 ms) with `AbortController`, and the count button keeps the last known number while fetching.
 - Finder: all six steps are local. Only `/meta` (cached) and the one results call touch the network.
 
