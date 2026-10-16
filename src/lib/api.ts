@@ -609,6 +609,14 @@ export interface CartItem {
    *  direct premium this customer pays). The cart explains the rule only then. */
   cod_reprices?: boolean;
   variantLabel: string;
+  /**
+   * docs/ux/COLOUR-QUANTITIES.md §4.6 — the line's colour as a field (a swatch
+   * and an English name), and `variantLabel` without it. Absent from an older
+   * Worker, where the screens fall back to `variantLabel`; null on a line with
+   * no colour.
+   */
+  color_tag?: CartColourTag | null;
+  options_label?: string;
   /** The cart prices a pre-order line as PREPAID; the checkout quote is the
    *  authority once a payment method is chosen. */
   unit_price_iqd: number;
@@ -701,6 +709,14 @@ export interface CartItem {
    * the discount is stated once, on the bundle.
    */
   composition?: CartComposition;
+}
+
+/** A line's colour, as the cart and the checkout quote send it. */
+export interface CartColourTag {
+  id: string;
+  name: string;
+  hex: string;
+  image: string;
 }
 
 /** One component of a bundle cart line, as the customer may see it. */

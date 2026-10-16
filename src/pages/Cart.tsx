@@ -39,6 +39,9 @@ import { isPaidTier, tierLabel } from '../components/subscription/tierMeta';
 import { useMoney } from '../CurrencyContext';
 import VariantImg from '../components/ui/VariantImg';
 import { cartEmptyText } from '../lib/cartEmptyText';
+import { groupCartLines } from '../lib/cartGroups';
+import { colourStrings } from '../lib/colourQuantities';
+import { ColourSwatch, ColourTag } from '../components/product/ColourTag';
 
 /**
  * Component-local trilingual strings for the support-code block (§3.3).
@@ -938,6 +941,19 @@ export default function Cart() {
     setSelectedIds(allSelected ? new Set() : new Set(items.map((i) => i.id)));
   };
 
+  /** A colour group's header selects or clears every colour of the product at once (§5.2). */
+  const toggleGroup = (ids: string[], on: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (on) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  };
+  const colourWords = colourStrings(lang);
+
   const openVariantModal = (item: CartItem) => {
     setVariantItemId(item.id);
     setPendingOptionId(item.option_id || '');
@@ -1449,6 +1465,579 @@ export default function Cart() {
 
   // A merchant-store cart is the same table with a different seller — and a
   // different screen, priced by /api/cart/merchant and checked out through
+  /**
+   * ONE CART LINE. `inGroup`: a colour line under its product's group header —
+   * the product name is not repeated, the colour tag is the line's first and
+   * largest text, and the picture slot shows the colour's own picture or its
+   * swatch, since the product photo would be the same picture three times
+   * (docs/ux/COLOUR-QUANTITIES.md §5.2).
+   */
+  const renderLine = (item: CartItem, inGroup = false) => {
+    // The server alone marks a gift line (`kind: 'gift'`, locked, priced 0).
+    if (item.kind === 'gift') return giftRow(item, item.gift ?? { level: 0, value_iqd: 0 });
+    const hasVariants = (item.options ?? []).length > 0 || (item.colors ?? []).length > 0;
+    const hasShippingOptions = (item.shipping_methods ?? []).length > 0;
+    const regularUnit = item.breakdown?.regular_iqd ?? null;
+    const appliedUnit = item.breakdown?.applied_iqd ?? null;
+    const hasSale = regularUnit !== null && appliedUnit !== null && appliedUnit < regularUnit;
+    const discountPct = hasSale
+      ? Math.round((1 - (appliedUnit as number) / (regularUnit as number)) * 100)
+      : 0;
+    /**
+     * WHAT THE MEMBERSHIP TOOK OFF THIS LINE — the server's figure for
+     * this row, not the difference between two unit prices.
+     *
+     * The percentage above describes the UNIT price, which is a fact
+     * of the line whatever produced it (an offer window, a typed
+     * member price, a membership rule that fits a unit price). It
+     * cannot describe a rule that covers only the first two units, or
+     * one held down by a per-order ceiling — and a rule applied at the
+     * line leaves the unit price at the regular one, so it shows no
+     * percentage at all. `total_iqd` is the whole line's true saving,
+     * after every ceiling the rule carries.
+     */
+    const memberLine = membershipByItemId.get(item.id) ?? null;
+    const memberSaving = memberLine && memberLine.total_iqd > 0 ? memberLine.total_iqd : 0;
+    const selected = selectedIds.has(item.id);
+    // A line the server will refuse at checkout because it never chose
+    // an option or colour (a row written before the cart enforced it).
+    const incomplete = item.availability?.selection ? !item.availability.selection.complete : false;
+    return (
+      // A hairline between rows: the list had no separation at all, so
+      // three products read as one dense block. `last:` keeps the
+      // group's own bottom edge clean.
+      <div
+        key={item.id}
+        data-cart-line={item.id}
+        data-cart-line-in-group={inGroup || undefined}
+        className={`max-w-full px-2.5 sm:px-4 py-3.5 flex gap-1.5 sm:gap-3 ${
+          inGroup ? 'ms-6 sm:ms-10 border-s-2 border-border-subtle ps-1.5 sm:ps-3' : 'border-b border-border-subtle last:border-b-0'
+        }`}
+      >
+        {/* A 22px dot inside a 44px target: the dot is the design, the
+            target is what a thumb actually hits. It was a bare <div>
+            with an onClick — unreachable by keyboard and silent to a
+            screen reader. */}
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={selected}
+          aria-label={itemName(item)}
+          onClick={() => toggleSelect(item.id)}
+          className="shrink-0 w-9 sm:w-11 min-h-[44px] pt-4 sm:pt-6 flex items-start justify-center -ms-1 sm:-ms-2 [touch-action:manipulation]"
+        >
+          <span
+            aria-hidden="true"
+            className={`w-[22px] h-[22px] rounded-md border flex items-center justify-center transition-colors ${
+              selected ? 'bg-surface-selected border-white/30' : 'border-[var(--clay-field)]'
+            }`}
+          >
+            {selected && <Check className="w-3.5 h-3.5 text-gold" strokeWidth={3} />}
+          </span>
+        </button>
+
+        {/* Product Image — in a colour group, the colour's own picture or its swatch (§5.2). */}
+        {inGroup && item.color_tag ? (
+          <div data-cart-item-image className="w-10 h-10 shrink-0 mt-2 flex items-center justify-center">
+            <ColourSwatch hex={item.color_tag.hex} image={item.color_tag.image} px={40} />
+          </div>
+        ) : (
+        <div
+          data-cart-item-image
+          className="w-[72px] h-[72px] min-[390px]:w-[80px] min-[390px]:h-[80px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-md overflow-hidden bg-surface-raised cursor-pointer"
+          onClick={() => navigate(`/product/${item.slug}`)}
+        >
+          <SafeImage sizes="100px"
+            src={item.image}
+            alt={itemName(item)}
+            aspect="auto"
+            className="w-full h-full"
+            /* The only pure-white surface in the entire app sat here,
+               as a 100×100 plate on a near-black page — and
+               a multiply blend existed to hide the white edges of
+               product cutouts against it. A neutral dark plate needs
+               neither, and it is what every other image surface in the
+               app already uses. */
+            bgClassName="bg-surface-raised"
+            fallbackClassName="text-text-muted"
+          />
+        </div>
+        )}
+
+        {/* Product Details */}
+        <div className="min-w-0 max-w-full flex-1 flex flex-col justify-between">
+          <div>
+            {inGroup && item.color_tag ? (
+              // The product is named once, on the group; the colour is this line's name.
+              <h3 data-cart-item-title className="mb-1">
+                <span className="sr-only">{itemName(item)} — </span>
+                <ColourTag
+                  name={item.color_tag.name}
+                  hex={item.color_tag.hex}
+                  image={item.color_tag.image}
+                  a11yPrefix={colourWords.colourA11y('').trim()}
+                  nameClassName="text-[15px] font-bold text-text-primary"
+                />
+              </h3>
+            ) : (
+              <h3 data-cart-item-title className="text-text-primary text-[13px] sm:text-[14px] font-medium leading-snug line-clamp-2 mb-1">{itemName(item)}</h3>
+            )}
+
+            <div className="flex flex-wrap gap-1.5 mb-1.5">
+              {/* THE COLOUR AS ITS OWN TAG (§5.1): a swatch and the name at body size, first in the row —
+                  no longer the last word of the grey label. */}
+              {!inGroup && item.color_tag ? (
+                <span data-cart-colour-tag className="bg-surface-raised border border-border-subtle rounded px-2 py-1 inline-flex max-w-full items-center">
+                  <ColourTag
+                    name={item.color_tag.name}
+                    hex={item.color_tag.hex}
+                    image={item.color_tag.image}
+                    a11yPrefix={colourWords.colourA11y('').trim()}
+                  />
+                </span>
+              ) : null}
+              {hasVariants && (
+                <button
+                  type="button"
+                  onClick={() => openVariantModal(item)}
+                  aria-invalid={incomplete || undefined}
+                  className={`rounded px-2 py-1 flex items-center gap-1 w-max border ${
+                    incomplete ? 'bg-amber-500/10 border-amber-500/50' : 'bg-surface-raised border-border-subtle'
+                  }`}
+                >
+                  <span className={`text-[12px] ${incomplete ? 'text-amber-200' : 'text-text-secondary'}`}>
+                    {incomplete
+                      ? loc('اختر الخيار أولًا', 'Choose an option first', 'سەرەتا هەڵبژاردەیەک هەڵبژێرە')
+                      : item.color_tag
+                      ? // The colour has its own tag; this chip opens the sheet for the options (or the colour).
+                        item.options_label || loc('تغيير', 'Change', 'گۆڕین')
+                      : item.variantLabel || loc('اختر الخيارات', 'Choose options', 'هەڵبژاردنەکان دیاری بکە')}
+                  </span>
+                  <ChevronRight className="w-3 h-3 text-text-muted" />
+                </button>
+              )}
+
+              {/* The line's journey — direct, or pre-order by air /
+                  sea / land — read from the transport the server
+                  priced. The legacy shipping sheet stays reachable
+                  only where a product still lists legacy methods. */}
+              {hasShippingOptions ? (
+                <button
+                  type="button"
+                  onClick={() => openShippingModal(item)}
+                  className="bg-surface-raised border border-border-subtle rounded px-2 py-1 flex items-center gap-1 w-max"
+                >
+                  <span className="text-[12px] text-text-secondary">{shippingLabel(item)}</span>
+                  <ChevronRight className="w-3 h-3 text-text-muted" />
+                </button>
+              ) : (
+                <span
+                  data-cart-shipping-type={typeForTransport(item.transport_method)}
+                  className="bg-surface-raised border border-border-subtle rounded px-2 py-1 flex items-center gap-1 w-max text-[12px] text-text-secondary"
+                >
+                  {shippingLabel(item)}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="min-w-0 flex flex-wrap items-baseline gap-1.5 mb-2 mt-1">
+            <span className="max-w-full text-text-primary font-semibold text-[15px] sm:text-[17px] tabular-nums">{money(item.unit_price_iqd)}</span>
+            {hasSale && (
+              <>
+                <span className="text-text-muted text-[12px] line-through">{(regularUnit as number).toLocaleString()}</span>
+                <span className="text-gold text-[12px] font-bold tabular-nums">−{discountPct}%</span>
+              </>
+            )}
+          </div>
+
+          {/* The membership named on the line it paid for. The Sorani
+              is this file's own «پاشەکەوتت کرد» (the summary bar) with
+              the Referrals page's «ئەندامێتی PRO»; only the Latin tier
+              name is a variable, as it is in every language. */}
+          {memberSaving > 0 && memberLabel && (
+            <p className="-mt-1 mb-2 text-[11.5px] leading-relaxed text-gold/90" data-cart-member-saving={item.id}>
+              <span className="tabular-nums">
+                {loc(
+                  `وفّرت ${money(memberSaving)} بعضوية ${memberLabel}`,
+                  `Saved ${money(memberSaving)} with ${memberLabel} membership`,
+                  `پاشەکەوتت کرد ${money(memberSaving)} — ئەندامێتی ${memberLabel}`
+                )}
+              </span>
+              {memberLine && memberLine.capped_by !== 'none' && (
+                <span className="text-text-muted"> · {cappedPhrase(memberLine)}</span>
+              )}
+            </p>
+          )}
+
+          {/* A BUNDLE IS ONE LINE WITH ITS CONTENTS UNDERNEATH
+              (docs/BUNDLES_MYSTERY.md §5.2). The parts are never
+              separate cart rows: the totals above already count the
+              bundle once, and the per-part figure below is that part's
+              STANDALONE value, labelled as such by the disclosure. */}
+          {/* A MYSTERY LINE HAS NO CONTENTS TO EXPAND, by design: its
+              spools are drawn at checkout and the pick is not told
+              before its milestone (§8.2 row 12). What it can honestly
+              say is how many, and when. */}
+          {item.composition?.mystery && (
+            <p
+              className="mb-2 flex items-center gap-1.5 text-[11.5px] text-text-secondary"
+              data-cart-mystery={item.id}
+            >
+              <Sparkles className="w-3 h-3 shrink-0 text-gold" aria-hidden="true" />
+              {/* HOW MANY, AND WHEN. The comment above promised both
+                  and only the count was rendered, so the cart — the
+                  screen where the customer is committing to a purchase
+                  whose contents are hidden — told them the least about
+                  it. The milestone is the SERVER's own sentence from
+                  `stageLabel`, never a second stage table here. */}
+              <span className="truncate">
+                {loc(
+                  `${item.composition.mystery.spool_qty} قطعة عشوائية`,
+                  `${item.composition.mystery.spool_qty} random item(s)`,
+                  `${item.composition.mystery.spool_qty} دانەی هەڕەمەکی`
+                )}
+                {item.composition.mystery.reveal_stage_label
+                  ? ` — ${loc('يُكشف', 'revealed', 'ئاشکرا دەبێت')} ${item.composition.mystery.reveal_stage_label}`
+                  : ''}
+              </span>
+            </p>
+          )}
+
+          {item.composition && (
+            <BundleContents
+              className="mb-2"
+              componentTotalIqd={item.composition.component_total_iqd}
+              savingPercent={item.composition.saving_percent}
+              lines={item.composition.components.map((k) => ({
+                key: k.component_id,
+                name: k.product.name,
+                name_ar: k.product.name_ar,
+                variant: k.variant,
+                qty: k.qty_per_bundle,
+                value_iqd: k.value_iqd,
+                optional: k.optional,
+                included: k.included,
+              }))}
+            />
+          )}
+
+          {/* The fee line: the unit price above already INCLUDES the
+              chosen extension, so this names the part of it that is
+              warranty — the resolver's dinar, never re-computed. */}
+          {item.breakdown?.warranty && (
+            <p className="-mt-1.5 mb-2 text-[11.5px] text-text-secondary tabular-nums flex items-center gap-1.5" data-cart-warranty-fee={item.id}>
+              <ShieldCheck className="w-3 h-3 text-gold shrink-0" aria-hidden="true" />
+              <span className="truncate">
+                {ew.includes} · +{money(item.breakdown.warranty.fee_iqd)}
+              </span>
+            </p>
+          )}
+
+          {(item.warranty_plans ?? []).length > 0 && (() => {
+            const current = (item.warranty_plans ?? []).find((w) => w.id === (item.warranty_plan_id ?? '')) ?? null;
+            return (
+              <div className="mb-2" data-cart-ext-warranty={item.id}>
+                <button
+                  type="button"
+                  aria-haspopup="dialog"
+                  onClick={() => setWarrantyPickerId(item.id)}
+                  className="lv-choice w-full min-h-[40px] px-2.5 py-1.5 flex items-center gap-2 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  data-selected={!!current}
+                >
+                  <ShieldCheck className={`w-3.5 h-3.5 shrink-0 ${current ? 'text-gold' : 'text-text-secondary'}`} aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[12px] font-bold text-text-primary leading-tight">{ew.title}</span>
+                    <span className={`block text-[11px] leading-tight truncate tabular-nums ${current ? 'text-gold/90' : 'text-text-muted'}`}>
+                      {current ? `${warrantyPlanLabel(current)} · +${money(current.fee_iqd)}` : ew.none}
+                    </span>
+                  </span>
+                  <ChevronRight className={`w-3.5 h-3.5 text-text-muted shrink-0 ${dir === 'rtl' ? 'rotate-180' : ''}`} aria-hidden="true" />
+                </button>
+              </div>
+            );
+          })()}
+
+          {/* A pre-order line whose price would change under cash on
+              delivery: the server's `cod_reprices`, never inferred. */}
+          {item.cod_reprices === true && (
+            <p className="-mt-1 mb-2 text-[11px] text-text-muted leading-relaxed" data-cart-cod-hint={item.id}>
+              {codHint}
+            </p>
+          )}
+
+          {/* A printer going to a home address: the owner's note, from
+              the server's flag and the server's amount — shown, never
+              added to the total. Gold: the store's own terms, the
+              same tone the product page and the order use. */}
+          {item.is_printer && printerNoteIqd !== null && (
+            <Note tone="zinc" compact animate={false} icon={<Truck className="w-3.5 h-3.5" />} className="mb-2 !border-x-0 !border-e-0 !border-y-0 !rounded-none !bg-transparent !py-1.5 !ps-2.5 !pe-0 !text-[11px] text-text-muted" testId="cart-printer-note">
+              {printerNoteText(money(printerNoteIqd))}
+            </Note>
+          )}
+
+          {/* The price moved since this cart was opened. The new one is
+              what the shop charges, so it is already applied — this
+              only stops the customer wondering whether they misread it
+              the first time. */}
+          {movedPrices.has(item.id) && (
+            <p
+              className={`mb-2 -mt-1 text-[11.5px] font-semibold ${
+                movedPrices.get(item.id)!.to > movedPrices.get(item.id)!.from ? 'text-amber-300' : 'text-gold'
+              }`}
+              data-price-moved={item.id}
+            >
+              {(() => {
+                const m = movedPrices.get(item.id)!;
+                const was = money(m.from);
+                const up = m.to > m.from;
+                if (lang === 'en') {
+                  return up
+                    ? `The price went up from ${was} while this was in your cart.`
+                    : `The price dropped from ${was} while this was in your cart.`;
+                }
+                if (lang === 'ckb') {
+                  return up
+                    ? `نرخەکە بەرزبووەتەوە لە ${was} کاتێک لە سەبەتەکەت بوو.`
+                    : `نرخەکە داشکاوە لە ${was} کاتێک لە سەبەتەکەت بوو.`;
+                }
+                return up
+                  ? `تغيّر السعر وارتفع من ${was} أثناء وجوده في السلة.`
+                  : `تغيّر السعر وانخفض من ${was} أثناء وجوده في السلة.`;
+              })()}
+            </p>
+          )}
+
+          {/* On a phone the stepper row also takes the width under the
+              picture (the text above is always taller than it), so a
+              long «سڕینەوە» stays beside the stepper instead of
+              dropping to a line of its own at 360-390px. */}
+          <div className="flex flex-wrap items-center justify-between gap-2 mt-auto -ms-[calc(72px+0.375rem)] min-[390px]:-ms-[calc(80px+0.375rem)] sm:ms-0">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* THE CAP IS THE SERVER'S, AND THE STEPPER DISABLES AT IT
+                  (§10). A composition line's `stock` is NULL for ever by
+                  design (§1.2), so the scarcity line below could never
+                  fire for a bundle however scarce its blocking
+                  component was — and tapping '+' at `max_qty` silently
+                  did nothing at all, because `clampQty` clamped to the
+                  same number and the old stepper returned when the
+                  clamp changed nothing. `BUNDLE_QTY_LIMIT` is
+                  translated and wired, and could never be reached from
+                  the UI. */}
+              {/* 28×28px before — every control in this row was under
+                  the 44px floor the same file uses in four other
+                  places. The minus no longer doubles as a delete: the
+                  Delete button beside it is the one removal path, so a
+                  mis-tap at qty 1 can no longer empty a line. */}
+              <QuantityInput
+                size="sm"
+                hintPlacement="above"
+                value={item.qty}
+                max={Math.min(LINE_QTY_MAX, lineCap(item) ?? LINE_QTY_MAX)}
+                limitKind={item.composition ? 'per_order' : quantityLimit(item.availability).kind}
+                onChange={(next) => setLineQuantity(item, next)}
+              />
+              {item.composition ? (
+                item.qty >= item.composition.max_qty && (
+                  <span className="text-amber-300/90 text-[12px]">
+                    {loc(
+                      `الحد الأقصى ${item.composition.max_qty} لكل طلب`,
+                      `At most ${item.composition.max_qty} per order`,
+                      `زۆرترین ${item.composition.max_qty} بۆ هەر داواکارییەک`
+                    )}
+                  </span>
+                )
+              ) : (
+                (() => {
+                  /* 0075 — THE COUNTER THIS LINE CONSUMES, NAMED.
+                     This read the legacy base `stock` column, so a
+                     pre-order line advertised a shelf it does not
+                     come off, and an option-tracked product showed
+                     the wrong level entirely. Both numbers now come
+                     from the server's resolution for this line. */
+                  const rem = lineRemaining(item);
+                  const cap = lineCap(item);
+                  /**
+                   * SOLD OUT IS NOT «متبقي 0 فقط».
+                   *
+                   * A line the door will refuse says so in red and
+                   * names the fix, instead of quietly counting down to
+                   * zero in amber beside an enabled checkout button.
+                   * The two cases read differently because the
+                   * remedies are different: nothing left is a line to
+                   * remove, fewer left than asked for is a quantity to
+                   * lower — so that one prints the number to lower it
+                   * TO, which is the whole of what the customer has to
+                   * do next.
+                   */
+                  if (lineBlocked(item) && !item.composition) {
+                    /**
+                     * «ألوان الحجز المسبق تظهر نفد» — THE SAME UNTRUTH, IN THE CART.
+                     *
+                     * «نفد المخزون» is a verdict about a SHELF, and a
+                     * pre-order does not come off one: it consumes the
+                     * IMPORT QUOTA 0075 put on the fulfilment cell and
+                     * its routes. A full quota is a different wait —
+                     * another route, or later — not an empty shop, so
+                     * printing the shelf's sentence over it refuses an
+                     * order the door would still have taken and tells
+                     * the customer to give up on a product that is
+                     * there. The product page was taught this
+                     * (`levelChip` prints no shelf verdict under
+                     * «طلب مسبق»); this line was not.
+                     *
+                     * WHICH COUNTER PRODUCED THE ZERO is already
+                     * answered twice over and neither answer was read:
+                     * `lineRemaining` marks its figure `preorder` when
+                     * the quota is what it counted, and the server
+                     * names the counter that closed in
+                     * `availability.reason`. Both are consulted,
+                     * because they arrive on different lines — a
+                     * tracked quota at zero still resolves to
+                     * `mode: 'preorder'`, while an exhausted route
+                     * resolves to `mode: 'unavailable'` with the code.
+                     *
+                     * THE SENTENCE IS NOT A NEW ONE AND IS NOT COPIED
+                     * HERE. It is decoded from the one trilingual
+                     * table the cart and checkout doors already read
+                     * (`apiRefusal`, src/lib/refusalStrings.ts), so
+                     * every screen says one thing about one counter.
+                     * It was hand-copied as an Arabic literal for one
+                     * release, and the copy had already lost the
+                     * remedy clause the table's own entry carries —
+                     * which is what a copy does. No Sorani is
+                     * invented anywhere in the chain: the table's
+                     * `ckb` for this code IS the Arabic, its own
+                     * documented choice until the owner writes the
+                     * Kurdish by hand.
+                     */
+                    const reason = item.availability?.reason ?? '';
+                    const quotaFull =
+                      reason === 'PREORDER_CAPACITY_EXHAUSTED' ||
+                      (rem?.preorder === true && rem.left === 0);
+                    /**
+                     * AND THE OTHER THREE, WHICH ARE NOT A SHELF EITHER.
+                     *
+                     * The quota is one of FOUR refusals
+                     * `saleAvailability` reports for a pre-order it
+                     * cannot sell; the other three are the route
+                     * nobody priced, no route offered at all, and
+                     * pre-order switched off. Pinning the exception to
+                     * the quota alone left «نفد المخزون» printed over
+                     * those three — the identical untruth, reached
+                     * three other ways, and on this catalogue the ways
+                     * it is actually reached: the shop's pre-order
+                     * capacity is untracked (`capacityFor` resolves
+                     * every route to `{tracked:false}`), so a
+                     * pre-order-only line that goes dark today goes
+                     * dark as NO_TRANSPORT_OFFERED or
+                     * TRANSPORT_COMMISSION_UNCONFIGURED, never as the
+                     * quota code. A line with no shelf must never be
+                     * told it has an empty one.
+                     */
+                    const notAShelf = PREORDER_REFUSALS.has(reason);
+                    const soldOut =
+                      !quotaFull &&
+                      !notAShelf &&
+                      (item.availability?.mode === 'unavailable' || rem?.left === 0);
+                    return (
+                      <span className="text-danger text-[12px] font-medium" data-line-blocked={item.id}>
+                        {quotaFull
+                          ? /* THE SENTENCE COMES FROM THE TABLE, NOT A COPY OF IT.
+                               This was the Arabic literal, hand-copied — and the copy
+                               had silently lost the remedy clause («جرّب طريقة شحن
+                               أخرى أو عُد لاحقًا») that refusalStrings' own contract
+                               requires of this entry: "the sentence has to point at
+                               the thing the customer can still do". One call gives
+                               the whole sentence in all three languages, with no
+                               literal left to drift from the checkout's. */
+                            apiRefusal({ code: 'PREORDER_CAPACITY_EXHAUSTED' }, lang as 'ar' | 'en' | 'ckb')
+                          : notAShelf
+                            ? apiRefusal({ code: reason }, lang as 'ar' | 'en' | 'ckb')
+                            : soldOut
+                              ? loc('نفد المخزون', 'Out of stock', 'کۆگا بەتاڵە')
+                              : typeof cap === 'number'
+                                ? loc(
+                                    `بقي ${cap} فقط — قلّل الكمية`,
+                                    `Only ${cap} left — lower the quantity`,
+                                    `تەنها ${cap} ماوە — بڕەکە کەم بکەرەوە`
+                                  )
+                                : loc(
+                                    'الكمية المطلوبة غير متوفرة',
+                                    'That quantity is not available',
+                                    'ئەو بڕە بەردەست نییە'
+                                  )}
+                      </span>
+                    );
+                  }
+                  if (!rem || rem.left >= 10) return null;
+                  return (
+                    <span className="text-amber-300/90 text-[12px]" data-line-remaining={item.id}>
+                      {rem.preorder
+                        ? loc(
+                            `بقي ${rem.left} من حصة الطلب المسبق`,
+                            `${rem.left} left in the pre-order quota`,
+                            `${rem.left} لە پشکی پێشداواکاری ماوە`
+                          )
+                        : loc(`متبقي ${rem.left} فقط`, `Only ${rem.left} left`, `تەنها ${rem.left} ماوە`)}
+                    </span>
+                  );
+                })()
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => deleteItem(item)}
+              className="lv-button lv-button-ghost min-h-[44px] px-3 text-[13px] hover:text-danger [touch-action:manipulation]"
+            >
+              {loc('حذف', 'Delete', 'سڕینەوە')}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  /** A group header and its colour lines: the tri-state checkbox selects or clears every colour at once. */
+  const renderColourGroup = (productId: string, lines: CartItem[]) => {
+    const first = lines[0];
+    const chosen = lines.filter((l) => selectedIds.has(l.id)).length;
+    const state: boolean | 'mixed' = chosen === 0 ? false : chosen === lines.length ? true : 'mixed';
+    const pieces = lines.reduce((sum, l) => sum + (Number(l.qty) || 0), 0);
+    const name = itemName(first);
+    return (
+      <div key={`group-${productId}`} role="group" aria-label={name} data-cart-colour-group={productId} className="border-b border-border-subtle last:border-b-0">
+        <div className="flex items-center gap-1.5 sm:gap-3 px-2.5 sm:px-4 pt-3.5">
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={state}
+            aria-label={colourWords.groupSelect(name)}
+            onClick={() => toggleGroup(lines.map((l) => l.id), state !== true)}
+            className="shrink-0 w-9 sm:w-11 min-h-[44px] flex items-center justify-center -ms-1 sm:-ms-2 [touch-action:manipulation]"
+          >
+            <span
+              aria-hidden="true"
+              className={`w-[22px] h-[22px] rounded-md border flex items-center justify-center transition-colors ${
+                state !== false ? 'bg-surface-selected border-white/30' : 'border-[var(--clay-field)]'
+              }`}
+            >
+              {state === true ? <Check className="w-3.5 h-3.5 text-gold" strokeWidth={3} /> : state === 'mixed' ? <span className="h-0.5 w-2.5 rounded bg-gold" /> : null}
+            </span>
+          </button>
+          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-surface-raised cursor-pointer" onClick={() => navigate(`/product/${first.slug}`)}>
+            <SafeImage sizes="40px" src={first.image} alt="" aspect="auto" className="w-full h-full" bgClassName="bg-surface-raised" fallbackClassName="text-text-muted" />
+          </div>
+          <div className="min-w-0">
+            <h3 data-cart-group-title className="text-text-primary text-[14px] font-medium leading-snug line-clamp-2">{name}</h3>
+            <p className="text-[12px] tabular-nums text-text-secondary">{colourWords.groupSummary(String(lines.length), String(pieces))}</p>
+          </div>
+        </div>
+        <div>{lines.map((l) => renderLine(l, true))}</div>
+      </div>
+    );
+  };
+
   // /api/store-orders instead of the platform resolver.
   if (merchantScope) return <MerchantCartView />;
 
@@ -1590,489 +2179,9 @@ export default function Cart() {
           </div>
 
           {/* Items */}
-          {items.map((item) => {
-            // The server alone marks a gift line (`kind: 'gift'`, locked, priced 0).
-            if (item.kind === 'gift') return giftRow(item, item.gift ?? { level: 0, value_iqd: 0 });
-            const hasVariants = (item.options ?? []).length > 0 || (item.colors ?? []).length > 0;
-            const hasShippingOptions = (item.shipping_methods ?? []).length > 0;
-            const regularUnit = item.breakdown?.regular_iqd ?? null;
-            const appliedUnit = item.breakdown?.applied_iqd ?? null;
-            const hasSale = regularUnit !== null && appliedUnit !== null && appliedUnit < regularUnit;
-            const discountPct = hasSale
-              ? Math.round((1 - (appliedUnit as number) / (regularUnit as number)) * 100)
-              : 0;
-            /**
-             * WHAT THE MEMBERSHIP TOOK OFF THIS LINE — the server's figure for
-             * this row, not the difference between two unit prices.
-             *
-             * The percentage above describes the UNIT price, which is a fact
-             * of the line whatever produced it (an offer window, a typed
-             * member price, a membership rule that fits a unit price). It
-             * cannot describe a rule that covers only the first two units, or
-             * one held down by a per-order ceiling — and a rule applied at the
-             * line leaves the unit price at the regular one, so it shows no
-             * percentage at all. `total_iqd` is the whole line's true saving,
-             * after every ceiling the rule carries.
-             */
-            const memberLine = membershipByItemId.get(item.id) ?? null;
-            const memberSaving = memberLine && memberLine.total_iqd > 0 ? memberLine.total_iqd : 0;
-            const selected = selectedIds.has(item.id);
-            // A line the server will refuse at checkout because it never chose
-            // an option or colour (a row written before the cart enforced it).
-            const incomplete = item.availability?.selection ? !item.availability.selection.complete : false;
-            return (
-              // A hairline between rows: the list had no separation at all, so
-              // three products read as one dense block. `last:` keeps the
-              // group's own bottom edge clean.
-              <div key={item.id} className="max-w-full px-2.5 sm:px-4 py-3.5 flex gap-1.5 sm:gap-3 border-b border-border-subtle last:border-b-0">
-                {/* A 22px dot inside a 44px target: the dot is the design, the
-                    target is what a thumb actually hits. It was a bare <div>
-                    with an onClick — unreachable by keyboard and silent to a
-                    screen reader. */}
-                <button
-                  type="button"
-                  role="checkbox"
-                  aria-checked={selected}
-                  aria-label={itemName(item)}
-                  onClick={() => toggleSelect(item.id)}
-                  className="shrink-0 w-9 sm:w-11 min-h-[44px] pt-4 sm:pt-6 flex items-start justify-center -ms-1 sm:-ms-2 [touch-action:manipulation]"
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`w-[22px] h-[22px] rounded-md border flex items-center justify-center transition-colors ${
-                      selected ? 'bg-surface-selected border-white/30' : 'border-[var(--clay-field)]'
-                    }`}
-                  >
-                    {selected && <Check className="w-3.5 h-3.5 text-gold" strokeWidth={3} />}
-                  </span>
-                </button>
-
-                {/* Product Image */}
-                <div
-                  data-cart-item-image
-                  className="w-[72px] h-[72px] min-[390px]:w-[80px] min-[390px]:h-[80px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-md overflow-hidden bg-surface-raised cursor-pointer"
-                  onClick={() => navigate(`/product/${item.slug}`)}
-                >
-                  <SafeImage sizes="100px"
-                    src={item.image}
-                    alt={itemName(item)}
-                    aspect="auto"
-                    className="w-full h-full"
-                    /* The only pure-white surface in the entire app sat here,
-                       as a 100×100 plate on a near-black page — and
-                       a multiply blend existed to hide the white edges of
-                       product cutouts against it. A neutral dark plate needs
-                       neither, and it is what every other image surface in the
-                       app already uses. */
-                    bgClassName="bg-surface-raised"
-                    fallbackClassName="text-text-muted"
-                  />
-                </div>
-
-                {/* Product Details */}
-                <div className="min-w-0 max-w-full flex-1 flex flex-col justify-between">
-                  <div>
-                    <h3 data-cart-item-title className="text-text-primary text-[13px] sm:text-[14px] font-medium leading-snug line-clamp-2 mb-1">{itemName(item)}</h3>
-
-                    <div className="flex flex-wrap gap-1.5 mb-1.5">
-                      {hasVariants && (
-                        <button
-                          type="button"
-                          onClick={() => openVariantModal(item)}
-                          aria-invalid={incomplete || undefined}
-                          className={`rounded px-2 py-1 flex items-center gap-1 w-max border ${
-                            incomplete ? 'bg-amber-500/10 border-amber-500/50' : 'bg-surface-raised border-border-subtle'
-                          }`}
-                        >
-                          <span className={`text-[12px] ${incomplete ? 'text-amber-200' : 'text-text-secondary'}`}>
-                            {incomplete
-                              ? loc('اختر الخيار أولًا', 'Choose an option first', 'سەرەتا هەڵبژاردەیەک هەڵبژێرە')
-                              : item.variantLabel || loc('اختر الخيارات', 'Choose options', 'هەڵبژاردنەکان دیاری بکە')}
-                          </span>
-                          <ChevronRight className="w-3 h-3 text-text-muted" />
-                        </button>
-                      )}
-
-                      {/* The line's journey — direct, or pre-order by air /
-                          sea / land — read from the transport the server
-                          priced. The legacy shipping sheet stays reachable
-                          only where a product still lists legacy methods. */}
-                      {hasShippingOptions ? (
-                        <button
-                          type="button"
-                          onClick={() => openShippingModal(item)}
-                          className="bg-surface-raised border border-border-subtle rounded px-2 py-1 flex items-center gap-1 w-max"
-                        >
-                          <span className="text-[12px] text-text-secondary">{shippingLabel(item)}</span>
-                          <ChevronRight className="w-3 h-3 text-text-muted" />
-                        </button>
-                      ) : (
-                        <span
-                          data-cart-shipping-type={typeForTransport(item.transport_method)}
-                          className="bg-surface-raised border border-border-subtle rounded px-2 py-1 flex items-center gap-1 w-max text-[12px] text-text-secondary"
-                        >
-                          {shippingLabel(item)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="min-w-0 flex flex-wrap items-baseline gap-1.5 mb-2 mt-1">
-                    <span className="max-w-full text-text-primary font-semibold text-[15px] sm:text-[17px] tabular-nums">{money(item.unit_price_iqd)}</span>
-                    {hasSale && (
-                      <>
-                        <span className="text-text-muted text-[12px] line-through">{(regularUnit as number).toLocaleString()}</span>
-                        <span className="text-gold text-[12px] font-bold tabular-nums">−{discountPct}%</span>
-                      </>
-                    )}
-                  </div>
-
-                  {/* The membership named on the line it paid for. The Sorani
-                      is this file's own «پاشەکەوتت کرد» (the summary bar) with
-                      the Referrals page's «ئەندامێتی PRO»; only the Latin tier
-                      name is a variable, as it is in every language. */}
-                  {memberSaving > 0 && memberLabel && (
-                    <p className="-mt-1 mb-2 text-[11.5px] leading-relaxed text-gold/90" data-cart-member-saving={item.id}>
-                      <span className="tabular-nums">
-                        {loc(
-                          `وفّرت ${money(memberSaving)} بعضوية ${memberLabel}`,
-                          `Saved ${money(memberSaving)} with ${memberLabel} membership`,
-                          `پاشەکەوتت کرد ${money(memberSaving)} — ئەندامێتی ${memberLabel}`
-                        )}
-                      </span>
-                      {memberLine && memberLine.capped_by !== 'none' && (
-                        <span className="text-text-muted"> · {cappedPhrase(memberLine)}</span>
-                      )}
-                    </p>
-                  )}
-
-                  {/* A BUNDLE IS ONE LINE WITH ITS CONTENTS UNDERNEATH
-                      (docs/BUNDLES_MYSTERY.md §5.2). The parts are never
-                      separate cart rows: the totals above already count the
-                      bundle once, and the per-part figure below is that part's
-                      STANDALONE value, labelled as such by the disclosure. */}
-                  {/* A MYSTERY LINE HAS NO CONTENTS TO EXPAND, by design: its
-                      spools are drawn at checkout and the pick is not told
-                      before its milestone (§8.2 row 12). What it can honestly
-                      say is how many, and when. */}
-                  {item.composition?.mystery && (
-                    <p
-                      className="mb-2 flex items-center gap-1.5 text-[11.5px] text-text-secondary"
-                      data-cart-mystery={item.id}
-                    >
-                      <Sparkles className="w-3 h-3 shrink-0 text-gold" aria-hidden="true" />
-                      {/* HOW MANY, AND WHEN. The comment above promised both
-                          and only the count was rendered, so the cart — the
-                          screen where the customer is committing to a purchase
-                          whose contents are hidden — told them the least about
-                          it. The milestone is the SERVER's own sentence from
-                          `stageLabel`, never a second stage table here. */}
-                      <span className="truncate">
-                        {loc(
-                          `${item.composition.mystery.spool_qty} قطعة عشوائية`,
-                          `${item.composition.mystery.spool_qty} random item(s)`,
-                          `${item.composition.mystery.spool_qty} دانەی هەڕەمەکی`
-                        )}
-                        {item.composition.mystery.reveal_stage_label
-                          ? ` — ${loc('يُكشف', 'revealed', 'ئاشکرا دەبێت')} ${item.composition.mystery.reveal_stage_label}`
-                          : ''}
-                      </span>
-                    </p>
-                  )}
-
-                  {item.composition && (
-                    <BundleContents
-                      className="mb-2"
-                      componentTotalIqd={item.composition.component_total_iqd}
-                      savingPercent={item.composition.saving_percent}
-                      lines={item.composition.components.map((k) => ({
-                        key: k.component_id,
-                        name: k.product.name,
-                        name_ar: k.product.name_ar,
-                        variant: k.variant,
-                        qty: k.qty_per_bundle,
-                        value_iqd: k.value_iqd,
-                        optional: k.optional,
-                        included: k.included,
-                      }))}
-                    />
-                  )}
-
-                  {/* The fee line: the unit price above already INCLUDES the
-                      chosen extension, so this names the part of it that is
-                      warranty — the resolver's dinar, never re-computed. */}
-                  {item.breakdown?.warranty && (
-                    <p className="-mt-1.5 mb-2 text-[11.5px] text-text-secondary tabular-nums flex items-center gap-1.5" data-cart-warranty-fee={item.id}>
-                      <ShieldCheck className="w-3 h-3 text-gold shrink-0" aria-hidden="true" />
-                      <span className="truncate">
-                        {ew.includes} · +{money(item.breakdown.warranty.fee_iqd)}
-                      </span>
-                    </p>
-                  )}
-
-                  {(item.warranty_plans ?? []).length > 0 && (() => {
-                    const current = (item.warranty_plans ?? []).find((w) => w.id === (item.warranty_plan_id ?? '')) ?? null;
-                    return (
-                      <div className="mb-2" data-cart-ext-warranty={item.id}>
-                        <button
-                          type="button"
-                          aria-haspopup="dialog"
-                          onClick={() => setWarrantyPickerId(item.id)}
-                          className="lv-choice w-full min-h-[40px] px-2.5 py-1.5 flex items-center gap-2 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                          data-selected={!!current}
-                        >
-                          <ShieldCheck className={`w-3.5 h-3.5 shrink-0 ${current ? 'text-gold' : 'text-text-secondary'}`} aria-hidden="true" />
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-[12px] font-bold text-text-primary leading-tight">{ew.title}</span>
-                            <span className={`block text-[11px] leading-tight truncate tabular-nums ${current ? 'text-gold/90' : 'text-text-muted'}`}>
-                              {current ? `${warrantyPlanLabel(current)} · +${money(current.fee_iqd)}` : ew.none}
-                            </span>
-                          </span>
-                          <ChevronRight className={`w-3.5 h-3.5 text-text-muted shrink-0 ${dir === 'rtl' ? 'rotate-180' : ''}`} aria-hidden="true" />
-                        </button>
-                      </div>
-                    );
-                  })()}
-
-                  {/* A pre-order line whose price would change under cash on
-                      delivery: the server's `cod_reprices`, never inferred. */}
-                  {item.cod_reprices === true && (
-                    <p className="-mt-1 mb-2 text-[11px] text-text-muted leading-relaxed" data-cart-cod-hint={item.id}>
-                      {codHint}
-                    </p>
-                  )}
-
-                  {/* A printer going to a home address: the owner's note, from
-                      the server's flag and the server's amount — shown, never
-                      added to the total. Gold: the store's own terms, the
-                      same tone the product page and the order use. */}
-                  {item.is_printer && printerNoteIqd !== null && (
-                    <Note tone="zinc" compact animate={false} icon={<Truck className="w-3.5 h-3.5" />} className="mb-2 !border-x-0 !border-e-0 !border-y-0 !rounded-none !bg-transparent !py-1.5 !ps-2.5 !pe-0 !text-[11px] text-text-muted" testId="cart-printer-note">
-                      {printerNoteText(money(printerNoteIqd))}
-                    </Note>
-                  )}
-
-                  {/* The price moved since this cart was opened. The new one is
-                      what the shop charges, so it is already applied — this
-                      only stops the customer wondering whether they misread it
-                      the first time. */}
-                  {movedPrices.has(item.id) && (
-                    <p
-                      className={`mb-2 -mt-1 text-[11.5px] font-semibold ${
-                        movedPrices.get(item.id)!.to > movedPrices.get(item.id)!.from ? 'text-amber-300' : 'text-gold'
-                      }`}
-                      data-price-moved={item.id}
-                    >
-                      {(() => {
-                        const m = movedPrices.get(item.id)!;
-                        const was = money(m.from);
-                        const up = m.to > m.from;
-                        if (lang === 'en') {
-                          return up
-                            ? `The price went up from ${was} while this was in your cart.`
-                            : `The price dropped from ${was} while this was in your cart.`;
-                        }
-                        if (lang === 'ckb') {
-                          return up
-                            ? `نرخەکە بەرزبووەتەوە لە ${was} کاتێک لە سەبەتەکەت بوو.`
-                            : `نرخەکە داشکاوە لە ${was} کاتێک لە سەبەتەکەت بوو.`;
-                        }
-                        return up
-                          ? `تغيّر السعر وارتفع من ${was} أثناء وجوده في السلة.`
-                          : `تغيّر السعر وانخفض من ${was} أثناء وجوده في السلة.`;
-                      })()}
-                    </p>
-                  )}
-
-                  {/* On a phone the stepper row also takes the width under the
-                      picture (the text above is always taller than it), so a
-                      long «سڕینەوە» stays beside the stepper instead of
-                      dropping to a line of its own at 360-390px. */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 mt-auto -ms-[calc(72px+0.375rem)] min-[390px]:-ms-[calc(80px+0.375rem)] sm:ms-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {/* THE CAP IS THE SERVER'S, AND THE STEPPER DISABLES AT IT
-                          (§10). A composition line's `stock` is NULL for ever by
-                          design (§1.2), so the scarcity line below could never
-                          fire for a bundle however scarce its blocking
-                          component was — and tapping '+' at `max_qty` silently
-                          did nothing at all, because `clampQty` clamped to the
-                          same number and the old stepper returned when the
-                          clamp changed nothing. `BUNDLE_QTY_LIMIT` is
-                          translated and wired, and could never be reached from
-                          the UI. */}
-                      {/* 28×28px before — every control in this row was under
-                          the 44px floor the same file uses in four other
-                          places. The minus no longer doubles as a delete: the
-                          Delete button beside it is the one removal path, so a
-                          mis-tap at qty 1 can no longer empty a line. */}
-                      <QuantityInput
-                        size="sm"
-                        hintPlacement="above"
-                        value={item.qty}
-                        max={Math.min(LINE_QTY_MAX, lineCap(item) ?? LINE_QTY_MAX)}
-                        limitKind={item.composition ? 'per_order' : quantityLimit(item.availability).kind}
-                        onChange={(next) => setLineQuantity(item, next)}
-                      />
-                      {item.composition ? (
-                        item.qty >= item.composition.max_qty && (
-                          <span className="text-amber-300/90 text-[12px]">
-                            {loc(
-                              `الحد الأقصى ${item.composition.max_qty} لكل طلب`,
-                              `At most ${item.composition.max_qty} per order`,
-                              `زۆرترین ${item.composition.max_qty} بۆ هەر داواکارییەک`
-                            )}
-                          </span>
-                        )
-                      ) : (
-                        (() => {
-                          /* 0075 — THE COUNTER THIS LINE CONSUMES, NAMED.
-                             This read the legacy base `stock` column, so a
-                             pre-order line advertised a shelf it does not
-                             come off, and an option-tracked product showed
-                             the wrong level entirely. Both numbers now come
-                             from the server's resolution for this line. */
-                          const rem = lineRemaining(item);
-                          const cap = lineCap(item);
-                          /**
-                           * SOLD OUT IS NOT «متبقي 0 فقط».
-                           *
-                           * A line the door will refuse says so in red and
-                           * names the fix, instead of quietly counting down to
-                           * zero in amber beside an enabled checkout button.
-                           * The two cases read differently because the
-                           * remedies are different: nothing left is a line to
-                           * remove, fewer left than asked for is a quantity to
-                           * lower — so that one prints the number to lower it
-                           * TO, which is the whole of what the customer has to
-                           * do next.
-                           */
-                          if (lineBlocked(item) && !item.composition) {
-                            /**
-                             * «ألوان الحجز المسبق تظهر نفد» — THE SAME UNTRUTH, IN THE CART.
-                             *
-                             * «نفد المخزون» is a verdict about a SHELF, and a
-                             * pre-order does not come off one: it consumes the
-                             * IMPORT QUOTA 0075 put on the fulfilment cell and
-                             * its routes. A full quota is a different wait —
-                             * another route, or later — not an empty shop, so
-                             * printing the shelf's sentence over it refuses an
-                             * order the door would still have taken and tells
-                             * the customer to give up on a product that is
-                             * there. The product page was taught this
-                             * (`levelChip` prints no shelf verdict under
-                             * «طلب مسبق»); this line was not.
-                             *
-                             * WHICH COUNTER PRODUCED THE ZERO is already
-                             * answered twice over and neither answer was read:
-                             * `lineRemaining` marks its figure `preorder` when
-                             * the quota is what it counted, and the server
-                             * names the counter that closed in
-                             * `availability.reason`. Both are consulted,
-                             * because they arrive on different lines — a
-                             * tracked quota at zero still resolves to
-                             * `mode: 'preorder'`, while an exhausted route
-                             * resolves to `mode: 'unavailable'` with the code.
-                             *
-                             * THE SENTENCE IS NOT A NEW ONE AND IS NOT COPIED
-                             * HERE. It is decoded from the one trilingual
-                             * table the cart and checkout doors already read
-                             * (`apiRefusal`, src/lib/refusalStrings.ts), so
-                             * every screen says one thing about one counter.
-                             * It was hand-copied as an Arabic literal for one
-                             * release, and the copy had already lost the
-                             * remedy clause the table's own entry carries —
-                             * which is what a copy does. No Sorani is
-                             * invented anywhere in the chain: the table's
-                             * `ckb` for this code IS the Arabic, its own
-                             * documented choice until the owner writes the
-                             * Kurdish by hand.
-                             */
-                            const reason = item.availability?.reason ?? '';
-                            const quotaFull =
-                              reason === 'PREORDER_CAPACITY_EXHAUSTED' ||
-                              (rem?.preorder === true && rem.left === 0);
-                            /**
-                             * AND THE OTHER THREE, WHICH ARE NOT A SHELF EITHER.
-                             *
-                             * The quota is one of FOUR refusals
-                             * `saleAvailability` reports for a pre-order it
-                             * cannot sell; the other three are the route
-                             * nobody priced, no route offered at all, and
-                             * pre-order switched off. Pinning the exception to
-                             * the quota alone left «نفد المخزون» printed over
-                             * those three — the identical untruth, reached
-                             * three other ways, and on this catalogue the ways
-                             * it is actually reached: the shop's pre-order
-                             * capacity is untracked (`capacityFor` resolves
-                             * every route to `{tracked:false}`), so a
-                             * pre-order-only line that goes dark today goes
-                             * dark as NO_TRANSPORT_OFFERED or
-                             * TRANSPORT_COMMISSION_UNCONFIGURED, never as the
-                             * quota code. A line with no shelf must never be
-                             * told it has an empty one.
-                             */
-                            const notAShelf = PREORDER_REFUSALS.has(reason);
-                            const soldOut =
-                              !quotaFull &&
-                              !notAShelf &&
-                              (item.availability?.mode === 'unavailable' || rem?.left === 0);
-                            return (
-                              <span className="text-danger text-[12px] font-medium" data-line-blocked={item.id}>
-                                {quotaFull
-                                  ? /* THE SENTENCE COMES FROM THE TABLE, NOT A COPY OF IT.
-                                       This was the Arabic literal, hand-copied — and the copy
-                                       had silently lost the remedy clause («جرّب طريقة شحن
-                                       أخرى أو عُد لاحقًا») that refusalStrings' own contract
-                                       requires of this entry: "the sentence has to point at
-                                       the thing the customer can still do". One call gives
-                                       the whole sentence in all three languages, with no
-                                       literal left to drift from the checkout's. */
-                                    apiRefusal({ code: 'PREORDER_CAPACITY_EXHAUSTED' }, lang as 'ar' | 'en' | 'ckb')
-                                  : notAShelf
-                                    ? apiRefusal({ code: reason }, lang as 'ar' | 'en' | 'ckb')
-                                    : soldOut
-                                      ? loc('نفد المخزون', 'Out of stock', 'کۆگا بەتاڵە')
-                                      : typeof cap === 'number'
-                                        ? loc(
-                                            `بقي ${cap} فقط — قلّل الكمية`,
-                                            `Only ${cap} left — lower the quantity`,
-                                            `تەنها ${cap} ماوە — بڕەکە کەم بکەرەوە`
-                                          )
-                                        : loc(
-                                            'الكمية المطلوبة غير متوفرة',
-                                            'That quantity is not available',
-                                            'ئەو بڕە بەردەست نییە'
-                                          )}
-                              </span>
-                            );
-                          }
-                          if (!rem || rem.left >= 10) return null;
-                          return (
-                            <span className="text-amber-300/90 text-[12px]" data-line-remaining={item.id}>
-                              {rem.preorder
-                                ? loc(
-                                    `بقي ${rem.left} من حصة الطلب المسبق`,
-                                    `${rem.left} left in the pre-order quota`,
-                                    `${rem.left} لە پشکی پێشداواکاری ماوە`
-                                  )
-                                : loc(`متبقي ${rem.left} فقط`, `Only ${rem.left} left`, `تەنها ${rem.left} ماوە`)}
-                            </span>
-                          );
-                        })()
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => deleteItem(item)}
-                      className="lv-button lv-button-ghost min-h-[44px] px-3 text-[13px] hover:text-danger [touch-action:manipulation]"
-                    >
-                      {loc('حذف', 'Delete', 'سڕینەوە')}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {/* SEVERAL COLOURS OF ONE PRODUCT ARE ONE GROUP (docs/ux/COLOUR-QUANTITIES.md §5.2):
+              the product once, then one line per colour. Gifts, bundles and mystery lines never group. */}
+          {groupCartLines(items).map((entry) => (entry.kind === 'line' ? renderLine(entry.item) : renderColourGroup(entry.productId, entry.items)))}
         </div>
 
         {/* Deals Row. The header is a real button: as a clickable <div> the

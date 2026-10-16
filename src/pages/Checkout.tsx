@@ -15,7 +15,10 @@ import ProAddressNotice from '../components/membership/ProAddressNotice';
 import { useWallet } from '../WalletContext';
 import { api, ApiAddress, ApiError, ApiOrder, CartItem, newIdempotencyKey, usdCentsToIqd, formatIqd } from '../lib/api';
 import { methodDesc, methodTitle } from '../lib/methodText';
-import type { DeliveryDayOption } from '../lib/api';
+import type { CartColourTag, DeliveryDayOption } from '../lib/api';
+import { groupCartLines } from '../lib/cartGroups';
+import { colourStrings } from '../lib/colourQuantities';
+import { ColourTag } from '../components/product/ColourTag';
 import DeliveryDayPicker from '../components/orders/DeliveryDayPicker';
 /**
  * THE SAME THREE PURE FUNCTIONS THE SERVER USES, not a second implementation
@@ -138,6 +141,13 @@ interface CheckoutQuoteLineDto {
   name_ar: string;
   image?: string;
   variant: string;
+  /**
+   * docs/ux/COLOUR-QUANTITIES.md §4.6 — the colour as a field, and `variant`
+   * without it. Absent from an older Worker (the cart line, then `variant`,
+   * stand in); null on a line with no colour.
+   */
+  color_tag?: CartColourTag | null;
+  options_label?: string;
   qty: number;
   unit_price_iqd: number;
   line_total_iqd: number;
@@ -1077,14 +1087,34 @@ export default function Checkout() {
   // so once a quote exists both the per-line totals and the subtotal come from
   // it — showing cart-basis prices beside a quote-basis total would be two
   // different orders on one screen.
+  /**
+   * THE COLOUR OF A CHECKOUT LINE (docs/ux/COLOUR-QUANTITIES.md §6): the
+   * quote line's `color_tag`; before a quote, or from an older Worker, the cart
+   * line's, else the cart line's colour by id. Null: the plain `variant`
+   * stands alone, as before.
+   */
+  const colourWords = colourStrings(lang);
+  const colourTagOf = (fromQuote: CartColourTag | null | undefined, cartLine: CartItem | undefined): CartColourTag | null => {
+    if (fromQuote !== undefined) return fromQuote;
+    if (!cartLine) return null;
+    if (cartLine.color_tag !== undefined) return cartLine.color_tag;
+    const col = cartLine.color_id ? (cartLine.colors ?? []).find((c) => c.id === cartLine.color_id) : undefined;
+    return col ? { id: col.id, name: col.name || col.id, hex: col.hex ?? '', image: '' } : null;
+  };
   const cartSubtotal = items.reduce((sum, item) => sum + item.unit_price_iqd * item.qty, 0);
   const total = quote ? quote.subtotal_iqd : cartSubtotal;
   const cartById = new Map(items.map((i) => [i.id, i] as const));
   const summaryLines: Array<{
     key: string;
+    productId: string;
     image: string;
     name: string;
     variant: string;
+    /** The line's colour (§6): the quote's, else the cart line's, else the plain `variant` stands alone. */
+    colourTag: CartColourTag | null;
+    optionsLabel: string;
+    /** The product's colour order, for grouping several colours under it. */
+    colourOrder: Array<{ id: string }>;
     qty: number;
     lineTotal: number;
     isPrinter: boolean;
@@ -1099,10 +1129,15 @@ export default function Checkout() {
     quote
       ? quote.lines.map((l) => {
           const cartLine = cartById.get(l.cart_item_id);
+          const tag = colourTagOf(l.color_tag, cartLine);
           return {
             // The server alone marks a gift line, in the quote and in the cart.
             gift: l.gift ?? (cartLine?.kind === 'gift' ? cartLine.gift ?? { level: 0, value_iqd: 0 } : null),
             key: l.cart_item_id,
+            productId: l.product_id,
+            colourTag: tag,
+            optionsLabel: l.color_tag !== undefined ? l.options_label ?? '' : tag ? cartLine?.options_label ?? '' : '',
+            colourOrder: cartLine?.colors ?? [],
             image: l.image ?? cartLine?.image ?? '',
             name: l.name,
             variant: l.variant,
@@ -1137,6 +1172,10 @@ export default function Checkout() {
       : items.map((i) => ({
           gift: i.kind === 'gift' ? i.gift ?? { level: 0, value_iqd: 0 } : null,
           key: i.id,
+          productId: i.productId,
+          colourTag: colourTagOf(undefined, i),
+          optionsLabel: i.options_label ?? '',
+          colourOrder: i.colors ?? [],
           // §3/§12: the product name is English in every language and is never translated.
           image: i.image,
           name: i.name,
@@ -2497,7 +2536,52 @@ export default function Checkout() {
               scroll area here would trap the wheel inside the item list and
               leave the totals below it unreachable all over again. */}
           <div className="mb-6 space-y-2">
-            {summaryLines.map((line) => (
+            {groupCartLines(
+              summaryLines.map((l) => ({
+                ...l,
+                id: l.key,
+                // Gift, bundle and mystery lines are never grouped (§6).
+                kind: l.gift ? 'gift' : (l.included?.length ?? 0) > 0 || l.mysterySpools ? 'composition' : undefined,
+                color_id: l.colourTag?.id ?? '',
+                colors: l.colourOrder,
+                options_label: l.optionsLabel,
+              }))
+            ).map((entry) =>
+              entry.kind === 'group' ? (
+                <div key={`group-${entry.productId}`} role="group" aria-label={entry.items[0].name} data-checkout-colour-group={entry.productId} className="flex gap-3 py-3 border-b border-border-subtle last:border-0">
+                  <div className="w-16 h-16 rounded-lg bg-black overflow-hidden shrink-0">
+                    {entry.items[0].image ? (
+                      <VariantImg sizes="64px" referrerPolicy="no-referrer" src={entry.items[0].image} alt="" className="w-full h-full object-cover opacity-80" />
+                    ) : (
+                      <div className="w-full h-full bg-surface-raised" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-normal text-text-primary line-clamp-1">{entry.items[0].name}</h4>
+                    <p className="text-[12px] tabular-nums text-text-muted">
+                      {colourWords.groupSummary(String(entry.items.length), String(entry.items.reduce((n, l) => n + l.qty, 0)))}
+                    </p>
+                    <ul className="mt-1.5 space-y-1">
+                      {entry.items.map((line) => (
+                        <li key={line.key} data-checkout-line={line.key} className="flex items-center justify-between gap-2 text-[13px]">
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            {line.colourTag ? (
+                              <ColourTag name={line.colourTag.name} hex={line.colourTag.hex} image={line.colourTag.image} qty={line.qty} a11yPrefix={colourWords.colourA11y('').trim()} />
+                            ) : (
+                              <span className="truncate text-text-secondary">{line.variant} × {line.qty}</span>
+                            )}
+                            {line.optionsLabel ? <span className="truncate text-[12px] text-text-muted">· {line.optionsLabel}</span> : null}
+                          </span>
+                          {/* The server's line total, never recomputed from a unit price. */}
+                          <span className="shrink-0 font-medium tabular-nums text-text-primary">{money(line.lineTotal)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-1.5 text-sm font-medium tabular-nums text-text-primary">{money(entry.items.reduce((n, l) => n + l.lineTotal, 0))}</p>
+                  </div>
+                </div>
+              ) : (
+              ((line) => (
                 <div key={line.key} data-checkout-line={line.key} className="group relative flex gap-3 overflow-hidden py-3 border-b border-border-subtle last:border-0">
                   <div className="w-16 h-16 rounded-lg bg-black overflow-hidden relative shrink-0">
                     {line.image ? (
@@ -2509,9 +2593,19 @@ export default function Checkout() {
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col justify-center">
                     <h4 className="text-sm font-normal text-text-primary line-clamp-1 mb-0.5">{line.name}</h4>
-                    {line.variant && (
+                    {line.colourTag ? (
+                      // THE COLOUR, AS A SWATCH AND A NAME, WITH ITS COUNT (§6) — the last screen
+                      // where 56 pieces of the wrong colour can still be seen.
+                      <div className="flex min-w-0 items-center gap-2 mb-0.5" data-checkout-colour={line.key}>
+                        <ColourTag name={line.colourTag.name} hex={line.colourTag.hex} image={line.colourTag.image} a11yPrefix={colourWords.colourA11y('').trim()} />
+                        <span className="shrink-0 text-[13px] font-bold tabular-nums text-text-primary">× {line.qty}</span>
+                      </div>
+                    ) : null}
+                    {line.colourTag ? (
+                      line.optionsLabel ? <p className="text-xs text-text-muted mb-1.5 font-light">{line.optionsLabel}</p> : null
+                    ) : line.variant ? (
                       <p className="text-xs text-text-muted mb-1.5 font-light">{line.variant}</p>
-                    )}
+                    ) : null}
                     <span className="text-sm font-medium text-text-primary tabular-nums">{money(line.lineTotal)}</span>
                     {line.gift && (
                       <span className="mt-1 flex flex-wrap items-center gap-1.5" data-checkout-gift-line={line.key}>
@@ -2545,7 +2639,9 @@ export default function Checkout() {
                     )}
                   </div>
                 </div>
-            ))}
+              ))(entry.item)
+              )
+            )}
           </div>
 
           <div className="space-y-4 pt-6 border-t border-white/5 mt-auto text-sm">
