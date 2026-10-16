@@ -20,7 +20,8 @@
  * NO COMPOUND-SELECT LADDERS, ≤ 100 PARAMETERS. Every list of ids is ONE
  * `json_each(?)` parameter; the membership CTE is three terms.
  */
-import { withCacheEpoch } from '../lib/publicApi/cache';
+import { edgeCache, withCacheEpoch } from '../lib/publicApi/cache';
+import { edgeServe, purgeAnonymousCache, type EdgeLifetime } from '../lib/edgePolicy';
 import { completenessAbsentLately, listing, optimisticSellableFlag, runListed } from '../lib/listing';
 import { membershipCte } from '../lib/catalogMembership';
 import { Hono, type Context } from 'hono';
@@ -74,60 +75,60 @@ export const CATEGORY_PAGE_CAP = 200;
 
 const TREE_CACHE = 'public, max-age=60, s-maxage=300';
 const PAGE_CACHE_SIGNED_OUT = 'public, max-age=60';
-
-/** The Workers Cache API, or null (node tests, a runtime without it). */
-function edgeCache(): Cache | null {
-  return typeof caches !== 'undefined' ? ((caches as unknown as { default?: Cache }).default ?? null) : null;
-}
+/**
+ * THEIR FRESHNESS, EXACTLY AS THE HEADERS ABOVE SAY IT (worker/lib/edgePolicy.ts
+ * «STALE WHILE REVALIDATE, AS DECLARED»). Neither declares a stale window: the
+ * tree carries «متوفرة الآن» counts and a category page carries tier-priced
+ * cards, and their rules were never the listing's ten stale minutes, so a copy
+ * is never served past its `s-maxage` (300 s; a page's `max-age=60` is its
+ * shared lifetime too). What they gain is the background refresh past half of
+ * it: a section read at least once in that time is rebuilt before it expires.
+ */
+const TREE_LIFETIME: EdgeLifetime = { maxAge: 60, sMaxAge: 300, staleWhileRevalidate: 0 };
+const PAGE_LIFETIME: EdgeLifetime = { maxAge: 60, sMaxAge: 60, staleWhileRevalidate: 0 };
 
 const treeCacheKey = (url: string) => new Request(withCacheEpoch(new URL('/api/catalog/tree', url).toString()), { method: 'GET' });
 
 /**
  * Drop the cached tree after a taxonomy write — called by the admin taxonomy
  * routes. Per-colo, like every Cache API delete (worker/lib/productDeletion.ts
- * says the same of `/files/*`): other colos age out within `s-maxage`.
+ * says the same of `/files/*`): other colos age out within `s-maxage`. The
+ * purge marker (`purgeAnonymousCache`) also retires a copy whose rebuild was
+ * already running when the write landed.
  */
 export async function purgeCatalogTreeCache(requestUrl: string): Promise<void> {
-  const cache = edgeCache();
-  if (!cache) return;
   try {
-    await cache.delete(treeCacheKey(requestUrl));
+    await Promise.all([
+      edgeCacheDelete(treeCacheKey(requestUrl)),
+      purgeAnonymousCache(new URL(requestUrl).origin, ['/api/catalog/tree']),
+    ]);
   } catch (e) {
     console.error('catalog tree cache purge failed (it expires within 300 s):', e instanceof Error ? e.message : e);
   }
 }
 
-async function cached(c: Context<AppContext>, key: Request, cacheControl: string, build: () => Promise<Response>) {
-  const cache = edgeCache();
-  if (cache) {
-    const hit = await cache.match(key).catch(() => undefined);
-    /**
-     * A HIT LEAVES WITH THIS ROUTE'S LIFETIME, NOT THE ZONE'S. Cloudflare hands
-     * a cached answer back with its `max-age` raised to the zone's Browser
-     * Cache TTL — four hours on levonis-iq.com (seen live 2026-09-28:
-     * `max-age=14400, s-maxage=300` on /api/catalog/tree). A visitor's browser
-     * then kept the section map for hours after an admin changed it, and
-     * `purgeCatalogTreeCache` clears the edge, never a browser.
-     */
-    if (hit) {
-      const res = new Response(hit.body, hit);
-      res.headers.set('Cache-Control', cacheControl);
-      return res;
-    }
-  }
-  const res = await build();
-  if (res.status === 200) {
-    res.headers.set('Cache-Control', cacheControl);
-    if (cache) {
-      const put = cache.put(key, res.clone()).catch(() => undefined);
-      try {
-        c.executionCtx.waitUntil(put);
-      } catch {
-        await put;
-      }
-    }
-  }
-  return res;
+async function edgeCacheDelete(key: Request): Promise<void> {
+  await edgeCache()?.delete(key);
+}
+
+/**
+ * A HIT LEAVES WITH THIS ROUTE'S LIFETIME, NOT THE ZONE'S. Cloudflare hands
+ * a cached answer back with its `max-age` raised to the zone's Browser
+ * Cache TTL — four hours on levonis-iq.com (seen live 2026-09-28:
+ * `max-age=14400, s-maxage=300` on /api/catalog/tree). A visitor's browser
+ * then kept the section map for hours after an admin changed it, and
+ * `purgeCatalogTreeCache` clears the edge, never a browser. `edgeServe`
+ * re-stamps every answer, hit or miss, with `cacheControl`.
+ */
+function cached(
+  c: Context<AppContext>,
+  key: Request,
+  cacheControl: string,
+  lifetime: EdgeLifetime,
+  build: () => Promise<Response>,
+  perViewer = false
+) {
+  return edgeServe(c, { key, lifetime, cacheControl, perViewer }, build);
 }
 
 /**
@@ -328,7 +329,7 @@ export async function buildCatalogTree(
  * (three dependent reads) before the cards.
  */
 catalogRoutes.get('/tree', (c) =>
-  cached(c, treeCacheKey(c.req.url), TREE_CACHE, async () =>
+  cached(c, treeCacheKey(c.req.url), TREE_CACHE, TREE_LIFETIME, async () =>
     c.json({ success: true, ...(await buildCatalogTree(c.env.DB, pricingCtxForUser(c.env.DB, null), { photos: true })) })
   )
 );
@@ -454,5 +455,7 @@ catalogRoutes.get('/:slug', async (c) => {
   // The key is the PATH alone: a query string changes nothing here, so letting
   // it into the key would only let anyone mint unbounded cache entries.
   const u = new URL(c.req.url);
-  return cached(c, new Request(withCacheEpoch(`${u.origin}${u.pathname}`), { method: 'GET' }), PAGE_CACHE_SIGNED_OUT, build);
+  // Tier-priced: a guest's copy says `Vary: Cookie`, so a browser cannot keep
+  // showing it to the same person once they sign in (the listing's rule, P2 review).
+  return cached(c, new Request(withCacheEpoch(`${u.origin}${u.pathname}`), { method: 'GET' }), PAGE_CACHE_SIGNED_OUT, PAGE_LIFETIME, build, true);
 });

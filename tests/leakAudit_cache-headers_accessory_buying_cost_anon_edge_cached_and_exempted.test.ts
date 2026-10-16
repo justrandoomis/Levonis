@@ -51,7 +51,7 @@ import { printQuoteRoutes } from '../worker/routes/printQuote';
 import { printRequestRoutes } from '../worker/routes/printRequests';
 import { adminRoutes } from '../worker/routes/admin';
 import { DEFAULT_ACCESSORIES } from '../worker/lib/printAccessories';
-import { ANONYMOUS_CACHE_CONTROL, canonicalKey, pathsChangedBySetting } from '../worker/lib/edgePolicy';
+import { ANONYMOUS_CACHE_CONTROL, ANONYMOUS_LIFETIME, canonicalKey, pathsChangedBySetting, storedCacheControl } from '../worker/lib/edgePolicy';
 import { sessionFreePublicGet } from '../worker/lib/session';
 
 const HOST = 'levonis-iq.com';
@@ -177,7 +177,10 @@ test('A: a guest answer is PUBLIC and stored in the shared colo cache — and ca
     const stored = cache.store.get(key);
     assert.ok(stored, `${path}: the guest answer is stored in caches.default under ${key}`);
     const storedBody = JSON.parse(await stored.clone().text());
-    assert.equal(stored.headers.get('Cache-Control'), ANONYMOUS_CACHE_CONTROL, `${path}: stored with the shared policy`);
+    // Stored PUBLIC for the declared window (s-maxage + stale-while-revalidate: the edge serves stale
+    // as the header says, worker/lib/edgePolicy.ts); every answer still leaves with the anonymous policy.
+    assert.equal(stored.headers.get('Cache-Control'), storedCacheControl(ANONYMOUS_LIFETIME), `${path}: stored with the shared policy`);
+    assert.match(stored.headers.get('Cache-Control') ?? '', /^public, /);
 
     // Second guest: answered from the shared entry.
     const hitsBefore = cache.hits;
