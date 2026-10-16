@@ -22,6 +22,7 @@
  * it as it is.
  */
 import { SPEC_KEYS } from '@levonis/catalog/bambuImport/registry/specKeys';
+import { normalizeSource, type Tr } from '@levonis/catalog/bambuImport/i18n';
 import type { KnowledgeCell } from '../compareSpecs';
 import { allTemplateGroups, FILTER_ONLY_FIELDS } from '../templateFamilies';
 import { isSpecStatus, type SpecStatus } from './labels';
@@ -65,8 +66,12 @@ export function isCompareFact(r: CompareFact): boolean {
 
 const ABSENT: ReadonlySet<SpecStatus> = new Set(['not_found', 'not_published', 'not_applicable', 'unknown']);
 
-/** A column's cells by template field id: the option's own fact first, then the product's; 220 V before region-free. */
-export function knowledgeCellsFor(rows: readonly CompareFact[], optionId: string | null): Record<string, KnowledgeCell> {
+/**
+ * A column's cells by template field id: the option's own fact first, then the product's; 220 V before region-free.
+ * With the product's translation memory (0196, docs/bambu-import/I18N-DESIGN.md §A.5) a text cell whose English has
+ * a translation carries it as `i18n` (the comparison prefers it to the dictionary).
+ */
+export function knowledgeCellsFor(rows: readonly CompareFact[], optionId: string | null, tm?: ReadonlyMap<string, Tr>): Record<string, KnowledgeCell> {
   const rank = (r: CompareFact): number => {
     const scope = r.scope_kind === 'option_value' ? (optionId && r.scope_id === optionId ? 0 : -1) : 2;
     if (scope < 0) return -1;
@@ -84,10 +89,13 @@ export function knowledgeCellsFor(rows: readonly CompareFact[], optionId: string
   for (const [key, r] of best) {
     const field = COMPARE_KEY_FIELDS.get(key)!;
     const status = r.status as SpecStatus;
+    const cellText = ABSENT.has(status) ? '' : String(r.value_text ?? '').trim();
+    const tr = cellText && tm && tm.size ? tm.get(normalizeSource(cellText)) : undefined;
     out[field] = {
       key,
       status,
-      text: ABSENT.has(status) ? '' : String(r.value_text ?? '').trim(),
+      text: cellText,
+      ...(tr && tr.ar && tr.ckb ? { i18n: { ar: tr.ar, ckb: tr.ckb } } : {}),
       num: ABSENT.has(status) ? null : typeof r.value_num === 'number' && Number.isFinite(r.value_num) ? r.value_num : null,
       num_max: ABSENT.has(status) ? null : typeof r.value_num_max === 'number' && Number.isFinite(r.value_num_max) ? r.value_num_max : null,
       unit: String(r.unit ?? '').trim(),

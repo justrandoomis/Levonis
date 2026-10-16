@@ -38,8 +38,8 @@ import assert from 'node:assert/strict';
 import { assertImportPayload, buildImportPayload, type ImportPayload } from '../packages/catalog/src/bambuImport/payload';
 import { newWorld as newWriterWorld, rebundle as rebundleWriter, RUN_ID as WRITER_RUN, stage as stageForWriter, write as writerWrite, type World as WriterWorld } from './fixtures/catalogImportWorld';
 import { extractionFingerprint } from '../packages/catalog/src/bambuImport/fingerprint';
-import { fixtureJson, sample, type SampleHandle } from './fixtures/bambu/load';
-import { compareKeysOf, edgeEvidence, expectedKnowledge, Site, verifyPublic, type VerifyContext } from '../scripts/bambu-import/verify';
+import { fixtureJson, pageOf, sample, type SampleHandle } from './fixtures/bambu/load';
+import { compareKeysOf, edgeEvidence, expectedKnowledge, knowledgeDiff, knowledgeProjection, Site, verifyPublic, type VerifyContext } from '../scripts/bambu-import/verify';
 import { COMPARE_KEY_FIELDS, comparedFields, knowledgeCellsFor } from '../worker/lib/knowledge/compareKeys';
 import { FILTER_ONLY_FIELDS } from '../worker/lib/templateFamilies';
 import type { HostFetcher } from '../scripts/bambu-import/fetch';
@@ -652,4 +652,47 @@ test('W4: the runner\'s gallery is the real writer\'s rows for every moved shape
   const coloured = JSON.parse(JSON.stringify(p)) as ImportPayload;
   (coloured.images[0] as unknown as Record<string, unknown>).color_id = 'col_1';
   assert.throws(() => assertImportPayload(coloured));
+});
+
+// ---------------------------------------------------------------- one item per label, and the translation memory (I18N-DESIGN §C.2)
+
+test('I18N §C.2: VERIFY expects the deduped compatibility and ignores *_i18n — the live route with visible targets and translations agrees', async () => {
+  const x = pageOf('filament-buffer').extraction;
+  const payload = buildImportPayload({
+    extraction: x,
+    writeMode: 'create',
+    extractionSha256: extractionFingerprint(x),
+    targets: fixtureJson('compat-targets.json') as never,
+    retrievedAt: '2026-10-16T00:00:00Z',
+  }).payload;
+  assert.equal(payload.relations.length, 7, 'the canary\'s seven relation rows (else this proves nothing)');
+  const l = live('a1', { payload, slug: 'filament-buffer', productId: payload.product_id });
+  const targets: Record<string, { id: string; slug: string; name: string }> = {
+    p1s: { id: 'p_p1s', slug: 'p1s', name: 'Bambu Lab P1S' },
+    'refurbished-p1s': { id: 'p_rp1s', slug: 'refurbished-p1s', name: 'Refurbished P1S' },
+    'refurbished-x1c': { id: 'p_rx1c', slug: 'refurbished-x1c', name: 'Refurbished X1C' },
+    'ams-hub': { id: 'p_hub', slug: 'ams-hub', name: 'AMS Hub' },
+  };
+  const translations = new Map([
+    ['Below 10mA', { ar: 'أقل من 10mA', ckb: 'کەمتر لە 10mA' }],
+    ['Plastics, PCBA', { ar: 'بلاستيك، PCBA', ckb: 'پلاستیک، PCBA' }],
+    ['Gray', { ar: 'رمادي', ckb: 'خۆڵەمێشی' }],
+  ]);
+  const stored = { relationState: () => 'resolved', visibleTarget: (r: ImportPayload['relations'][number]) => targets[r.target_source_handle] ?? null, translations };
+  const expected = expectedKnowledge(payload, l.media, []);
+  const answered = routeKnowledge(payload, l.media, stored);
+  // The live answer really is the decorated one: links, `more`, and the memory's words.
+  assert.deepEqual(answered.compatibility.compatible.map((c) => c.label), ['P1 Series', 'X1 Series']);
+  assert.deepEqual(answered.compatibility.requires.map((c) => c.label), ['AMS Hub']);
+  const p1 = answered.compatibility.compatible[0];
+  assert.equal(p1.product?.slug, 'p1s');
+  assert.deepEqual(p1.more?.map((m) => m.slug), ['refurbished-p1s']);
+  assert.equal(answered.compatibility.requires[0].product?.slug, 'ams-hub');
+  const current = answered.specs.flatMap((g) => g.rows).find((r) => r.key === 'electrical.current')!;
+  assert.deepEqual(current.value_i18n, { ar: 'أقل من 10mA', ckb: 'کەمتر لە 10mA' });
+  // …and VERIFY's expectation (no targets, no memory) is the same facts.
+  assert.deepEqual(knowledgeDiff(knowledgeProjection(expected as never), knowledgeProjection(answered as never)), { rows: 0, box: 0, documents: 0, relations: 0, swatches: 0 });
+  const o = await verify({ ...l, stored });
+  assert.equal(o.checks.knowledge.ok, true, JSON.stringify(o.checks.knowledge));
+  assert.equal(o.checks.fingerprint.ok, true, JSON.stringify(o.checks.fingerprint));
 });

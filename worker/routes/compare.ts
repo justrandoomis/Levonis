@@ -79,6 +79,7 @@ import { applyRelations, loadRelationsViews } from '../lib/productOverlay';
 import { multicolorBadge, multicolorProfile, variantSheet, type MulticolorBadge, type MulticolorProfile } from '../lib/multicolor';
 import { pricingCtx, resolveVariantPricing, type PricingCtx } from './products';
 import { hasKnowledgeValue, knowledgeCellsFor, loadCompareKnowledge } from '../lib/knowledge/compare';
+import { loadProductsTranslationMaps } from '../lib/translate/memory';
 
 export const compareRoutes = new Hono<AppContext>();
 
@@ -533,7 +534,7 @@ compareRoutes.get('/', async (c) => {
     );
   }
 
-  const [catalogRows, images, ctx, full, knowledge] = await Promise.all([
+  const [catalogRows, images, ctx, full, knowledge, translations] = await Promise.all([
     loadCatalogs(c.env.DB),
     loadCompareImages(c.env.DB, ids),
     pricingCtx(c),
@@ -546,6 +547,9 @@ compareRoutes.get('/', async (c) => {
     // The knowledge model's facts for the compare-flagged keys (0194; the Bambu
     // import spec §G.5): one IN read in this wave, null on a database without it.
     loadCompareKnowledge(c.env.DB, ids),
+    // The imported English of those facts in Arabic and Sorani (0196, docs/bambu-import/I18N-DESIGN.md §A.5):
+    // one IN read in the same wave; empty without 0196, and the dictionary stays the fallback.
+    loadProductsTranslationMaps(c.env.DB, ids),
   ]);
   /**
    * THE OPTIONS AND THEIR PRICES COME FROM THE TABLES, through the product
@@ -623,7 +627,7 @@ compareRoutes.get('/', async (c) => {
    * narrowed to. Empty for a product nobody imported and before 0194.
    */
   const cells = slots.map((slot, i) =>
-    knowledgeCellsFor(knowledge?.get(slot.productId) ?? [], picked[i]?.option?.id ?? null)
+    knowledgeCellsFor(knowledge?.get(slot.productId) ?? [], picked[i]?.option?.id ?? null, translations.get(slot.productId))
   );
 
   /**

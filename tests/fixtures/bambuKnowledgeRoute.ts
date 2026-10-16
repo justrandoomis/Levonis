@@ -29,6 +29,10 @@ export interface StoredKnowledgeKnobs {
   extraSpecs?: readonly SpecValueDbRow[];
   /** The store page's address (owner-only: a store row's `source_ref`). */
   canonicalUrl?: string;
+  /** A relation's VISIBLE target as the route's LEFT JOIN finds it (resolved rows only; default: none visible). */
+  visibleTarget?: (r: ImportPayload['relations'][number]) => { id: string; slug: string; name: string } | null;
+  /** The product's translation memory (0196): normalized English → ar/ckb. */
+  translations?: ReadonlyMap<string, { ar: string; ckb: string }>;
 }
 
 export function routeKnowledge(
@@ -88,12 +92,25 @@ export function routeKnowledge(
         .map((d) => ({ kind: d.kind, title_en: d.title_en, title_ar: d.title_ar, title_ckb: d.title_ckb, url: d.url, host: d.host, scope_kind: d.scope_kind, scope_id: d.scope_id })),
       relations: payload.relations
         .filter((r) => live(r.scope_kind, r.scope_id))
-        .map((r) => ({ relation: r.relation, target_kind: r.target_kind, target_label: r.target_label, state: knobs.relationState ? knobs.relationState(r) : r.state, scope_kind: r.scope_kind, scope_id: r.scope_id })),
+        .map((r) => {
+          const state = knobs.relationState ? knobs.relationState(r) : r.state;
+          const t = state === 'resolved' ? knobs.visibleTarget?.(r) ?? null : null;
+          return {
+            relation: r.relation,
+            target_kind: r.target_kind,
+            target_label: r.target_label,
+            state,
+            scope_kind: r.scope_kind,
+            scope_id: r.scope_id,
+            ...(t ? { t_id: t.id, t_slug: t.slug, t_name: t.name, t_name_ar: t.name, t_name_ku: t.name } : {}),
+          };
+        }),
       swatches: payload.swatches
         .filter((w) => values.has(w.value_id) && key(w.source_media_id))
         .map((w) => ({ option_value_id: w.value_id, url: `/files/${key(w.source_media_id)}`, width: 128, height: 128, published_hex: '' })),
       sourceRoute: payload.route,
     },
-    { url: canonicalProductMediaUrl }
+    { url: canonicalProductMediaUrl },
+    { translations: knobs.translations }
   );
 }

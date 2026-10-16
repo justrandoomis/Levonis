@@ -60,6 +60,7 @@ import { stateLabel, type SpecStatus } from './knowledge/labels';
 
 import type { CompareLens } from '@levonis/catalog/discoveryTypes';
 import { unitOf, round as roundUnit } from '@levonis/catalog/bambuImport/registry/units';
+import { normalizeSource } from '@levonis/catalog/bambuImport/i18n';
 
 export type CompareBasis = 'same_section' | 'same_type' | 'mixed';
 
@@ -129,6 +130,8 @@ export interface KnowledgeCell {
   num_max: number | null;
   unit: string;
   test_method: string;
+  /** The imported English of `text` in Arabic and Sorani, from the translation memory (0196), when it has it. */
+  i18n?: { ar: string; ckb: string };
 }
 
 export interface CompareRow {
@@ -676,7 +679,11 @@ function readKnowledgeValue(field: TemplateField, cell: KnowledgeCell): CompareV
     unit = cell.unit || fieldUnit;
   }
   const value = readCompareValue(unit === fieldUnit ? field : { ...field, unit }, raw);
-  return { ...value, ...(unit ? { unit } : {}), ...extras };
+  // The translation memory's Arabic and Sorani of the fact's own words, when the cell reads as those words (a text
+  // reading of the published value — never a number this parser reformatted).
+  const memory =
+    cell.i18n && TRANSLATED_PARSES.has(cmp.parse) && !value.missing && normalizeSource(value.text) === normalizeSource(cell.text) ? { i18n: { ...cell.i18n } } : {};
+  return { ...value, ...(unit ? { unit } : {}), ...extras, ...memory };
 }
 
 /**
@@ -892,6 +899,8 @@ function translated(phrase: string, lang: 'ar' | 'ckb'): string | null {
  */
 function withTranslation(value: CompareValue, parse: SpecCompare['parse']): CompareValue {
   if (value.missing || !TRANSLATED_PARSES.has(parse)) return value;
+  // The translation memory (0196) already answered this cell: written by us and reviewed, it wins over the dictionary.
+  if (value.i18n && value.i18n.ar && value.i18n.ckb) return value;
   const out: { ar?: string; ckb?: string } = {};
   for (const lang of ['ar', 'ckb'] as const) {
     let text: string | null;

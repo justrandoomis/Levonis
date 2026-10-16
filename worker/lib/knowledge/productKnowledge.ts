@@ -45,6 +45,7 @@ import { productImageFromRelations } from '../productSelectionImage';
 import type { ImageRow } from '../productOverlay';
 import { isMissingKnowledgeSchema, knowledgeRead } from './schema';
 import { assembleKnowledge, boxItemsWith, emptyKnowledge, type InTheBoxItem, type ProductKnowledge, type SpecValueDbRow } from './answer';
+import { loadProductTranslationMap } from '../translate/memory';
 
 /*
  * The answer's shape and every rule that shapes it live in ./answer.ts (pure: the import's runner builds its
@@ -54,6 +55,7 @@ export {
   assembleKnowledge,
   boxItemsWith,
   compatibilityBucketOf,
+  dedupeCompatibility,
   emptyKnowledge,
   isOwnerOnlyKey,
   knowledgeRowOf,
@@ -61,6 +63,7 @@ export {
   type CheckedSource,
   type CompatibilityBucket,
   type CompatibilityItem,
+  type CompatibilityTarget,
   type InTheBoxItem,
   type KnowledgeDocument,
   type KnowledgeGroup,
@@ -101,16 +104,18 @@ const scopeLive = (a: string) => `CASE ${a}.scope_kind
 
 /**
  * Everything `/knowledge` answers for one VISIBLE product (the route checked
- * that). ONE WAVE of six statements — the pictures of the relation targets
+ * that). ONE WAVE of seven statements — the pictures of the relation targets
  * ride it too, their ids a subquery of the relation read's own rule, so an
  * imported printer linking its AMS, plates and filaments costs no dependent
- * round trip (tests/d1Waves.test.ts measures that path). Empty without 0194.
- * A fact scoped to a value or variant the page body no longer shows is left
- * out (`scopeLive`).
+ * round trip (tests/d1Waves.test.ts measures that path), and so does the
+ * product's translation memory (0196, docs/bambu-import/I18N-DESIGN.md §A.5:
+ * the Arabic and Sorani of its imported values, box items and titles; empty
+ * without 0196). Empty without 0194. A fact scoped to a value or variant the
+ * page body no longer shows is left out (`scopeLive`).
  */
 export async function loadProductKnowledge(db: D1Database, productId: string): Promise<ProductKnowledge> {
   const visibleTarget = optimisticVisible(db, 't');
-  const [specRows, docRows, relationRows, swatchRows, sourceRows, targetImages] = await Promise.all([
+  const [specRows, docRows, relationRows, swatchRows, sourceRows, targetImages, translations] = await Promise.all([
     knowledgeRead(db, async () =>
       (
         await db
@@ -188,6 +193,7 @@ export async function loadProductKnowledge(db: D1Database, productId: string): P
         return [] as ImageRow[];
       }
     }),
+    loadProductTranslationMap(db, productId),
   ]);
   if (!specRows || !docRows || !relationRows || !swatchRows || !sourceRows || !targetImages) return emptyKnowledge();
   const imagesOf = new Map<string, ImageRow[]>();
@@ -195,6 +201,7 @@ export async function loadProductKnowledge(db: D1Database, productId: string): P
   const pictures = new Map([...imagesOf].map(([id, rows]) => [id, productImageFromRelations(rows)]));
   return assembleKnowledge(
     { specs: specRows, documents: docRows, relations: relationRows, swatches: swatchRows, sourceRoute: sourceRows[0]?.source_route ?? null },
-    { url: canonicalProductMediaUrl, targetPicture: (id) => pictures.get(id) ?? '' }
+    { url: canonicalProductMediaUrl, targetPicture: (id) => pictures.get(id) ?? '' },
+    { translations }
   );
 }
