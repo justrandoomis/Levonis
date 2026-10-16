@@ -35,6 +35,8 @@ const AdminCoupons = React.lazy(() => import('../components/adminCoupons/AdminCo
 const AdminDelivery = React.lazy(() => import('../components/adminDelivery/AdminDelivery'));
 const AdminCommunity = React.lazy(() => import('../components/adminCommunity/AdminCommunity'));
 const AdminProducts = React.lazy(() => import('../components/AdminProducts'));
+/** «استيراد Bambu Lab» (the Bambu import spec §H.2): the owner's read-only import dashboard, its own chunk. */
+const CatalogImportTab = React.lazy(() => import('../components/adminImport/CatalogImportTab'));
 // The bundles panel moved to its own folder when a bundle became a real
 // products row (docs/BUNDLES_MYSTERY.md §11.1). The chunk NAME is unchanged —
 // tests/bundleBudget.test.ts pins it — because the file name is unchanged.
@@ -148,6 +150,7 @@ type AdminTab =
   | 'trade_in'
   | 'price_protection'
   | 'products'
+  | 'catalog_import'
   | 'pricing'
   | 'bundles'
   | 'mystery'
@@ -250,6 +253,8 @@ export default function Admin() {
    * `/admin?tab=security` opens it.
    */
   const canSeeSecurity = user?.is_owner === true && user?.owner_email_unverified !== true;
+  /** «استيراد Bambu Lab»: the verified owner only, as the API (requireOwner) and «الأمان». */
+  const canSeeCatalogImport = canSeeSecurity;
 
   /** People waiting in the support console, for the sidebar badge. */
   const supportWaiting = supportTotal(useSupportCounts());
@@ -277,6 +282,9 @@ export default function Admin() {
     { id: 'trade_in', icon: Repeat, label: loc('الاستبدال', 'Trade-in', 'گۆڕینەوە'), badge: servicesWaiting?.trade_in ?? 0, ...section('services', 'الخدمات', 'Services', 'خزمەتگوزارییەکان') },
     { id: 'price_protection', icon: ShieldCheck, label: loc('حماية السعر', 'Price protection', 'پاراستنی نرخ'), badge: servicesWaiting?.price_protection ?? 0, ...section('services', 'الخدمات', 'Services', 'خزمەتگوزارییەکان') },
     { id: 'products', icon: Package, label: t('adminProducts'), ...section('catalog', 'الكتالوج', 'Catalog', 'کاتالۆگ') },
+    ...(canSeeCatalogImport
+      ? [{ id: 'catalog_import', icon: Package, label: loc('استيراد Bambu Lab', 'Bambu Lab import', 'هاوردەکردنی Bambu Lab'), ...section('catalog', 'الكتالوج', 'Catalog', 'کاتالۆگ') }]
+      : []),
     ...(canSeePricing || pricingMustVerify
       ? [{ id: 'pricing', icon: Calculator, label: loc('التسعير والشحن', 'Pricing & shipping', 'نرخدانان و ناردنی بەرهەم'), ...section('catalog', 'الكتالوج', 'Catalog', 'کاتالۆگ') }]
       : []),
@@ -372,6 +380,8 @@ export default function Admin() {
         {activeTab === 'products' && (
           <AdminProducts />
         )}
+
+        {activeTab === 'catalog_import' && canSeeCatalogImport && <CatalogImportTab />}
 
         {activeTab === 'pricing' && canSeePricing && <AdminPricing />}
 

@@ -44,6 +44,7 @@ import { COMPLETENESS_UI, tri } from './adminProducts/completeness';
 import HideIncompleteCard, { ListMissingBadge } from './adminProducts/HideIncompleteCard';
 import VariantImg from './ui/VariantImg';
 import NeedsPricingQueue from './adminProducts/NeedsPricingQueue';
+import { INFO_WORDS, InfoCompletenessCell } from './adminProducts/InfoCompleteness';
 import { activeTileSub as activeSub, hiddenBanner, NEEDS_PRICING, statusBadgeKind, tri as triQ } from './adminProducts/needsPricingStrings';
 import { PRICE_REQUEST_ADMIN_TEXT, requestersText } from '../../packages/contracts/src/priceRequests';
 
@@ -1172,13 +1173,14 @@ export default function AdminProducts() {
         </div>
       ) : (
         <div className={`${T.surface} overflow-x-auto`}>
-          <table className={`w-full min-w-[760px] border-collapse ${T.stickyActionsColumn}`}>
+          <table className={`w-full min-w-[860px] border-collapse ${T.stickyActionsColumn}`}>
             <thead>
               <tr className={T.tableHead}>
                 <th className="text-start font-semibold px-4 py-2.5">{loc('المنتج', 'Product', 'بەرهەم')}</th>
                 <th className="text-start font-semibold px-3 py-2.5">{t.price}</th>
                 <th className="text-start font-semibold px-3 py-2.5">{t.stock}</th>
                 <th className="text-start font-semibold px-3 py-2.5">{loc('الحالة', 'Status', 'دۆخ')}</th>
+                <th className="text-start font-semibold px-3 py-2.5" data-col="info-completeness">{INFO_WORDS.column[lang === 'en' || lang === 'ckb' ? lang : 'ar']}</th>
                 <th className="text-start font-semibold px-3 py-2.5">{loc('المبيعات', 'Sales', 'فرۆش')}</th>
                 <th className="text-start font-semibold px-3 py-2.5">{t.updated}</th>
                 <th className="text-end font-semibold px-4 py-2.5">{loc('إجراءات', 'Actions', 'کردارەکان')}</th>
@@ -1233,6 +1235,10 @@ export default function AdminProducts() {
                         <ListMissingBadge n={p.missing_count} held={p.held} lang={lang} />
                         <PriceRequestsChip n={p.price_requests} lang={lang} />
                       </span>
+                    </td>
+                    <td className="px-3 py-3">
+                      {/* Separate from the commercial «ناقص» beside the status: how well the product is described. */}
+                      <InfoCompletenessCell value={p.info_completeness} lang={lang === 'en' || lang === 'ckb' ? lang : 'ar'} />
                     </td>
                     <td className="px-3 py-3">
                       <p className="text-[13.5px] font-bold text-[var(--ap-text-1)]"><span dir="ltr">{p.sold ?? 0}</span></p>

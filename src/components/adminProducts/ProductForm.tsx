@@ -76,6 +76,7 @@ const TranslationsSheet = React.lazy(() => import('./form/TranslationsSheet'));
 const DataFileSheet = React.lazy(() => import('./form/DataFileSheet'));
 import { DATA_FILE_STRINGS, pick as pickDataFileString } from './dataFileStrings';
 import { COMPLETENESS_UI, CompletenessBanner, CompletenessProvider, MissingBlock, fill, tri, useProductCompleteness } from './completeness';
+import InfoCompletenessCard from './InfoCompleteness';
 // Types only — no runtime import, so the sheet stays in its own lazy chunk.
 import type { ReviewItem, TranslationOverrides } from './form/TranslationsSheet';
 import {
@@ -1065,6 +1066,8 @@ export default function ProductForm({
 
       {saveErr && <Banner kind="error">{saveErr}</Banner>}
       <CompletenessBanner read={completeness} lang={lang} dirty={dirty} status={doc.status} />
+      {/* «اكتمال المعلومات» (the Bambu import spec §H.2): how well the product is described — never a sale gate. */}
+      <InfoCompletenessCard productId={doc.id || productId || null} lang={lang === 'en' || lang === 'ckb' ? lang : 'ar'} />
       {staleSave && (
         <div data-form="stale-edit">
           <Banner kind="warn">

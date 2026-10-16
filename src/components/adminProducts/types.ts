@@ -275,6 +275,8 @@ export interface ListingItem {
    * as one «owner data» item). null = not checked yet, or no migration 0184.
    */
   missing_count?: number | null;
+  /** «اكتمال المعلومات» (the Bambu import spec §H.2): null for a product with no knowledge row. */
+  info_completeness?: import('./InfoCompleteness').InfoCompletenessSummary | null;
   /** Held by the owner's «hide incomplete» switch (not sold). */
   held?: boolean;
   /** Held for a catalogue gap (a missing image or section): hidden from customers too (DECISIONS row 240). */
