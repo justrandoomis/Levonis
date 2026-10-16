@@ -174,6 +174,10 @@ test('the sources keep the shape: a media query for reduced motion, m.* under <M
     'src/components/search/LiveSearchPanel.tsx',
     'src/lib/useRail.ts',
     'src/lib/motionFeatures.tsx',
+    // Not eager, but in the product page's opening closure: it rendered the
+    // proxy and was the one static importer of `vendor-motion` there (speed
+    // audit 2026-10-16; tests/bundleBudget.test.ts holds the closure).
+    'src/components/ui/Note.tsx',
   ];
   for (const f of eager) {
     const src = read(f);
@@ -195,7 +199,7 @@ test('the sources keep the shape: a media query for reduced motion, m.* under <M
   assert.match(features, /function quietLoader\(\): Promise<FeatureBundle> \{\s*return loadMotionFeatures\(\)\.catch\(\(\) => new Promise<FeatureBundle>\(\(\) => \{\}\)\);/, "LazyMotion's loader must not reject (it has no catch)");
   assert.match(features, /export function useMotionFeaturesFailed\(\): boolean \{\s*return React\.useSyncExternalStore\(subscribe, readFailed, readServer\);/);
   assert.match(features, /\.catch\(\(err: unknown\) => \{\s*loading = null;\s*setFailed\(true\);/, 'a failure sets the flag and lets the next mount retry');
-  for (const f of ['src/components/ui/Overlay.tsx', 'src/components/ui/Toast.tsx', 'src/components/ui/AppBusy.tsx', 'src/components/pwa/UpdateReadyToast.tsx', 'src/components/search/LiveSearchPanel.tsx']) {
+  for (const f of ['src/components/ui/Overlay.tsx', 'src/components/ui/Toast.tsx', 'src/components/ui/AppBusy.tsx', 'src/components/pwa/UpdateReadyToast.tsx', 'src/components/search/LiveSearchPanel.tsx', 'src/components/ui/Note.tsx']) {
     const src = read(f);
     assert.match(src, /useMotionFeaturesFailed\(\)/, `${f} does not ask whether the features failed`);
     const initials = [...src.matchAll(/^\s*initial=\{([^\n]*)\}\s*$/gm)].map((m) => m[1]);

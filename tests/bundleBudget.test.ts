@@ -457,6 +457,15 @@ test('opening a product excludes below-fold reviews, closed purchase dialogs, re
     assert.ok(file, `${name} remains available in its own deferred chunk`);
     assert.equal(opening.has(file!), false, `${name} became a static product import and would compete with the lead image`);
   }
+  // THE ANIMATION FEATURES ARE NOT ON THE PRODUCT'S FIRST PAINT (speed audit
+  // 2026-10-16). `vendor-motion` (16 KB gzip: projection, drag, layout) was in
+  // this closure through one importer, ui/Note.tsx's `motion` proxy, and as the
+  // last of the document's modulepreloads to land it held the page's first
+  // render back about 0.2 s on a phone. The opening renders `m.*` or plain
+  // elements; the features arrive later, from idle or the first touch.
+  const features = files.find((f) => /^vendor-motion-(?!core-)/.test(f));
+  assert.ok(features, 'no vendor-motion chunk — the features half was regrouped');
+  assert.equal(opening.has(features!), false, `${features} is a static product import again — a module of the product's opening renders the \`motion\` proxy (src/lib/motionFeatures.tsx says what to render instead)`);
 });
 
 test('the storefront owns at most 47 KB gzip and its complete app payload stays under 233 KB, with other blocks lazy', () => {

@@ -16,10 +16,23 @@
  * back, a payment method switched) rises a few pixels on the house `quick`
  * spring; under reduced motion `useMotion` collapses that to a cross-fade.
  * `animate={false}` renders it inert for surfaces that mount with the page.
+ *
+ * NOT THE `motion` PROXY (speed audit 2026-10-16). `import { motion } from
+ * 'motion/react'` carries every feature of the library — the projection tree,
+ * drag, layout — and this file was the ONE static importer of that chunk
+ * (`vendor-motion`, 16 KB gzip) in the product page's opening closure: the
+ * page's only note mounts inert (`animate={false}`, the printer delivery
+ * line), yet the whole page waited for the chunk, the last of its preloads to
+ * arrive (measured live: FCP and LCP about 0.2 s later on a phone). An inert
+ * note is now a plain element that draws its final state; an animated one is
+ * `m.div` (the eager core) under <MotionFeatures>, and paints at rest when the
+ * features chunk has failed — the house primitives' rule
+ * (src/lib/motionFeatures.tsx). tests/productOpeningMotion.test.ts holds it.
  */
 import type { ReactNode } from 'react';
-import { motion } from 'motion/react';
+import * as Motion from 'motion/react-m';
 import { useMotion } from '../../lib/motion';
+import { MotionFeatures, useMotionFeaturesFailed } from '../../lib/motionFeatures';
 
 export type NoteTone = 'gold' | 'amber' | 'zinc';
 
@@ -77,7 +90,6 @@ export default function Note({
   className = '',
   testId,
 }: NoteProps) {
-  const m = useMotion();
   const t = TONES[tone];
   // A softer radius on the start edge would fight the hairline that defines
   // it, so the note is squared off there and rounded away from it. Flat
@@ -86,18 +98,41 @@ export default function Note({
   const shape = compact
     ? 'rounded-e-lg ps-3 pe-3 py-2 text-[12.5px]'
     : 'rounded-e-lg ps-3.5 pe-4 py-3 text-[13px]';
-  return (
-    <motion.div
-      role="note"
-      data-testid={testId}
-      data-note-tone={tone}
-      initial={animate ? { opacity: 0, y: m.travel(6) } : false}
-      animate={{ opacity: 1, y: 0 }}
-      transition={m.spring('quick')}
-      className={`flex items-start gap-2.5 border border-s-2 leading-snug ${t.box} ${t.edge} ${shape} ${className}`}
-    >
+  const box = `flex items-start gap-2.5 border border-s-2 leading-snug ${t.box} ${t.edge} ${shape} ${className}`;
+  const content = (
+    <>
       {icon ? <span aria-hidden="true" className={`mt-0.5 shrink-0 ${t.icon}`}>{icon}</span> : null}
       <div className="min-w-0 flex-1">{children}</div>
-    </motion.div>
+    </>
+  );
+  // Inert: the final state, drawn by the browser with no animation code at all.
+  if (!animate) {
+    return (
+      <div role="note" data-testid={testId} data-note-tone={tone} className={box}>
+        {content}
+      </div>
+    );
+  }
+  return <RisingNote tone={tone} testId={testId} className={box}>{content}</RisingNote>;
+}
+
+/** The note that rises into place: `m.div` under <MotionFeatures>, at rest when the features failed to load. */
+function RisingNote({ tone, testId, className, children }: { tone: NoteTone; testId?: string; className: string; children: ReactNode }) {
+  const m = useMotion();
+  const atRest = useMotionFeaturesFailed();
+  return (
+    <MotionFeatures>
+      <Motion.div
+        role="note"
+        data-testid={testId}
+        data-note-tone={tone}
+        initial={atRest ? false : { opacity: 0, y: m.travel(6) }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={m.spring('quick')}
+        className={className}
+      >
+        {children}
+      </Motion.div>
+    </MotionFeatures>
   );
 }
