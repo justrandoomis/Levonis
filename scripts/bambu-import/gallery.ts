@@ -54,6 +54,7 @@ const boundOf = (r: StoredGalleryRow) => !!(r.option_value_id || r.variant_id);
  * other. Exactly one primary is kept: the first one left, else the row in the earliest position. An import row never
  * binds a colour (the Worker writes `color_id` null), so a binding is a value or a variant.
  */
+// TODO(W4): import the package's collapseContentDuplicates once the writer lane moves it there (this is a hand copy).
 export function collapseContentDuplicates(rows: readonly StoredGalleryRow[]): { rows: StoredGalleryRow[]; collapsed: number } {
   const byKey = new Map<string, StoredGalleryRow[]>();
   for (const r of rows) byKey.set(r.r2_key, [...(byKey.get(r.r2_key) ?? []), r]);
