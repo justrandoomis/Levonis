@@ -302,6 +302,7 @@ Rules:
 2. `/write` starts only when `now + worst(write) + worst(publish-finish) + worst(verify) < deadline`, i.e. at least about 13 minutes remain. A committed product is therefore verified in the same job.
 3. When a wait does not fit, the runner sends `event RETRYING` with `retry_at`, sets the lease to expire now, and exits `more=true blocked=false`, so the chain job continues. The next job resumes the same item first: RETRYING is in flight, so no other item can start.
 4. `stage_attempts` persists in D1. Eight attempts of one stage across jobs → BLOCKED `RETRIES_EXHAUSTED`.
+5. A resumed item (no `/write` answer in this job) rebuilds its payload from the page read now, and is verified only when that payload's digest equals the `payload_sha256` the Worker staged and wrote (`/lease`). A difference is retried (`VERIFY_STALE`, twice), then BLOCKED `VERIFY_FAILED_PERSISTENT`: the source changed after the write.
 
 `tests/bambuImportRunner.test.ts` drives these rules with a fake clock: a 30-minute backoff near the deadline releases and exits, and a `/write` is never started with fewer than 13 minutes left.
 
@@ -778,7 +779,7 @@ The trigger in §B.3 is the authority; this drawing is its picture.
 - D1 `SQLITE_BUSY` or overload;
 - media timeouts;
 - a cache still stale during verification (for up to `s-maxage` + 60 s);
-- `CURATION_PENDING`: a curated-scope item whose curated file is not in the bundled index (1 h, at most twice, then BLOCKED `CURATION_MISSING`).
+- `CURATION_PENDING`: a curated-scope item whose curated file is not in the bundled index (1 h, at most twice, then BLOCKED `CURATION_MISSING`). It is parked, never waited out in the job: the file can only arrive with a new commit, so the runner releases the lease (`RETRYING` with `retry_at`) and the job exits `more=true`.
 
 **Permanent failures** go BLOCKED at once:
 
@@ -1780,7 +1781,7 @@ The public v1 product DTO has no option-value or group ids, no variant `combo_ke
    - for each colour, version or size value (at most 12 per product; all of them for the audit classes): click it and assert that **the hero URL equals the expected binding** and that **no image bound to another value of the same group, or to a contradicted variant, is present in the gallery**. A disabled impossible value shows the helper;
    - the breadcrumb: not applicable, the page draws none (§1 row 28; the section is checks 3 and 10);
    - screenshots for the 8 audit classes, 1 in 25, and every failure, sealed.
-8. **Existing products:** for a merge, `before_fp_equal` is true and the V2 status is unchanged (§E.3).
+8. **Existing products:** for a merge, `before_fp_equal` is true and the V2 status is unchanged (§E.3). A merge keeps the existing product's name, price, options and images (§E.2), so checks 1, 2, 5 and 7 read only what the import owns: 1 the sections and the appended images (not the name or the price); 2 the appended images by URL and a `/knowledge` answer (its counts are the Worker's recompute, check 10; no fingerprint: the ids are the existing product's); 5 the request smoke only (the quote is the existing product's); 7 the main image, the dinar text and the store requests (not the chooser, the price or the buying controls).
 9. **Cache:** a stale answer makes the runner re-call `/publish-finish` (which purges the site, knowledge and v1 keys) and wait up to `s-maxage + 60 s` (max 360 s, within the deadline rules) before failing the check. A persistent failure → BLOCKED `VERIFY_FAILED_PERSISTENT`.
 10. **The Worker's own recompute at `/complete`**, stored in `d1_checks`:
     - VISIBLE true and SELLABLE false, through catalog-only's own predicates;
@@ -1899,7 +1900,7 @@ A separate `chain` job (`needs: import`, `permissions: { actions: write }`, no c
 
 - `needs.import.result == 'success'`;
 - `needs.import.outputs.more == 'true'` and `needs.import.outputs.blocked != 'true'`;
-- the input `chain` is true and `chain_count < 12`.
+- the mode is `run`, the input `chain` is true, `max_items` is `0` (a bounded job is reviewed before the next one; the first step refuses `chain` with any other `max_items`), and `chain_count < 12`.
 
 It dispatches with `mode=run`, the same `run_id` and `seal_pubkey`, and `chain_count + 1`. It builds the request body with `jq` from env values, which it validates again. `GITHUB_TOKEN` may dispatch a `workflow_dispatch` (a documented exception to the no-recursion rule). Because the deadline rules make the import job exit cleanly, a job is not killed by its timeout in normal operation; if it is, the chain stops and the agent resumes by hand. **Nothing is scheduled at any time.** The agent watches each job's log and the dashboard, and stops the chain by not re-dispatching after any anomaly.
 
@@ -2130,7 +2131,9 @@ on:
       seal_pubkey: { description: 'one-time X25519 public key that seals every artifact', required: true }
       confirm:     { description: 'IMPORT-LIVE for open/run/close/withdraw', default: '' }
 permissions: { contents: read }
-concurrency: { group: bambu-import, cancel-in-progress: false }
+concurrency:                # the kill switch (revoke) has a group of its own: it runs AT ONCE, beside a running import
+  group: ${{ inputs.mode == 'revoke' && format('bambu-import-revoke-{0}', github.run_id) || 'bambu-import' }}
+  cancel-in-progress: false
 jobs:
   import:
     if: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
@@ -2185,7 +2188,7 @@ jobs:
   chain:
     needs: import
     if: ${{ needs.import.result == 'success' && needs.import.outputs.more == 'true' && needs.import.outputs.blocked != 'true'
-            && inputs.chain && fromJSON(inputs.chain_count) < 12 }}
+            && inputs.mode == 'run' && inputs.chain && inputs.max_items == '0' && fromJSON(inputs.chain_count) < 12 }}
     runs-on: ubuntu-latest
     permissions: { actions: write }
     steps:                     # no checkout, no npm, no repository code
@@ -2211,7 +2214,7 @@ jobs:
 - no `${{ inputs.` or `${{ github.event.inputs.` appears inside any `run:`;
 - every input is validated by the first step with the listed patterns;
 - every `upload-artifact` path ends in `.sealed`;
-- the concurrency group is set, `timeout-minutes` is 350, and the deadline is 330.
+- the concurrency group is set (`bambu-import` for every mode but `revoke`, whose group is its own so the kill switch never waits behind the job it stops), `timeout-minutes` is 350, and the deadline is 330.
 
 ### K.4 The review after each canary and audit-class product
 
