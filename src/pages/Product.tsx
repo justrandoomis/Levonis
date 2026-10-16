@@ -3482,7 +3482,7 @@ export default function Product() {
             dimension={colourGroup ? { kind: 'group', groupId: colourGroup.id } : { kind: 'color' }}
             sharedOptionValueIds={sharedIds}
             fulfillmentType={requestedOrderType}
-            transportMethod={requestedOrderType === 'pre_order' ? effectiveTransport : ''}
+            route={requestedOrderType === 'pre_order' ? effectiveTransport : ''}
             warrantyPlanId={warrantyPlanId}
             sharedReady={source === 'catalog' && !catalogOnly && sharedSelectionComplete && routeReady}
             sharedLabel={[
@@ -3584,7 +3584,7 @@ export default function Product() {
    * quotes and its portals into the bar — is mounted in the layout on screen
    * only, as the price-request panel is.
    */
-  const selectionBlocksFor = (wide: boolean) => (
+  const selectionBlocks = (wide: boolean) => (
     <>
       {/*
         THE ORDER OF THESE PANELS IS THE ORDER OF THE DECISION, stated by the
@@ -4909,7 +4909,7 @@ export default function Product() {
             <div className="mt-5 space-y-3 lg:hidden">
               {noPrice ? unpricedBlock(false) : null}
               {priceBlock}
-              {selectionBlocksFor(false)}
+              {selectionBlocks(false)}
               {noPrice ? null : statusMessages}
             </div>
 
@@ -5322,7 +5322,7 @@ export default function Product() {
             </div>
             {noPrice ? unpricedBlock(true) : null}
             {priceBlock}
-            {selectionBlocksFor(true)}
+            {selectionBlocks(true)}
             {noPrice ? null : (
             <div className="lv-surface space-y-3 p-4">
               {colourMulti ? (

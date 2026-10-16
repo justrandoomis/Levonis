@@ -82,10 +82,20 @@ test('picking a colour does not undo the two panels above it', () => {
   // A colour never decides HOW a product is sold — `option_availability` is
   // per option — so clearing the order type and the route on a colour tap sent
   // the buyer back two steps for answering step four.
-  const tap = /setColorId\(selected \? '' : col\.id\);([\s\S]{0,200}?)\}\}/.exec(page);
-  assert.ok(tap, 'the colour button still sets the colour');
-  assert.ok(!/setOrderType\(''\)/.test(tap![1]), 'and no longer clears the order type');
-  assert.ok(!/setTransportMethod\(''\)/.test(tap![1]), 'nor the chosen route');
+  //
+  // The tap runs through one handler since docs/ux/COLOUR-QUANTITIES.md (D4:
+  // the quantity reset lives in the tap), so the handler and the reset it
+  // calls are both read.
+  assert.match(page, /onClick=\{\(\) => \{[\s\S]{0,900}?onColourChipTap\(col\.id, selected\);\s*\}\}/, 'the colour button goes through the tap handler');
+  const tap = /const onColourChipTap = \(id: string, selected: boolean\) => \{([\s\S]*?)\n {2}\};/.exec(page);
+  assert.ok(tap, 'the tap handler exists');
+  assert.match(tap![1], /const next = selected \? '' : id;[\s\S]*setColorId\(next\);/, 'the colour button still sets the colour');
+  const reset = /const afterColourTap = \(from: string, to: string\) => \{([\s\S]*?)\n {2}\};/.exec(page);
+  assert.ok(reset, 'the reset the tap calls exists');
+  for (const body of [tap![1], reset![1]]) {
+    assert.ok(!/setOrderType\(''\)/.test(body), 'and no longer clears the order type');
+    assert.ok(!/setTransportMethod\(''\)/.test(body), 'nor the chosen route');
+  }
 });
 
 test('a disabled button always has a sentence beside it — and only one', () => {
@@ -97,15 +107,19 @@ test('a disabled button always has a sentence beside it — and only one', () =>
   // in the alert stack over the CTA. A second hand-written copy there put the
   // same sentence on screen twice, adjacent.
   assert.ok(!page.includes('data-transport-required-note'), 'no second copy in the alert stack');
-  assert.match(page, /blockingCodes\.map\(\(code\) => \(/);
+  // `shownBlockingCodes` is `blockingCodes` with «اختر لونًا» left out while
+  // the several-colours rows choose the colour (docs/ux/COLOUR-QUANTITIES.md).
+  assert.match(page, /const shownBlockingCodes = colourMulti\s*\?\s*blockingCodes\.filter\([\s\S]{0,200}:\s*blockingCodes;/);
+  assert.match(page, /shownBlockingCodes\.map\(\(code\) => \(/);
 
   // …and the code is translated in all three languages, never shown raw.
   for (const lang of ["'اختر وسيلة النقل.'", "'Choose a transport method.'", "'شێوازی گواستنەوە هەڵبژێرە.'"]) {
     assert.ok(page.includes(`TRANSPORT_REQUIRED: ${lang}`), `TRANSPORT_REQUIRED is missing ${lang}`);
   }
   // The cart door keeps that code rather than flattening it into 'VALIDATION',
-  // so the refusal reaches the customer in their own language.
-  const cart = readFileSync(join(ROOT, 'worker/routes/cart.ts'), 'utf8');
+  // so the refusal reaches the customer in their own language. Both doors
+  // (one line, several colours) judge a line through worker/lib/cartAdd.ts.
+  const cart = readFileSync(join(ROOT, 'worker/lib/cartAdd.ts'), 'utf8');
   assert.match(
     cart,
     /resolved\.errors\.length === 1 && resolved\.errors\[0\] === 'TRANSPORT_REQUIRED'/,

@@ -130,11 +130,14 @@ test('a pre-order needs a route — at the button and again at the door', () => 
   // THE SERVER HALF, which is the one that matters: the client is never
   // trusted. Keyed on `lineOrderType` so the door refuses exactly the lines
   // the read model and the checkout call pre-orders.
-  const cart = read('worker/routes/cart.ts');
-  assert.match(cart, /const addLineType = lineOrderType\(availability, fulfillmentType, transportMethod\);/);
+  // Both doors (one line, several colours) judge a line through
+  // worker/lib/cartAdd.ts (docs/ux/COLOUR-QUANTITIES.md §4.3).
+  assert.match(read('worker/routes/cart.ts'), /judgeLevonisLineOrThrow\(/);
+  const cart = read('worker/lib/cartAdd.ts');
+  assert.match(cart, /const lineType = lineOrderType\(availability, fulfillmentType, transportMethod\);/);
   assert.match(
     cart,
-    /if \(addLineType === 'pre_order' && !transportMethod\) \{[\s\S]{0,400}'TRANSPORT_REQUIRED'/,
+    /if \(lineType === 'pre_order' && !transportMethod\) \{[\s\S]{0,400}'TRANSPORT_REQUIRED'/,
     'the door refuses a routeless pre-order'
   );
   // The refusal names the routes on offer so a caller can show a chooser

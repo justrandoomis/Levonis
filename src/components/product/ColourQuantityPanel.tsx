@@ -80,7 +80,8 @@ export interface ColourQuantityPanelProps {
   /** The selection every colour shares (without the colour group's value). */
   sharedOptionValueIds: string[];
   fulfillmentType: '' | 'direct_sale' | 'pre_order';
-  transportMethod: string;
+  /** The pre-order route the page's filter kept (`effectiveTransport`), or ''. */
+  route: string;
   warrantyPlanId: string;
   /** The product-level half of the page's buy gate, without the colour. */
   sharedReady: boolean;
@@ -156,7 +157,7 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
     dimension,
     sharedOptionValueIds,
     fulfillmentType,
-    transportMethod,
+    route,
     warrantyPlanId,
     sharedReady,
     sharedLabel = '',
@@ -192,7 +193,7 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
 
   // --------------------------------------------------------------- quotes
   /** The shared selection a quote answers. A change re-quotes every row with a quantity. */
-  const sharedKey = JSON.stringify([sharedOptionValueIds, fulfillmentType, transportMethod, warrantyPlanId, dimension]);
+  const sharedKey = JSON.stringify([sharedOptionValueIds, fulfillmentType, route, warrantyPlanId, dimension]);
   const [quotes, setQuotes] = useState<Record<string, RowQuote>>({});
   const [quoteFailed, setQuoteFailed] = useState<Record<string, boolean>>({});
   const inFlight = useRef(new Map<string, AbortController>());
@@ -235,7 +236,7 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
             optionId: ids[0] || undefined,
             optionValueIds: ids.length ? ids : undefined,
             colorId: lineColour(r.id) || undefined,
-            transportMethod: transportMethod || undefined,
+            transportMethod: route || undefined,
             fulfillmentType: fulfillmentType || undefined,
             warrantyPlanId: warrantyPlanId || undefined,
           },
@@ -272,7 +273,7 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
         });
     }
     // `tick` re-runs this when a slot frees.
-  }, [rows, quantities, quotes, quoteFailed, sharedKey, sharedReady, tick, lineIds, lineColour, productSlug, transportMethod, fulfillmentType, warrantyPlanId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rows, quantities, quotes, quoteFailed, sharedKey, sharedReady, tick, lineIds, lineColour, productSlug, route, fulfillmentType, warrantyPlanId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const freshQuote = (rowId: string): RowQuote | null => quotes[quoteKey(rowId)] ?? null;
 
@@ -440,7 +441,7 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
         })),
       };
       if (fulfillmentType) body.fulfillmentType = fulfillmentType;
-      if (fulfillmentType === 'pre_order' && transportMethod) body.transportMethod = transportMethod;
+      if (fulfillmentType === 'pre_order' && route) body.transportMethod = route;
       if (warrantyPlanId) body.warrantyPlanId = warrantyPlanId;
       if (replaceCart) body.replaceCart = true;
       const res = await api.post<{ items: CartItem[]; added: AddedLine[] }>('/api/cart/items/batch', body);
