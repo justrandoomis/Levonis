@@ -997,6 +997,36 @@ test('close with two end-of-queue holds: neither is open work, /run/finish close
   }
 });
 
+test('review 2: a hold still queued is not a block — open and run summaries stay "in progress" and list it; the close calls it partial', async () => {
+  const w = new World({ holds: { 'ams-2-pro': 'OWNER_HIDDEN' } });
+  try {
+    // mode open: nothing is blocked, nothing is processed, the hold is queued last.
+    assert.equal(await w.importer({ mode: 'open', runId: '' }).main(), 0, w.logLines.join('\n'));
+    const opened = readFileSync(w.summaryFile, 'utf8');
+    assert.match(opened, /^## Bambu Lab import: in progress/m, opened);
+    assert.doesNotMatch(opened, /partial/);
+    assert.match(opened, /- HELD `ams-2-pro` OWNER_HIDDEN/, 'the hold is named all the same');
+    assert.match(opened, /\| resumption_instruction \| - \|/, 'nothing to resume');
+    // The canary (max_items 1): one COMPLETE, the hold still queued, more to do.
+    assert.equal(await w.importer({ maxItems: 1, chain: false }).main(), 0, w.logLines.join('\n'));
+    assert.deepEqual({ more: w.outputs.more, blocked: w.outputs.blocked }, { more: 'true', blocked: 'false' });
+    assert.equal(w.item('filament-buffer').state, 'COMPLETE');
+    assert.equal(w.item('ams-2-pro').state, 'DISCOVERED');
+    const ran = readFileSync(w.summaryFile, 'utf8');
+    assert.match(ran, /^## Bambu Lab import: in progress/m, ran);
+    assert.doesNotMatch(ran, /partial|BLOCKED or withdrawn/);
+    assert.match(ran, /- HELD `ams-2-pro` OWNER_HIDDEN/);
+    assert.match(ran, /\| resumption_instruction \| - \|/);
+    // The close: the hold is what makes the run partial, and the summary says so in those words.
+    assert.equal(await w.importer({ mode: 'close' }).main(), 0, w.logLines.join('\n'));
+    const closed = readFileSync(w.summaryFile, 'utf8');
+    assert.match(closed, /^## Bambu Lab import: partial/m);
+    assert.match(closed, /The run is \*\*partial\*\*: the items below — BLOCKED, withdrawn at the source, or held by the reviewed manifest — are named here\./);
+  } finally {
+    w.dispose();
+  }
+});
+
 test('/lease refuses a queued item while another is in flight (409): the runner reads the status again and goes on, nothing blocks', async () => {
   const first = '6945416380552';
   const w = new World({ items: { [first]: { state: 'RETRYING', last_completed: 'ENRICHING', retry_at: '2026-10-16T07:00:00.000Z', stage_attempts: 1 } } });
