@@ -23,10 +23,14 @@ has a counterpart on the target maps to exactly one ACTIVE option value or ACTIV
     Steel" = "0.2 mm — Stainless Steel"; nothing semantic: "P1S AMS 2 Pro Combo" is not "P1S AMS 2 Combo", and a
     part code is not a name);
   - a colour by its exact name, or the same Bambu colour code "(NNNNN)", or the colour name without its code when
-    the Levonis colour carries none. A source group none of whose values has a counterpart is not a dimension of the target and
-is not read. A variant that maps to nothing, or whose option values another source variant also maps to (two
-source products on one existing value), is unmapped. Colour-only targets may repeat (a colour is shared by its
-refill and spool variants).
+    the Levonis colour carries none; then, by the integrator's second approval, the same names case-insensitively
+    ("Lilac purple (11700)" = "Lilac Purple");
+  - a source "Printer Model" group with no counterpart on the target is compatibility, not a dimension (third
+    approval): variants that differ only in it are one choice. Flow Type and every other group stay dimensions.
+A source group none of whose values has a counterpart is not a dimension of the target and is not read. A variant
+that maps to nothing, or whose option values another source choice also maps to (two source choices on one existing
+value: Flow Type's Standard and High Flow on one size), is unmapped. Colour-only targets may repeat (a colour is
+shared by its refill and spool variants).
 """
 import hashlib, json, os, re, unicodedata
 
@@ -104,6 +108,14 @@ def value_map_for(page, option_values, colours):
                         found.append(('c', c['id'], 'colour_code'))
                     elif code_of(t) and not code_of(n) and n == strip_code(t):
                         found.append(('c', c['id'], 'name_without_code'))
+                if not found:
+                    # The integrator's second approval (2026-10-16): colour names compare case-insensitively (case only).
+                    for c in act_cols:
+                        n = clean(c['name_en'])
+                        if n.casefold() == t.casefold():
+                            found.append(('c', c['id'], 'case'))
+                        elif code_of(t) and not code_of(n) and n.casefold() == strip_code(t).casefold():
+                            found.append(('c', c['id'], 'name_without_code_case'))
             else:
                 found = [('o', o['value_id'], 'exact') for o in act_ovs if clean(o['name_en']) == t]
                 if not found:
@@ -120,6 +132,10 @@ def value_map_for(page, option_values, colours):
         counterpart[label] = bool(hits)
         for t, h in hits.items():
             gmatch[(label, t)] = h
+    # The integrator's third approval (2026-10-16): a source "Printer Model" group with no counterpart on the target is
+    # compatibility, not a dimension — variants that differ only in it are one choice of the target (a hotend sold per
+    # printer). Every other group without a counterpart (Flow Type) still counts in the conflation rule below.
+    compat_only = {clean(g['label']) for g in page['groups'] if clean(g['label']).casefold() == 'printer model' and not counterpart[clean(g['label'])]}
     vm, unmapped, keys = {}, [], {}
     for sku in page['skus']:
         ids, colour, ok = [], None, True
@@ -148,12 +164,14 @@ def value_map_for(page, option_values, colours):
         if colour:
             e['color_id'] = colour
         vm[sku['id']] = e
-        keys.setdefault((tuple(sorted(ids)), colour), []).append(sku['id'])
-    for (ids, _colour), sids in keys.items():
-        if ids and len(sids) > 1:
-            for sid in sids:
-                vm.pop(sid, None)
-                unmapped.append(sid)
+        choice = tuple((clean(p['key']), clean(p['value'])) for p in sku['props'] if clean(p['key']) not in compat_only)
+        keys.setdefault((tuple(sorted(ids)), colour), {}).setdefault(choice, []).append(sku['id'])
+    for (ids, _colour), choices in keys.items():
+        if ids and len(choices) > 1:
+            for sids in choices.values():
+                for sid in sids:
+                    vm.pop(sid, None)
+                    unmapped.append(sid)
     order = {s['id']: i for i, s in enumerate(page['skus'])}
     vm = {k: vm[k] for k in sorted(vm, key=lambda k: order[k])}
     unmapped = sorted(set(unmapped), key=lambda k: order[k])

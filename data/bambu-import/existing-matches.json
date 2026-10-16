@@ -204,24 +204,84 @@
       "source_handle": "bambu-hotend-a1-a2",
       "levonis_product_id": "prd_543be33251174072a97f",
       "decision": "merge_publish",
-      "value_map": {},
-      "unmapped_variants": [
-        "737888342695104517",
-        "737888342695104522",
-        "737888342695104527",
-        "737888342695104532",
-        "737888342695104537",
-        "737888342695104542",
-        "737888342695104547",
-        "737888342695104552",
-        "737888342695104557",
-        "737888342695104562",
-        "737888342695104567",
-        "737888342695104572",
-        "737888342695104577",
-        "737888342695104582",
-        "737888342695104587"
-      ],
+      "value_map": {
+        "737888342695104517": {
+          "option_value_ids": [
+            "size-04-hs-1908msz"
+          ]
+        },
+        "737888342695104522": {
+          "option_value_ids": [
+            "size-06-hs-1908msz"
+          ]
+        },
+        "737888342695104527": {
+          "option_value_ids": [
+            "size-08-hs-1908msz"
+          ]
+        },
+        "737888342695104532": {
+          "option_value_ids": [
+            "size-02-ss-1908msz"
+          ]
+        },
+        "737888342695104537": {
+          "option_value_ids": [
+            "size-04-ss"
+          ]
+        },
+        "737888342695104542": {
+          "option_value_ids": [
+            "size-04-hs-1908msz"
+          ]
+        },
+        "737888342695104547": {
+          "option_value_ids": [
+            "size-06-hs-1908msz"
+          ]
+        },
+        "737888342695104552": {
+          "option_value_ids": [
+            "size-08-hs-1908msz"
+          ]
+        },
+        "737888342695104557": {
+          "option_value_ids": [
+            "size-02-ss-1908msz"
+          ]
+        },
+        "737888342695104562": {
+          "option_value_ids": [
+            "size-04-ss"
+          ]
+        },
+        "737888342695104567": {
+          "option_value_ids": [
+            "size-04-hs-1908msz"
+          ]
+        },
+        "737888342695104572": {
+          "option_value_ids": [
+            "size-06-hs-1908msz"
+          ]
+        },
+        "737888342695104577": {
+          "option_value_ids": [
+            "size-08-hs-1908msz"
+          ]
+        },
+        "737888342695104582": {
+          "option_value_ids": [
+            "size-02-ss-1908msz"
+          ]
+        },
+        "737888342695104587": {
+          "option_value_ids": [
+            "size-04-ss"
+          ]
+        }
+      },
+      "unmapped_variants": [],
       "reason": "same_model",
       "approval_ref": "DECISIONS row 242",
       "reviewed_by": "p0-step-3e-review",
@@ -523,6 +583,9 @@
         "40489682075784": {
           "color_id": "bl-pla-matte-ice-blue"
         },
+        "40489682108552": {
+          "color_id": "bl-pla-matte-lilac-purple"
+        },
         "40489682141320": {
           "color_id": "bl-pla-matte-marine-blue"
         },
@@ -584,9 +647,7 @@
           "color_id": "bl-pla-matte-nardo-gray"
         }
       },
-      "unmapped_variants": [
-        "40489682108552"
-      ],
+      "unmapped_variants": [],
       "reason": "same_model",
       "approval_ref": "DECISIONS row 242",
       "reviewed_by": "p0-step-3e-review",
@@ -1232,27 +1293,99 @@
       "source_handle": "bambu-high-flow-hotend-h2-p2s-x2d",
       "levonis_product_id": "prd_04b5f3bc920545c09362",
       "decision": "merge_publish",
-      "value_map": {},
-      "unmapped_variants": [
-        "763236615601614850",
-        "763236615601614855",
-        "763238932346396674",
-        "763238932346396679",
-        "763238932350590980",
-        "776234881897246720",
-        "776234881897246725",
-        "776234881897246730",
-        "776234881897246735",
-        "776234881897246740",
-        "776234881897246745",
-        "776234881897246750",
-        "776234881897246755",
-        "776234881897246760",
-        "776234881897246765",
-        "776234881897246770",
-        "776234881897246775",
-        "776234881897246780"
-      ],
+      "value_map": {
+        "763236615601614850": {
+          "option_value_ids": [
+            "size-04-hs-0qdm1uz"
+          ]
+        },
+        "763236615601614855": {
+          "option_value_ids": [
+            "size-06-hs-0qdm1uz"
+          ]
+        },
+        "763238932346396674": {
+          "option_value_ids": [
+            "size-04-hs-0qdm1uz"
+          ]
+        },
+        "763238932346396679": {
+          "option_value_ids": [
+            "size-06-hs-0qdm1uz"
+          ]
+        },
+        "763238932350590980": {
+          "option_value_ids": [
+            "size-08-hs-0qdm1uz"
+          ]
+        },
+        "776234881897246720": {
+          "option_value_ids": [
+            "size-08-hs-0qdm1uz"
+          ]
+        },
+        "776234881897246725": {
+          "option_value_ids": [
+            "size-04-hs-0qdm1uz"
+          ]
+        },
+        "776234881897246730": {
+          "option_value_ids": [
+            "size-06-hs-0qdm1uz"
+          ]
+        },
+        "776234881897246735": {
+          "option_value_ids": [
+            "size-08-hs-0qdm1uz"
+          ]
+        },
+        "776234881897246740": {
+          "option_value_ids": [
+            "size-04-hs-0qdm1uz"
+          ]
+        },
+        "776234881897246745": {
+          "option_value_ids": [
+            "size-06-hs-0qdm1uz"
+          ]
+        },
+        "776234881897246750": {
+          "option_value_ids": [
+            "size-08-hs-0qdm1uz"
+          ]
+        },
+        "776234881897246755": {
+          "option_value_ids": [
+            "size-04-hs-0qdm1uz"
+          ]
+        },
+        "776234881897246760": {
+          "option_value_ids": [
+            "size-06-hs-0qdm1uz"
+          ]
+        },
+        "776234881897246765": {
+          "option_value_ids": [
+            "size-08-hs-0qdm1uz"
+          ]
+        },
+        "776234881897246770": {
+          "option_value_ids": [
+            "size-04-hs-0qdm1uz"
+          ]
+        },
+        "776234881897246775": {
+          "option_value_ids": [
+            "size-06-hs-0qdm1uz"
+          ]
+        },
+        "776234881897246780": {
+          "option_value_ids": [
+            "size-08-hs-0qdm1uz"
+          ]
+        }
+      },
+      "unmapped_variants": [],
       "reason": "same_model",
       "approval_ref": "DECISIONS row 242",
       "reviewed_by": "p0-step-3e-review",
@@ -1264,27 +1397,48 @@
       "levonis_product_id": "prd_c1d2ebe72024422888e4",
       "levonis_slug": "bambu-hotend-h2-p2s-x2d-standard-flow",
       "decision": "merge",
-      "value_map": {},
+      "value_map": {
+        "720440262071091201": {
+          "option_value_ids": [
+            "size-02-ss"
+          ]
+        },
+        "775924445524066304": {
+          "option_value_ids": [
+            "size-02-ss"
+          ]
+        },
+        "775924445524066328": {
+          "option_value_ids": [
+            "size-02-ss"
+          ]
+        },
+        "775924445524066352": {
+          "option_value_ids": [
+            "size-02-ss"
+          ]
+        },
+        "775924445524066376": {
+          "option_value_ids": [
+            "size-02-ss"
+          ]
+        }
+      },
       "unmapped_variants": [
-        "720440262071091201",
         "720440262071091213",
         "720440262071091225",
         "720440262071091231",
         "720440262071091237",
         "775921387696074752",
-        "775924445524066304",
         "775924445524066310",
         "775924445524066316",
         "775924445524066322",
-        "775924445524066328",
         "775924445524066334",
         "775924445524066340",
         "775924445524066346",
-        "775924445524066352",
         "775924445524066358",
         "775924445524066364",
         "775924445524066370",
-        "775924445524066376",
         "775924445524066382",
         "775924445524066388",
         "775924445524066394",

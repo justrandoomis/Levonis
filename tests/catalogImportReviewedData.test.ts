@@ -85,7 +85,7 @@ test('the committed reviewed files parse with the Worker\'s own parser, byte for
   const total = (d: string, f: (e: (typeof b.matches.entries)[number]) => number) => b.matches.entries.filter((e) => e.decision === d).reduce((n, e) => n + f(e), 0);
   assert.deepEqual(
     { merge: [total('merge', (e) => Object.keys(e.value_map).length), total('merge', (e) => e.unmapped_variants.length)], merge_publish: [total('merge_publish', (e) => Object.keys(e.value_map).length), total('merge_publish', (e) => e.unmapped_variants.length)] },
-    { merge: [174, 65], merge_publish: [44, 99] }
+    { merge: [179, 60], merge_publish: [78, 65] }
   );
   assert.equal(b.taxonomy.snapshot_sha256, SNAPSHOT_SHA256);
   for (const f of ['existing-matches.json', 'compat-targets.json', 'taxonomy-map.json']) {
