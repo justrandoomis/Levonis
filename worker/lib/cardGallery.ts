@@ -8,9 +8,10 @@
  * gallery: every picture with seventeen keys (three alt texts, the storage
  * key, byte size, content type, the option / colour / variant it is bound
  * to, …) plus the same URLs again in `images`. A card draws ONE picture. On
- * the live catalogue that was 148 KB of the 165 KB `/api/products?limit=50`
- * answer (26 KB → about 5 KB on the wire), one Bambu filament alone carrying
- * 31 gallery entries, and it grows with every imported product.
+ * the live catalogue (2026-10-16) that was 144 KB of the 172 KB
+ * `/api/products?limit=50` answer — 26.6 KB on the wire, 5.6 KB without it —
+ * one Bambu filament alone carrying 31 gallery entries, and it grows with
+ * every imported product.
  *
  * WHICH PICTURE. The one every card reader already chooses, chosen here by the
  * same rule, so no card, tile, banner or old cached bundle can change its
@@ -55,7 +56,7 @@ const isPublicFile = (url: string): boolean => publicMediaUrl('', url) !== null;
 
 /**
  * The picture a card shows — src/lib/productImage.ts `productPrimaryImage`,
- * the same three steps in the same order (tests/cardGallery.test.ts holds the
+ * the same three steps in the same order (tests/cardProjection.test.ts holds the
  * two equal).
  */
 export function cardLeadUrl(media: readonly unknown[], images: readonly unknown[]): string {
