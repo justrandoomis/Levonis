@@ -1,4 +1,7 @@
 {
-  "version": 1,
-  "overrides": []
+ "version": 1,
+ "status": "Bundled for step 9 unchanged from the P0 draft: empty, no reviewed override (no image bytes were reviewed; candidates stay in scans.json for a later visual review). Entries, when added, use the runner's spelling {resourceFileId, valueIds, variantIds}.",
+ "reviewed_by": "p0-agent (draft)",
+ "reviewed_at": "2026-10-15",
+ "overrides": []
 }

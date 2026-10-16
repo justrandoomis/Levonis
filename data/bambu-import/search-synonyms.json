@@ -1,4 +1,643 @@
 {
-  "version": 1,
-  "rows": []
+ "version": 1,
+ "status": "Bundled for step 9 unchanged from the P0 draft: inserted by /run/prepare-taxonomy with INSERT OR IGNORE (an existing or owner-added term is never overwritten); names stay English, these only route ar/ckb searches.",
+ "reviewed_by": "p0-agent (draft)",
+ "reviewed_at": "2026-10-15",
+ "direction": "term -> canonical (search_synonyms(term, canonical))",
+ "rows": [
+  {
+   "term": "ايه2ال",
+   "term_normalized": "ايه2ال",
+   "canonical": "a2l",
+   "lang": "ar",
+   "kind": "model",
+   "products_with_canonical": 110
+  },
+  {
+   "term": "اي2ال",
+   "term_normalized": "اي2ال",
+   "canonical": "a2l",
+   "lang": "ar",
+   "kind": "model",
+   "products_with_canonical": 110
+  },
+  {
+   "term": "بي1اس",
+   "term_normalized": "بي1اس",
+   "canonical": "p1s",
+   "lang": "ar",
+   "kind": "model",
+   "products_with_canonical": 11
+  },
+  {
+   "term": "بي2اس",
+   "term_normalized": "بي2اس",
+   "canonical": "p2s",
+   "lang": "ar",
+   "kind": "model",
+   "products_with_canonical": 141
+  },
+  {
+   "term": "اكس1سي",
+   "term_normalized": "اكس1سي",
+   "canonical": "x1c",
+   "lang": "ar",
+   "kind": "model",
+   "products_with_canonical": 22
+  },
+  {
+   "term": "اكس1",
+   "term_normalized": "اكس1",
+   "canonical": "x1",
+   "lang": "ar",
+   "kind": "model",
+   "products_with_canonical": 114
+  },
+  {
+   "term": "اتش2اس",
+   "term_normalized": "اتش2اس",
+   "canonical": "h2s",
+   "lang": "ar",
+   "kind": "model",
+   "products_with_canonical": 51
+  },
+  {
+   "term": "اتش2سي",
+   "term_normalized": "اتش2سي",
+   "canonical": "h2c",
+   "lang": "ar",
+   "kind": "model",
+   "products_with_canonical": 76
+  },
+  {
+   "term": "ار1",
+   "term_normalized": "ار1",
+   "canonical": "r1",
+   "lang": "ar",
+   "kind": "model",
+   "products_with_canonical": 82
+  },
+  {
+   "term": "لايت",
+   "term_normalized": "لايت",
+   "canonical": "lite",
+   "lang": "ar",
+   "kind": "model",
+   "products_with_canonical": 18
+  },
+  {
+   "term": "برو",
+   "term_normalized": "برو",
+   "canonical": "pro",
+   "lang": "ar",
+   "kind": "model",
+   "products_with_canonical": 25
+  },
+  {
+   "term": "اتش تي",
+   "term_normalized": "اتش تي",
+   "canonical": "ht",
+   "lang": "ar",
+   "kind": "model",
+   "products_with_canonical": 23
+  },
+  {
+   "term": "سايبر بريك",
+   "term_normalized": "سايبر بريك",
+   "canonical": "cyberbrick",
+   "lang": "ar",
+   "kind": "model",
+   "products_with_canonical": 57
+  },
+  {
+   "term": "سايبربريك",
+   "term_normalized": "سايبربريك",
+   "canonical": "cyberbrick",
+   "lang": "ar",
+   "kind": "model",
+   "products_with_canonical": 57
+  },
+  {
+   "term": "سلسلة",
+   "term_normalized": "سلسله",
+   "canonical": "series",
+   "lang": "ar",
+   "kind": "model",
+   "products_with_canonical": 371
+  },
+  {
+   "term": "عبوة بدون بكرة",
+   "term_normalized": "عبوه بدون بكره",
+   "canonical": "refill",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 14
+  },
+  {
+   "term": "ريفل",
+   "term_normalized": "ريفل",
+   "canonical": "refill",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 14
+  },
+  {
+   "term": "مع بكرة",
+   "term_normalized": "مع بكره",
+   "canonical": "spool",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 57
+  },
+  {
+   "term": "بكرة قابلة لاعادة الاستخدام",
+   "term_normalized": "بكره قابله لاعاده الاستخدام",
+   "canonical": "reusable",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 2
+  },
+  {
+   "term": "بي اي اي",
+   "term_normalized": "بي اي اي",
+   "canonical": "pei",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 3
+  },
+  {
+   "term": "مطفي",
+   "term_normalized": "مطفي",
+   "canonical": "matte",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 5
+  },
+  {
+   "term": "مات",
+   "term_normalized": "مات",
+   "canonical": "matte",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 5
+  },
+  {
+   "term": "متوهج",
+   "term_normalized": "متوهج",
+   "canonical": "glow",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 1
+  },
+  {
+   "term": "مضيء",
+   "term_normalized": "مضيء",
+   "canonical": "glow",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 1
+  },
+  {
+   "term": "رخامي",
+   "term_normalized": "رخامي",
+   "canonical": "marble",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 3
+  },
+  {
+   "term": "معدني",
+   "term_normalized": "معدني",
+   "canonical": "metal",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 4
+  },
+  {
+   "term": "خشبي",
+   "term_normalized": "خشبي",
+   "canonical": "wood",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 1
+  },
+  {
+   "term": "شفاف نصفي",
+   "term_normalized": "شفاف نصفي",
+   "canonical": "translucent",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 4
+  },
+  {
+   "term": "متدرج",
+   "term_normalized": "متدرج",
+   "canonical": "gradient",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 1
+  },
+  {
+   "term": "الياف كربون",
+   "term_normalized": "الياف كربون",
+   "canonical": "cf",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 8
+  },
+  {
+   "term": "الياف زجاج",
+   "term_normalized": "الياف زجاج",
+   "canonical": "gf",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 2
+  },
+  {
+   "term": "اي اس اي",
+   "term_normalized": "اي اس اي",
+   "canonical": "asa",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 5
+  },
+  {
+   "term": "بولي كربونات",
+   "term_normalized": "بولي كربونات",
+   "canonical": "pc",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 6
+  },
+  {
+   "term": "بي في اي",
+   "term_normalized": "بي في اي",
+   "canonical": "pva",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 1
+  },
+  {
+   "term": "دعامات",
+   "term_normalized": "دعامات",
+   "canonical": "support",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 14
+  },
+  {
+   "term": "مادة الدعم",
+   "term_normalized": "ماده الدعم",
+   "canonical": "support",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 14
+  },
+  {
+   "term": "لوح خشب",
+   "term_normalized": "لوح خشب",
+   "canonical": "plywood",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 7
+  },
+  {
+   "term": "اكريليك",
+   "term_normalized": "اكريليك",
+   "canonical": "acrylic",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 5
+  },
+  {
+   "term": "فينيل",
+   "term_normalized": "فينيل",
+   "canonical": "vinyl",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 6
+  },
+  {
+   "term": "جلد صناعي",
+   "term_normalized": "جلد صناعي",
+   "canonical": "leatherette",
+   "lang": "ar",
+   "kind": "material",
+   "products_with_canonical": 1
+  },
+  {
+   "term": "هوت اند",
+   "term_normalized": "هوت اند",
+   "canonical": "hotend",
+   "lang": "ar",
+   "kind": "product_type",
+   "products_with_canonical": 38
+  },
+  {
+   "term": "هوتند",
+   "term_normalized": "هوتند",
+   "canonical": "hotend",
+   "lang": "ar",
+   "kind": "product_type",
+   "products_with_canonical": 38
+  },
+  {
+   "term": "راس الطباعة",
+   "term_normalized": "راس الطباعه",
+   "canonical": "hotend",
+   "lang": "ar",
+   "kind": "product_type",
+   "products_with_canonical": 38
+  },
+  {
+   "term": "صفيحة طباعة",
+   "term_normalized": "صفيحه طباعه",
+   "canonical": "plate",
+   "lang": "ar",
+   "kind": "product_type",
+   "products_with_canonical": 15
+  },
+  {
+   "term": "لوح طباعة",
+   "term_normalized": "لوح طباعه",
+   "canonical": "plate",
+   "lang": "ar",
+   "kind": "product_type",
+   "products_with_canonical": 15
+  },
+  {
+   "term": "سطح الطباعة",
+   "term_normalized": "سطح الطباعه",
+   "canonical": "plate",
+   "lang": "ar",
+   "kind": "product_type",
+   "products_with_canonical": 15
+  },
+  {
+   "term": "ليزر",
+   "term_normalized": "ليزر",
+   "canonical": "laser",
+   "lang": "ar",
+   "kind": "product_type",
+   "products_with_canonical": 184
+  },
+  {
+   "term": "حفر بالليزر",
+   "term_normalized": "حفر بالليزر",
+   "canonical": "laser",
+   "lang": "ar",
+   "kind": "product_type",
+   "products_with_canonical": 184
+  },
+  {
+   "term": "قص بالشفرة",
+   "term_normalized": "قص بالشفره",
+   "canonical": "cutting",
+   "lang": "ar",
+   "kind": "product_type",
+   "products_with_canonical": 41
+  },
+  {
+   "term": "براغي",
+   "term_normalized": "براغي",
+   "canonical": "screw",
+   "lang": "ar",
+   "kind": "product_type",
+   "products_with_canonical": 29
+  },
+  {
+   "term": "مغناطيس",
+   "term_normalized": "مغناطيس",
+   "canonical": "magnet",
+   "lang": "ar",
+   "kind": "product_type",
+   "products_with_canonical": 7
+  },
+  {
+   "term": "محمل",
+   "term_normalized": "محمل",
+   "canonical": "bearings",
+   "lang": "ar",
+   "kind": "product_type",
+   "products_with_canonical": 5
+  },
+  {
+   "term": "محرك",
+   "term_normalized": "محرك",
+   "canonical": "motor",
+   "lang": "ar",
+   "kind": "product_type",
+   "products_with_canonical": 39
+  },
+  {
+   "term": "مروحة",
+   "term_normalized": "مروحه",
+   "canonical": "fan",
+   "lang": "ar",
+   "kind": "product_type",
+   "products_with_canonical": 29
+  },
+  {
+   "term": "حزام",
+   "term_normalized": "حزام",
+   "canonical": "belt",
+   "lang": "ar",
+   "kind": "product_type",
+   "products_with_canonical": 26
+  },
+  {
+   "term": "انبوب تفلون",
+   "term_normalized": "انبوب تفلون",
+   "canonical": "ptfe",
+   "lang": "ar",
+   "kind": "product_type",
+   "products_with_canonical": 13
+  },
+  {
+   "term": "كاشطة",
+   "term_normalized": "كاشطه",
+   "canonical": "scraper",
+   "lang": "ar",
+   "kind": "product_type",
+   "products_with_canonical": 3
+  },
+  {
+   "term": "غراء",
+   "term_normalized": "غراء",
+   "canonical": "glue",
+   "lang": "ar",
+   "kind": "product_type",
+   "products_with_canonical": 3
+  },
+  {
+   "term": "ماسوورە",
+   "term_normalized": "ماسووره",
+   "canonical": "spool",
+   "lang": "ckb",
+   "kind": "material",
+   "products_with_canonical": 57
+  },
+  {
+   "term": "پڕکردنەوە",
+   "term_normalized": "پڕكردنهوه",
+   "canonical": "refill",
+   "lang": "ckb",
+   "kind": "material",
+   "products_with_canonical": 14
+  },
+  {
+   "term": "ڕیشاڵی کاربۆن",
+   "term_normalized": "ڕيشاڵي كاربۆن",
+   "canonical": "cf",
+   "lang": "ckb",
+   "kind": "material",
+   "products_with_canonical": 8
+  },
+  {
+   "term": "ڕیشاڵی شووشە",
+   "term_normalized": "ڕيشاڵي شووشه",
+   "canonical": "gf",
+   "lang": "ckb",
+   "kind": "material",
+   "products_with_canonical": 2
+  },
+  {
+   "term": "پاڵپشت",
+   "term_normalized": "پاڵپشت",
+   "canonical": "support",
+   "lang": "ckb",
+   "kind": "material",
+   "products_with_canonical": 14
+  },
+  {
+   "term": "ئاکریلیک",
+   "term_normalized": "ياكريليك",
+   "canonical": "acrylic",
+   "lang": "ckb",
+   "kind": "material",
+   "products_with_canonical": 5
+  },
+  {
+   "term": "ڤاینل",
+   "term_normalized": "ڤاينل",
+   "canonical": "vinyl",
+   "lang": "ckb",
+   "kind": "material",
+   "products_with_canonical": 6
+  },
+  {
+   "term": "نۆزڵ",
+   "term_normalized": "نۆزڵ",
+   "canonical": "nozzle",
+   "lang": "ckb",
+   "kind": "product_type",
+   "products_with_canonical": 17
+  },
+  {
+   "term": "هۆتئێند",
+   "term_normalized": "هۆتيێند",
+   "canonical": "hotend",
+   "lang": "ckb",
+   "kind": "product_type",
+   "products_with_canonical": 38
+  },
+  {
+   "term": "پلێتی چاپ",
+   "term_normalized": "پلێتي چاپ",
+   "canonical": "plate",
+   "lang": "ckb",
+   "kind": "product_type",
+   "products_with_canonical": 15
+  },
+  {
+   "term": "لەیزەر",
+   "term_normalized": "لهيزهر",
+   "canonical": "laser",
+   "lang": "ckb",
+   "kind": "product_type",
+   "products_with_canonical": 184
+  },
+  {
+   "term": "پارچەی یەدەگ",
+   "term_normalized": "پارچهي يهدهگ",
+   "canonical": "parts",
+   "lang": "ckb",
+   "kind": "product_type",
+   "products_with_canonical": 647
+  },
+  {
+   "term": "پارچە یەدەگ",
+   "term_normalized": "پارچه يهدهگ",
+   "canonical": "parts",
+   "lang": "ckb",
+   "kind": "product_type",
+   "products_with_canonical": 647
+  },
+  {
+   "term": "پرینتەر",
+   "term_normalized": "پرينتهر",
+   "canonical": "printer",
+   "lang": "ckb",
+   "kind": "product_type",
+   "products_with_canonical": 41
+  },
+  {
+   "term": "بزوێنەر",
+   "term_normalized": "بزوێنهر",
+   "canonical": "motor",
+   "lang": "ckb",
+   "kind": "product_type",
+   "products_with_canonical": 39
+  },
+  {
+   "term": "پانکە",
+   "term_normalized": "پانكه",
+   "canonical": "fan",
+   "lang": "ckb",
+   "kind": "product_type",
+   "products_with_canonical": 29
+  },
+  {
+   "term": "موگناتیس",
+   "term_normalized": "موگناتيس",
+   "canonical": "magnet",
+   "lang": "ckb",
+   "kind": "product_type",
+   "products_with_canonical": 7
+  },
+  {
+   "term": "بڕغی",
+   "term_normalized": "بڕغي",
+   "canonical": "screw",
+   "lang": "ckb",
+   "kind": "product_type",
+   "products_with_canonical": 29
+  },
+  {
+   "term": "سایبەربریک",
+   "term_normalized": "سايبهربريك",
+   "canonical": "cyberbrick",
+   "lang": "ckb",
+   "kind": "model",
+   "products_with_canonical": 57
+  },
+  {
+   "term": "ئەی ئێم ئێس",
+   "term_normalized": "يهي يێم يێس",
+   "canonical": "ams",
+   "lang": "ckb",
+   "kind": "model",
+   "products_with_canonical": 94
+  },
+  {
+   "term": "زنجیرە",
+   "term_normalized": "زنجيره",
+   "canonical": "series",
+   "lang": "ckb",
+   "kind": "model",
+   "products_with_canonical": 371
+  }
+ ],
+ "skipped_already_seeded": [],
+ "dropped_canonical_not_in_catalogue": []
 }
