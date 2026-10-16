@@ -13,8 +13,14 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { parseProductRow, primaryMediaFirst, projectPublic } from '../worker/lib/productModel';
 import type { MediaV2, ProductDoc } from '../worker/lib/productModel';
+import { productDocumentPublic, productRoutes } from '../worker/routes/products';
+import { ROOT } from './fixtures/d1';
+import { asD1, freshDb, get, stubApp } from './fixtures/app';
+import { seedLiveCatalog } from './fixtures/liveCatalog';
 
 /**
  * A real doc, built by the REAL parser from a row shaped like the products
@@ -287,4 +293,88 @@ test('hand-authored spec groups keep their place ahead of the derived ones', () 
   const out = projectPublic(doc) as unknown as { spec_groups: Array<{ id: string }> };
   assert.equal(out.spec_groups[0].id, 'sg_manual');
   assert.equal(out.spec_groups.length, 2);
+});
+
+// ---------------------------------------------------------------------------
+// THE SPEC TABLE IS SENT ONCE (speed audit 2026-10-16, finding 24).
+//
+// The public detail carried the table twice: `spec_groups` (three languages,
+// what the page draws) and the legacy flat `specifications` copy of the same
+// rows, which the page draws only when `spec_groups` has no row. On a printer
+// that second copy was ~30 KB of the preloaded detail, never drawn.
+// ---------------------------------------------------------------------------
+
+/** A hand-typed table: `groups` groups of `rows` rows, every value a unique marker. */
+function tableRows(groups: number, rows: number) {
+  return Array.from({ length: groups }, (_, gi) => ({
+    id: `sg_${gi}`,
+    title_ar: `مجموعة ${gi}`,
+    title_en: `Group ${gi}`,
+    title_ckb: `گرووپی ${gi}`,
+    order: gi,
+    rows: Array.from({ length: rows }, (_, ri) => ({
+      id: `sr_${gi}_${ri}`,
+      label_ar: `الخاصية ${gi}-${ri}`,
+      label_en: `Property ${gi}-${ri}`,
+      label_ckb: `تایبەتمەندی ${gi}-${ri}`,
+      value_ar: `VALUE-MARK-${gi}-${ri} قيمة`,
+      value_en: `VALUE-MARK-${gi}-${ri} value`,
+      value_ckb: `VALUE-MARK-${gi}-${ri} بەها`,
+      unit: 'mm',
+      order: ri,
+    })),
+  }));
+}
+
+test('a product with a spec table publishes it once — the flat legacy copy is empty', () => {
+  const doc = printerDoc({});
+  doc.spec_groups = tableRows(3, 4) as ProductDoc['spec_groups'];
+  const out = productDocumentPublic(doc) as { spec_groups: Array<{ rows: unknown[] }>; specifications: unknown[] };
+  assert.deepEqual(out.specifications, [], 'the flat copy of the table rode along');
+  assert.equal(out.spec_groups.flatMap((g) => g.rows).length, 12, 'the table the page draws is whole');
+  // The derived family groups alone are a table too: no flat copy of those either (it never held them).
+  const derived = productDocumentPublic(printerDoc({ max_acceleration: '10000' })) as { spec_groups: Array<{ rows: unknown[] }>; specifications: unknown[] };
+  assert.ok(derived.spec_groups.some((g) => g.rows.length > 0));
+  assert.deepEqual(derived.specifications, []);
+  // A legacy flat table (`[{key, value}]` in the column) is upgraded into a group — and so sent once too.
+  const legacy = parseProductRow({ id: 'prd_l', slug: 'l', status: 'active', name_en: 'L', price_iqd: 1, specifications: JSON.stringify([{ key: 'الوزن', value: '5 kg' }]) });
+  const legacyOut = productDocumentPublic(legacy) as { spec_groups: Array<{ rows: Array<{ label_ar: string; value_ar: string }> }>; specifications: unknown[] };
+  assert.deepEqual(legacyOut.specifications, []);
+  assert.deepEqual(legacyOut.spec_groups[0].rows.map((r) => [r.label_ar, r.value_ar]), [['الوزن', '5 kg']]);
+});
+
+test('the flat list still rides wherever the page would read it: no group has a row', () => {
+  const doc = printerDoc({});
+  doc.spec_groups = [{ id: 'sg_empty', title_ar: 'فارغة', title_en: 'Empty', title_ckb: 'بەتاڵ', order: 0, rows: [] }];
+  const out = productDocumentPublic(doc) as { spec_groups: Array<{ rows: unknown[] }>; specifications: unknown[] };
+  assert.equal(out.spec_groups.some((g) => g.rows.length > 0), false);
+  assert.ok(Array.isArray(out.specifications), 'the key stays an array for every reader that iterates it');
+  assert.deepEqual(out.specifications, [], 'and it is what the legacy view of no rows is');
+  // The admin document keeps its flat view (the editor and the exports are not on the shop's critical path).
+  const admin = productDocumentPublic(Object.assign(printerDoc({}), { spec_groups: tableRows(1, 2) }), { includeInternal: true }) as { specifications: unknown[] };
+  assert.equal(admin.specifications.length, 2);
+});
+
+test('the product page draws spec_groups first and the flat list only when no group has a row', () => {
+  // The rule the server's `publicSpecifications` mirrors; if the page ever preferred the flat list, an empty one would hide the table.
+  const src = readFileSync(join(ROOT, 'src/pages/Product.tsx'), 'utf8');
+  assert.ok(src.includes('const specGroups = (product.spec_groups ?? []).filter((g) => (g.rows ?? []).length > 0);'));
+  assert.ok(src.includes('const legacySpecs = product.specifications ?? [];'));
+  assert.match(src, /\{specGroups\.length > 0 \? \(\s*<div className="space-y-4">\s*\{specGroups\.map/);
+});
+
+test('through the detail route: every value of the table is in the answer exactly once', async () => {
+  const raw = freshDb();
+  seedLiveCatalog(raw);
+  raw.prepare('UPDATE products SET specifications = ? WHERE slug = ?').run(JSON.stringify(tableRows(4, 10)), 'bambu-lab-x2d');
+  const app = stubApp(asD1(raw), null, (a) => a.route('/api/products', productRoutes));
+  const res = await get(app, '/api/products/bambu-lab-x2d');
+  assert.equal(res.status, 200);
+  const text = await res.text();
+  const body = JSON.parse(text) as { product: { spec_groups: Array<{ rows: unknown[] }>; specifications: unknown[] } };
+  assert.deepEqual(body.product.specifications, []);
+  assert.ok(body.product.spec_groups.flatMap((g) => g.rows).length >= 40);
+  for (const mark of ['VALUE-MARK-0-0 قيمة', 'VALUE-MARK-3-9 قيمة', 'الخاصية 2-5']) {
+    assert.equal(text.split(mark).length - 1, 1, `«${mark}» is in the detail ${text.split(mark).length - 1} times`);
+  }
 });
