@@ -434,8 +434,11 @@ export function speedAttention(rows: readonly VitalsDayRow[], today: string): Sp
  * FX-1 (2026-10-09): 232.6 → 233.4 KB measured — the display currency's exact
  * rate, its per-device cache, tab sync and freshness are first-paint code
  * (FX programme plan §13); the figure follows the build.
+ * The speed lanes (2026-10-18): 233.5 → 235.9 KB measured — the animation
+ * core now rides in the store pages' closure, and the entry carries the
+ * category pages' early reads; the figure follows the build again.
  */
-export const STOREFRONT_FIXED_KB = 231;
+export const STOREFRONT_FIXED_KB = 234;
 /** The Arabic Cairo subset every store page preloads (index.html: 30,896 B); the Latin subsets load on demand. */
 export const STOREFRONT_FONT_KB = 31;
 

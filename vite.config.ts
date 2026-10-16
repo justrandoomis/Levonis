@@ -206,6 +206,20 @@ function iconChunk(id: string, meta: ChunkMeta): string | undefined {
 
 function manualChunks(id: string, meta: ChunkMeta): string | undefined {
   if (id.includes('/src/translations.ts')) return 'vendor-i18n';
+  // THE CORE'S TWO DOORS RIDE WITH THE CORE (speed audit 2026-10-16). The
+  // entry no longer imports the library at all: <MotionFeatures> (with the
+  // features' loader) and the rails' value animator are reached only by lazy
+  // modules and dynamic imports, which need `vendor-motion-core` with them
+  // anyway. Left to Rollup each became a chunk under 1 KB of its own (one more
+  // request, tests/motionLazy.test.ts counts them). Neither imports
+  // application code, so the core's hash still changes only with them.
+  if (/[\\/]src[\\/]lib[\\/](?:motionFeatures\.tsx|motionAnimate\.ts)$/.test(id)) return 'vendor-motion-core';
+  // Vite's dynamic-import helper rides with React, where every page already
+  // has it: <MotionFeatures> asks for the features bundle through it, and a
+  // manual chunk swallows the unassigned dependencies of its modules — left
+  // alone, the helper moved into the core and the entry imported the whole
+  // core back for it. Framework code with React's lifetime, not the app's.
+  if (/vite\/preload-helper/.test(id)) return 'vendor-react';
   // THE STORE LAYOUT'S TABLES AS ONE FILE (review 2026-09-30): the package's
   // three leaf tables (tokens, refs, blocks — no runtime imports of their own)
   // and the storefront's token → class lookups (theme.ts, which imports only

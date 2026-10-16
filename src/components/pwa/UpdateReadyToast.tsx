@@ -24,15 +24,15 @@
  * the main site, the full-screen routes, and a merchant's storefront on its
  * own subdomain. A deploy reaches every one of them.
  */
-// `m` + <MotionFeatures> (src/lib/motionFeatures.tsx): this module is in the
-// entry (main.tsx calls `watchForUpdates`), so the `motion` proxy's feature
-// set must not ride with it before the first paint.
-import { AnimatePresence } from 'motion/react';
-import * as Motion from 'motion/react-m';
-import { useState, useSyncExternalStore } from 'react';
+// NO ANIMATION LIBRARY (speed audit 2026-10-16): this module is in the entry
+// (main.tsx calls `watchForUpdates`), and its `AnimatePresence` + `m.div` made
+// the library's core (32 KB gzip) part of every first download — for a line
+// that never shows on a first visit. It rises with the Web Animations API on
+// the house `ui` spring's timing (src/lib/presenceFade.ts).
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useLanguage } from '../../LanguageContext';
 import { useMotion } from '../../lib/motion';
-import { MotionFeatures, useMotionFeaturesFailed } from '../../lib/motionFeatures';
+import { fadeTiming } from '../../lib/presenceFade';
 import { UI_LAYERS } from '../ui/overlayLayers';
 
 let waiting: ServiceWorker | null = null;
@@ -97,6 +97,10 @@ export function watchForUpdates(registration: ServiceWorkerRegistration): void {
 
 let reloading = false;
 
+/** It rises 16 px as it fades in, and falls as it leaves; under reduced motion a cross-fade only. */
+const AWAY = (reduced: boolean): Keyframe => (reduced ? { opacity: 0 } : { opacity: 0, transform: 'translateY(16px)' });
+const HERE = (reduced: boolean): Keyframe => (reduced ? { opacity: 1 } : { opacity: 1, transform: 'none' });
+
 function onControllerChange(): void {
   if (reloading) return;
   reloading = true;
@@ -111,7 +115,6 @@ function onControllerChange(): void {
 export default function UpdateReadyToast() {
   const { t } = useLanguage();
   const m = useMotion();
-  const atRest = useMotionFeaturesFailed();
   const ready = useSyncExternalStore(
     updateReadyStore.subscribe,
     updateReadyStore.snapshot,
@@ -136,49 +139,67 @@ export default function UpdateReadyToast() {
 
   const visible = ready && !hidden;
 
+  // In at once, out when the fade has finished (the line stays in the document for its exit).
+  const [present, setPresent] = useState(false);
+  if (visible && !present) setPresent(true);
+  const line = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const el = line.current;
+    if (!visible || !el || typeof el.animate !== 'function') return;
+    const rise = el.animate([AWAY(m.reduced), HERE(m.reduced)], fadeTiming(m.reduced, 'ui'));
+    return () => rise.cancel();
+  }, [visible, m.reduced]);
+  useEffect(() => {
+    if (visible || !present) return;
+    const el = line.current;
+    if (!el || typeof el.animate !== 'function') {
+      setPresent(false);
+      return;
+    }
+    const fall = el.animate([AWAY(m.reduced)], { ...fadeTiming(m.reduced, 'ui'), fill: 'forwards' });
+    fall.onfinish = () => setPresent(false);
+    return () => {
+      fall.onfinish = null;
+      fall.cancel();
+    };
+  }, [visible, present, m.reduced]);
+
+  if (!present) return null;
+
   return (
-    <AnimatePresence>
-      {visible && (
-        <MotionFeatures>
-        <Motion.div
-          // `--nav-stack` is the single source of truth for how much of the
-          // bottom edge the floating BottomNav owns (src/index.css). Guessing
-          // a pixel offset here is precisely how the cart's summary bar ended
-          // up inside the nav's gradient scrim, which is what
-          // its old fixed 80px (100px from sm) offset was.
-          style={{ bottom: 'calc(var(--nav-stack) + 0.5rem)', zIndex: UI_LAYERS.popover }}
-          className="fixed inset-x-3 mx-auto max-w-sm rounded-xl border border-border-subtle bg-surface-raised px-4 py-3 shadow-2xl"
-          role="status"
-          data-update-toast
-          initial={atRest ? false : m.reduced ? { opacity: 0 } : { opacity: 0, y: 16 }}
-          animate={m.reduced ? { opacity: 1 } : { opacity: 1, y: 0 }}
-          exit={m.reduced ? { opacity: 0 } : { opacity: 0, y: 16 }}
-          transition={m.spring('ui')}
-        >
-          <div className="flex items-center justify-between gap-3">
-            <p className="min-w-0 text-[13px] font-bold text-white">{t('pwaUpdateReady')}</p>
-            <div className="flex shrink-0 items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setHidden(true)}
-                disabled={busy}
-                className="min-h-[36px] rounded-lg px-3 text-[12px] font-medium text-zinc-400 transition-colors hover:text-white disabled:opacity-50"
-              >
-                {t('pwaUpdateLater')}
-              </button>
-              <button
-                type="button"
-                onClick={apply}
-                disabled={busy}
-                className="min-h-[36px] rounded-lg bg-gold px-3 text-[12px] font-bold text-accent-contrast transition-opacity hover:opacity-90 disabled:opacity-60"
-              >
-                {busy ? t('pwaUpdateApplying') : t('pwaUpdateAction')}
-              </button>
-            </div>
-          </div>
-        </Motion.div>
-        </MotionFeatures>
-      )}
-    </AnimatePresence>
+    <div
+      ref={line}
+      // `--nav-stack` is the single source of truth for how much of the
+      // bottom edge the floating BottomNav owns (src/index.css). Guessing
+      // a pixel offset here is precisely how the cart's summary bar ended
+      // up inside the nav's gradient scrim, which is what
+      // its old fixed 80px (100px from sm) offset was.
+      style={{ bottom: 'calc(var(--nav-stack) + 0.5rem)', zIndex: UI_LAYERS.popover }}
+      className="fixed inset-x-3 mx-auto max-w-sm rounded-xl border border-border-subtle bg-surface-raised px-4 py-3 shadow-2xl"
+      role="status"
+      data-update-toast
+    >
+      <div className="flex items-center justify-between gap-3">
+        <p className="min-w-0 text-[13px] font-bold text-white">{t('pwaUpdateReady')}</p>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setHidden(true)}
+            disabled={busy}
+            className="min-h-[36px] rounded-lg px-3 text-[12px] font-medium text-zinc-400 transition-colors hover:text-white disabled:opacity-50"
+          >
+            {t('pwaUpdateLater')}
+          </button>
+          <button
+            type="button"
+            onClick={apply}
+            disabled={busy}
+            className="min-h-[36px] rounded-lg bg-gold px-3 text-[12px] font-bold text-accent-contrast transition-opacity hover:opacity-90 disabled:opacity-60"
+          >
+            {busy ? t('pwaUpdateApplying') : t('pwaUpdateAction')}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

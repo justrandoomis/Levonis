@@ -50,7 +50,7 @@ const KB = 1024;
  * 60 KB, and the budget is re-cut to 120 KB: comfortable headroom for ordinary
  * work, tight enough that re-eagering a page is caught the same day.
  */
-const ENTRY_BUDGET = 72 * KB;
+const ENTRY_BUDGET = 68 * KB; // 72 → 68 (speed audit 2026-10-16: 62.8 KB measured)
 /** §10: any single route chunk. */
 const CHUNK_BUDGET = 250 * KB;
 /**
@@ -71,7 +71,16 @@ const CHUNK_BUDGET = 250 * KB;
  * 1.6 KB) still fits, so the guard is the pair of «never in the initial
  * payload» lists below, which name them; the number catches the next page.
  */
-const INITIAL_BUDGET = 200 * KB;
+/*
+ * SPEED AUDIT 2026-10-16: the animation library's core (`vendor-motion-core`,
+ * 31.7 KB) left the first paint — the busy scrim and the update line fade with
+ * the Web Animations API, the shell asks for the features through a dynamic
+ * import and the rails import their spring on first use. 179.6 KB over four
+ * files before, 148.1 KB over three after; the budget is re-cut to the
+ * measured number plus ~8 %: 160 KB. `vendor-motion-core` is on the
+ * «never in the initial payload» list below.
+ */
+const INITIAL_BUDGET = 160 * KB;
 /** Existing/public stylesheets; the entry's is downloaded before first paint. */
 const CSS_BUDGET = 60 * KB;
 /**
@@ -278,6 +287,8 @@ test('the initial payload — the entry plus everything it STATICALLY imports �
   for (const lazyOnly of [
     'vendor-charts', 'vendor-qr', 'vendor-webgl', 'Bundles', 'BundleDetail', 'BundlesShelf',
     'vendor-icons', 'NotificationBell', 'EmailVerifyBanner', 'CompleteProfileSheet', 'ThemeIntroSheet', 'tierMeta', 'LiveSearchPanel', 'motionFeaturesBundle',
+    // Speed audit 2026-10-16: the core too (see INITIAL_BUDGET).
+    'vendor-motion-core',
   ]) {
     const found = [...seen].find((f) => f.startsWith(`${lazyOnly}-`));
     assert.equal(
@@ -423,9 +434,17 @@ test('the split really happened: every page and panel §10 names has a chunk of 
  * build measures 233.4 KB against 232.6 KB at the server commit (+0.8 KB).
  * The speed tab's figure moves to 231 (worker/lib/storeSpeed.ts) and the cap
  * stays that figure plus the same 3 KB tolerance: 234 KB.
+ *
+ * OCTOBER 18 (the speed lanes landed together): the animation core left the
+ * initial payload and is counted in the store pages' own closure instead;
+ * with the category lane's early reads in the entry, a clean build measures
+ * 235.9 KB against 233.5 KB just before the lanes (+2.4 KB: entry +1.5,
+ * vendor-react +0.4, vendor-motion-core +0.5; the store pages' own files are
+ * unchanged). The speed tab's figure moves to 234 and the cap stays that
+ * figure plus the same 3 KB tolerance: 237 KB.
  */
 const STOREFRONT_BUDGET = 47 * KB;
-const STOREFRONT_APP_BUDGET = 234 * KB;
+const STOREFRONT_APP_BUDGET = 237 * KB;
 const STOREFRONT_SHARED_UI = ['Overlay', 'overlayStack', 'Segmented'];
 /** Vendor chunks a lazy page may share; they are budgeted on their own, not against a page. */
 const isSharedVendor = (f: string) => /^vendor-/.test(f);
@@ -443,6 +462,19 @@ function staticClosure(start: string): Set<string> {
   return seen;
 }
 
+/**
+ * THE PRODUCT PAGE'S OPENING, ALL OF IT (speed audit 2026-10-16): the page's
+ * chunk and everything it statically imports, the shared vendors included —
+ * what a cold landing on /product/:slug downloads before the page renders
+ * (the Worker modulepreloads it, worker/lib/socialPreview.ts). Measured
+ * 257.0 KB after `vendor-motion` (15.7 KB) left it; ~3 % over that.
+ * LANDED ON THE NEWER DEFAULT BRANCH (2026-10-18): the colour and discount
+ * work had grown the opening first (287.4 KB before the speed lanes); with
+ * the four lanes together a clean build measures 274.7 KB, and the cap stays
+ * ~3 % over that.
+ */
+const PRODUCT_OPENING_BUDGET = 283 * KB;
+
 test('opening a product excludes below-fold reviews, closed purchase dialogs, refusal translations, the price-request panel, the knowledge tabs and the several-colours panel', () => {
   const files = readdirSync(ASSETS).filter((file) => file.endsWith('.js'));
   const product = files.find((file) => file.startsWith('Product-'));
@@ -450,6 +482,14 @@ test('opening a product excludes below-fold reviews, closed purchase dialogs, re
   const opening = staticClosure(product!);
   const bytes = [...opening].reduce((sum, file) => sum + gz(join(ASSETS, file)), 0);
   console.log(`bundle: product opening ${kb(bytes)} gzip (complete static closure)`);
+  assert.ok(bytes <= PRODUCT_OPENING_BUDGET, `the product page's opening is ${kb(bytes)} gzip, over ${kb(PRODUCT_OPENING_BUDGET)}`);
+  // The Worker modulepreloads at most 24 files of a route's closure beyond the entry (socialPreview.ts chunkPreloads):
+  // a 25th is discovered only when its importer has been parsed. The colour and discount work had already taken
+  // the opening to 30 files beyond the entry before the speed lanes landed on it (2026-10-18), so the six past the
+  // 24th are found late; held at 30 here so it cannot grow further while that is brought back under the cap.
+  const entryClosure = staticClosure(entryFromHtml(readFileSync(join(DIST, 'index.html'), 'utf8'))!);
+  const beyondEntry = [...opening].filter((f) => !entryClosure.has(f));
+  assert.ok(beyondEntry.length <= 30, `the product opening is ${beyondEntry.length} files beyond the entry; the document preloads 24`);
   // «طلب السعر» (DECISIONS row 240) is mounted only for a product or selection with no price: a priced page never pays for it.
   // The Bambu import spec §G.6: the knowledge tabs (specifications, documents …) load near the viewport, never with the page.
   // docs/ux/COLOUR-QUANTITIES.md §3.11: «عدة ألوان» (the per-colour list, the batch add, its sheet) loads when the
@@ -495,7 +535,11 @@ test('the storefront owns at most 47 KB gzip and its complete app payload stays 
   // P4: the speed tab's «ثابت للتطبيق» row (worker/lib/storeSpeed.ts STOREFRONT_FIXED_KB) IS this
   // measurement — the initial payload plus the storefront pages' own closure — so the number a
   // merchant is shown cannot drift from the build by more than 3 KB.
-  const fixedBytes = [...initial].reduce((sum, f) => sum + gz(join(ASSETS, f)), 0) + appTotal;
+  // The animation library's core left the initial payload (speed audit
+  // 2026-10-16) but the store pages still render `m.*`, so it is in their own
+  // closure now: a store visitor downloads it as before, and the figure counts it.
+  const storeCore = vendor.filter((f) => f.startsWith('vendor-motion-core-')).reduce((sum, f) => sum + gz(join(ASSETS, f)), 0);
+  const fixedBytes = [...initial].reduce((sum, f) => sum + gz(join(ASSETS, f)), 0) + appTotal + storeCore;
   assert.ok(fixedBytes <= STOREFRONT_APP_BUDGET,
     `the storefront app payload, including all shared UI, is ${kb(fixedBytes)}, over ${kb(STOREFRONT_APP_BUDGET)}`);
   const fixed = fixedBytes / KB;

@@ -499,7 +499,7 @@ function EmailVerifyBanner() {
 const AppIntro = React.lazy(() => import('./components/bloub/AppIntro'));
 import { MotionCharacterFallbackHeader, MotionCharacterRouteHeader, useCharacterBusy } from './components/bloub/MotionCharacterAnchor';
 import { homeCriticalReadyStore } from './lib/appBootstrap';
-import { preloadMotionFeatures } from './lib/motionFeatures';
+import { preloadMotionFeatures } from './lib/motionFeaturesPrefetch';
 import { useBusy } from './lib/busy';
 
 /**

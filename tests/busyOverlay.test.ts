@@ -389,10 +389,14 @@ test('no full-screen backdrop blur — the most expensive pixel in the app, spen
 
 test('after an order the scrim is simply gone — it does not fade over the celebration', () => {
   const code = stripComments(appBusy);
-  assert.match(code, /hidden: \(instant: boolean\) => \(instant \? \{ opacity: 0, transition: \{ duration: 0 \} \} : \{ opacity: 0 \}\)/);
-  // Through AnimatePresence's `custom`: a child being removed receives no props.
-  assert.match(code, /<AnimatePresence custom=\{ended === 'order'\}>/);
-  assert.match(code, /exit="hidden"/);
+  // Decided at the moment it leaves (speed audit 2026-10-16: the fade is the
+  // Web Animations API now, no AnimatePresence, so the scrim keeps itself in
+  // the document for its exit and drops it at once after an order).
+  assert.match(code, /const instant = ended === 'order';/);
+  assert.match(code, /if \(instant \|\| !el \|\| typeof el\.animate !== 'function'\) \{\s*setPresent\(false\);\s*return;\s*\}/);
+  assert.match(code, /if \(!present \|\| \(!visible && instant\)\) return null;/, 'not one frame of it after an order');
+  // Otherwise it fades out as it came, and leaves the document when the fade has finished.
+  assert.match(code, /const fade = el\.animate\(SCRIM\.hidden, \{ \.\.\.fadeTiming\(m\.reduced, 'quick'\), fill: 'forwards' \}\);\s*fade\.onfinish = \(\) => setPresent\(false\);/);
 });
 
 test('beforeunload is armed for the money commits and for nothing else', () => {
@@ -416,11 +420,13 @@ test('beforeunload is armed for the money commits and for nothing else', () => {
 });
 
 test('the overlay animates opacity only, in either motion preference', () => {
-  assert.match(appBusy, /shown: \{ opacity: 1 \}/);
-  // `hidden` unless the motion-features chunk has FAILED, in which case the
-  // layer paints at rest (P2 review) — the same variants, no scale, no travel.
-  assert.match(appBusy, /initial=\{atRest \? false : "hidden"\}/);
-  assert.match(appBusy, /animate="shown"/);
+  // The keyframes are opacity alone, in and out (src/lib/presenceFade.ts times
+  // them on the house `quick` spring, a cross-fade under reduced motion). No
+  // animation library and no chunk that can fail to load: the scrim is in the
+  // document, swallowing taps, from its first frame (speed audit 2026-10-16).
+  assert.match(appBusy, /shown: \[\{ opacity: 0 \}, \{ opacity: 1 \}\],\s*hidden: \[\{ opacity: 0 \}\],/);
+  assert.match(appBusy, /const fade = el\.animate\(SCRIM\.shown, fadeTiming\(m\.reduced, 'quick'\)\);/);
+  assert.doesNotMatch(stripComments(appBusy), /from 'motion\//, 'the busy layer is in the entry: it must not carry the animation library');
   const code = stripComments(appBusy);
   assert.ok(!/scale:/.test(code), 'no scale');
   assert.ok(!/\by:\s/.test(code), 'no travel');
