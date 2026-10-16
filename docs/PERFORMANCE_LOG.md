@@ -2021,3 +2021,86 @@ forced-colours `.lv-button` line and switch knob/fill rules, `scroll-padding-bot
 `border-gold/40`, and the forced-colours Highlight frame on the chosen gallery picture. Removed — the
 `focus-visible:ring-gold`, `focus-within:ring-gold`, `peer-focus-visible:ring-gold` and `ring-gold/70` focus
 utilities (their `ring-focus` twins were already in the sheet, or are now) and `hover:bg-gold/15`.
+
+## 2026-10-16 — speed audit, the edge lane: stale serving, the category head start, the lead photo, the large rungs, the search dictionary
+
+The owner asked to remove every cause of the slow display on Iraqi phones. The audit (25 confirmed causes,
+each re-measured live by two skeptics) gave this lane the server side: findings «the edge cache never serves
+stale», «category and other non-rewritten pages get no head start» / «the 5-step serial waterfall», «the
+product's main photo is not preloaded on 25 of 26 product pages», «?w=1280 and ?w=1600 return the untouched
+original», and «live search: 5 dependent D1 round trips». Nothing a visitor reads changed; no header, budget
+or migration changed.
+
+- **Stale serving, as the headers have always said** (`worker/lib/edgePolicy.ts` `edgeServe`). The Workers
+  Cache API ignores `stale-while-revalidate`, so every anonymous answer died at `s-maxage=120` and the next
+  guest in that colo paid the whole D1 build (live: 0.5–1.5 s, 2–5 dependent round trips). A copy is now kept
+  for its declared window and stamped with when its data was read: fresh to half of `s-maxage`; served and
+  rebuilt behind it to `s-maxage`; served AT ONCE and rebuilt behind it inside `stale-while-revalidate`; a miss
+  past it. Per route class: price/stock answers (listing, search, product, home, shelves, a store's products)
+  keep their declared 120 s + 600 s — the bound the header publishes and browsers already apply — and a
+  session never sees a shared copy; the catalogue tree and category pages declare no stale window and keep
+  their own `s-maxage` exactly (background refresh only). The refresh is a guest's request replayed through
+  the whole Worker after the answer has gone (one per key per isolate; a 404 drops the copy). A purge also
+  writes a per-path marker, so in the colo that wrote every copy of the path read before the write is retired —
+  parameterised listings and searches included, which before lived on 120 s even there.
+- **The head start for the category map and the community home** (`mainOpeningFor`, `run_worker_first`):
+  `/categories`, `/categories/<slug>`, `/categories/<a>/<b>` carry the main host's resolve answer, their page's
+  chunk closure and a `preload as=fetch` of the page's first read (`/api/catalog/tree`, `/api/catalog/<slug>`);
+  `/community` carries the resolve and `/api/community/access` (not the 32-file page closure: while the
+  community is shut the gate never renders it — measured +0.19 s LCP with it, below).
+- **The lead photo in both themes** (`leadImagePreloads`, `worker/lib/productOpeningLead.ts`): once per theme
+  under the boot script's media query, exactly as Product.tsx renders it in that theme; with option- or
+  colour-bound pictures only when the page's own answer (this colo's copy of `/api/products/<slug>`, no build)
+  proves its opening selection empty.
+- **Large rungs** (`clampRung`, `cutVariant`): `?w=1600` of a 1254 px picture is its `?w=1280` copy; a rung the
+  binding will not encode in AVIF is cut in WebP at full size and kept in the AVIF place; the sweep no longer
+  marks large photos unreadable; when no copy can be had the colo keeps the original under the copy's address
+  for an hour instead of failing per request.
+- **The search dictionary** once per isolate for 30 s (`synonymsFor`), forgotten by its writers.
+
+### Lab — the Worker in place (`wrangler dev --local` on the built dist, the catalogue seeded by `scripts/lib/e2e-catalog-only-seed.ts` with 1254 px main and light-theme photos and colour-bound pictures on half the products; Playwright 360×800 DPR 3, CPU ×4, Slow-4G 150 ms / 1.6 Mbps, light scheme, a cold context per visit with the HTTP cache on, median of 5; before = `0d8ed43b`, after = this lane)
+
+| route | LCP before → after | FCP before → after | first page read done | lead image requested |
+|---|---|---|---|---|
+| `/categories` | 3216 → **3096** | 2076 → 2112 | 2457 → **989** (tree) | — |
+| `/categories/printers` | 3936 → **3672** | 2124 → 2360 | 3090 → **1303** (`/api/catalog/printers`) | — |
+| `/categories/printers/fdm-printers` | 4256 → **3684** | 2036 → 2148 | 3046 → **1219** (tree) | — |
+| `/community` | 2404 → **2280** | 2032 → **1928** | 2325 → **948** (access) | — |
+| `/product/bambu-lab-a1` | 3520 → **3320** | 2868 → **2732** | 1098 → 1101 | 3118 → **220** |
+| `/product/bambu-lab-x2d` | 3468 → **3348** | 3004 → **2788** | 1093 → 1101 | 3234 → **205** |
+
+No picture was downloaded twice (with the HTTP cache off — not how a phone loads — a preloaded picture was
+sometimes fetched again; the skeptics saw the same harness artefact). The shell paints 36–236 ms later on the
+category routes: their 24 modulepreloads share the link with the entry (the trade P2b measured and kept for
+the product page). Locally D1 answers in milliseconds, so the lab shows only the removed round trips; on the
+live site each removed step also carries its server time (resolve 0.2–1.1 s, the catalogue read 0.3–1.0 s on
+a miss), which is where the audit's A/B measured −1.0 to −1.4 s on these category pages.
+
+Stale serving in workerd (`wrangler dev --local`, `/api/products?limit=50`): miss 167 ms; fresh hit 20–61 ms;
+at 72 s a late-fresh hit 69 ms (refreshed behind it: Age 2 two seconds later); at 200 s the stale copy served
+in 58 ms with `Age: 127` and rebuilt behind it (Age 3 three seconds later); the tree past its `s-maxage` is a
+miss. Before the refresh waited one turn of the event loop, the stale copy left in 158–194 ms — no faster than
+a build — because the rebuild shared the isolate's thread with the answer on its way out.
+
+Search (the wave-counting adapter on the real listing route, `tests/searchSynonymsMemo.test.ts`): a warm
+isolate answers a keystroke in 4 dependent D1 waves instead of 5 (16 → 15 statements).
+
+### Tests
+
+New: `tests/edgeStaleWhileRevalidate.test.ts` (10), `tests/mainOpeningDocuments.test.ts` (7),
+`tests/imageVariantFallback.test.ts` (7), `tests/productLeadPreload.test.ts` (6), `tests/searchSynonymsMemo.test.ts`
+(3). Changed: `tests/documentPreloads.test.ts` (the light-image case now preloads both themes; a source pin),
+`tests/imageVariants.test.ts` (1600 of a 1254 px picture is kept as its 1280 copy; a failed cut says
+`X-Variant-Source: original`), `tests/securityPolicy.test.ts` (the run_worker_first revisit),
+`tests/leakAudit_cache-headers_accessory_buying_cost_anon_edge_cached_and_exempted.test.ts` (the stored copy is
+public for its declared window), `tests/fixtures/imageDoubles.ts` (the binding's AVIF ceiling).
+
+### Not changed, and why
+
+- `/api/bundles` stays uncached (both skeptics: an empty 49-byte list off the LCP path, +0.05–0.1 s).
+- The listing read of `/categories/<a>/<b>` is not preloaded: its URL needs the section id, a D1 lookup on the
+  document's own path (the skeptics measured 0–0.26 s for it). The `/categories` photo pool is not preloaded
+  either: the category lane may stop the banner waiting on it, and an unused preload costs 27 KB on the link.
+- The chunk cap stays 24 (CategoryPage's closure is 28, CategoryListing's 26): the shell already paints later.
+- Search answers are not trimmed here (the slim card is the payload lane's), and the vocabulary and postings
+  reads are not merged (a one-letter prefix range is about a tenth of the index at 1,115 products).
