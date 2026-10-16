@@ -16,7 +16,8 @@
  *         0  the guard row ops_guards('catalog-import-batch') — inserted only while
  *            the item is WRITING under this lease with this staged payload
  *            (else its CHECK aborts everything: a stale or changed write never lands)
- *         …  merge: the protected fingerprint SELECTs, one table per statement
+ *         …  merge: the protected fingerprint SELECTs, one table per statement, then the same rows as SQL
+ *            texts kept on the item (stage_data.fp_before, removed by the checkpoint)
  *         …  plan.statements (product, options, variants, images, catalogs,
  *            printer fits, search tokens, outbox)
  *         …  side statements: option-group 0194 columns, product_source_refs,
@@ -27,7 +28,9 @@
  *         …  incoming: the pending relations that name this product's handle,
  *            and their printer fits when this product is a printer (§B.6)
  *         n-2 the WRITTEN event (fenced by trg_cie_lease_fence)
- *         n-1 the checkpoint: PUBLISHING, last_completed_stage WRITING
+ *         n-1 the checkpoint: PUBLISHING, last_completed_stage WRITING, and what only this transaction can
+ *            prove — the merge's before_fp_equal (the texts compared again) or the create's after_money_default
+ *            (the probe in SQL) — with the plan the readback compares against (readback_target)
  *         …  merge: the fingerprint SELECTs again; create: the money-default probe
  *         n+1 DELETE the guard row
  *
@@ -35,7 +38,10 @@
  *
  *   runImportWrite(ctx, plan)    — runs the batch (one D1 transaction), compares
  *       the fingerprints in memory, checks the money defaults, and does the
- *       post-commit bookkeeping (`postCommitProductSave`, the write digest).
+ *       post-commit bookkeeping (`postCommitProductSave`, the readback and its
+ *       record, the write digest). Nothing /complete needs depends on this
+ *       part: what it cannot record, GET /readback runs and records itself
+ *       (`readbackFromTarget`, review 6c).
  *
  * `/stage` calls `planImportWrite` with `mode: 'stage'`: the same plan against
  * placeholder media, never run, for its invocation estimate (§A.1 change 1).
@@ -181,6 +187,8 @@ export interface ImportWriteContext {
   counter: InvocationCounter;
   /** The media bindings for verification; required in 'write' mode. */
   media?: MediaWriteEnv;
+  /** The wait between the post-commit tries (READBACK_WAITS_MS); a timer unless a test passes its own. */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 /** A context over a raw binding, counting from zero (tests, and a caller with no reads of its own). */
@@ -319,7 +327,8 @@ export interface ImportWriteResult {
   counts: WrittenCounts;
   /**
    * Merge: the protected fingerprints before and after are equal (read inside the batch, compared after its commit;
-   * a JSON array of money by its fee tuples, as the guard trigger compares it); null for a create.
+   * a JSON array of money by its fee tuples, as the guard trigger compares it); null for a create. The batch records
+   * its own SQL comparison of the same rows as `stage_data.before_fp_equal` (what /complete reads).
    */
   before_fp_equal: boolean | null;
   /**
@@ -327,7 +336,7 @@ export interface ImportWriteResult {
    * variant and colour rows is at its default, and the stock decision is 'not_configured'; null for a merge.
    */
   after_money_default: boolean | null;
-  /** verifyApplied's mismatches against this payload's plan, right after the commit (-1: the readback could not run). */
+  /** verifyApplied's mismatches against this payload's plan, right after the commit (-1: not run here; GET /readback runs it). */
   readback_mismatches: number;
   /**
    * The image rows this write bound, AFTER the content-duplicate collapse (§C.4 step 1): the runner computes the
@@ -401,24 +410,59 @@ const guardedColumns = (table: string): GuardedColumn[] => {
 const fingerprintColumns = (table: string): string[] =>
   guardedColumns(table).map((c) => (c.jsonElementMoney ? `${jsonElementMoneySql(c, table)} AS ${c.name}` : c.name));
 
-/** One table per statement, never a UNION chain (§A.5). Each binds the product id once. */
-export const FINGERPRINT_QUERIES: ReadonlyArray<{ table: string; sql: string }> = [
-  { table: 'products', sql: `SELECT id, ${fingerprintColumns('products').join(', ')} FROM products WHERE id = ?` },
-  { table: 'product_option_values', sql: `SELECT id, ${fingerprintColumns('product_option_values').join(', ')} FROM product_option_values WHERE product_id = ? ORDER BY id` },
-  { table: 'product_colors', sql: `SELECT id, ${fingerprintColumns('product_colors').join(', ')} FROM product_colors WHERE product_id = ? ORDER BY id` },
-  { table: 'product_variants', sql: `SELECT id, ${fingerprintColumns('product_variants').join(', ')} FROM product_variants WHERE product_id = ? ORDER BY id` },
-  { table: 'product_option_fulfillment', sql: 'SELECT * FROM product_option_fulfillment WHERE product_id = ? ORDER BY id' },
-  { table: 'product_option_transports', sql: 'SELECT * FROM product_option_transports WHERE product_id = ? ORDER BY id' },
-  { table: 'product_pricing_state', sql: 'SELECT * FROM product_pricing_state WHERE product_id = ?' },
-  { table: 'product_sku_prices', sql: 'SELECT * FROM product_sku_prices WHERE product_id = ? ORDER BY combo_key, channel' },
-  { table: 'pricing_v2_sku_results', sql: 'SELECT * FROM pricing_v2_sku_results WHERE product_id = ? ORDER BY combo_key, channel' },
-  { table: 'pricing_price_points', sql: 'SELECT * FROM pricing_price_points WHERE product_id = ? ORDER BY scope, scope_id, kind' },
-  { table: 'pricing_preorder_discounts', sql: 'SELECT * FROM pricing_preorder_discounts WHERE product_id = ? ORDER BY scope, scope_id' },
-  { table: 'inventory_lots', sql: 'SELECT COUNT(*) AS n, total(qty_received) AS received, total(qty_remaining) AS remaining, total(total_cost_iqd) AS cost FROM inventory_lots WHERE product_id = ?' },
-  { table: 'inventory_ledger', sql: 'SELECT COUNT(*) AS n, total(qty) AS qty, MAX(id) AS last FROM inventory_ledger WHERE product_id = ?' },
-  { table: 'order_items', sql: 'SELECT COUNT(*) AS n, total(qty) AS qty, total(line_total_iqd) AS total FROM order_items WHERE product_id = ?' },
-  { table: 'price_history', sql: 'SELECT COUNT(*) AS n, MAX(id) AS last FROM price_history WHERE product_id = ?' },
+/**
+ * One table per statement, never a UNION chain (§A.5). Each binds the product id once. `columns` names what the
+ * statement answers, for the SQL form of the fingerprint below; null for a `SELECT *` (read from the live schema).
+ */
+export const FINGERPRINT_QUERIES: ReadonlyArray<{ table: string; sql: string; columns: readonly string[] | null }> = [
+  ...(['products', 'product_option_values', 'product_colors', 'product_variants'] as const).map((t) => ({
+    table: t,
+    sql: `SELECT id, ${fingerprintColumns(t).join(', ')} FROM ${t} WHERE ${t === 'products' ? 'id = ?' : 'product_id = ? ORDER BY id'}`,
+    columns: ['id', ...guardedColumns(t).map((c) => c.name)],
+  })),
+  { table: 'product_option_fulfillment', sql: 'SELECT * FROM product_option_fulfillment WHERE product_id = ? ORDER BY id', columns: null },
+  { table: 'product_option_transports', sql: 'SELECT * FROM product_option_transports WHERE product_id = ? ORDER BY id', columns: null },
+  { table: 'product_pricing_state', sql: 'SELECT * FROM product_pricing_state WHERE product_id = ?', columns: null },
+  { table: 'product_sku_prices', sql: 'SELECT * FROM product_sku_prices WHERE product_id = ? ORDER BY combo_key, channel', columns: null },
+  { table: 'pricing_v2_sku_results', sql: 'SELECT * FROM pricing_v2_sku_results WHERE product_id = ? ORDER BY combo_key, channel', columns: null },
+  { table: 'pricing_price_points', sql: 'SELECT * FROM pricing_price_points WHERE product_id = ? ORDER BY scope, scope_id, kind', columns: null },
+  { table: 'pricing_preorder_discounts', sql: 'SELECT * FROM pricing_preorder_discounts WHERE product_id = ? ORDER BY scope, scope_id', columns: null },
+  {
+    table: 'inventory_lots',
+    sql: 'SELECT COUNT(*) AS n, total(qty_received) AS received, total(qty_remaining) AS remaining, total(total_cost_iqd) AS cost FROM inventory_lots WHERE product_id = ?',
+    columns: ['n', 'received', 'remaining', 'cost'],
+  },
+  { table: 'inventory_ledger', sql: 'SELECT COUNT(*) AS n, total(qty) AS qty, MAX(id) AS last FROM inventory_ledger WHERE product_id = ?', columns: ['n', 'qty', 'last'] },
+  { table: 'order_items', sql: 'SELECT COUNT(*) AS n, total(qty) AS qty, total(line_total_iqd) AS total FROM order_items WHERE product_id = ?', columns: ['n', 'qty', 'total'] },
+  { table: 'price_history', sql: 'SELECT COUNT(*) AS n, MAX(id) AS last FROM price_history WHERE product_id = ?', columns: ['n', 'last'] },
 ];
+
+/**
+ * THE FINGERPRINT AS ONE SQL TEXT VALUE (review 6c): a query's rows as `json_group_array(json_array(<columns>))`,
+ * the product id bound as `?1`, made plain text (`|| ''`, no JSON subtype) so two of them compare with `IS`. The
+ * batch stores every table's text before its writes (`stage_data.fp_before`) and its checkpoint compares them with
+ * the same texts after the writes, so the merge's protected-fields result is COMMITTED WITH THE WRITE
+ * (`stage_data.before_fp_equal`) — never a post-commit record a D1 blip or an ended invocation can lose. The
+ * in-memory digest of the SELECT rows stays the /write answer; the SQL form compares the stored values themselves,
+ * so it is at least as strict.
+ */
+export function fingerprintTextSql(q: { table: string; sql: string }, columns: readonly string[]): string {
+  if (q.sql.split('?').length !== 2) throw new Error(`fingerprint query of ${q.table}: one parameter expected`);
+  if (!columns.length) return "'absent'";
+  const cols = columns.map((c) => `"${c.replace(/"/g, '""')}"`).join(', ');
+  return `((SELECT json_group_array(json_array(${cols})) FROM (${q.sql.replace('?', '?1')})) || '')`;
+}
+
+/** The live columns of every `SELECT *` fingerprint table (PRAGMA table_info, one read each: a merge only). */
+async function starColumns(db: D1Database): Promise<Map<string, string[]>> {
+  const out = new Map<string, string[]>();
+  for (const q of FINGERPRINT_QUERIES) {
+    if (q.columns) continue;
+    const { results } = await db.prepare(`PRAGMA table_info("${q.table}")`).all<{ name: string }>();
+    out.set(q.table, (results ?? []).map((r) => String(r.name)));
+  }
+  return out;
+}
 
 /** Any guarded column of `table` away from its insert default (the generated triggers' own expressions). */
 const anyNonDefault = (table: string) => guardedColumns(table).map((c) => nonDefaultSql(c, table)).join(' OR ');
@@ -437,6 +481,9 @@ export const MONEY_PROBE_SQL = `SELECT
 /** The probe's row read as "every money, stock and package column of the new rows is at its default". */
 export const moneyProbeAtDefault = (p: Record<string, unknown>): boolean =>
   Number(p.product_ok) === 1 && Number(p.stock_decision_ok) === 1 && GUARDED_CHILD_TABLES.every((t) => Number(p[`${t}_bad`]) === 0);
+
+/** moneyProbeAtDefault in SQL, over the probe itself (`?1` the product id): what the checkpoint records (review 6c). */
+export const MONEY_PROBE_OK_SQL = `(SELECT product_ok = 1 AND stock_decision_ok = 1${GUARDED_CHILD_TABLES.map((t) => ` AND ${t}_bad = 0`).join('')} FROM (${MONEY_PROBE_SQL}))`;
 
 // ---------------------------------------------------------------- reads
 
@@ -1225,7 +1272,8 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
     throw refusalOfPlanner(e);
   }
 
-  // 13. The batch.
+  // 13. The batch. A merge's fingerprint texts need the live columns of the `SELECT *` tables.
+  const fpSql = merge ? await starColumns(db) : null;
   const statements: D1PreparedStatement[] = [];
   statements.push(
     db
@@ -1241,6 +1289,19 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
   const beforeStart = statements.length;
   if (merge) for (const q of FINGERPRINT_QUERIES) statements.push(db.prepare(q.sql).bind(productId));
   const beforeEnd = statements.length;
+  // Merge: the same fingerprints as SQL texts, kept on the item for the checkpoint to compare (removed by it, in
+  // this very transaction: no protected value ever persists in stage_data).
+  const fpTexts = fpSql ? FINGERPRINT_QUERIES.map((q) => fingerprintTextSql(q, q.columns ?? fpSql.get(q.table) ?? [])) : [];
+  if (fpTexts.length) {
+    statements.push(
+      db
+        .prepare(
+          `UPDATE catalog_import_items SET stage_data = json_set(CASE WHEN json_valid(stage_data) THEN stage_data ELSE '{}' END, '$.fp_before', json_array(${fpTexts.join(', ')}))
+            WHERE id = ?2 AND run_id = ?3`
+        )
+        .bind(productId, input.itemId, input.runId)
+    );
+  }
   statements.push(...save.statements);
 
   const side: SideRow[] = [];
@@ -1397,19 +1458,36 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
       )
       .bind(newId('cie'), runId, input.itemId, runId, merge ? 'merged' : 'created', JSON.stringify({ groups: counts.groups, values: counts.values, variants: counts.variants, images: counts.images, specs: counts.specs }), input.leaseToken)
   );
+  // THE CHECKPOINT RECORDS WHAT ONLY THIS TRANSACTION CAN PROVE (review 6c): the merge's protected-fields result
+  // (the fingerprint texts stored before the writes against the same texts now) or the create's money probe, and
+  // the plan the readback compares the stored product with (readbackTargetJson). Recorded after the commit, a D1
+  // blip, an invocation that ended, or a batch answer that was lost would leave them unrecorded for good: the item
+  // has left WRITING and nothing writes it again.
+  const proof = merge
+    ? `, '$.before_fp_equal', json(CASE WHEN ${fpTexts.map((t, i) => `json_extract(stage_data, '$.fp_before[${i}]') IS ${t}`).join(' AND ')} THEN 'true' ELSE 'false' END)`
+    : `, '$.after_money_default', json(CASE WHEN ${MONEY_PROBE_OK_SQL} THEN 'true' ELSE 'false' END)`;
+  const target = input.mode === 'write' ? readbackTargetJson(save) : '';
+  if (input.mode === 'write' && !target) {
+    warnings.push('readback target not recorded: only this invocation can verify the write');
+    console.warn('catalog_import_readback_target_not_stored', JSON.stringify({ code: 'IMPORT_READBACK_TARGET_NOT_STORED', item: input.itemId }));
+  }
   statements.push(
     db
       .prepare(
         `UPDATE catalog_import_items
-            SET processing_state = 'PUBLISHING', last_completed_stage = 'WRITING', levonis_product_id = ?, slug = ?, match_kind = ?,
+            SET processing_state = 'PUBLISHING', last_completed_stage = 'WRITING', levonis_product_id = ?1, slug = ?2, match_kind = ?3,
                 stage_attempts = 0, retry_at = '',
-                stage_data = json_set(CASE WHEN json_valid(stage_data) THEN stage_data ELSE '{}' END, '$.written', json(?), '$.payload_counts', json(?), '$.images', json(?)),
+                stage_data = json_set(json_remove(CASE WHEN json_valid(stage_data) THEN stage_data ELSE '{}' END, '$.fp_before', '$.readback', '$.readback_target'),
+                                      '$.written', json(?4), '$.payload_counts', json(?5), '$.images', json(?6)${target ? ", '$.readback_target', json(?10)" : ''}${proof}),
                 updated_at = ${NOW_SQL}
-          WHERE id = ? AND run_id = ? AND lease_token = ?`
+          WHERE id = ?7 AND run_id = ?8 AND lease_token = ?9`
       )
       // The rows written (after the content-duplicate collapse), in the same batch: a runner resumed after this
       // write, with no /write answer, reads them from /lease (stage_data.images) instead of recomputing them.
-      .bind(productId, slug, merge ? 'merged' : 'created', JSON.stringify(counts), JSON.stringify(payloadCounts(payload)), JSON.stringify(writtenImageRows(images)), input.itemId, runId, input.leaseToken)
+      .bind(
+        productId, slug, merge ? 'merged' : 'created', JSON.stringify(counts), JSON.stringify(payloadCounts(payload)), JSON.stringify(writtenImageRows(images)),
+        input.itemId, runId, input.leaseToken, ...(target ? [target] : [])
+      )
   );
   const afterStart = statements.length;
   let probe = -1;
@@ -1770,8 +1848,9 @@ export async function runImportWrite(ctx: ImportWriteContext, plan: ImportWriteP
     { action: 'catalog_import.write', detail: { run_id: plan.runId, item_id: plan.itemId, match_kind: plan.matchKind, ...plan.counts, image_bindings: undefined, specs_by_status: undefined, specs_by_region: undefined, relations_by_state: undefined } },
   ]);
   // The readback (§A.3 GET /readback, §I.1.6): the stored product against the plan of this very payload —
-  // reloadForVerification + verifyApplied — recorded on the item, since /readback itself carries no payload.
-  const readback = await verifyWrite(ctx, plan, { before_fp_equal: beforeEqual, after_money_default: moneyDefault });
+  // reloadForVerification + verifyApplied — recorded on the item, since /readback itself carries no payload. When
+  // it cannot be recorded here, GET /readback runs it against the plan the checkpoint committed (readbackFromTarget).
+  const readback = await verifyWrite(ctx, plan);
   if (plan.matchKind === 'merged') {
     try {
       await ctx.db
@@ -1804,6 +1883,11 @@ export const READBACK_STATEMENTS = 24;
 /** The post-commit verification and its record are each tried this many times (a passing D1 error is not a verdict). */
 export const READBACK_TRIES = 3;
 
+/** The waits before the second and the third try (review 6c): a passing D1 error lasts longer than no time at all. */
+export const READBACK_WAITS_MS: readonly number[] = [250, 1000];
+
+const timer = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 /** `stage_data.readback`: whether verifyApplied RAN, and what it found (counts and section names, never a value). */
 export interface ReadbackRecord {
   ran: boolean;
@@ -1812,50 +1896,142 @@ export interface ReadbackRecord {
 }
 
 /**
- * verifyApplied over the freshly committed product, recorded as `stage_data.readback`, with the write's own
- * protected-fields result (`before_fp_equal`, a merge) or money probe (`after_money_default`, a create) beside
- * it, so a runner resumed without the /write answer reads them from /lease. Never turns the committed write into
- * a failure: a verification that cannot run within its tries is recorded as NOT RUN (`ran: false`), never as a
- * mismatch — GET /readback then answers a transient 503, not a failed check.
+ * THE READBACK TARGET (review 6c): what verifyApplied compares the stored product with — the plan's own document,
+ * its relations as requested, its catalogs and printer fits — committed by the write's checkpoint as
+ * `stage_data.readback_target`, so the verification can run after the invocation that wrote the product is gone.
+ * Dropped by the record of a verification that ran; never answered (items.ts stageDataOf). Never a cost: every
+ * cost key is stored null — the import's actor has no money scope, so verifyApplied never compares one, while a
+ * merge's plan carries the product's stored costs forward.
  */
-async function verifyWrite(ctx: ImportWriteContext, plan: ImportWritePlan, result: { before_fp_equal: boolean | null; after_money_default: boolean | null }): Promise<ReadbackRecord> {
+export interface ReadbackTarget {
+  v: 1;
+  product_id: string;
+  doc: ProductSavePlan['doc'];
+  requested: NonNullable<ProductSavePlan['relations']>['requested'] | null;
+  catalog_ids: string[] | null;
+  printer_fits: string[] | null;
+  money: boolean;
+}
+
+/** A cost key of the document or the relations (product_cost_iqd, cost_iqd, cost_adjust_iqd, …). */
+const COST_KEY = /(^|_)cost(_|$)/;
+
+/** The most a target may weigh, in UTF-8 bytes (a D1 row holds 2 MB; the item row carries the counts and images beside it). */
+export const READBACK_TARGET_MAX_BYTES = 640 * 1024;
+
+/**
+ * The target as the checkpoint binds it; '' when it cannot be stored — a plan with order-type cells (never an
+ * import's: its wire body names none), an actor with money scope (never the import's), or one over
+ * READBACK_TARGET_MAX_BYTES. Then only the writing invocation verifies the product, as before review 6c.
+ */
+export function readbackTargetJson(save: ProductSavePlan): string {
+  if (save.cells || save.money) return '';
+  const target: ReadbackTarget = {
+    v: 1,
+    product_id: save.productId,
+    doc: save.doc,
+    requested: save.relations?.requested ?? null,
+    catalog_ids: save.catalogIds,
+    printer_fits: save.printerFits,
+    money: save.money,
+  };
+  const json = JSON.stringify(target, (key, value) => (COST_KEY.test(key) ? null : value));
+  return new TextEncoder().encode(json).byteLength <= READBACK_TARGET_MAX_BYTES ? json : '';
+}
+
+/** The item's committed target, or null (none recorded, or not one this code wrote). */
+export function readbackTargetOf(stageData: string): ReadbackTarget | null {
+  try {
+    const t = (JSON.parse(stageData || '{}') as { readback_target?: ReadbackTarget }).readback_target;
+    return t && typeof t === 'object' && t.v === 1 && typeof t.product_id === 'string' ? t : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The plan verifyApplied reads, rebuilt from a target: only the fields it compares (doc, relations, catalogs, fits, money; no cells). */
+function planOfTarget(t: ReadbackTarget): ProductSavePlan {
+  return {
+    productId: t.product_id,
+    doc: t.doc,
+    relations: t.requested ? { mode: t.requested.inventory_mode, summary: null, requested: t.requested } : null,
+    cells: null,
+    catalogIds: t.catalog_ids,
+    printerFits: t.printer_fits,
+    money: t.money,
+  } as unknown as ProductSavePlan;
+}
+
+/** One verification of the stored product against a plan. Throws on a D1 error (no verdict). */
+async function verifyOnce(db: D1Database, productId: string, plan: ProductSavePlan): Promise<ReadbackRecord> {
+  const stored = await reloadForVerification(db, productId);
+  const found = stored ? verifyApplied(plan, stored, { documentKeys: null }) : null;
+  return found ? { ran: true, mismatches: found.length, sections: [...new Set(found.map((m) => m.section))].sort() } : { ran: true, mismatches: 1, sections: ['product_missing'] };
+}
+
+/**
+ * Records `stage_data.readback` — never over a record whose verification RAN — and, for a verification that ran,
+ * drops the target it no longer needs. `where` narrows the item further (GET /readback: still VERIFYING_LIVE).
+ */
+async function recordReadback(db: D1Database, itemId: string, runId: string, out: ReadbackRecord, where = ''): Promise<void> {
+  const base = "CASE WHEN json_valid(stage_data) THEN stage_data ELSE '{}' END";
+  await db
+    .prepare(
+      `UPDATE catalog_import_items SET stage_data = json_set(${out.ran ? `json_remove(${base}, '$.readback_target')` : base}, '$.readback', json(?))
+        WHERE id = ? AND run_id = ? AND COALESCE(json_extract(${base}, '$.readback.ran'), 0) <> 1${where}`
+    )
+    .bind(JSON.stringify(out), itemId, runId)
+    .run();
+}
+
+/**
+ * verifyApplied over the freshly committed product, recorded as `stage_data.readback`. Never turns the committed
+ * write into a failure: each half is tried READBACK_TRIES times with READBACK_WAITS_MS between, and a verification
+ * that cannot run is recorded as NOT RUN (`ran: false`), never as a mismatch — GET /readback then runs it against
+ * the committed target (readbackFromTarget). The write's own proofs (`before_fp_equal`, `after_money_default`)
+ * are recorded by its checkpoint, inside the batch, not here.
+ */
+async function verifyWrite(ctx: ImportWriteContext, plan: ImportWritePlan): Promise<ReadbackRecord> {
   const db = ctx.db;
+  const wait = ctx.sleep ?? timer;
   let out: ReadbackRecord = { ran: false, mismatches: null, sections: [] };
   for (let t = 0; t < READBACK_TRIES && !out.ran; t++) {
-    // A retry only while the invocation can still afford a whole readback (D1's 1,000, the reserve included).
-    if (t > 0 && ctx.counter.count + READBACK_STATEMENTS > IMPORT_INVOCATION_LIMIT + IMPORT_RESERVE) break;
+    if (t > 0) {
+      // A retry only while the invocation can still afford a whole readback (D1's 1,000, the reserve included).
+      if (ctx.counter.count + READBACK_STATEMENTS > IMPORT_INVOCATION_LIMIT + IMPORT_RESERVE) break;
+      await wait(READBACK_WAITS_MS[t - 1] ?? 1000);
+    }
     try {
-      const stored = await reloadForVerification(db, plan.productId);
-      const found = stored ? verifyApplied(plan.save, stored, { documentKeys: null }) : null;
-      out = found ? { ran: true, mismatches: found.length, sections: [...new Set(found.map((m) => m.section))].sort() } : { ran: true, mismatches: 1, sections: ['product_missing'] };
+      out = await verifyOnce(db, plan.productId, plan.save);
     } catch (e) {
       console.error('catalog_import_readback_failed', JSON.stringify({ code: 'IMPORT_READBACK_FAILED', reason: message(e).slice(0, 80) }));
     }
   }
-  const sets: string[] = ["'$.readback', json(?)"];
-  const args: unknown[] = [JSON.stringify(out)];
-  if (result.before_fp_equal !== null) {
-    sets.push("'$.before_fp_equal', json(?)");
-    args.push(JSON.stringify(result.before_fp_equal));
-  }
-  if (result.after_money_default !== null) {
-    sets.push("'$.after_money_default', json(?)");
-    args.push(JSON.stringify(result.after_money_default));
-  }
   for (let t = 0; t < READBACK_TRIES; t++) {
+    if (t > 0) await wait(READBACK_WAITS_MS[t - 1] ?? 1000);
     try {
-      await db
-        .prepare(
-          `UPDATE catalog_import_items SET stage_data = json_set(CASE WHEN json_valid(stage_data) THEN stage_data ELSE '{}' END, ${sets.join(', ')})
-            WHERE id = ? AND run_id = ?`
-        )
-        .bind(...args, plan.itemId, plan.runId)
-        .run();
+      await recordReadback(db, plan.itemId, plan.runId, out);
       break;
     } catch (e) {
       console.error('catalog_import_readback_not_stored', JSON.stringify({ code: 'IMPORT_READBACK_NOT_STORED', reason: message(e).slice(0, 80) }));
     }
   }
+  return out;
+}
+
+/**
+ * GET /readback's own run of the write's verification (review 6c; §A.3: /readback runs reloadForVerification +
+ * verifyApplied): for an item whose write could not record it — a D1 blip after the commit, an invocation that
+ * ended, a batch whose answer was lost — against the target its checkpoint committed, then recorded. Only while
+ * the product is as the write left it (PUBLISHING or VERIFYING_LIVE, not hidden on a block: the caller checks, the
+ * record's own condition again): never against a product the import itself has hidden. Null when no target was
+ * committed. A D1 error is thrown (the route answers a transient 5xx and the target stays for the next call).
+ */
+export async function readbackFromTarget(db: D1Database, item: { id: string; run_id: string; levonis_product_id: string; stage_data: string }): Promise<ReadbackRecord | null> {
+  const target = readbackTargetOf(item.stage_data);
+  if (!target) return null;
+  const out = await verifyOnce(db, item.levonis_product_id, planOfTarget(target));
+  await recordReadback(db, item.id, item.run_id, out, " AND processing_state IN ('PUBLISHING', 'VERIFYING_LIVE') AND unpublished_on_block = 0");
   return out;
 }
 

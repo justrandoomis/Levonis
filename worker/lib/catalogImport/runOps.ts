@@ -8,7 +8,8 @@
  *   /run/protect-snapshot  §E.4 per-run fingerprints, phase before | after
  *   /run/finish            closed or partial; the token cleared
  *   /items/:sid/withdraw   BLOCKED SOURCE_WITHDRAWN → WITHDRAWN_AT_SOURCE, with evidence
- *   /items/:sid/readback   the write's recorded verifyApplied + live ownership checks
+ *   /items/:sid/readback   the write's verifyApplied (recorded by the write, or run here against the plan its
+ *                          checkpoint committed) + live ownership checks
  *
  * Digests of protected material are stored, never answered and never logged:
  * an answer carries counts only.
@@ -25,7 +26,7 @@ import { packedInserts } from './budget';
 import { currentAndNext } from './report';
 import { taxonomyNodeId, type ReviewedBundle, type TaxonomyCreateNode } from './reviewed';
 import { stageDataOf, type ItemRow } from './items';
-import { FINGERPRINT_QUERIES } from './writer';
+import { FINGERPRINT_QUERIES, readbackFromTarget } from './writer';
 
 // ---------------------------------------------------------------- /hello
 
@@ -434,9 +435,17 @@ export async function withdrawItem(db: D1Database, run: ImportRun, item: ItemRow
  * The admin-side half of §I.1.6: the write's own verifyApplied over this payload's plan (recorded by the write,
  * `stage_data.readback`), and — live — every bound value, variant and colour id belongs to the product, every
  * value to a group of the product, every swatch to a value of the product, every variant's combination to values
- * of the product, and every stored key exists in R2. Counts and check names only. A verification that has not run,
- * or an R2 that does not answer, is a transient 503 — never a failed check.
+ * of the product, and every stored key exists in R2. Counts and check names only. An R2 that does not answer is a
+ * transient 503 — never a failed check.
+ *
+ * A verification the write could not record (review 6c: a D1 blip after its commit, an invocation that ended, a
+ * batch answer that was lost) is RUN HERE, against the plan the write's checkpoint committed, and recorded — while
+ * the product is as the write left it: PUBLISHING or VERIFYING_LIVE and not hidden on a block (a resumed item's
+ * product is put back by /publish-finish first). Otherwise, or while D1 fails, the answer is a transient 503 that a
+ * later call clears — never a state that waits for ever.
  */
+const READBACK_RERUN_STATES: ReadonlySet<string> = new Set(['PUBLISHING', 'VERIFYING_LIVE']);
+
 export async function readbackItem(
   env: Pick<Env, 'DB' | 'BUCKET' | 'R2_PUBLIC' | 'R2_PRIVATE'>,
   item: ItemRow
@@ -444,11 +453,16 @@ export async function readbackItem(
   const db = env.DB;
   const pid = item.levonis_product_id;
   if (!pid) throw new OpsRefusal(409, 'IMPORT_ILLEGAL_TRANSITION', [item.id]);
-  const recorded = (stageDataOf(item).readback ?? null) as { ran?: boolean; mismatches?: number | null } | null;
-  // The write's own verification has not RUN (a passing failure after its commit, or no record yet): not a
-  // verdict. Transient for the runner (5xx) — never `ok: false`, which VERIFY reads as a failed check.
-  const ran = !!recorded && recorded.ran !== false && typeof recorded.mismatches === 'number' && recorded.mismatches >= 0;
-  if (!ran) throw new OpsRefusal(503, 'IMPORT_READBACK_PENDING', [item.id]);
+  const ranOf = (r: { ran?: boolean; mismatches?: number | null } | null) => !!r && r.ran !== false && typeof r.mismatches === 'number' && r.mismatches >= 0;
+  let recorded = (stageDataOf(item).readback ?? null) as { ran?: boolean; mismatches?: number | null } | null;
+  if (!ranOf(recorded) && READBACK_RERUN_STATES.has(item.processing_state) && Number(item.unpublished_on_block) !== 1) {
+    // The write's own verification has not run: run it now, against what the write committed (a D1 error is thrown:
+    // the route's transient 5xx, and the target stays for the next call).
+    recorded = await readbackFromTarget(db, item);
+  }
+  // Still not run (no target, or a product the import has hidden): not a verdict. Transient for the runner (5xx) — never
+  // `ok: false`, which VERIFY reads as a failed check.
+  if (!ranOf(recorded)) throw new OpsRefusal(503, 'IMPORT_READBACK_PENDING', [item.id]);
   const own = await db
     .prepare(
       `SELECT

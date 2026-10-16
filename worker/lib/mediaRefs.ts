@@ -951,7 +951,8 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'catalog_import_items.discovery_sources': 'where the item was discovered (sitemap, collection handles)',
   'catalog_import_items.discovered_at': 'a timestamp ("cover" inside "discovered")',
   'catalog_import_items.payload_sha256': 'a hash of the staged payload',
-  'catalog_import_items.stage_data': 'stage counts, plan estimates and the description kind; counts and booleans, no keys',
+  'catalog_import_items.stage_data':
+    "the import's working record: counts, booleans, the written image rows and, until GET /readback has verified the write, the plan it compares with — keys the product's own rows and catalog_import_media.r2_key already reference, never shown",
   'catalog_import_items.quality': 'coverage counts (§H.3), never values',
   'catalog_import_items.d1_checks': "the Worker's recomputed checks: counts and booleans",
   'catalog_import_items.edge_evidence': "the runner's public-site evidence: HTTP statuses, counts and public URLs",

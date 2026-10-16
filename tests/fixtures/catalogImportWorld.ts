@@ -267,3 +267,58 @@ export function complete(world: World, itemId: string): void {
     )
     .run(itemId);
 }
+
+/**
+ * A D1 binding that fails around the import's WRITE BATCH (the batch that carries the write's checkpoint) once
+ * armed — review 6c, the post-commit record:
+ *
+ *   'tail'  the batch commits; then every statement and batch fails (D1's ambiguous "Network connection lost")
+ *           until `heal()`: a short outage after the commit, or an invocation that ends right after it —
+ *           either way nothing after the commit lands;
+ *   'lost'  the batch commits and its answer is lost (the same error thrown from the batch call itself); the
+ *           binding is healthy again at once.
+ *
+ * Every other statement, before the batch and after `heal()`, goes through untouched.
+ */
+export function postCommitFaultD1(inner: D1Database, mode: 'tail' | 'lost'): { db: D1Database; arm: () => void; heal: () => void; refused: () => number } {
+  const state = { armed: false, down: false, refused: 0 };
+  const sqlOf = new WeakMap<object, string>();
+  const innerOf = new WeakMap<object, D1PreparedStatement>();
+  const fail = () => {
+    state.refused++;
+    return Promise.reject(new Error('D1_ERROR: Network connection lost.'));
+  };
+  const wrap = (sql: string, st: D1PreparedStatement): D1PreparedStatement => {
+    const w = {
+      bind: (...v: unknown[]) => wrap(sql, st.bind(...v)),
+      first: (col?: string) => (state.down ? fail() : col === undefined ? st.first() : st.first(col)),
+      all: () => (state.down ? fail() : st.all()),
+      run: () => (state.down ? fail() : st.run()),
+      raw: (o?: { columnNames?: boolean }) => (state.down ? fail() : st.raw(o as never)),
+    };
+    sqlOf.set(w, sql);
+    innerOf.set(w, st);
+    return w as unknown as D1PreparedStatement;
+  };
+  const db = {
+    prepare: (sql: string) => wrap(sql, inner.prepare(sql)),
+    batch: async (stmts: D1PreparedStatement[]) => {
+      if (state.down) return fail();
+      const isWrite = state.armed && stmts.some((s) => /last_completed_stage = 'WRITING'/.test(sqlOf.get(s as object) ?? ''));
+      const r = await inner.batch(stmts.map((s) => innerOf.get(s as object) ?? s));
+      if (!isWrite) return r;
+      state.armed = false;
+      if (mode === 'lost') return fail();
+      state.down = true;
+      return r;
+    },
+    exec: (q: string) => inner.exec(q),
+    dump: () => (inner as unknown as { dump: () => Promise<ArrayBuffer> }).dump(),
+  };
+  return {
+    db: db as unknown as D1Database,
+    arm: () => (state.armed = true),
+    heal: () => (state.down = false),
+    refused: () => state.refused,
+  };
+}

@@ -12,19 +12,26 @@
  *     workflow 60, a second fetch ≥ 24 h after the block that still finds the
  *     page gone, and the sitemap no longer listing it;
  *   - readback: a vanished object or a binding to another product's value is a
- *     mismatch the answer counts.
+ *     mismatch the answer counts; through the door, a write whose post-commit
+ *     statements all failed (or whose batch answer was lost) is verified by
+ *     /readback itself (review 6c).
  */
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { bundleTexts, manifestRowOf, newWorld, RUN_ID, stage, write } from './fixtures/catalogImportWorld';
+import { buildFor, bundleTexts, manifestRowOf, newWorld, postCommitFaultD1, RUN_ID, stage, write } from './fixtures/catalogImportWorld';
 import { sample } from './fixtures/bambu/load';
-import { OPS, OPS_RUN, openRun, opsWorld, setBundle, TOKEN, type OpsWorld } from './fixtures/catalogImportOps';
+import { installCdnDouble, OPS, OPS_RUN, openRun, opsWorld, restoreFetch, setBundle, TOKEN, type OpsWorld } from './fixtures/catalogImportOps';
+import { freshDb } from './fixtures/app';
+import { limitD1 } from './fixtures/d1Limits';
 import { applyEvent, itemBySource } from '../worker/lib/catalogImport/items';
 import { readbackItem, withdrawItem } from '../worker/lib/catalogImport/runOps';
 import { OpsRefusal } from '../worker/lib/catalogImport/auth';
 import { purgePlan } from '../worker/lib/catalogImport/purge';
 
-after(() => setBundle(null));
+after(() => {
+  setBundle(null);
+  restoreFetch();
+});
 
 const post = async (w: OpsWorld, path: string, body: unknown = {}) => {
   const r = await w.call(`${OPS}${path}`, { body });
@@ -326,5 +333,66 @@ test('purge: every ancestor section of a three-level placement is purged too (it
   for (const slug of chain) {
     assert.ok(plan.sections.includes(slug), `${slug} is purged`);
     assert.ok(plan.paths.includes(`/api/catalog/${slug}`));
+  }
+});
+
+test('review 6b, 2 (the door): every statement after the /write batch fails, or the batch answers an error after committing — /readback runs the verification itself and answers 200, and /lease never carries the plan', async () => {
+  for (const mode of ['tail', 'lost'] as const) {
+    const raw = freshDb();
+    const f = postCommitFaultD1(limitD1(raw), mode);
+    const w = opsWorld({ raw, env: { DB: f.db } });
+    const x = sample('ams-2-pro-feeder-unit');
+    const sid = x.sourceProductId;
+    setBundle(bundleTexts({ manifestRows: [manifestRowOf(x, 1)], matches: [] }));
+    openRun(w.raw);
+    installCdnDouble(w);
+    try {
+      await post(w, '/manifest', { rows: [row(manifestRowOf(x, 1))] });
+      await post(w, '/run/prepare-taxonomy', {});
+      const t = String((await post(w, `/items/${sid}/lease`, { lease_token: '' })).json.lease_token);
+      for (const [state, outcome] of [['EXTRACTING', 'start'], ['ENRICHING', 'ok'], ['VALIDATING', 'ok']]) assert.equal((await event(w, sid, t, state, outcome)).status, 200, state);
+      const payload = buildFor({ queue: 0 }, 'ams-2-pro-feeder-unit').payload;
+      const staged = await post(w, `/items/${sid}/stage`, { lease_token: t, payload, document_checks: [] });
+      assert.equal(staged.status, 200, JSON.stringify(staged.json));
+      assert.equal((await event(w, sid, t, 'INGESTING_MEDIA', 'ok')).status, 200);
+      const wanted = new Map<string, { source_media_id: string; role: string; source_url: string }>();
+      for (const i of payload.images) wanted.set(i.source_media_id, { source_media_id: i.source_media_id, role: 'gallery', source_url: i.source_url });
+      for (const sw of payload.swatches) if (!wanted.has(sw.source_media_id)) wanted.set(sw.source_media_id, { source_media_id: sw.source_media_id, role: 'swatch', source_url: sw.source_url });
+      for (const b of payload.content_blocks) if (b.kind === 'image' && b.source_media_id && !wanted.has(b.source_media_id)) wanted.set(b.source_media_id, { source_media_id: b.source_media_id, role: 'description', source_url: b.source_url });
+      const list = [...wanted.values()];
+      while (list.length) {
+        const r = await post(w, `/items/${sid}/media`, { lease_token: t, media: list.splice(0, 4) });
+        assert.ok((r.json.media as Array<{ status: string }>).every((m) => m.status === 'stored'), JSON.stringify(r.json));
+      }
+      assert.equal((await event(w, sid, t, 'WRITING', 'ok')).status, 200);
+      f.arm();
+      const written = await post(w, `/items/${sid}/write`, { lease_token: t, payload_sha256: staged.json.payload_sha256, payload, document_checks: [] });
+      f.heal();
+      assert.ok(f.refused() > 0, `${mode}: the fault happened`);
+      if (mode === 'tail') {
+        assert.equal(written.status, 200, JSON.stringify(written.json));
+        assert.equal(written.json.readback_mismatches, -1, 'the write could not verify itself');
+      } else {
+        assert.equal(written.status, 503, JSON.stringify(written.json));
+        assert.equal(written.json.code, 'D1_OVERLOADED', 'transient and ambiguous for the runner');
+      }
+      // What a resumed runner learns: the write committed; the record of the money probe with it; no plan.
+      const lease = await post(w, `/items/${sid}/lease`, { lease_token: t });
+      assert.equal(lease.json.state, 'PUBLISHING', mode);
+      const sd = lease.json.stage_data as Record<string, unknown>;
+      assert.equal(sd.after_money_default, true, mode);
+      assert.equal('readback_target' in sd, false, `${mode}: /lease never carries the plan`);
+      // 'tail': asked as the write left it (PUBLISHING); 'lost': after /publish-finish, as the runner's VERIFY asks.
+      if (mode === 'lost') assert.equal((await post(w, `/items/${sid}/publish-finish`, { lease_token: t })).json.state, 'VERIFYING_LIVE');
+      const rb = await w.call(`${OPS}/items/${sid}/readback`);
+      const answer = (await rb.json()) as { ok: boolean; mismatches: number; checks: Record<string, boolean> };
+      assert.equal(rb.status, 200, `${mode}: ${JSON.stringify(answer)}`);
+      assert.equal(answer.ok, true, `${mode}: ${JSON.stringify(answer)}`);
+      assert.equal(answer.checks.write_verified, true);
+      const again = await w.call(`${OPS}/items/${sid}/readback`);
+      assert.equal(again.status, 200, `${mode}: and from the record ever after`);
+    } finally {
+      restoreFetch();
+    }
   }
 });

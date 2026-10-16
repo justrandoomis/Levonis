@@ -26,7 +26,12 @@
  *     JSON-only gallery refused; merged representatives name the product's own
  *     variants; the collapse (and a representative kept through it), the aux
  *     HEAD, the owner's primary, no self relation; facet mirrors; one heading per
- *     section; no body-less usage step.
+ *     section; no body-less usage step;
+ *   - review 6c: a thrown aux HEAD is a 503 with nothing committed; the post-commit
+ *     tries wait between them; the merge's before_fp_equal and the create's money
+ *     probe are recorded by the batch itself, and the readback target it commits
+ *     lets /readback verify what the write could not (every post-commit statement
+ *     failed, or the batch's answer was lost), exactly as the plan would.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -40,6 +45,7 @@ import {
   LEASE,
   newWorld,
   plan,
+  postCommitFaultD1,
   RUN_ID,
   setWriting,
   stage,
@@ -54,21 +60,26 @@ import { planProductSave, saveProductAtomic } from '../worker/lib/productPersist
 import { validateProductDoc } from '../worker/lib/productModel';
 import {
   FINGERPRINT_QUERIES,
+  fingerprintTextSql,
   importWriteContext,
   ImportWriteRefused,
   IMPORT_ACTOR,
   MONEY_PROBE_SQL,
   moneyProbeAtDefault,
   planImportWrite,
+  readbackFromTarget,
+  readbackTargetJson,
   runImportWrite,
   spoolOptionOf,
 } from '../worker/lib/catalogImport/writer';
+import { reloadForVerification, verifyApplied } from '../worker/lib/productPersistence';
 import { colourFacet } from '../packages/catalog/src/bambuImport/registry/colours';
 import { contradicts } from '../packages/catalog/src/bambuImport/media';
 import { collapseContentDuplicates as packageCollapse } from '../packages/catalog/src/bambuImport/mediaCollapse';
-import { itemBySource } from '../worker/lib/catalogImport/items';
+import { finishPublishing, itemBySource, stageDataOf } from '../worker/lib/catalogImport/items';
+import { agreementOf } from '../worker/lib/catalogImport/complete';
 import { readbackItem } from '../worker/lib/catalogImport/runOps';
-import { OpsRefusal } from '../worker/lib/catalogImport/auth';
+import { OpsRefusal, type ImportRun } from '../worker/lib/catalogImport/auth';
 import { IMPORT_INVOCATION_LIMIT } from '../worker/lib/catalogImport/budget';
 import { GUARDED_ROW_TABLES, IMPORT_GUARD_ID } from '../worker/lib/catalogImport/protectedTables';
 import { payloadSha256, parseReviewedBundle, emptyReviewedTexts, resolveTaxonomy } from '../worker/lib/catalogImport/reviewed';
@@ -77,6 +88,9 @@ import { busFor, configureEventBus, resetEventBus } from '../worker/lib/eventBus
 
 const one = <T = Record<string, unknown>>(w: World, sql: string, ...p: unknown[]) => ({ ...(w.raw.prepare(sql).get(...(p as never[])) as object) }) as T;
 const rows = <T = Record<string, unknown>>(w: World, sql: string, ...p: unknown[]) => (w.raw.prepare(sql).all(...(p as never[])) as object[]).map((r) => ({ ...r })) as T[];
+const RUN_ROW: ImportRun = { id: RUN_ID, state: 'running', token_expires_at: '', github_run_id: '42', reviewed_bundle_sha256: '', code_commit: '', manifest_total: 0, started_at: '' };
+const stageDataRaw = (w: World, itemId: string) => JSON.parse(String(one(w, 'SELECT stage_data FROM catalog_import_items WHERE id = ?', itemId).stage_data)) as Record<string, unknown>;
+const r2Env = (w: World) => ({ DB: w.db, BUCKET: w.bucket as never, R2_PUBLIC: w.bucket as never, R2_PRIVATE: w.media.R2_PRIVATE as never });
 
 async function refused(fn: () => Promise<unknown>, code: string): Promise<ImportWriteRefused> {
   try {
@@ -386,8 +400,12 @@ test('a merge into a printer with a legacy warranty plan and a pre-order route w
   assert.notEqual(after.warranty_plans, before.warranty_plans, 'the save path re-serialised the legacy plan (the case under test)');
   assert.notEqual(after.preorder_transports, before.preorder_transports, 'and the route');
   assert.equal(result.before_fp_equal, true, 'no fee, percentage, commission or active flag moved');
-  // The fingerprint still reads the money: a fee, a commission or a route switched off changes it.
-  const fp = () => JSON.stringify(w.raw.prepare(FINGERPRINT_QUERIES.find((q) => q.table === 'products')!.sql).all('p_leg'));
+  assert.equal(stageDataRaw(w, s.itemId).before_fp_equal, true, 'and the batch\'s own SQL comparison, recorded with the write, agrees');
+  // The fingerprint still reads the money: a fee, a commission or a route switched off changes it — in its rows and
+  // in its SQL text alike.
+  const productsQuery = FINGERPRINT_QUERIES.find((q) => q.table === 'products')!;
+  const text = () => String((w.raw.prepare(`SELECT ${fingerprintTextSql(productsQuery, productsQuery.columns!)} AS t`).get('p_leg') as { t: string }).t);
+  const fp = () => JSON.stringify(w.raw.prepare(productsQuery.sql).all('p_leg')) + text();
   const base = fp();
   for (const change of [
     `UPDATE products SET warranty_plans = json_set(warranty_plans, '$[0].fee_iqd', 60000) WHERE id = 'p_leg'`,
@@ -1085,10 +1103,188 @@ test('a passing read failure after the commit is retried; a verification that ca
   assert.equal(r2.readback_mismatches, -1);
   assert.equal(JSON.parse(String(one(w2, 'SELECT stage_data FROM catalog_import_items WHERE id = ?', s2.itemId).stage_data)).readback.ran, false);
   const item = await itemBySource(w2.db, RUN_ID, s2.payload.source_product_id);
-  await assert.rejects(
-    () => readbackItem({ DB: w2.db, BUCKET: w2.bucket as never, R2_PUBLIC: w2.bucket as never, R2_PRIVATE: w2.media.R2_PRIVATE as never }, item),
-    (e: unknown) => e instanceof OpsRefusal && e.status === 503 && e.code === 'IMPORT_READBACK_PENDING'
-  );
+  // While D1 still fails, /readback's own run of the verification fails too: the route's transient 5xx (review 6c),
+  // never ok:false; once D1 answers, it runs and records it (no longer a 503 for ever).
+  await assert.rejects(() => readbackItem({ ...r2Env(w2), DB: always.db }, item), /Network connection lost/);
+  assert.equal((await readbackItem(r2Env(w2), item)).ok, true);
+  assert.deepEqual(stageDataRaw(w2, s2.itemId).readback, { ran: true, mismatches: 0, sections: [] });
+});
+
+test('review 6b, 2: the post-commit tries wait 250 ms, then 1 s, between them — a passing D1 error is short, never instant', async () => {
+  for (const [what, match] of [
+    ['the readback', /^SELECT \* FROM products WHERE id = \?$/],
+    ['its record', /^UPDATE catalog_import_items SET stage_data = json_set/],
+  ] as const) {
+    const w = newWorld();
+    const s = stage(w, 'ams-2-pro-feeder-unit');
+    const flaky = flakyD1(w.db, match, 2);
+    const waits: number[] = [];
+    const ctx = { ...importWriteContext(flaky.db, w.media as never), sleep: async (ms: number) => void waits.push(ms) };
+    const p = await planImportWrite(ctx, { mode: 'write', payload: s.payload, bundle: w.bundle, runId: RUN_ID, itemId: s.itemId, leaseToken: LEASE });
+    flaky.arm();
+    const r = await runImportWrite(ctx, p);
+    assert.equal(flaky.failures(), 2, what);
+    assert.deepEqual(waits, [250, 1000], `${what}: a wait before the second and the third try`);
+    assert.equal(r.readback_mismatches, 0, `${what}: verified`);
+    assert.deepEqual(stageDataRaw(w, s.itemId).readback, { ran: true, mismatches: 0, sections: [] }, `${what}: recorded on the third try`);
+  }
+});
+
+test('review 6b, 2: every statement after the commit fails — the batch itself recorded the protected-fields result and the money probe, and /readback re-runs the verification it could not record', async () => {
+  // A create: the post-commit tail (audit, readback, record) all fails, as in a D1 outage or an invocation that ends.
+  const w = newWorld();
+  const s = stage(w, 'ams-2-pro-feeder-unit');
+  const f = postCommitFaultD1(w.db, 'tail');
+  const ctx = { ...importWriteContext(f.db, w.media as never), sleep: async () => undefined };
+  const p = await planImportWrite(ctx, { mode: 'write', payload: s.payload, bundle: w.bundle, runId: RUN_ID, itemId: s.itemId, leaseToken: LEASE });
+  f.arm();
+  const r = await runImportWrite(ctx, p);
+  f.heal();
+  assert.ok(f.refused() >= 6, 'the readback and its record were tried, and refused');
+  assert.equal(r.readback_mismatches, -1);
+  const sd = stageDataRaw(w, s.itemId);
+  assert.equal(sd.after_money_default, true, 'the money probe, recorded by the batch itself');
+  assert.notEqual((sd.readback as { ran?: boolean } | undefined)?.ran, true, 'the verification never ran');
+  const item = () => itemBySource(w.db, RUN_ID, s.payload.source_product_id);
+  assert.equal('readback_target' in stageDataOf(await item()), false, 'what the write committed for the readback is never answered (/lease, the dashboard)');
+  // A product the import has hidden on a block is never verified (it is not as the write left it): transient.
+  w.raw.prepare('UPDATE catalog_import_items SET unpublished_on_block = 1 WHERE id = ?').run(s.itemId);
+  await assert.rejects(() => item().then((i) => readbackItem(r2Env(w), i)), (e: unknown) => e instanceof OpsRefusal && e.status === 503 && e.code === 'IMPORT_READBACK_PENDING');
+  assert.equal('readback' in stageDataRaw(w, s.itemId) && (stageDataRaw(w, s.itemId).readback as { ran?: boolean }).ran === true, false, 'nothing recorded');
+  w.raw.prepare('UPDATE catalog_import_items SET unpublished_on_block = 0 WHERE id = ?').run(s.itemId);
+  await finishPublishing(w.db, RUN_ROW, await item());
+  // As the write left it: /readback runs the write's own verification now, against the plan the write committed.
+  const rb = await readbackItem(r2Env(w), await item());
+  assert.equal(rb.ok, true, JSON.stringify(rb));
+  assert.equal(rb.checks.write_verified, true);
+  const after = stageDataRaw(w, s.itemId);
+  assert.deepEqual(after.readback, { ran: true, mismatches: 0, sections: [] }, 'recorded once it ran');
+  assert.equal('readback_target' in after, false, 'and the plan it compared with is gone');
+  // The record answers from now on: no verification again (its first read would fail here).
+  const again = flakyD1(w.db, /^SELECT \* FROM products WHERE id = \?$/, 99);
+  again.arm();
+  assert.equal((await readbackItem({ ...r2Env(w), DB: again.db }, await item())).ok, true);
+  assert.equal(again.failures(), 0);
+
+  // A merge: the same tail; the protected-fields result is the batch's own, so /complete can agree.
+  const w2 = newWorld();
+  await existingA1(w2);
+  w2.matches.push(a1Match());
+  const m = stage(w2, 'a1', { writeMode: 'merge', mergeProductId: 'p_a1old' });
+  const f2 = postCommitFaultD1(w2.db, 'tail');
+  const ctx2 = { ...importWriteContext(f2.db, w2.media as never), sleep: async () => undefined };
+  const p2 = await planImportWrite(ctx2, { mode: 'write', payload: m.payload, bundle: w2.bundle, runId: RUN_ID, itemId: m.itemId, leaseToken: LEASE });
+  f2.arm();
+  const r2 = await runImportWrite(ctx2, p2);
+  f2.heal();
+  assert.equal(r2.before_fp_equal, true);
+  const sd2 = stageDataRaw(w2, m.itemId);
+  assert.equal(sd2.before_fp_equal, true, 'recorded by the batch, not after it');
+  assert.equal('fp_before' in sd2, false, 'no protected value left in stage_data');
+  const edge = { version: 1, live_url: 'x', round: 1, checks: Object.fromEntries(['v1', 'structure', 'knowledge', 'fingerprint', 'listings', 'search', 'sellable', 'media', 'compare', 'merge'].map((k) => [k, { ok: true, hard: true }])), browser: { ok: true, checks: 1, failed: 0 }, sections: { leaf: '', root: '', secondary: [] }, selections_checked: 1, counts: { a: 1 } };
+  assert.deepEqual(agreementOf(edge as never, { ok: true, checks: {}, counts: {}, failed: [] }, { a: 1 }, true, { before_fp_equal: sd2.before_fp_equal }).failed, []);
+  await finishPublishing(w2.db, RUN_ROW, await itemBySource(w2.db, RUN_ID, m.payload.source_product_id));
+  const rb2 = await readbackItem(r2Env(w2), await itemBySource(w2.db, RUN_ID, m.payload.source_product_id));
+  assert.equal(rb2.ok, true, JSON.stringify(rb2));
+  assert.deepEqual(stageDataRaw(w2, m.itemId).readback, { ran: true, mismatches: 0, sections: [] });
+});
+
+test('review 6b, 2: the committed readback target verifies exactly as the plan does — the same mismatches, written as it is or tampered with', async () => {
+  const cases: Array<[string, (w: World) => Promise<ReturnType<typeof stage>>]> = [
+    ...(['ams-2-pro-feeder-unit', 'h2d', 'pla-basic-filament', 'build-plate-combo', 'bambu-hotend-a1-a2'] as const).map(
+      (h) => [h, async (w: World) => stage(w, h)] as [string, (w: World) => Promise<ReturnType<typeof stage>>]
+    ),
+    [
+      'a1 merged',
+      async (w: World) => {
+        await existingA1(w);
+        // The owner's costs, which the merge's plan carries forward: never copied into the target.
+        w.raw.exec("UPDATE products SET product_cost_iqd = 1234567 WHERE id = 'p_a1old'; UPDATE product_option_values SET cost_iqd = 7654321 WHERE id = 'v_std'");
+        w.matches.push(a1Match());
+        return stage(w, 'a1', { writeMode: 'merge', mergeProductId: 'p_a1old' });
+      },
+    ],
+  ];
+  for (const [label, staged] of cases) {
+    const w = newWorld();
+    const s = await staged(w);
+    const { plan: p } = await write(w, s);
+    const pid = p.productId;
+    const json = readbackTargetJson(p.save);
+    assert.ok(json.length > 0, `${label}: a target is stored`);
+    assert.doesNotMatch(json, /1234567|7654321|cost_iqd":[1-9]|cost_adjust_iqd":[1-9]/, `${label}: no cost value in the target`);
+    if (label === 'a1 merged') assert.match(JSON.stringify(p.save.doc), /1234567/, 'the plan itself carries the stored cost forward (the case under test)');
+    // The item as GET /readback finds it after a lost record: VERIFYING_LIVE, the target, no readback.
+    w.raw.prepare("UPDATE catalog_import_items SET processing_state = 'VERIFYING_LIVE', last_completed_stage = 'PUBLISHING', stage_data = json_set(json_remove(stage_data, '$.readback'), '$.readback_target', json(?)) WHERE id = ?").run(json, s.itemId);
+    const viaTarget = async () => {
+      w.raw.prepare("UPDATE catalog_import_items SET stage_data = json_set(json_remove(stage_data, '$.readback'), '$.readback_target', json(?)) WHERE id = ?").run(json, s.itemId);
+      return (await readbackFromTarget(w.db, await itemBySource(w.db, RUN_ID, s.payload.source_product_id)))!;
+    };
+    const viaPlan = async () => {
+      const found = verifyApplied(p.save, (await reloadForVerification(w.db, pid))!, { documentKeys: null });
+      return { ran: true, mismatches: found.length, sections: [...new Set(found.map((m) => m.section))].sort() };
+    };
+    assert.deepEqual(await viaTarget(), { ran: true, mismatches: 0, sections: [] }, `${label}: as written`);
+    assert.deepEqual(await viaTarget(), await viaPlan(), label);
+    // Tampered with: the scalars, a gallery row, the catalogs — each one is seen the same way through both.
+    w.raw.prepare("UPDATE products SET name = name || ' (edited)', slug = slug || '-x' WHERE id = ?").run(pid);
+    w.raw.prepare('UPDATE product_images SET sort_order = sort_order + 100 WHERE id = (SELECT id FROM product_images WHERE product_id = ? ORDER BY id LIMIT 1)').run(pid);
+    w.raw.prepare('DELETE FROM product_catalogs WHERE rowid = (SELECT rowid FROM product_catalogs WHERE product_id = ? LIMIT 1)').run(pid);
+    const tampered = await viaTarget();
+    assert.ok(Number(tampered.mismatches) >= 3, `${label}: ${JSON.stringify(tampered)}`);
+    assert.deepEqual(tampered, await viaPlan(), `${label}: tampered`);
+  }
+});
+
+test('review 6b, 2: the batch\'s own protected-fields record reads a change the guard triggers missed (one dropped for the test): false, like the in-memory answer', async () => {
+  const w = newWorld();
+  await existingA1(w);
+  w.matches.push(a1Match());
+  const s = stage(w, 'a1', { writeMode: 'merge', mergeProductId: 'p_a1old' });
+  const { plan: p, ctx } = await plan(w, s);
+  w.raw.exec('DROP TRIGGER trg_import_guard_products_upd');
+  // A stock write the batch must never hold, after every write of the plan, right before the checkpoint (which sits
+  // just before the after-SELECTs; they shift by one).
+  const at = p.layout.after[0] - 1;
+  p.statements.splice(at, 0, w.db.prepare('UPDATE products SET low_stock_threshold = COALESCE(low_stock_threshold, 0) + 7 WHERE id = ?').bind('p_a1old'));
+  p.layout = { ...p.layout, after: [p.layout.after[0] + 1, p.layout.after[1] + 1] };
+  const r = await runImportWrite(ctx, p);
+  assert.equal(r.before_fp_equal, false, 'the in-memory comparison');
+  const sd = stageDataRaw(w, s.itemId);
+  assert.equal(sd.before_fp_equal, false, 'the record /complete reads');
+  assert.equal('fp_before' in sd, false, 'the texts never persist');
+  // A `SELECT *` table (its columns read from the live schema): a pricing-state row changed inside the batch.
+  const w2 = newWorld();
+  await existingA1(w2);
+  w2.matches.push(a1Match());
+  const s2 = stage(w2, 'a1', { writeMode: 'merge', mergeProductId: 'p_a1old' });
+  const { plan: p2, ctx: ctx2 } = await plan(w2, s2);
+  assert.equal(count(w2.raw, 'SELECT COUNT(*) AS n FROM product_pricing_state WHERE product_id = ?', 'p_a1old'), 1);
+  w2.raw.exec('DROP TRIGGER trg_import_guard_product_pricing_state_upd');
+  p2.statements.splice(p2.layout.after[0] - 1, 0, w2.db.prepare("UPDATE product_pricing_state SET reprice_blocked_code = 'TEST', reprice_blocked_at = '2026-10-16T00:00:00.000Z' WHERE product_id = ?").bind('p_a1old'));
+  p2.layout = { ...p2.layout, after: [p2.layout.after[0] + 1, p2.layout.after[1] + 1] };
+  const r2 = await runImportWrite(ctx2, p2);
+  assert.equal(r2.before_fp_equal, false);
+  assert.equal(stageDataRaw(w2, s2.itemId).before_fp_equal, false);
+});
+
+test('review 6b, 2: a batch that commits but answers an error (D1\'s ambiguous "connection lost") leaves the same durable record', async () => {
+  const w = newWorld();
+  const s = stage(w, 'ams-2-pro-feeder-unit');
+  const f = postCommitFaultD1(w.db, 'lost');
+  const ctx = importWriteContext(f.db, w.media as never);
+  const p = await planImportWrite(ctx, { mode: 'write', payload: s.payload, bundle: w.bundle, runId: RUN_ID, itemId: s.itemId, leaseToken: LEASE });
+  f.arm();
+  await assert.rejects(() => runImportWrite(ctx, p), /Network connection lost/);
+  const item = () => itemBySource(w.db, RUN_ID, s.payload.source_product_id);
+  const lost = await item();
+  assert.equal(lost.processing_state, 'PUBLISHING', 'the checkpoint committed');
+  assert.equal(lost.levonis_product_id, s.payload.product_id);
+  assert.equal(stageDataOf(lost).after_money_default, true);
+  await finishPublishing(w.db, RUN_ROW, lost);
+  const rb = await readbackItem(r2Env(w), await item());
+  assert.equal(rb.ok, true, JSON.stringify(rb));
+  assert.deepEqual(stageDataRaw(w, s.itemId).readback, { ran: true, mismatches: 0, sections: [] });
 });
 
 test('a swatch names only a value of this product\'s own groups (the swatch table is keyed by the value id alone)', async () => {

@@ -12,18 +12,21 @@
  *     complete selection eligible, an incomplete one SELECTION_REQUIRED, a bogus
  *     one fails the check — and no request row is ever created;
  *   - the live URL must be this item's page on the origin called; a stale lease
- *     aborts the COMPLETE whole.
+ *     aborts the COMPLETE whole;
+ *   - review 6c: a thrown R2 HEAD in the recompute is a transient 503 with
+ *     nothing recorded; a merge whose post-commit statements all failed still
+ *     completes on the before_fp_equal its batch recorded.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { count, newWorld, RUN_ID, stage, write, type World } from './fixtures/catalogImportWorld';
+import { count, LEASE, newWorld, postCommitFaultD1, RUN_ID, stage, write, type World } from './fixtures/catalogImportWorld';
 import type { ImportPayload } from '../packages/catalog/src/bambuImport/payload';
 import { OpsRefusal, type ImportRun } from '../worker/lib/catalogImport/auth';
 import { applyEvent, finishPublishing, itemBySource } from '../worker/lib/catalogImport/items';
 import { sample } from './fixtures/bambu/load';
 import { publishV2 } from './fixtures/v2Publish';
 import { agreementOf, completeItem, EXPECTED_EDGE_CHECKS } from '../worker/lib/catalogImport/complete';
-import { payloadCounts } from '../worker/lib/catalogImport/writer';
+import { importWriteContext, payloadCounts, planImportWrite, runImportWrite } from '../worker/lib/catalogImport/writer';
 
 const RUN: ImportRun = { id: RUN_ID, state: 'running', token_expires_at: '', github_run_id: '42', reviewed_bundle_sha256: '', code_commit: '', manifest_total: 0, started_at: '' };
 const ORIGIN = 'https://levonis-iq.com';
@@ -242,4 +245,26 @@ test('review 6b, 2: a thrown R2 HEAD during the recompute is a transient 503 bef
     const ok = await call();
     assert.equal(ok.state, 'COMPLETE', `${shape}: ${JSON.stringify(ok.d1_checks.agreement.failed)}`);
   }
+});
+
+test('review 6b, 2: a merge whose every post-commit statement failed still completes — on the before_fp_equal its batch recorded', async () => {
+  const w = newWorld();
+  const x = sample('a1');
+  w.raw.exec(`INSERT INTO products (id, slug, name, name_ar, name_ku, status, price_iqd, category_id, options, colors, images)
+    VALUES ('p_a1t', 'bambu-a1-t', 'Bambu Lab A1', 'بامبو A1', 'بامبو A1', 'active', 0, 'cat_printers', '[]', '[]', '[]')`);
+  w.raw.exec("INSERT INTO product_catalogs (product_id, catalog_id, position) VALUES ('p_a1t', 'cat_printers', 1)");
+  w.matches.push({ source_product_id: x.sourceProductId, source_handle: x.handle, levonis_product_id: 'p_a1t', decision: 'merge', value_map: {}, unmapped_variants: [], reason: 'same_model', reviewed_by: 't', reviewed_at: 'd' });
+  const s = stage(w, 'a1', { writeMode: 'merge', mergeProductId: 'p_a1t' });
+  const f = postCommitFaultD1(w.db, 'tail');
+  const ctx = { ...importWriteContext(f.db, w.media as never), sleep: async () => undefined };
+  const p = await planImportWrite(ctx, { mode: 'write', payload: s.payload, bundle: w.bundle, runId: RUN_ID, itemId: s.itemId, leaseToken: LEASE });
+  f.arm();
+  const result = await runImportWrite(ctx, p);
+  f.heal();
+  assert.ok(f.refused() > 0);
+  assert.equal(result.readback_mismatches, -1, 'nothing after the commit landed');
+  await finishPublishing(w.db, RUN, await itemBySource(w.db, RUN_ID, s.payload.source_product_id));
+  const base = evidence(s.payload, result.slug, { selections: [] });
+  const a = await complete(w, s.payload.source_product_id, { lease_token: LEASE, live_url: URL_OF(result.slug), edge_evidence: { ...base, checks: { ...base.checks, merge: { ok: true, hard: true } } } });
+  assert.equal(a.state, 'COMPLETE', JSON.stringify(a.d1_checks.failed.concat(a.d1_checks.agreement.failed)));
 });

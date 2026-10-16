@@ -111,11 +111,20 @@ export async function itemBySource(db: D1Database, runId: string, sourceProductI
 const leaseUntil = () => new Date(Date.now() + LEASE_MS).toISOString();
 const newLeaseToken = () => `lse_${randomToken(18)}`;
 
-/** The counts and digests of stage_data (never a value): what /lease hands back. */
+/** Keys of stage_data that are the Worker's own working material, never answered (/lease, the dashboard). */
+const STAGE_DATA_PRIVATE = ['readback_target', 'fp_before'] as const;
+
+/**
+ * The counts and digests of stage_data (never a value): what /lease hands back. The write's readback target (the
+ * plan's document, kept until GET /readback has verified against it, writer.ts) is not part of it.
+ */
 export function stageDataOf(item: Pick<ItemRow, 'stage_data'>): Record<string, unknown> {
   try {
     const v = JSON.parse(item.stage_data || '{}') as unknown;
-    return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return {};
+    const out = { ...(v as Record<string, unknown>) };
+    for (const k of STAGE_DATA_PRIVATE) delete out[k];
+    return out;
   } catch {
     return {};
   }

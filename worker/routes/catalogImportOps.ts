@@ -16,7 +16,8 @@
  *   POST /items/:sid/media              ≤ 4 media, store.bblcdn.com only, 45 s
  *   POST /items/:sid/write              ONE guarded batch (worker/lib/catalogImport/writer.ts)
  *   POST /items/:sid/publish-finish     republish if hidden on block; recompute; purge; VERIFYING_LIVE
- *   GET  /items/:sid/readback           the write's verifyApplied + live ownership checks (503 while it has not run)
+ *   GET  /items/:sid/readback           the write's verifyApplied + live ownership checks (run here, against the plan the
+ *                                       write committed, when the write could not record it; 503 while hidden on a block)
  *   POST /items/:sid/complete           runner evidence + the Worker's own D1 recompute
  *   POST /items/:sid/withdraw           BLOCKED SOURCE_WITHDRAWN → WITHDRAWN_AT_SOURCE
  *   POST /run/prepare-taxonomy          insert-only nodes, brand, synonyms
