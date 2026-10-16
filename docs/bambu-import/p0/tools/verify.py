@@ -1,7 +1,20 @@
-"""P0 exit checks (step 3 exit row, the parts P0 can prove). Usage: python3 -I tools/verify.py"""
+"""P0 exit checks (step 3 exit row, the parts P0 can prove).
+
+Usage:
+  python3 -I tools/verify.py
+      the corpus checks (needs the crawl: work/facts.json, work/parsed/, crawl.log.jsonl);
+  python3 -I tools/verify.py --snapshot <snapshot.json> --sealed <snapshot.sealed> [--data DIR] [--manifest FILE]
+                             [--pages DIR] [--candidates FILE] [--review FILE]
+      step 3 e: data/bambu-import/{existing-matches,compat-targets,taxonomy-map}.json against the sealed live
+      snapshot and the manifest (tools/verify_reviewed.py). Sandbox only: the snapshot is private, and the
+      output carries counts, check names, public handles and ids only.
+"""
 import collections, json, os, re, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); P0 = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
+if __name__ == '__main__' and '--snapshot' in sys.argv:
+    import verify_reviewed
+    sys.exit(verify_reviewed.main(sys.argv[1:]))
 import compat as C
 import p0lib
 import sentences as SC
