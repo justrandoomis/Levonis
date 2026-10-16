@@ -775,3 +775,19 @@ test('EVERY probe file against a catalogue that mixes priced and unpriced produc
   assert.equal(quote.status, 409);
   assert.equal(((await quote.json()) as { code?: string }).code, 'PRICE_NOT_AVAILABLE');
 });
+
+test('import.json (workflow 7\'s live probe of the Bambu import\'s ops door): the uniform 404 to an anonymous GET, nothing else', async () => {
+  const file = files.find((f) => f.file === 'import.json');
+  assert.ok(file, 'scripts/live-cost-probes.d/import.json exists');
+  assert.ok(file!.spec.probes.some((p) => p.path === '/api/ops/catalog-import/run/status' && JSON.stringify(p.status) === '[404]'));
+  const env = { DB: asD1(freshDb()), STORE_ROOT_DOMAIN: APEX, APP_ORIGIN: `https://${APEX}`, INITIAL_ADMIN_EMAIL: 'boss@x.co', EXTRA_ALLOWED_ORIGINS: '', ASSETS: { fetch: async () => new Response('spa') } };
+  for (const p of file!.spec.probes) {
+    const res = await fetchPublished(worker, new Request(`https://${APEX}${p.path}`, { headers: { Host: APEX, accept: 'application/json', 'CF-Connecting-IP': '9.9.9.9' } }), env as never, ctx);
+    assert.equal(res.headers.get('cache-control'), 'private, no-store', p.path);
+    const text = await res.text();
+    assert.deepEqual(judge(p, res.status, text), [], p.path);
+  }
+  // A probe that expected an answer from the door would fail: the runner reads the status and the body.
+  assert.notDeepEqual(judge({ ...file!.spec.probes[0], status: [200] }, 404, '{"error":"Not found"}'), []);
+  assert.notDeepEqual(judge(file!.spec.probes[0], 404, '{"code":"IMPORT_LEASE_LOST","message":"x"}'), []);
+});

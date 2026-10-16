@@ -1,0 +1,18 @@
+{
+  "step": "The Bambu catalogue import's ops door (import spec §A.3, §K.2 step 6; DECISIONS row 241): with no open run — every deploy but the import's own days — /api/ops/catalog-import answers an anonymous caller the one uniform 404, private and not stored, and says nothing else",
+  "probes": [
+    {
+      "path": "/api/ops/catalog-import/run/status",
+      "status": [404],
+      "expectValues": { "error": "Not found" },
+      "forbidKeys": "^(code|message|run|counts|current|next|token|lease_token|state)$",
+      "forbidPattern": "cir_[0-9a-f]|lease|token|sha256|IMPORT_"
+    },
+    {
+      "path": "/api/ops/catalog-import/items/1/readback",
+      "status": [404],
+      "expectValues": { "error": "Not found" },
+      "forbidPattern": "cir_[0-9a-f]|lease|token|sha256|IMPORT_"
+    }
+  ]
+}
