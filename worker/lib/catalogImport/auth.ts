@@ -105,8 +105,12 @@ export const requireImportToken: MiddlewareHandler<OpsEnv> = async (c, next) => 
     )
       .bind(hash)
       .first<ImportRun>();
-  } catch {
-    run = null; // no 0195 (a deploy ahead of its migration): the door does not exist
+  } catch (e) {
+    // No 0195 (a deploy ahead of its migration): the door does not exist. Any other failure of this read (a lost
+    // connection, an overloaded database) is not a miss: a 404 would read as "token gone" and stop the job, so it
+    // answers the transient 503 — which says nothing about the token, since no caller can choose it.
+    if (!/no such table/i.test(e instanceof Error ? e.message : String(e))) return opsError(c, 503, 'D1_OVERLOADED');
+    run = null;
   }
   // The main site only, like global administration (worker/lib/http.ts requireMainHost): a merchant subdomain
   // meets the same 404 — after the same read, so the host does not change the work either.
@@ -157,7 +161,9 @@ export const OPS_MESSAGES: Readonly<Record<string, string>> = {
   IMPORT_EVENT_REFUSED: 'This transition is made by its own endpoint, not by an event.',
   IMPORT_WITHDRAW_REFUSED: 'The item is not BLOCKED SOURCE_WITHDRAWN with the evidence and the approval this needs.',
   IMPORT_RUN_NOT_FINISHED: 'Items of this run are still queued or in flight.',
-  RETRIES_EXHAUSTED: 'Eight attempts of this stage were already recorded.',
+  RETRIES_EXHAUSTED: 'This stage has failed eight times; the item blocks.',
+  IMPORT_READBACK_PENDING: 'The write was committed but its read-back has not run yet; ask again.',
+  IMPORT_STORAGE_UNAVAILABLE: 'The media storage did not answer; ask again.',
   IMPORT_VERIFY_DISAGREES: 'The runner evidence and the Worker recompute do not both pass and agree.',
   RATE_LIMITED: 'Too many calls for this run; wait a minute.',
   D1_OVERLOADED: 'The database is busy; try again.',

@@ -15,8 +15,9 @@
  */
 import type { Env } from '../types';
 import { newId } from '../crypto';
+import { fence, isFenceMiss } from '../operations';
 import { EXPECTED_MIGRATION } from '../schemaVersion';
-import { headMediaObject } from '../mediaStorage';
+import { importObjectPresence } from './media';
 import { canonicalJson } from '@levonis/catalog/bambuImport/fingerprint';
 import { H, sha256Hex } from '@levonis/catalog/bambuImport/hash';
 import { NOW_SQL, OpsRefusal, IMPORT_PROTOCOL, type ImportRun } from './auth';
@@ -312,23 +313,60 @@ export async function protectSnapshot(db: D1Database, run: ImportRun, body: Reco
 
 // ---------------------------------------------------------------- /run/finish
 
-/** closed, or partial when an item is BLOCKED or WITHDRAWN_AT_SOURCE; the token cleared. Refused while items are queued or in flight. */
-export async function finishRun(db: D1Database, run: ImportRun): Promise<{ state: 'closed' | 'partial' }> {
+/** A queued item the reviewed manifest still holds (§B.5 holds, queued last): it waits for the owner, not the queue. */
+export interface HeldItem {
+  source_product_id: string;
+  handle: string;
+  queue_position: number;
+  hold_code: string;
+}
+
+/** The source ids the bundled manifest holds today (a hold the owner has since answered is no longer one). */
+export const heldSourceIds = (bundle: Pick<ReviewedBundle, 'manifest'>): string[] =>
+  bundle.manifest.rows.filter((r) => r.hold_code !== '').map((r) => r.source_product_id);
+
+/** The DISCOVERED items of the run that the manifest holds: they can never start while another hold is BLOCKED. */
+export async function heldItems(db: D1Database, runId: string, bundle: Pick<ReviewedBundle, 'manifest'>): Promise<HeldItem[]> {
+  const held = heldSourceIds(bundle);
+  if (!held.length) return [];
+  const { results } = await db
+    .prepare(
+      `SELECT source_product_id, handle, queue_position, hold_code FROM catalog_import_items
+        WHERE run_id = ? AND processing_state = 'DISCOVERED' AND source_product_id IN (SELECT value FROM json_each(?)) ORDER BY queue_position`
+    )
+    .bind(runId, JSON.stringify(held))
+    .all<HeldItem>();
+  const byId = new Map(bundle.manifest.rows.map((r) => [r.source_product_id, r.hold_code]));
+  return (results ?? []).map((r) => ({ ...r, queue_position: Number(r.queue_position), hold_code: byId.get(String(r.source_product_id)) || r.hold_code }));
+}
+
+/**
+ * closed, or partial when an item is BLOCKED or WITHDRAWN_AT_SOURCE, or still held (§K.2 step 13: "no DISCOVERED …
+ * item remains except the end-of-queue holds"; R-19, L-7: the run closes partial and names them). The holds are
+ * the DISCOVERED items the bundled manifest holds: with two or more of them, the first blocks at its turn and the
+ * in-flight index keeps every later one queued for good, so they cannot keep the run open. Refused while any other
+ * item is queued or in flight. The token is cleared; the answer names the held items.
+ */
+export async function finishRun(db: D1Database, run: ImportRun, bundle: Pick<ReviewedBundle, 'manifest'>): Promise<{ state: 'closed' | 'partial'; held: HeldItem[] }> {
+  const heldSources = JSON.stringify(heldSourceIds(bundle));
   const row = await db
     .prepare(
       `SELECT SUM(CASE WHEN processing_state IN ('BLOCKED','WITHDRAWN_AT_SOURCE') THEN 1 ELSE 0 END) AS partial,
-              SUM(CASE WHEN processing_state NOT IN ('COMPLETE','BLOCKED','WITHDRAWN_AT_SOURCE') THEN 1 ELSE 0 END) AS open
-         FROM catalog_import_items WHERE run_id = ?`
+              SUM(CASE WHEN processing_state = 'DISCOVERED' AND source_product_id IN (SELECT value FROM json_each(?2)) THEN 1 ELSE 0 END) AS held,
+              SUM(CASE WHEN processing_state NOT IN ('COMPLETE','BLOCKED','WITHDRAWN_AT_SOURCE')
+                        AND NOT (processing_state = 'DISCOVERED' AND source_product_id IN (SELECT value FROM json_each(?2))) THEN 1 ELSE 0 END) AS open
+         FROM catalog_import_items WHERE run_id = ?1`
     )
-    .bind(run.id)
-    .first<{ partial: number | null; open: number | null }>();
+    .bind(run.id, heldSources)
+    .first<{ partial: number | null; held: number | null; open: number | null }>();
   if (Number(row?.open ?? 0) > 0) throw new OpsRefusal(409, 'IMPORT_RUN_NOT_FINISHED', [run.id]);
-  const state = Number(row?.partial ?? 0) > 0 ? 'partial' : 'closed';
+  const held = Number(row?.held ?? 0) > 0 ? await heldItems(db, run.id, bundle) : [];
+  const state = Number(row?.partial ?? 0) > 0 || held.length > 0 ? 'partial' : 'closed';
   await db
     .prepare(`UPDATE catalog_import_runs SET state = ?, token_sha256 = '', closed_at = ${NOW_SQL} WHERE id = ? AND state IN ('open','running','blocked')`)
     .bind(state, run.id)
     .run();
-  return { state };
+  return { state, held };
 }
 
 // ---------------------------------------------------------------- /items/:sid/withdraw
@@ -364,20 +402,29 @@ export async function withdrawItem(db: D1Database, run: ImportRun, item: ItemRow
     ev.sitemap_absent === true;
   if (!ok) throw new OpsRefusal(409, 'IMPORT_WITHDRAW_REFUSED', [item.id]);
   const evidence = { first_at: new Date(firstAt).toISOString(), second_fetch: { at: new Date(secondAt).toISOString(), outcome: 'withdrawn', status: second.status }, sitemap_absent: true };
-  await db.batch([
-    db
-      .prepare(
-        `UPDATE catalog_import_items SET processing_state = 'WITHDRAWN_AT_SOURCE', withdrawn_evidence = ?, withdrawn_by = ?, updated_at = ${NOW_SQL}
-          WHERE id = ? AND processing_state = 'BLOCKED' AND blocker_code = 'SOURCE_WITHDRAWN'`
-      )
-      .bind(JSON.stringify(evidence), approval, item.id),
-    db
-      .prepare(
-        `INSERT INTO catalog_import_events (id, run_id, item_id, seq, stage, outcome, code, message, detail, lease_token, github_run_id)
-         VALUES (?, ?, ?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM catalog_import_events WHERE run_id = ?), 'WITHDRAWN_AT_SOURCE', 'withdrawn', 'SOURCE_WITHDRAWN', '', '{}', '', ?)`
-      )
-      .bind(newId('cie'), run.id, item.id, run.id, run.github_run_id),
-  ]);
+  // Fenced on the state this call read: an item that moved meanwhile gets no 'withdrawn' event (409, stale).
+  const [fenceIn, fenceOut] = fence(db, `EXISTS (SELECT 1 FROM catalog_import_items WHERE id = ? AND processing_state = 'BLOCKED' AND blocker_code = 'SOURCE_WITHDRAWN')`, [item.id]);
+  try {
+    await db.batch([
+      fenceIn,
+      db
+        .prepare(
+          `UPDATE catalog_import_items SET processing_state = 'WITHDRAWN_AT_SOURCE', withdrawn_evidence = ?, withdrawn_by = ?, updated_at = ${NOW_SQL}
+            WHERE id = ? AND processing_state = 'BLOCKED' AND blocker_code = 'SOURCE_WITHDRAWN'`
+        )
+        .bind(JSON.stringify(evidence), approval, item.id),
+      db
+        .prepare(
+          `INSERT INTO catalog_import_events (id, run_id, item_id, seq, stage, outcome, code, message, detail, lease_token, github_run_id)
+           VALUES (?, ?, ?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM catalog_import_events WHERE run_id = ?), 'WITHDRAWN_AT_SOURCE', 'withdrawn', 'SOURCE_WITHDRAWN', '', '{}', '', ?)`
+        )
+        .bind(newId('cie'), run.id, item.id, run.id, run.github_run_id),
+      fenceOut,
+    ]);
+  } catch (e) {
+    if (isFenceMiss(e)) throw new OpsRefusal(409, 'IMPORT_ILLEGAL_TRANSITION', [item.id]);
+    throw e;
+  }
   return { state: 'WITHDRAWN_AT_SOURCE' };
 }
 
@@ -386,8 +433,9 @@ export async function withdrawItem(db: D1Database, run: ImportRun, item: ItemRow
 /**
  * The admin-side half of §I.1.6: the write's own verifyApplied over this payload's plan (recorded by the write,
  * `stage_data.readback`), and — live — every bound value, variant and colour id belongs to the product, every
- * value to a group of the product, every variant's combination to values of the product, and every stored key
- * exists in R2. Counts and check names only.
+ * value to a group of the product, every swatch to a value of the product, every variant's combination to values
+ * of the product, and every stored key exists in R2. Counts and check names only. A verification that has not run,
+ * or an R2 that does not answer, is a transient 503 — never a failed check.
  */
 export async function readbackItem(
   env: Pick<Env, 'DB' | 'BUCKET' | 'R2_PUBLIC' | 'R2_PRIVATE'>,
@@ -396,7 +444,11 @@ export async function readbackItem(
   const db = env.DB;
   const pid = item.levonis_product_id;
   if (!pid) throw new OpsRefusal(409, 'IMPORT_ILLEGAL_TRANSITION', [item.id]);
-  const recorded = (stageDataOf(item).readback ?? null) as { mismatches?: number } | null;
+  const recorded = (stageDataOf(item).readback ?? null) as { ran?: boolean; mismatches?: number | null } | null;
+  // The write's own verification has not RUN (a passing failure after its commit, or no record yet): not a
+  // verdict. Transient for the runner (5xx) — never `ok: false`, which VERIFY reads as a failed check.
+  const ran = !!recorded && recorded.ran !== false && typeof recorded.mismatches === 'number' && recorded.mismatches >= 0;
+  if (!ran) throw new OpsRefusal(503, 'IMPORT_READBACK_PENDING', [item.id]);
   const own = await db
     .prepare(
       `SELECT
@@ -407,10 +459,12 @@ export async function readbackItem(
           OR (i.color_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM product_colors k WHERE k.id = i.color_id AND k.product_id = ?1)))) AS foreign_bindings,
          (SELECT COUNT(*) FROM product_option_values v WHERE v.product_id = ?1
              AND NOT EXISTS (SELECT 1 FROM product_option_groups g WHERE g.id = v.group_id AND g.product_id = ?1)) AS foreign_values,
+         (SELECT COUNT(*) FROM product_option_value_swatches s WHERE s.product_id = ?1
+             AND NOT EXISTS (SELECT 1 FROM product_option_values v WHERE v.id = s.option_value_id AND v.product_id = ?1)) AS foreign_swatches,
          (SELECT COUNT(*) FROM product_images WHERE product_id = ?1) AS images`
     )
     .bind(pid)
-    .first<{ product: number; foreign_bindings: number; foreign_values: number; images: number }>();
+    .first<{ product: number; foreign_bindings: number; foreign_values: number; foreign_swatches: number; images: number }>();
   const { results: variants } = await db.prepare('SELECT combo_key FROM product_variants WHERE product_id = ?').bind(pid).all<{ combo_key: string }>();
   const { results: valueRows } = await db.prepare('SELECT id FROM product_option_values WHERE product_id = ?').bind(pid).all<{ id: string }>();
   const values = new Set((valueRows ?? []).map((v) => String(v.id)));
@@ -429,26 +483,26 @@ export async function readbackItem(
     .all<{ r2_key: string }>();
   let missingKeys = 0;
   for (const k of keyRows ?? []) {
-    try {
-      const h = await headMediaObject(env, 'public', String(k.r2_key));
-      if (!h || Number(h.size ?? 0) <= 0) missingKeys++;
-    } catch {
-      missingKeys++;
-    }
+    const presence = await importObjectPresence(env, String(k.r2_key));
+    // A storage error is not a missing object: the whole answer is transient, asked again.
+    if (presence === 'unknown') throw new OpsRefusal(503, 'IMPORT_STORAGE_UNAVAILABLE', [item.id]);
+    if (presence === 'absent') missingKeys++;
   }
   const checks = {
     product: Number(own?.product ?? 0) === 1,
-    write_verified: !!recorded && recorded.mismatches === 0,
+    write_verified: recorded!.mismatches === 0,
     bindings_own: Number(own?.foreign_bindings ?? 0) === 0,
     values_own: Number(own?.foreign_values ?? 0) === 0,
+    swatches_own: Number(own?.foreign_swatches ?? 0) === 0,
     variants_own: foreignCombos === 0,
     keys_exist: missingKeys === 0,
   };
   const mismatches =
     (checks.product ? 0 : 1) +
-    (recorded && typeof recorded.mismatches === 'number' && recorded.mismatches >= 0 ? recorded.mismatches : 1) +
+    Number(recorded!.mismatches) +
     Number(own?.foreign_bindings ?? 0) +
     Number(own?.foreign_values ?? 0) +
+    Number(own?.foreign_swatches ?? 0) +
     foreignCombos +
     missingKeys;
   return {

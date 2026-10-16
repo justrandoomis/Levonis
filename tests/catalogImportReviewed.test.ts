@@ -299,6 +299,20 @@ test('identity rows, override bindings and relation targets come from the review
   assert.equal(refusal(checkReviewedScope(w.bundle, { ...p, relations: [pending] })), 'REVIEWED_SCOPE_REFUSED:relation_pending_on_unreviewed_handle');
   const t = reviewedTargets(targets);
   assert.ok(t.handles.has('ams-2-pro') && t.handles.size > 20);
-  // Taxonomy last.
-  assert.equal(refusal(checkReviewedScope(w.bundle, { ...p, route: '1>2>3' })), 'TAXONOMY_UNMAPPED:no_route_or_handle_entry');
+  // Taxonomy last, from the manifest row's own route: a reviewed route the map does not know is unmapped.
+  const unmapped = parseReviewedBundle({ ...w.texts, manifest: JSON.stringify({ version: 1, source: 'bambu_us', rows: [{ ...w.row, currentAllIdRoute: '1>2>3', leaf: '' }] }) });
+  assert.equal(refusal(checkReviewedScope(unmapped, { ...p, route: '1>2>3' })), 'TAXONOMY_UNMAPPED:no_route_or_handle_entry');
+});
+
+test('review 6b: the placement is the manifest row\'s — a payload route that differs is refused, and the map must land on the row\'s reviewed leaf', () => {
+  const w = gateWorld();
+  const p = w.payload();
+  assert.equal(refusal(checkReviewedScope(w.bundle, p)), 'ok');
+  const v = checkReviewedScope(w.bundle, p);
+  assert.ok(v.ok && v.taxonomy.primary === 'cat_bi_parts_ams', 'the row\'s own reviewed leaf');
+  // The store moved the product (or a caller says so): refused, never placed by the sent route.
+  assert.equal(refusal(checkReviewedScope(w.bundle, { ...p, route: '552709755391528960>552709755467026432>552709755534135296' })), 'REVIEWED_SCOPE_REFUSED:route_differs_from_manifest');
+  // A row whose reviewed leaf is not where its route resolves (a draft that disagrees with the map): refused too.
+  const otherLeaf = parseReviewedBundle({ ...w.texts, manifest: JSON.stringify({ version: 1, source: 'bambu_us', rows: [{ ...w.row, leaf: '@pla' }] }) });
+  assert.equal(refusal(checkReviewedScope(otherLeaf, p)), 'REVIEWED_SCOPE_REFUSED:leaf_differs_from_manifest');
 });

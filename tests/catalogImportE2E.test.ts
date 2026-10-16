@@ -177,7 +177,9 @@ interface Verified {
   knowledgeRoute: boolean;
 }
 
-async function verifyLive(w: OpsWorld, p: ImportPayload, written: mirror.WriteAnswer & { images?: Array<{ id: string; source_media_id: string; r2_key: string }> }, media: Map<string, mirror.MediaAnswerRow>): Promise<Verified> {
+type WrittenRow = { id: string; source_media_id: string; r2_key: string; sort_order: number; is_primary: boolean; option_value_id: string | null; variant_id: string | null; binding_rule: string };
+
+async function verifyLive(w: OpsWorld, p: ImportPayload, written: mirror.WriteAnswer & { images?: WrittenRow[] }, media: Map<string, mirror.MediaAnswerRow>): Promise<Verified> {
   const checks: Record<string, { ok: boolean; hard: boolean; status?: number; counts?: Record<string, number> }> = {};
   const slug = written.slug;
   // 1. public v1
@@ -197,9 +199,14 @@ async function verifyLive(w: OpsWorld, p: ImportPayload, written: mirror.WriteAn
     },
     { swatches: [], specs: [], documents: [], relations: [] }
   );
-  // The expected side: the payload, the /media results and the /write answer's own image rows (§I.1.2).
-  const kept = new Set((written.images ?? []).map((i) => i.id));
-  const expectedPayload = { ...p, images: written.images ? p.images.filter((i) => kept.has(i.id)) : p.images };
+  // The expected side: the payload, the /media results and the rows the write WROTE (§I.1.2), as the runner builds it
+  // (scripts/bambu-import/gallery.ts): each the payload image of its id with the written position, primary and binding —
+  // the primary moves with the content-duplicate collapse when a later copy leads.
+  const byId = new Map(p.images.map((i) => [i.id, i]));
+  const expectedImages = written.images
+    ? written.images.map((r) => ({ ...byId.get(r.id)!, sort_order: r.sort_order, is_primary: r.is_primary, option_value_id: r.option_value_id, variant_id: r.variant_id, binding_rule: r.binding_rule }))
+    : p.images;
+  const expectedPayload = { ...p, images: expectedImages };
   const mediaResults = [...media.values()].filter((m) => m.status === 'stored').map((m) => ({ source_media_id: m.source_media_id, r2_key: m.r2_key }));
   const expected = projectionFromPayload(expectedPayload, mediaResults);
   const fpOk = projectionFingerprint(structural(expected)) === projectionFingerprint(structural(live));
@@ -238,6 +245,9 @@ async function verifyLive(w: OpsWorld, p: ImportPayload, written: mirror.WriteAn
   if (noSpecs) compareTolerated.add(p.handle);
   checks.compare = { ok: (cmp.status === 200 && JSON.stringify(await cmp.clone().json()).includes(written.product_id)) || noSpecs, hard: true, status: cmp.status, counts: { compare_keys: compareKeys } };
   if (!written.created) checks.merge = { ok: written.before_fp_equal === true, hard: true };
+  // 7. The browser's own check (scripts/bambu-import/browser.ts runs Playwright on the step-7 page; this world has no
+  //    browser): recorded as the runner records it. The Worker refuses a COMPLETE without it (§I.1.7).
+  (checks as Record<string, unknown>).browser = { ok: true, checks: { hero: true, gallery: true, selection: true } };
   const evidence = {
     version: 1,
     live_url: `https://levonis-iq.com/product/${slug}`,
@@ -263,7 +273,7 @@ async function verifyLive(w: OpsWorld, p: ImportPayload, written: mirror.WriteAn
 
 interface ItemOutcome {
   state: string;
-  write: mirror.WriteAnswer & { images?: Array<{ id: string; source_media_id: string; r2_key: string }> };
+  write: mirror.WriteAnswer & { images?: WrittenRow[] };
   failedChecks: string[];
   knowledgeRoute: boolean;
 }
@@ -459,11 +469,40 @@ test('a block after the write hides the created product and the resume puts it b
   assert.equal(item().f, 0);
   const stages = (w.raw.prepare('SELECT stage FROM catalog_import_events ORDER BY seq').all() as Array<{ stage: string }>).map((e) => e.stage);
   assert.ok(stages.includes('UNPUBLISHED') && stages.includes('REPUBLISHED'));
-  // And it completes.
-  const rows = (writeAnswers.get(f.sid)?.images ?? []) as ItemOutcome['write']['images'];
+  // And it completes, from the rows the write RECORDED (stage_data.images on the lease): what a runner resumed in a
+  // later job, with no /write answer, verifies against.
+  const rows = (l.stage_data as { images?: WrittenRow[] }).images;
+  assert.ok(rows && rows.length > 0, 'the written rows come back with the lease');
+  assert.deepEqual(rows, writeAnswers.get(f.sid)?.images, 'the same rows the /write answer named');
   const { evidence } = await verifyLive(w, f.payload, { ...written, images: rows }, media);
   const done = await client.complete(f.sid, l.lease_token, String(evidence.live_url), evidence);
   assert.equal(done.state, 'COMPLETE');
+});
+
+test('a collapse that hands the primary on: the hotend\'s general lead picture is the same file as its 0.4 mm hero — verified against the written rows', async () => {
+  const w = opsWorld();
+  const fx = fixtures().filter((f) => f.handle === 'bambu-hotend-a1-a2');
+  setBundle(textsFor(fx.map((f) => ({ ...f.row, queue_position: 1 }))));
+  openRun(w.raw);
+  const lead = fx[0].payload.images.find((i) => i.sort_order === 0)!;
+  const hero = fx[0].payload.images.find((i) => i.sort_order === 2)!;
+  assert.ok(lead.is_primary && lead.binding_rule === 'general' && hero.option_value_id);
+  // The store serves the hero's bytes under the lead's name (a re-upload): one content-addressed object.
+  installCdnDouble(w, { bytesOf: (url) => (url === lead.source_url ? hero.source_url : url) });
+  try {
+    const client = await clientFor(w);
+    await client.hello();
+    await client.manifest(fx.map((f) => manifestRequestRow({ ...f.row, queue_position: 1 }, new Date().toISOString())));
+    await client.prepareTaxonomy();
+    const o = await runItem(w, client, fx[0]);
+    assert.deepEqual(o.failedChecks, []);
+    assert.equal(o.state, 'COMPLETE');
+    const primary = o.write.images!.find((i) => i.is_primary)!;
+    assert.notEqual(primary.id, lead.id, 'the payload\'s primary was collapsed away: the primary moved to the hero copy');
+    assert.equal(o.write.images!.length, fx[0].payload.images.length - 1);
+  } finally {
+    restoreFetch();
+  }
 });
 
 test('with no open run every ops path is the uniform 404', async () => {

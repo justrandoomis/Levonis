@@ -18,7 +18,8 @@
  *            VERIFYING_LIVE and COMPLETE are reached only through /write,
  *            /publish-finish and /complete — an event cannot self-attest them
  *   retry    a working stage → RETRYING with the code and retry_at; every code
- *            but DEADLINE_EXIT counts toward stage_attempts (§A.7 rule 4); `release`
+ *            but DEADLINE_EXIT counts toward stage_attempts (§A.7 rule 4: the
+ *            eighth failure of a stage is refused RETRIES_EXHAUSTED); `release`
  *            lets the lease lapse now (the deadline park)
  *   blocked  a working stage or RETRYING → BLOCKED with its blocker and the resume
  *            instruction. After WRITTEN, a product this run CREATED is hidden in the
@@ -43,8 +44,18 @@ import { republishStatements, unpublishOnBlockStatements } from './unpublish';
 export const STAGES = ['EXTRACTING', 'ENRICHING', 'VALIDATING', 'INGESTING_MEDIA', 'WRITING', 'PUBLISHING', 'VERIFYING_LIVE'] as const;
 export type Stage = (typeof STAGES)[number];
 export const TERMINAL = new Set(['COMPLETE', 'WITHDRAWN_AT_SOURCE']);
-/** Eight attempts of one stage across jobs (§A.7 rule 4): the ninth retry is refused, so the runner blocks. */
+/**
+ * Eight attempts of one stage across jobs (§A.7 rule 4, §B.5): a stage that has failed seven times (stage_attempts
+ * 7) may run once more; its eighth failure is refused RETRIES_EXHAUSTED, so the runner blocks — the runner's own
+ * rule (scripts/bambu-import/run.ts withRetries: `stageAttempts + 1 >= MAX_STAGE_ATTEMPTS`).
+ */
 export const MAX_STAGE_ATTEMPTS = 8;
+
+/** An item of the run between DISCOVERED and a terminal state (BLOCKED and RETRYING included): ux_cii_inflight's own predicate. */
+const IN_FLIGHT = "processing_state NOT IN ('DISCOVERED','COMPLETE','WITHDRAWN_AT_SOURCE')";
+
+/** ux_cii_inflight's refusal: another item of the run is in flight. */
+const isInflightClash = (e: unknown) => /UNIQUE constraint failed:\s*catalog_import_items\.run_id/i.test(String((e as Error)?.message ?? e));
 
 /** The stage after `last_completed_stage` — the trigger's own CASE (§B.3). */
 export function stageAfter(lastCompleted: string): Stage | null {
@@ -144,6 +155,12 @@ function leaseAnswer(item: ItemRow, token: string): LeaseAnswer {
 export async function leaseItem(db: D1Database, run: ImportRun, sourceProductId: string, presented: string): Promise<LeaseAnswer> {
   const item = await itemBySource(db, run.id, sourceProductId);
   if (TERMINAL.has(item.processing_state)) return leaseAnswer(item, '');
+  // §A.3: /lease is fenced by ux_cii_inflight. A queued item is not leased while another is in flight (it could
+  // not start), and its attempts do not grow.
+  if (item.processing_state === 'DISCOVERED') {
+    const other = await db.prepare(`SELECT 1 AS x FROM catalog_import_items WHERE run_id = ? AND ${IN_FLIGHT} LIMIT 1`).bind(run.id).first();
+    if (other) throw new OpsRefusal(409, 'IMPORT_ILLEGAL_TRANSITION', [item.id]);
+  }
   const until = leaseUntil();
   if (presented && presented === item.lease_token && Number(item.lease_live) === 1) {
     const renewed = await db
@@ -269,11 +286,15 @@ export async function applyEvent(db: D1Database, run: ImportRun, item: ItemRow, 
       break;
     case 'start': {
       if (old !== 'DISCOVERED' || body.state !== 'EXTRACTING') throw new OpsRefusal(409, 'IMPORT_ILLEGAL_TRANSITION', [item.id]);
-      // Only the next item of the queue starts (§J.4): nothing DISCOVERED before it. The in-flight index refuses a
-      // second item while one is anywhere between DISCOVERED and a terminal state, BLOCKED and RETRYING included.
+      // Only the next item of the queue starts (§J.4): nothing DISCOVERED before it, and no other item anywhere between
+      // DISCOVERED and a terminal state, BLOCKED and RETRYING included (ux_cii_inflight; its own refusal, should a
+      // start race this read, is answered the same way below).
       const earlier = await db
-        .prepare("SELECT 1 AS x FROM catalog_import_items WHERE run_id = ? AND processing_state = 'DISCOVERED' AND queue_position < ? LIMIT 1")
-        .bind(run.id, item.queue_position)
+        .prepare(
+          `SELECT 1 AS x FROM catalog_import_items
+            WHERE run_id = ? AND id <> ? AND ((processing_state = 'DISCOVERED' AND queue_position < ?) OR ${IN_FLIGHT}) LIMIT 1`
+        )
+        .bind(run.id, item.id, item.queue_position)
         .first();
       if (earlier) throw new OpsRefusal(409, 'IMPORT_ILLEGAL_TRANSITION', [item.id]);
       next = 'EXTRACTING';
@@ -303,7 +324,7 @@ export async function applyEvent(db: D1Database, run: ImportRun, item: ItemRow, 
     case 'retry': {
       if (!(STAGES as readonly string[]).includes(old) || body.state !== 'RETRYING') throw new OpsRefusal(409, 'IMPORT_ILLEGAL_TRANSITION', [item.id]);
       const counts = body.code !== 'DEADLINE_EXIT';
-      if (counts && stageAttempts >= MAX_STAGE_ATTEMPTS) throw new OpsRefusal(409, 'RETRIES_EXHAUSTED', [item.id]);
+      if (counts && stageAttempts + 1 >= MAX_STAGE_ATTEMPTS) throw new OpsRefusal(409, 'RETRIES_EXHAUSTED', [item.id]);
       next = 'RETRYING';
       if (counts) stageAttempts += 1;
       statements.push(
@@ -369,7 +390,7 @@ export async function applyEvent(db: D1Database, run: ImportRun, item: ItemRow, 
   try {
     results = (await db.batch(statements)) as Array<{ meta?: { changes?: number } }>;
   } catch (e) {
-    if (isFenceMiss(e)) throw new OpsRefusal(409, 'IMPORT_ILLEGAL_TRANSITION', [item.id]);
+    if (isFenceMiss(e) || isInflightClash(e)) throw new OpsRefusal(409, 'IMPORT_ILLEGAL_TRANSITION', [item.id]);
     const mapped = refusalOfBatch(e);
     if (mapped instanceof Error && 'code' in mapped && typeof (mapped as { code: unknown }).code === 'string' && mapped !== e) {
       throw new OpsRefusal(409, (mapped as { code: string }).code, [item.id]);

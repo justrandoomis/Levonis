@@ -164,3 +164,18 @@ test('an item that was never written fails the first check and says nothing else
   assert.equal(r.ok, false);
   assert.deepEqual(r.failed, ['written']);
 });
+
+test('review 6b: the placement is the manifest row\'s reviewed one (not the stored source_route); a swatch of another product\'s value fails', async () => {
+  const { w, s, pid } = await written('pla-basic-filament');
+  assert.deepEqual((await check(w, s.itemId)).failed, []);
+  // The stored source_route says another section: the recompute still resolves the manifest row's own route.
+  assert.deepEqual(await failedUnder(w, s.itemId, () => w.raw.prepare("UPDATE product_source_refs SET source_route = '552709755391528960>552709755467026432>552709755534135296' WHERE product_id = ?").run(pid)), []);
+  // The product moved to a section the manifest row was not reviewed for: the recompute sees it.
+  const moved = await failedUnder(w, s.itemId, () => w.raw.prepare("UPDATE products SET sub_category_id = 'cat_printers_fdm' WHERE id = ?").run(pid));
+  assert.ok(moved.includes('taxonomy'), JSON.stringify(moved));
+  // A swatch row credited to this product for a value it does not own (§I.1.6).
+  const foreign = await failedUnder(w, s.itemId, () =>
+    w.raw.prepare("INSERT INTO product_option_value_swatches (option_value_id, product_id, url, r2_key) VALUES ('ov_of_another_product', ?, '/files/x.webp', 'x.webp')").run(pid)
+  );
+  assert.ok(foreign.includes('swatches_own'), JSON.stringify(foreign));
+});

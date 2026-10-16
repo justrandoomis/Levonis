@@ -78,6 +78,12 @@ export interface ProductMediaFetchOptions {
    * else. Absent: any public address, as before.
    */
   allowHost?: (hostname: string) => boolean;
+  /** The whole address of every hop, asked like allowHost (fetchGuard.ts): the import's https-only rule. */
+  allowUrl?: (url: URL) => boolean;
+  /** An Accept header for the source request (the CDN-resized fallback asks for JPEG or PNG). */
+  accept?: string;
+  /** The provenance recorded for the bytes, when the address fetched is a rendition of it (default: that address). */
+  provenance_url?: string;
 }
 
 export interface StagedProductWebpInput {
@@ -735,7 +741,11 @@ export async function ingestProductMediaUrl(
       budget: options.budget,
       fetcher: options.fetcher,
       allowHost: options.allowHost,
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LevonisBot/1.0; +https://levonis-iq.com)' },
+      allowUrl: options.allowUrl,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; LevonisBot/1.0; +https://levonis-iq.com)',
+        ...(options.accept ? { Accept: options.accept } : {}),
+      },
     });
   } catch (error) {
     if (error instanceof GuardedFetchError && error.code === 'SOURCE_TOO_LARGE') {
@@ -758,7 +768,7 @@ export async function ingestProductMediaUrl(
   }
   return ingestProductMediaBytes(env, {
     bytes: fetched.bytes,
-    source_url: sourceUrl,
+    source_url: options.provenance_url ?? sourceUrl,
     original_name: originalName,
     cleanup_grace_minutes: options.cleanup_grace_minutes,
   });

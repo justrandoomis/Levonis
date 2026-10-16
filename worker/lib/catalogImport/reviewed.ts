@@ -649,6 +649,15 @@ export function resolveTaxonomy(map: TaxonomyMap, handle: string, route: string)
   return { primary: primaryId, secondaries, via };
 }
 
+/**
+ * The placement a manifest row was reviewed for: its own route (and handle override) through the map. The
+ * writer places a product here and the D1 recompute before COMPLETE resolves it the same way (verifyD1.ts), never
+ * from a stored or sent route.
+ */
+export function taxonomyOfRow(bundle: Pick<ReviewedBundle, 'taxonomy'>, row: Pick<ManifestRow, 'handle' | 'currentAllIdRoute'>): TaxonomyResolution | null {
+  return resolveTaxonomy(bundle.taxonomy, row.handle, row.currentAllIdRoute);
+}
+
 // ---------------------------------------------------------------- the scope gate (§A.3, §E.1)
 
 /** `p_` + H('bambu_us:product:' + source id): a created product's deterministic id (§B.8). */
@@ -769,9 +778,14 @@ export function checkReviewedScope(bundle: ReviewedBundle, payload: ImportPayloa
       return refuse('REVIEWED_SCOPE_REFUSED', 'relation_pending_on_unreviewed_handle');
     }
   }
-  // 8. The taxonomy (§D.2 rule 1).
-  const taxonomy = resolveTaxonomy(bundle.taxonomy, payload.handle, payload.route);
+  // 8. The taxonomy (§D.2 rule 1), from the route REVIEWED for this row: a payload whose route differs from a
+  //    non-empty manifest route (the store moved it, or a caller says otherwise) is refused, and the resolved
+  //    section must be the manifest's reviewed leaf when the row names one (§D.2 rules 4 and 7 review placement
+  //    against these rows).
+  if (row.currentAllIdRoute && payload.route !== row.currentAllIdRoute) return refuse('REVIEWED_SCOPE_REFUSED', 'route_differs_from_manifest');
+  const taxonomy = taxonomyOfRow(bundle, row);
   if (!taxonomy) return refuse('TAXONOMY_UNMAPPED', 'no_route_or_handle_entry');
+  if (row.leaf && taxonomy.primary !== catalogIdOf(row.leaf)) return refuse('REVIEWED_SCOPE_REFUSED', 'leaf_differs_from_manifest');
   return { ok: true, row, match, taxonomy };
 }
 

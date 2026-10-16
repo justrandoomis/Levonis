@@ -283,3 +283,191 @@ test('media: store.bblcdn.com over https on every hop; any other host is MEDIA_H
     restoreFetch();
   }
 });
+
+// ---------------------------------------------------------------- review 6b
+
+/** An item of the world at INGESTING_MEDIA through the routes, its create staged; the lease token. */
+async function toIngesting(w: OpsWorld, handle: 'ams-2-pro-feeder-unit' = 'ams-2-pro-feeder-unit'): Promise<{ sid: string; t: string }> {
+  const x = sample(handle);
+  setBundle(bundleTexts({ manifestRows: [manifestRowOf(x, 1)], matches: [] }));
+  openRun(w.raw);
+  await w.call(`${OPS}/manifest`, { body: { rows: [{ ...manifestRowOf(x, 1), source_collections: [], breadcrumbs: '', discovery_sources: ['sitemap'], discovered_at: '2026-10-15' }] } });
+  await w.call(`${OPS}/run/prepare-taxonomy`, { body: {} });
+  const t = await toValidating(w, x.sourceProductId);
+  const payload = buildFor({ queue: 0 }, handle).payload;
+  assert.equal((await w.call(`${OPS}/items/${x.sourceProductId}/stage`, { body: { lease_token: t, payload, document_checks: [] } })).status, 200);
+  await w.call(`${OPS}/items/${x.sourceProductId}/event`, { body: { lease_token: t, state: 'INGESTING_MEDIA', outcome: 'ok', code: '', message: '', retry_at: '', release: false, detail: {} } });
+  return { sid: x.sourceProductId, t };
+}
+
+test('review 6b: /stage refuses a payload whose route is not the one the manifest row was reviewed for', async () => {
+  const w = opsWorld();
+  const x = sample('ams-2-pro-feeder-unit');
+  setBundle(bundleTexts({ manifestRows: [manifestRowOf(x, 1)], matches: [] }));
+  openRun(w.raw);
+  await w.call(`${OPS}/manifest`, { body: { rows: [{ ...manifestRowOf(x, 1), source_collections: [], breadcrumbs: '', discovery_sources: ['sitemap'], discovered_at: '2026-10-15' }] } });
+  await w.call(`${OPS}/run/prepare-taxonomy`, { body: {} });
+  const t = await toValidating(w, x.sourceProductId);
+  // The printers' route: a section the map knows, but not this row's.
+  const moved = { ...buildFor({ queue: 0 }, 'ams-2-pro-feeder-unit').payload, route: '552709755391528960>552709755467026432>552709755534135296' };
+  const r = await w.call(`${OPS}/items/${x.sourceProductId}/stage`, { body: { lease_token: t, payload: moved, document_checks: [] } });
+  assert.equal(r.status, 409);
+  assert.equal(((await r.json()) as { code: string }).code, 'IMPORT_REVIEWED_SCOPE_REFUSED');
+  assert.equal(Number((w.raw.prepare('SELECT COUNT(*) AS n FROM products').get() as { n: number }).n), 0);
+});
+
+test('review 6b: a passing D1 error on the door\'s own token read is a transient 503 — only a missing 0195 is the 404', async () => {
+  const w = opsWorld();
+  setBundle(bundleTexts({ manifestRows: [], matches: [] }));
+  openRun(w.raw);
+  const db = w.env.DB as D1Database & Record<string, unknown>;
+  let fail = '';
+  w.env.DB = new Proxy(db, {
+    get(target, key) {
+      if (key === 'prepare') {
+        return (sql: string) => {
+          if (fail && /FROM catalog_import_runs/.test(sql) && /token_sha256 = \?/.test(sql)) {
+            const message = fail;
+            fail = '';
+            const st = { bind: () => st, first: async () => { throw new Error(message); }, all: async () => { throw new Error(message); }, run: async () => { throw new Error(message); } };
+            return st;
+          }
+          return target.prepare(sql);
+        };
+      }
+      const v = Reflect.get(target, key);
+      return typeof v === 'function' ? (v as (...a: unknown[]) => unknown).bind(target) : v;
+    },
+  });
+  for (const message of ['D1_ERROR: Network connection lost.', 'D1 DB is overloaded. Requests queued for too long.', 'D1_ERROR: D1 DB reset because its code was updated.']) {
+    fail = message;
+    const r = await w.call(`${OPS}/run/status`);
+    assert.equal(r.status, 503, message);
+    assert.equal(((await r.json()) as { code: string }).code, 'D1_OVERLOADED');
+    assert.equal(r.headers.get('cache-control'), NO_STORE);
+    assert.equal((await w.call(`${OPS}/run/status`)).status, 200, 'the next call answers');
+  }
+  fail = 'no such table: catalog_import_runs';
+  assert.equal((await w.call(`${OPS}/run/status`)).status, 404, 'a database without 0195: the door does not exist');
+});
+
+test('review 6b: media over https on the default port on EVERY hop — a redirect to http:// or to another port is refused, never fetched', async () => {
+  const { ingestProductMediaUrl } = await import('../worker/lib/productMediaIngest');
+  const { GuardedFetchError } = await import('../worker/lib/fetchGuard');
+  const { mediaUrlAllowed } = await import('../worker/lib/catalogImport/media');
+  const env = { DB: null, BUCKET: null, R2_PUBLIC: null, R2_PRIVATE: null, IMAGES: null } as never;
+  const allowHost = (h: string) => h === 'store.bblcdn.com';
+  const allowUrl = (u: URL) => u.protocol === 'https:' && u.port === '';
+  for (const location of ['http://store.bblcdn.com/s1/plain.png', 'http://store.bblcdn.com:80/s1/plain.png', 'https://store.bblcdn.com:8443/s1/other.png']) {
+    const asked: string[] = [];
+    const fetcher = (async (url: string) => {
+      asked.push(url);
+      return new Response(null, { status: 302, headers: { location } });
+    }) as unknown as typeof fetch;
+    await assert.rejects(
+      () => ingestProductMediaUrl(env, 'https://store.bblcdn.com/s1/a.png', { allowHost, allowUrl, fetcher }),
+      (e: unknown) => e instanceof GuardedFetchError && e.code === 'HOST_NOT_ALLOWED',
+      location
+    );
+    assert.deepEqual(asked, ['https://store.bblcdn.com/s1/a.png'], `${location}: the downgraded hop is never requested`);
+  }
+  assert.equal(mediaUrlAllowed('https://store.bblcdn.com:8443/x.png'), false, 'nor a first hop on another port');
+  assert.equal(mediaUrlAllowed('https://store.bblcdn.com:443/x.png'), true, 'the default port, spelled out');
+  // Through the route: the store answers a redirect to plain http; the medium fails MEDIA_HOST_NOT_ALLOWED, the http URL is never asked.
+  const w = opsWorld();
+  const { sid, t } = await toIngesting(w);
+  const real = globalThis.fetch;
+  const asked: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    asked.push(url);
+    return new Response(null, { status: 302, headers: { location: 'http://store.bblcdn.com/s1/plain.png' } });
+  }) as typeof fetch;
+  try {
+    const r = await w.call(`${OPS}/items/${sid}/media`, { body: { lease_token: t, media: [{ source_media_id: 'm1', role: 'gallery', source_url: 'https://store.bblcdn.com/s1/a.png' }] } });
+    const media = ((await r.json()) as { media: Array<{ status: string; error_code: string }> }).media;
+    assert.deepEqual(media.map((m) => `${m.status}:${m.error_code}`), ['failed:MEDIA_HOST_NOT_ALLOWED']);
+    assert.deepEqual(asked, ['https://store.bblcdn.com/s1/a.png']);
+  } finally {
+    globalThis.fetch = real;
+  }
+});
+
+test('review 6b: an original over the source cap is fetched once more as the CDN\'s 2400-px rendition, recorded cdn_resized', async () => {
+  const w = opsWorld();
+  const { sid, t } = await toIngesting(w);
+  const real = globalThis.fetch;
+  const asked: Array<{ url: string; accept: string }> = [];
+  const { pngBytes } = await import('./fixtures/imageDoubles');
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    asked.push({ url, accept: new Headers(init?.headers).get('accept') ?? '' });
+    if (url.includes('__op__')) return new Response(pngBytes(320, 240) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'image/png' } });
+    return new Response(new Uint8Array(9 * 1024 * 1024) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'image/png', 'content-length': String(9 * 1024 * 1024) } });
+  }) as typeof fetch;
+  try {
+    const r = await w.call(`${OPS}/items/${sid}/media`, { body: { lease_token: t, media: [{ source_media_id: 'huge1', role: 'gallery', source_url: 'https://store.bblcdn.com/s1/huge.png' }] } });
+    const media = ((await r.json()) as { media: Array<{ status: string; r2_key: string; error_code: string }> }).media;
+    assert.equal(media[0].status, 'stored', JSON.stringify(media));
+    assert.deepEqual(asked.map((a) => a.url), ['https://store.bblcdn.com/s1/huge.png', 'https://store.bblcdn.com/s1/huge.png__op__resize,m_lfit,w_2400__op__format,f_auto__op__quality,q_90']);
+    assert.equal(asked[1].accept, 'image/jpeg,image/png');
+    const row = w.raw.prepare("SELECT status, fetched_variant, source_url FROM catalog_import_media WHERE source_media_id = 'huge1'").get() as Record<string, string>;
+    assert.deepEqual({ ...row }, { status: 'stored', fetched_variant: 'cdn_resized', source_url: 'https://store.bblcdn.com/s1/huge.png' }, 'the provenance stays the original');
+  } finally {
+    globalThis.fetch = real;
+  }
+});
+
+test('review 6b: a passing R2 error on a stored medium answers pending at /media (WRITING: no re-fetch; VERIFYING_LIVE: never failed), in both binding shapes', async () => {
+  const { newWorld, stage, write, RUN_ID } = await import('./fixtures/catalogImportWorld');
+  const { R2Double } = await import('./fixtures/imageDoubles');
+  const { ingestImportMedia } = await import('../worker/lib/catalogImport/media');
+  const { itemBySource, finishPublishing } = await import('../worker/lib/catalogImport/items');
+  const run = { id: RUN_ID, state: 'running', token_expires_at: '', github_run_id: 'x', reviewed_bundle_sha256: '', code_commit: '', manifest_total: 0, started_at: '' };
+  for (const shape of ['one bucket (the fixtures)', 'R2_PUBLIC apart from the legacy BUCKET (wrangler.jsonc)'] as const) {
+    const w = newWorld();
+    const s = stage(w, 'ams-2-pro-feeder-unit');
+    const env = { DB: w.db, BUCKET: shape.startsWith('one') ? w.bucket : new R2Double(), R2_PUBLIC: w.bucket, R2_PRIVATE: new R2Double(), IMAGES: w.images.binding } as never;
+    const primary = s.payload.images.find((i) => i.is_primary)!;
+    const req = [{ source_media_id: primary.source_media_id, role: 'gallery', source_url: primary.source_url }];
+    const head = w.bucket.head.bind(w.bucket);
+    const throwOnce = () => {
+      let once = true;
+      w.bucket.head = (async (key: string) => {
+        if (once) {
+          once = false;
+          throw new Error('R2 internal error (10001)');
+        }
+        return head(key);
+      }) as typeof w.bucket.head;
+    };
+    const real = globalThis.fetch;
+    const asked: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      asked.push(String(input));
+      throw new Error('no network in this test');
+    }) as typeof fetch;
+    try {
+      const media = async () => ingestImportMedia(env, 'https://levonis-iq.com/x', run, await itemBySource(w.db, RUN_ID, s.payload.source_product_id), req);
+      // WRITING: the HEAD failed — pending, and the stored medium is not fetched again.
+      throwOnce();
+      assert.deepEqual((await media()).map((m) => [m.status, m.error_code]), [['pending', 'IMAGE_STORAGE_FAILED']], shape);
+      assert.deepEqual(asked, [], `${shape}: nothing re-fetched`);
+      w.bucket.head = head as typeof w.bucket.head;
+      // VERIFYING_LIVE (a resumed runner learning its keys): pending, never failed MEDIA_NOT_STORED.
+      await write(w, s);
+      await finishPublishing(w.db, run, await itemBySource(w.db, RUN_ID, s.payload.source_product_id));
+      throwOnce();
+      assert.deepEqual((await media()).map((m) => m.status), ['pending'], shape);
+      w.bucket.head = head as typeof w.bucket.head;
+      const stored = await media();
+      assert.equal(stored[0].status, 'stored', `${shape}: answered stored once R2 answers`);
+      // An object R2 positively does not have is still failed MEDIA_NOT_STORED.
+      w.bucket.objects.delete(stored[0].r2_key);
+      assert.deepEqual((await media()).map((m) => [m.status, m.error_code]), [['failed', 'MEDIA_NOT_STORED']], shape);
+    } finally {
+      globalThis.fetch = real;
+      w.bucket.head = head as typeof w.bucket.head;
+    }
+  }
+});

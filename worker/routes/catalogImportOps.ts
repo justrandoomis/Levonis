@@ -16,13 +16,13 @@
  *   POST /items/:sid/media              ≤ 4 media, store.bblcdn.com only, 45 s
  *   POST /items/:sid/write              ONE guarded batch (worker/lib/catalogImport/writer.ts)
  *   POST /items/:sid/publish-finish     republish if hidden on block; recompute; purge; VERIFYING_LIVE
- *   GET  /items/:sid/readback           the write's verifyApplied + live ownership checks
+ *   GET  /items/:sid/readback           the write's verifyApplied + live ownership checks (503 while it has not run)
  *   POST /items/:sid/complete           runner evidence + the Worker's own D1 recompute
  *   POST /items/:sid/withdraw           BLOCKED SOURCE_WITHDRAWN → WITHDRAWN_AT_SOURCE
  *   POST /run/prepare-taxonomy          insert-only nodes, brand, synonyms
  *   POST /run/protect-snapshot          §E.4 fingerprints, before | after
- *   POST /run/finish                    closed | partial; the token cleared
- *   GET  /run/status                    counts by state, current, next, last verified URL, §H.3 progress
+ *   POST /run/finish                    closed | partial (the BLOCKED, WITHDRAWN and still-held items); the token cleared
+ *   GET  /run/status                    counts by state, current, next, the held items, last verified URL, §H.3 progress
  *
  * Every answer is `private, no-store`; every error `{code, message}` from the
  * fixed catalogue; no input, SQL text or stack is ever echoed.
@@ -58,7 +58,7 @@ import {
 import { ingestImportMedia, mediaRequestsOf } from '../lib/catalogImport/media';
 import { affectedProducts, recomputeAndPurge } from '../lib/catalogImport/purge';
 import { completeItem } from '../lib/catalogImport/complete';
-import { acceptManifest, finishRun, helloRecord, migrationsPresent, prepareTaxonomy, protectSnapshot, readbackItem, withdrawItem, WORKER_BUILD } from '../lib/catalogImport/runOps';
+import { acceptManifest, finishRun, heldItems, helloRecord, migrationsPresent, prepareTaxonomy, protectSnapshot, readbackItem, withdrawItem, WORKER_BUILD } from '../lib/catalogImport/runOps';
 import { currentAndNext, lastVerifiedUrl, measuredRate, runProgress, stateCounts } from '../lib/catalogImport/report';
 import { ImportWriteRefused, planImportWrite, runImportWrite, type DocumentCheck, type ImportWriteContext } from '../lib/catalogImport/writer';
 import { republishAfterBlock } from '../lib/catalogImport/unpublish';
@@ -202,7 +202,7 @@ catalogImportOpsRoutes.post(
   '/run/finish',
   handle(async (c) => {
     await readBody(c);
-    return c.json(await finishRun(c.env.DB, c.get('importRun')));
+    return c.json(await finishRun(c.env.DB, c.get('importRun'), bundleOrRefuse()));
   })
 );
 
@@ -218,7 +218,10 @@ catalogImportOpsRoutes.get(
       await measuredRate(db, run.id),
       await runProgress(db, run.id),
     ];
-    return c.json({ run: { id: run.id, state: run.state }, counts, current, next, last_verified_url: url, ...progress, rate });
+    // The queued items the reviewed manifest holds (§K.2 step 13): /run/finish closes the run partial around them.
+    const bundle = currentReviewedBundle();
+    const held = bundle.ok ? await heldItems(db, run.id, bundle.bundle) : [];
+    return c.json({ run: { id: run.id, state: run.state }, counts, current, next, held, last_verified_url: url, ...progress, rate });
   })
 );
 

@@ -4,9 +4,13 @@
  *
  *   - At most 4 media a call, inside a 45 s wall budget: what does not fit is
  *     answered `pending` and the runner sends it again.
- *   - store.bblcdn.com over https ONLY, on every hop (`allowHost`, through
- *     worker/lib/fetchGuard.ts): any other host is `failed` /
+ *   - store.bblcdn.com over https on its default port ONLY, on every hop
+ *     (`allowHost` and `allowUrl`, through worker/lib/fetchGuard.ts): any other
+ *     host, a redirect to http:// or to another port is `failed` /
  *     MEDIA_HOST_NOT_ALLOWED and nothing is requested from it.
+ *   - An original over the source cap (or one the converter refuses for its
+ *     input size) is asked once more as the CDN's 2400-px rendition (§C.4 step 2),
+ *     recorded `fetched_variant = 'cdn_resized'`; the provenance stays the original.
  *   - The bytes go through the app's own pipeline (ingestProductMediaUrl:
  *     guarded fetch, sniff, convert to WebP, content-addressed R2 key, cleanup
  *     intent, file_objects); the `catalog_import_media` row keeps the key
@@ -14,7 +18,8 @@
  *   - A medium already `stored` whose R2 object HEADs is never fetched again; a
  *     vanished object is re-ingested. After the write (PUBLISHING,
  *     VERIFYING_LIVE) nothing is fetched: the call only tells a resumed runner
- *     the keys already stored (§A.7, the runner contract).
+ *     the keys already stored (§A.7, the runner contract). A HEAD that FAILED
+ *     (R2 unavailable) is `pending`, in every state: never `failed`.
  *   - A transient failure (a timeout, a fetch that failed, the converter or
  *     storage unavailable) answers `pending` until its third attempt, then
  *     `failed`; a permanent one (a 4xx answer, bytes that are not an image) is
@@ -31,7 +36,7 @@
 import type { Env } from '../types';
 import { GuardedFetchError } from '../fetchGuard';
 import { ingestProductMediaUrl, ProductMediaIngestError } from '../productMediaIngest';
-import { headMediaObject } from '../mediaStorage';
+import { isSafeMediaKey, mediaBucket } from '../mediaStorage';
 import { NOW_SQL, OpsRefusal, type ImportRun } from './auth';
 import type { ItemRow } from './items';
 
@@ -79,14 +84,30 @@ export function mediaRequestsOf(raw: unknown): MediaRequest[] {
   });
 }
 
-/** The allow-list: store.bblcdn.com over https, nothing else (a stand-in only ever swaps the fetcher). */
+/** One hop's address: https on the default port, no credentials (the host is allowHost's). */
+const hopAllowed = (u: URL): boolean => u.protocol === 'https:' && u.port === '' && !u.username && !u.password;
+
+/** The allow-list: store.bblcdn.com over https on its default port, nothing else (a stand-in only ever swaps the fetcher). */
 export function mediaUrlAllowed(url: string): boolean {
   try {
     const u = new URL(url);
-    return u.protocol === 'https:' && u.hostname === MEDIA_HOST && !u.username && !u.password;
+    return hopAllowed(u) && u.hostname === MEDIA_HOST;
   } catch {
     return false;
   }
+}
+
+export type FetchedVariant = 'original' | 'cdn_resized';
+
+/** §C.4 step 2: the CDN's own resize of an original, 2400 px on the longest side, as JPEG or PNG. */
+export const CDN_RESIZE_OPS = '__op__resize,m_lfit,w_2400__op__format,f_auto__op__quality,q_90';
+export const CDN_RESIZED_ACCEPT = 'image/jpeg,image/png';
+
+/** `<url>__op__resize,…` — the operations follow the object's path (a query, if any, stays a query). */
+export function cdnResizedUrl(url: string): string {
+  const u = new URL(url);
+  u.pathname = `${u.pathname}${CDN_RESIZE_OPS}`;
+  return u.toString();
 }
 
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]', '::1']);
@@ -114,6 +135,31 @@ export function standInFetcher(env: Pick<Env, 'CATALOG_IMPORT_MEDIA_ORIGIN'>, re
     const u = new URL(typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url);
     return fetch(`${base}${u.pathname}${u.search}`, init);
   }) as typeof fetch;
+}
+
+/** An import object's presence in R2: a storage error is `unknown`, never an absence (§B.5: transient). */
+export type ObjectPresence = 'present' | 'absent' | 'unknown';
+
+/**
+ * HEADs an imported object in the public bucket (where /media stores it), then the legacy bucket when that is
+ * a different binding. Unlike headMediaObject — whose read-through turns a THROWN primary HEAD into the legacy
+ * bucket's miss — an error on either bucket is reported as `unknown`, so a passing R2 failure never reads as
+ * "not stored".
+ */
+export async function importObjectPresence(env: Pick<Env, 'BUCKET' | 'R2_PUBLIC' | 'R2_PRIVATE'>, key: string): Promise<ObjectPresence> {
+  if (!isSafeMediaKey(key)) return 'absent';
+  const primary = mediaBucket(env, 'public');
+  const buckets = [primary, ...(env.BUCKET && env.BUCKET !== primary ? [env.BUCKET] : [])].filter(Boolean);
+  let errored = false;
+  for (const bucket of buckets) {
+    try {
+      const h = await bucket.head(key);
+      if (h && Number(h.size ?? 0) > 0) return 'present';
+    } catch {
+      errored = true;
+    }
+  }
+  return errored ? 'unknown' : 'absent';
 }
 
 interface StoredRow {
@@ -159,36 +205,40 @@ export async function ingestImportMedia(env: MediaEnv, requestUrl: string, run: 
   const started = Date.now();
   const out: MediaAnswer[] = [];
 
-  const record = async (m: MediaRequest, a: MediaAnswer, extra: { bytes?: number | null; sha256?: string; tried: boolean }) => {
+  const record = async (m: MediaRequest, a: MediaAnswer, extra: { bytes?: number | null; sha256?: string; tried: boolean; variant?: FetchedVariant }) => {
     await db
       .prepare(
-        `INSERT INTO catalog_import_media (run_id, source_product_id, source_media_id, role, source_url, status, r2_key, width, height, bytes, sha256, error_code, attempts)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO catalog_import_media (run_id, source_product_id, source_media_id, role, source_url, status, r2_key, width, height, bytes, sha256, error_code, attempts,
+                                           fetched_variant)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (run_id, source_product_id, source_media_id) DO UPDATE SET
            role = excluded.role, source_url = excluded.source_url, status = excluded.status, r2_key = excluded.r2_key,
            width = excluded.width, height = excluded.height, bytes = excluded.bytes, sha256 = excluded.sha256,
-           error_code = excluded.error_code, attempts = catalog_import_media.attempts + ?, updated_at = ${NOW_SQL}`
+           error_code = excluded.error_code, attempts = catalog_import_media.attempts + ?, fetched_variant = excluded.fetched_variant, updated_at = ${NOW_SQL}`
       )
       .bind(
         run.id, item.source_product_id, m.source_media_id, m.role, m.source_url, a.status, a.r2_key, a.width, a.height,
-        extra.bytes ?? null, extra.sha256 ?? '', a.error_code, extra.tried ? 1 : 0, extra.tried ? 1 : 0
+        extra.bytes ?? null, extra.sha256 ?? '', a.error_code, extra.tried ? 1 : 0, extra.variant ?? 'original', extra.tried ? 1 : 0
       )
       .run();
   };
 
   for (const m of requests) {
     const prev = known.get(m.source_media_id);
-    // Already stored and still in R2: never fetched again.
+    // Already stored and still in R2: never fetched again. A HEAD that failed says nothing: the medium is answered
+    // `pending` (the runner asks again), never `failed`, and its row is left as it is.
     if (prev && prev.status === 'stored' && prev.r2_key) {
-      let present = false;
-      try {
-        const h = await headMediaObject(env, 'public', prev.r2_key);
-        present = !!h && Number(h.size ?? 0) > 0;
-      } catch {
-        present = false;
+      const presence = await importObjectPresence(env, prev.r2_key);
+      if (presence === 'present') {
+        out.push({ source_media_id: m.source_media_id, status: 'stored', r2_key: prev.r2_key, width: prev.width, height: prev.height, error_code: '' });
+        continue;
       }
-      if (present || !fetchNow) {
-        out.push({ source_media_id: m.source_media_id, status: present ? 'stored' : 'failed', r2_key: present ? prev.r2_key : '', width: prev.width, height: prev.height, error_code: present ? '' : 'MEDIA_NOT_STORED' });
+      if (presence === 'unknown') {
+        out.push({ source_media_id: m.source_media_id, status: 'pending', r2_key: '', width: null, height: null, error_code: 'IMAGE_STORAGE_FAILED' });
+        continue;
+      }
+      if (!fetchNow) {
+        out.push({ source_media_id: m.source_media_id, status: 'failed', r2_key: '', width: null, height: null, error_code: 'MEDIA_NOT_STORED' });
         continue;
       }
     }
@@ -207,22 +257,42 @@ export async function ingestImportMedia(env: MediaEnv, requestUrl: string, run: 
       out.push({ source_media_id: m.source_media_id, status: 'pending', r2_key: '', width: null, height: null, error_code: '' });
       continue;
     }
-    try {
-      const r = await ingestProductMediaUrl(env, m.source_url, {
+    const ingest = (url: string, variant: FetchedVariant) => {
+      const budget = MEDIA_WALL_MS - (Date.now() - started) - MEDIA_MARGIN_MS;
+      if (budget < 1_000) throw new GuardedFetchError('FETCH_TIMEOUT', 'The wall budget of this call is spent');
+      return ingestProductMediaUrl(env, url, {
         allowHost: (host) => host === MEDIA_HOST,
+        // https on the default port, on EVERY hop: a redirect to http:// (or to another port) is refused, never fetched.
+        allowUrl: hopAllowed,
         fetcher,
-        timeout_ms: Math.min(30_000, left - MEDIA_MARGIN_MS),
+        timeout_ms: Math.min(30_000, budget),
         max_redirects: 2,
+        ...(variant === 'cdn_resized' ? { accept: CDN_RESIZED_ACCEPT } : {}),
+        // The provenance stays the original address, whichever variant was fetched.
+        provenance_url: m.source_url,
       });
+    };
+    let variant: FetchedVariant = 'original';
+    try {
+      let r;
+      try {
+        r = await ingest(m.source_url, 'original');
+      } catch (e) {
+        // §C.4 step 2: an original over the source cap, or one the converter refuses for its input size, is asked
+        // ONCE more through the CDN's own 2400-px rendition.
+        if (!(e instanceof ProductMediaIngestError && e.code === 'IMAGE_SOURCE_TOO_LARGE')) throw e;
+        variant = 'cdn_resized';
+        r = await ingest(cdnResizedUrl(m.source_url), 'cdn_resized');
+      }
       const a: MediaAnswer = { source_media_id: m.source_media_id, status: 'stored', r2_key: r.key, width: r.width, height: r.height, error_code: '' };
-      await record(m, a, { bytes: r.bytes, sha256: /([0-9a-f]{64})\.webp$/.exec(r.key)?.[1] ?? '', tried: true });
+      await record(m, a, { bytes: r.bytes, sha256: /([0-9a-f]{64})\.webp$/.exec(r.key)?.[1] ?? '', tried: true, variant });
       out.push(a);
     } catch (e) {
       const f = failureOf(e);
       const tries = Number(prev?.attempts ?? 0) + 1;
       const status = f.transient && tries < MEDIA_TRIES ? 'pending' : 'failed';
       const a: MediaAnswer = { source_media_id: m.source_media_id, status, r2_key: '', width: null, height: null, error_code: f.code };
-      await record(m, a, { tried: true });
+      await record(m, a, { tried: true, variant });
       out.push(a);
     }
   }

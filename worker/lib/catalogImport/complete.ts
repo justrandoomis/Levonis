@@ -10,7 +10,8 @@
  *   1. the evidence is the runner's for THIS item: version 1, the live URL is
  *      this item's `/product/<slug>` on the origin the call came to;
  *   2. every check the runner marks hard is ok, every expected check is there
- *      (the merge check for a merge), and the browser, when it ran, passed;
+ *      (the merge check for a merge), and the browser check is there and passed;
+ *      a merge also needs the write's own recorded `before_fp_equal` true;
  *   3. the evidence's counts equal the counts of the payload this item WROTE
  *      (`stage_data.payload_counts`, recorded by the write's checkpoint): the
  *      runner verified what was written, not another build of the page;
@@ -29,6 +30,7 @@
  */
 import type { Env } from '../types';
 import { newId } from '../crypto';
+import { fence, isFenceMiss } from '../operations';
 import { NOW_SQL, OpsRefusal, type ImportRun } from './auth';
 import { stageDataOf, type ItemRow } from './items';
 import type { ReviewedBundle } from './reviewed';
@@ -140,19 +142,42 @@ export interface Agreement {
   failed: string[];
 }
 
-export function agreementOf(evidence: EdgeEvidence, d1: D1Checks, payloadCounts: Record<string, number>, merged: boolean): Agreement {
+export function agreementOf(
+  evidence: EdgeEvidence,
+  d1: D1Checks,
+  payloadCounts: Record<string, number>,
+  merged: boolean,
+  written: { before_fp_equal?: unknown } = {}
+): Agreement {
   const failed: string[] = [];
   for (const name of [...EXPECTED_EDGE_CHECKS, ...(merged ? ['merge'] : [])]) {
     if (!evidence.checks[name]) failed.push(`edge.${name}.missing`);
   }
   for (const [name, c] of Object.entries(evidence.checks)) if (c.hard && !c.ok) failed.push(`edge.${name}`);
-  if (evidence.browser && !evidence.browser.ok) failed.push('edge.browser');
+  // §I.1.7: the browser check is part of the evidence, always — a COMPLETE never rests on the API checks alone.
+  if (!evidence.browser) failed.push('edge.browser.missing');
+  else if (!evidence.browser.ok) failed.push('edge.browser');
+  // §A.4 step 7, §I.1.8: a merge completes only on the protected-fields result the WRITE recorded (stage_data,
+  // after its commit) — never on a runner's assumption when its /write answer was lost. Absent counts as not equal.
+  if (merged && written.before_fp_equal !== true) failed.push('write.before_fp_equal');
   const edgeOk = failed.length === 0;
   const keys = new Set([...Object.keys(payloadCounts), ...Object.keys(evidence.counts)]);
   const countsAgree = keys.size > 0 && [...keys].every((k) => evidence.counts[k] === payloadCounts[k]);
   if (!countsAgree) failed.push('counts.edge_vs_written_payload');
   for (const name of d1.failed) failed.push(`d1.${name}`);
   return { edge_ok: edgeOk, counts_agree: countsAgree, failed };
+}
+
+/** A batch fenced on the item: a fence miss is the stale 409 the runner re-leases on; a trigger refusal its own code. */
+async function fenced(item: Pick<ItemRow, 'id'>, run: () => Promise<unknown>): Promise<void> {
+  try {
+    await run();
+  } catch (e) {
+    if (isFenceMiss(e)) throw new OpsRefusal(409, 'IMPORT_ILLEGAL_TRANSITION', [item.id]);
+    const mapped = refusalOfBatch(e);
+    if (mapped !== e && mapped instanceof Error && 'code' in mapped) throw new OpsRefusal(409, String((mapped as { code: unknown }).code), [item.id]);
+    throw e;
+  }
 }
 
 export interface CompleteAnswer {
@@ -177,26 +202,34 @@ export async function completeItem(
   const db = env.DB;
   const d1 = await recomputeD1Checks(db, { bundle, runId: run.id, itemId: item.id, selections, media: env });
   const stageData = stageDataOf(item);
-  const agreement = agreementOf(evidence, d1, numbers(stageData.payload_counts), item.match_kind === 'merged');
+  const agreement = agreementOf(evidence, d1, numbers(stageData.payload_counts), item.match_kind === 'merged', { before_fp_equal: stageData.before_fp_equal });
   const d1Checks = { ...d1, agreement };
   const complete = d1.ok && agreement.edge_ok && agreement.counts_agree;
+  // Both batches are fenced on the state and the lease this call read: the recompute is slow, and an item that
+  // moved meanwhile (a retry or a block under the same lease) gets no COMPLETED event and no record (409, stale).
+  const [fenceIn, fenceOut] = fence(db, `EXISTS (SELECT 1 FROM catalog_import_items WHERE id = ? AND processing_state = 'VERIFYING_LIVE' AND lease_token = ?)`, [item.id, item.lease_token]);
   if (!complete) {
     // Nothing moves; the latest records are kept for the owner, with an info event naming the code.
-    await db.batch([
-      db
-        .prepare(`UPDATE catalog_import_items SET d1_checks = ?, edge_evidence = ?, updated_at = ${NOW_SQL} WHERE id = ? AND lease_token = ? AND processing_state = 'VERIFYING_LIVE'`)
-        .bind(JSON.stringify(d1Checks), JSON.stringify(evidence), item.id, item.lease_token),
-      db
-        .prepare(
-          `INSERT INTO catalog_import_events (id, run_id, item_id, seq, stage, outcome, code, message, detail, lease_token, github_run_id)
-           VALUES (?, ?, ?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM catalog_import_events WHERE run_id = ?), 'VERIFYING_LIVE', 'info', 'IMPORT_VERIFY_DISAGREES', '', ?, ?, ?)`
-        )
-        .bind(newId('cie'), run.id, item.id, run.id, JSON.stringify({ failed: agreement.failed.length, round: evidence.round }), item.lease_token, run.github_run_id),
-    ]);
+    await fenced(item, () =>
+      db.batch([
+        fenceIn,
+        db
+          .prepare(`UPDATE catalog_import_items SET d1_checks = ?, edge_evidence = ?, updated_at = ${NOW_SQL} WHERE id = ? AND lease_token = ? AND processing_state = 'VERIFYING_LIVE'`)
+          .bind(JSON.stringify(d1Checks), JSON.stringify(evidence), item.id, item.lease_token),
+        db
+          .prepare(
+            `INSERT INTO catalog_import_events (id, run_id, item_id, seq, stage, outcome, code, message, detail, lease_token, github_run_id)
+             VALUES (?, ?, ?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM catalog_import_events WHERE run_id = ?), 'VERIFYING_LIVE', 'info', 'IMPORT_VERIFY_DISAGREES', '', ?, ?, ?)`
+          )
+          .bind(newId('cie'), run.id, item.id, run.id, JSON.stringify({ failed: agreement.failed.length, round: evidence.round }), item.lease_token, run.github_run_id),
+        fenceOut,
+      ])
+    );
     return { state: 'VERIFYING_LIVE', seq: null, d1_checks: d1Checks };
   }
-  try {
-    await db.batch([
+  await fenced(item, () =>
+    db.batch([
+      fenceIn,
       db
         .prepare(
           `UPDATE catalog_import_items
@@ -212,12 +245,9 @@ export async function completeItem(
            VALUES (?, ?, ?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM catalog_import_events WHERE run_id = ?), 'COMPLETED', 'ok', '', '', ?, ?, ?)`
         )
         .bind(newId('cie'), run.id, item.id, run.id, JSON.stringify({ round: evidence.round, selections: evidence.selections_checked }), item.lease_token, run.github_run_id),
-    ]);
-  } catch (e) {
-    const mapped = refusalOfBatch(e);
-    if (mapped !== e && mapped instanceof Error && 'code' in mapped) throw new OpsRefusal(409, String((mapped as { code: unknown }).code), [item.id]);
-    throw e;
-  }
+      fenceOut,
+    ])
+  );
   const seq = await db
     .prepare("SELECT seq FROM catalog_import_events WHERE run_id = ? AND item_id = ? AND stage = 'COMPLETED' ORDER BY seq DESC LIMIT 1")
     .bind(run.id, item.id)

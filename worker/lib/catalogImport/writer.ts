@@ -59,6 +59,7 @@ import { H, sha256Hex } from '@levonis/catalog/bambuImport/hash';
 import { canonicalJson } from '@levonis/catalog/bambuImport/fingerprint';
 import { specKey } from '@levonis/catalog/bambuImport/registry/specKeys';
 import { colourFacet } from '@levonis/catalog/bambuImport/registry/colours';
+import { collapseContentDuplicates } from '@levonis/catalog/bambuImport/mediaCollapse';
 import { HttpError } from '../http';
 import { auditStatementCount } from '../audit';
 import { comboKey } from '../inventory';
@@ -98,7 +99,7 @@ import { hashSource, TRANSLATION_VERSION } from '../translate';
 import { fieldsFor, flatFields } from '../templateFamilies';
 import type { Env } from '../types';
 import { GUARDED_ROW_TABLES, IMPORT_GUARD_ID, IMPORT_GUARD_REFUSAL, jsonElementMoneySql, nonDefaultSql, type GuardedColumn } from './protectedTables';
-import { countingD1, IMPORT_INVOCATION_LIMIT, packedInserts, type InvocationCounter } from './budget';
+import { countingD1, IMPORT_INVOCATION_LIMIT, IMPORT_RESERVE, packedInserts, type InvocationCounter } from './budget';
 import { newImportProductDoc } from './doc';
 import {
   checkReviewedScope,
@@ -362,67 +363,12 @@ interface MediaRow {
 }
 
 /**
- * Gallery entries whose stored WebP has the SAME object key collapse into the
- * earliest position (§C.4 step 1), recomputed here from the item's own media
- * rows: when any copy is bound, the general copies go and the bound rows of a
- * later copy take the earliest position — with rule `content_duplicate`, except
- * a representative (its via variant kept) and a reviewed override; when
- * none is, only the earliest general row stays. Rows of ONE gallery entry
- * (a value set) are never collapsed. Exactly one primary is kept.
+ * The content-duplicate collapse (§C.4 step 1) is the shared package's rule
+ * (packages/catalog/src/bambuImport/mediaCollapse.ts), applied here to the rows on
+ * this item's own stored keys; the runner recomputes the same rule when it has no
+ * /write answer. Re-exported for callers of this module.
  */
-export function collapseContentDuplicates(rows: readonly ImportImageRow[]): { rows: ImportImageRow[]; collapsed: number } {
-  const byKey = new Map<string, ImportImageRow[]>();
-  rows.forEach((r) => {
-    const list = byKey.get(r.r2_key) ?? [];
-    list.push(r);
-    byKey.set(r.r2_key, list);
-  });
-  const drop = new Set<string>();
-  const changed = new Map<string, Partial<ImportImageRow>>();
-  for (const group of byKey.values()) {
-    const sources = [...new Set(group.map((r) => r.source_media_id))];
-    if (sources.length < 2) continue;
-    const firstSort = (sid: string) => Math.min(...group.filter((r) => r.source_media_id === sid).map((r) => r.sort_order));
-    const canonical = sources.reduce((a, b) => (firstSort(b) < firstSort(a) ? b : a));
-    const earliest = firstSort(canonical);
-    const bound = group.filter((r) => r.option_value_id || r.variant_id || r.color_id);
-    if (bound.length) {
-      const seen = new Set<string>();
-      for (const r of group) {
-        const binding = `${r.option_value_id ?? ''}|${r.variant_id ?? ''}|${r.color_id ?? ''}`;
-        if (!(r.option_value_id || r.variant_id || r.color_id) || seen.has(binding)) {
-          drop.add(r.id);
-          continue;
-        }
-        seen.add(binding);
-        if (r.source_media_id === canonical) continue;
-        // A representative keeps its rule and the variant whose hero it shows (R6: the page drops it on a clashing
-        // selection), and a reviewed override its rule, as the package's own planMedia places them; only a binding
-        // inherited from the copy (value, variant, value set) becomes 'content_duplicate'. Either way it moves first.
-        changed.set(
-          r.id,
-          r.binding_rule === 'representative' || r.binding_rule === 'reviewed_override'
-            ? { sort_order: earliest }
-            : { sort_order: earliest, binding_rule: 'content_duplicate', via_variant_id: '' }
-        );
-      }
-    } else {
-      const keep = group.find((r) => r.source_media_id === canonical && r.sort_order === earliest) ?? group[0];
-      for (const r of group) if (r.id !== keep.id) drop.add(r.id);
-    }
-  }
-  const out = rows.filter((r) => !drop.has(r.id)).map((r) => ({ ...r, ...(changed.get(r.id) ?? {}) }));
-  if (out.length && !out.some((r) => r.is_primary)) {
-    const lead = [...out].sort((a, b) => a.sort_order - b.sort_order)[0];
-    lead.is_primary = true;
-  }
-  let seenPrimary = false;
-  for (const r of out) {
-    if (r.is_primary && seenPrimary) r.is_primary = false;
-    if (r.is_primary) seenPrimary = true;
-  }
-  return { rows: out, collapsed: rows.length - out.length };
-}
+export { collapseContentDuplicates };
 
 // ---------------------------------------------------------------- search aliases (§C.1, step 5)
 
@@ -828,6 +774,11 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
     if (v.value_ids.some((id) => !groupOfValue.has(id)) || comboKey({ option_value_ids: v.value_ids, color_id: null }) !== v.combo_key) {
       throw new ImportWriteRefused('IMPORT_IDENTITY_AMBIGUOUS', 'IDENTITY_AMBIGUOUS', 409, 'variant_combo_key_differs');
     }
+  }
+  // A swatch is a picture of one of THIS product's values: product_option_value_swatches is keyed by the value id
+  // alone, so a swatch naming any other id would take another product's slot (or a value not yet written).
+  if (payload.swatches.some((sw) => !groupOfValue.has(sw.value_id))) {
+    throw new ImportWriteRefused('IMPORT_IDENTITY_AMBIGUOUS', 'IDENTITY_AMBIGUOUS', 409, 'swatch_value_not_this_product');
   }
   const valueCount = payload.groups.reduce((n, g) => n + g.values.length, 0);
   if (payload.groups.length > IMPORT_ROW_CAP || valueCount > IMPORT_ROW_CAP || payload.variants.length > IMPORT_ROW_CAP || payload.images.length > IMPORT_ROW_CAP) {
@@ -1456,11 +1407,13 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
         `UPDATE catalog_import_items
             SET processing_state = 'PUBLISHING', last_completed_stage = 'WRITING', levonis_product_id = ?, slug = ?, match_kind = ?,
                 stage_attempts = 0, retry_at = '',
-                stage_data = json_set(CASE WHEN json_valid(stage_data) THEN stage_data ELSE '{}' END, '$.written', json(?), '$.payload_counts', json(?)),
+                stage_data = json_set(CASE WHEN json_valid(stage_data) THEN stage_data ELSE '{}' END, '$.written', json(?), '$.payload_counts', json(?), '$.images', json(?)),
                 updated_at = ${NOW_SQL}
           WHERE id = ? AND run_id = ? AND lease_token = ?`
       )
-      .bind(productId, slug, merge ? 'merged' : 'created', JSON.stringify(counts), JSON.stringify(payloadCounts(payload)), input.itemId, runId, input.leaseToken)
+      // The rows written (after the content-duplicate collapse), in the same batch: a runner resumed after this
+      // write, with no /write answer, reads them from /lease (stage_data.images) instead of recomputing them.
+      .bind(productId, slug, merge ? 'merged' : 'created', JSON.stringify(counts), JSON.stringify(payloadCounts(payload)), JSON.stringify(writtenImageRows(images)), input.itemId, runId, input.leaseToken)
   );
   const afterStart = statements.length;
   let probe = -1;
@@ -1761,6 +1714,21 @@ function countsOf(a: {
   };
 }
 
+/** The image rows a write bound, as /write answers them and stage_data.images records them. */
+export function writtenImageRows(images: readonly ImportImageRow[]): ImportWriteResult['images'] {
+  return images.map((i) => ({
+    id: i.id,
+    source_media_id: i.source_media_id,
+    r2_key: i.r2_key,
+    sort_order: i.sort_order,
+    is_primary: i.is_primary,
+    option_value_id: i.option_value_id,
+    variant_id: i.variant_id,
+    color_id: i.color_id,
+    binding_rule: i.binding_rule,
+  }));
+}
+
 // ---------------------------------------------------------------- the run
 
 const digestOf = (rows: unknown): string => sha256Hex(canonicalJson(rows));
@@ -1807,7 +1775,7 @@ export async function runImportWrite(ctx: ImportWriteContext, plan: ImportWriteP
   ]);
   // The readback (§A.3 GET /readback, §I.1.6): the stored product against the plan of this very payload —
   // reloadForVerification + verifyApplied — recorded on the item, since /readback itself carries no payload.
-  const readback = await verifyWrite(ctx.db, plan);
+  const readback = await verifyWrite(ctx, plan, { before_fp_equal: beforeEqual, after_money_default: moneyDefault });
   if (plan.matchKind === 'merged') {
     try {
       await ctx.db
@@ -1826,18 +1794,8 @@ export async function runImportWrite(ctx: ImportWriteContext, plan: ImportWriteP
     counts: plan.counts,
     before_fp_equal: beforeEqual,
     after_money_default: moneyDefault,
-    readback_mismatches: readback.mismatches,
-    images: plan.images.map((i) => ({
-      id: i.id,
-      source_media_id: i.source_media_id,
-      r2_key: i.r2_key,
-      sort_order: i.sort_order,
-      is_primary: i.is_primary,
-      option_value_id: i.option_value_id,
-      variant_id: i.variant_id,
-      color_id: i.color_id,
-      binding_rule: i.binding_rule,
-    })),
+    readback_mismatches: readback.ran ? Number(readback.mismatches) : -1,
+    images: writtenImageRows(plan.images),
   };
 }
 
@@ -1847,29 +1805,60 @@ export async function runImportWrite(ctx: ImportWriteContext, plan: ImportWriteP
  */
 export const READBACK_STATEMENTS = 24;
 
+/** The post-commit verification and its record are each tried this many times (a passing D1 error is not a verdict). */
+export const READBACK_TRIES = 3;
+
+/** `stage_data.readback`: whether verifyApplied RAN, and what it found (counts and section names, never a value). */
+export interface ReadbackRecord {
+  ran: boolean;
+  mismatches: number | null;
+  sections: string[];
+}
+
 /**
- * verifyApplied over the freshly committed product, recorded as `stage_data.readback` (counts and section
- * names, never a value). Never turns the committed write into a failure: a read that fails records -1.
+ * verifyApplied over the freshly committed product, recorded as `stage_data.readback`, with the write's own
+ * protected-fields result (`before_fp_equal`, a merge) or money probe (`after_money_default`, a create) beside
+ * it, so a runner resumed without the /write answer reads them from /lease. Never turns the committed write into
+ * a failure: a verification that cannot run within its tries is recorded as NOT RUN (`ran: false`), never as a
+ * mismatch — GET /readback then answers a transient 503, not a failed check.
  */
-async function verifyWrite(db: D1Database, plan: ImportWritePlan): Promise<{ mismatches: number; sections: string[] }> {
-  let out = { mismatches: -1, sections: [] as string[] };
-  try {
-    const stored = await reloadForVerification(db, plan.productId);
-    const found = stored ? verifyApplied(plan.save, stored, { documentKeys: null }) : null;
-    out = found ? { mismatches: found.length, sections: [...new Set(found.map((m) => m.section))].sort() } : { mismatches: 1, sections: ['product_missing'] };
-  } catch (e) {
-    console.error('catalog_import_readback_failed', JSON.stringify({ code: 'IMPORT_READBACK_FAILED', reason: message(e).slice(0, 80) }));
+async function verifyWrite(ctx: ImportWriteContext, plan: ImportWritePlan, result: { before_fp_equal: boolean | null; after_money_default: boolean | null }): Promise<ReadbackRecord> {
+  const db = ctx.db;
+  let out: ReadbackRecord = { ran: false, mismatches: null, sections: [] };
+  for (let t = 0; t < READBACK_TRIES && !out.ran; t++) {
+    // A retry only while the invocation can still afford a whole readback (D1's 1,000, the reserve included).
+    if (t > 0 && ctx.counter.count + READBACK_STATEMENTS > IMPORT_INVOCATION_LIMIT + IMPORT_RESERVE) break;
+    try {
+      const stored = await reloadForVerification(db, plan.productId);
+      const found = stored ? verifyApplied(plan.save, stored, { documentKeys: null }) : null;
+      out = found ? { ran: true, mismatches: found.length, sections: [...new Set(found.map((m) => m.section))].sort() } : { ran: true, mismatches: 1, sections: ['product_missing'] };
+    } catch (e) {
+      console.error('catalog_import_readback_failed', JSON.stringify({ code: 'IMPORT_READBACK_FAILED', reason: message(e).slice(0, 80) }));
+    }
   }
-  try {
-    await db
-      .prepare(
-        `UPDATE catalog_import_items SET stage_data = json_set(CASE WHEN json_valid(stage_data) THEN stage_data ELSE '{}' END, '$.readback', json(?))
-          WHERE id = ? AND run_id = ?`
-      )
-      .bind(JSON.stringify(out), plan.itemId, plan.runId)
-      .run();
-  } catch (e) {
-    console.error('catalog_import_readback_not_stored', JSON.stringify({ code: 'IMPORT_READBACK_NOT_STORED', reason: message(e).slice(0, 80) }));
+  const sets: string[] = ["'$.readback', json(?)"];
+  const args: unknown[] = [JSON.stringify(out)];
+  if (result.before_fp_equal !== null) {
+    sets.push("'$.before_fp_equal', json(?)");
+    args.push(JSON.stringify(result.before_fp_equal));
+  }
+  if (result.after_money_default !== null) {
+    sets.push("'$.after_money_default', json(?)");
+    args.push(JSON.stringify(result.after_money_default));
+  }
+  for (let t = 0; t < READBACK_TRIES; t++) {
+    try {
+      await db
+        .prepare(
+          `UPDATE catalog_import_items SET stage_data = json_set(CASE WHEN json_valid(stage_data) THEN stage_data ELSE '{}' END, ${sets.join(', ')})
+            WHERE id = ? AND run_id = ?`
+        )
+        .bind(...args, plan.itemId, plan.runId)
+        .run();
+      break;
+    } catch (e) {
+      console.error('catalog_import_readback_not_stored', JSON.stringify({ code: 'IMPORT_READBACK_NOT_STORED', reason: message(e).slice(0, 80) }));
+    }
   }
   return out;
 }

@@ -19,7 +19,9 @@ import assert from 'node:assert/strict';
 import { count, newWorld, RUN_ID, stage, write, type World } from './fixtures/catalogImportWorld';
 import type { ImportPayload } from '../packages/catalog/src/bambuImport/payload';
 import { OpsRefusal, type ImportRun } from '../worker/lib/catalogImport/auth';
-import { finishPublishing, itemBySource } from '../worker/lib/catalogImport/items';
+import { applyEvent, finishPublishing, itemBySource } from '../worker/lib/catalogImport/items';
+import { sample } from './fixtures/bambu/load';
+import { publishV2 } from './fixtures/v2Publish';
 import { agreementOf, completeItem, EXPECTED_EDGE_CHECKS } from '../worker/lib/catalogImport/complete';
 import { payloadCounts } from '../worker/lib/catalogImport/writer';
 
@@ -39,6 +41,8 @@ async function verifying(handle: 'ams-2-pro-feeder-unit' | 'h2d' = 'ams-2-pro-fe
 function evidence(p: ImportPayload, slug: string, over: { checks?: Record<string, unknown>; counts?: Record<string, number>; selections?: string[][] } = {}) {
   const checks: Record<string, unknown> = {};
   for (const k of EXPECTED_EDGE_CHECKS) checks[k] = { ok: true, hard: true, status: 200, counts: { n: 1 }, detail: { expected: 'a'.repeat(64), note: 'never stored' } };
+  // The browser's own check (scripts/bambu-import/browser.ts): always part of the evidence (§I.1.7).
+  checks.browser = { ok: true, checks: { hero: true, gallery: true } };
   return {
     version: 1,
     live_url: URL_OF(slug),
@@ -137,10 +141,64 @@ test('the live URL must be this item\'s page on the origin called; a stale lease
   assert.equal(itemRow(w, s.itemId).state, 'VERIFYING_LIVE');
 });
 
-test('a merge needs the runner\'s merge check (before_fp_equal) on top of the others', () => {
-  const ev = { version: 1 as const, live_url: '', round: 1, checks: Object.fromEntries(EXPECTED_EDGE_CHECKS.map((k) => [k, { ok: true, hard: true }])), browser: null, sections: { leaf: '', root: '', secondary: [] }, selections_checked: 1, counts: { groups: 1 } };
+test('a merge needs the runner\'s merge check AND the before_fp_equal the write recorded; every COMPLETE needs the browser check', () => {
+  const ev = { version: 1 as const, live_url: '', round: 1, checks: Object.fromEntries(EXPECTED_EDGE_CHECKS.map((k) => [k, { ok: true, hard: true }])), browser: { ok: true, checks: 2, failed: 0 }, sections: { leaf: '', root: '', secondary: [] }, selections_checked: 1, counts: { groups: 1 } };
   const d1 = { ok: true, checks: {}, counts: {}, failed: [] };
+  const recorded = { before_fp_equal: true };
   assert.deepEqual(agreementOf(ev, d1, { groups: 1 }, false).failed, []);
-  assert.deepEqual(agreementOf(ev, d1, { groups: 1 }, true).failed, ['edge.merge.missing']);
-  assert.deepEqual(agreementOf({ ...ev, checks: { ...ev.checks, merge: { ok: false, hard: true } } }, d1, { groups: 1 }, true).failed, ['edge.merge']);
+  assert.deepEqual(agreementOf(ev, d1, { groups: 1 }, true, recorded).failed, ['edge.merge.missing']);
+  assert.deepEqual(agreementOf({ ...ev, checks: { ...ev.checks, merge: { ok: false, hard: true } } }, d1, { groups: 1 }, true, recorded).failed, ['edge.merge']);
+  // W1: evidence without the browser check is never a COMPLETE.
+  assert.deepEqual(agreementOf({ ...ev, browser: null }, d1, { groups: 1 }, false).failed, ['edge.browser.missing']);
+  // W2: the runner's merge check alone is not the proof — the write's own record is (a lost /write answer is not `true`).
+  const merged = { ...ev, checks: { ...ev.checks, merge: { ok: true, hard: true } } };
+  assert.deepEqual(agreementOf(merged, d1, { groups: 1 }, true, recorded).failed, []);
+  assert.deepEqual(agreementOf(merged, d1, { groups: 1 }, true, {}).failed, ['write.before_fp_equal'], 'absent counts as not equal');
+  assert.deepEqual(agreementOf(merged, d1, { groups: 1 }, true, { before_fp_equal: false }).failed, ['write.before_fp_equal']);
+});
+
+test('review 6b: /complete is fenced on the state it read — an item that moved during the recompute gets no COMPLETED event', async () => {
+  const { w, s, result } = await verifying();
+  const sid = s.payload.source_product_id;
+  const stale = await itemBySource(w.db, RUN_ID, sid);
+  // Under the same lease, the item is parked (the runner's in-job retry after an ambiguous /complete).
+  await applyEvent(w.db, RUN, stale, { state: 'RETRYING', outcome: 'retry', code: 'OPS_UNREACHABLE', retry_at: '', release: false, detail: {} });
+  const env = { DB: w.db, BUCKET: w.bucket as never, R2_PUBLIC: w.bucket as never, R2_PRIVATE: w.media.R2_PRIVATE as never };
+  const body = { lease_token: 'lease_test_0001', live_url: URL_OF(result.slug), edge_evidence: evidence(s.payload, result.slug) };
+  await assert.rejects(
+    () => completeItem(env, `${ORIGIN}/x`, RUN, stale, w.bundle, body),
+    (e: unknown) => e instanceof OpsRefusal && e.status === 409 && e.code === 'IMPORT_ILLEGAL_TRANSITION'
+  );
+  assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM catalog_import_events WHERE item_id = ? AND stage = 'COMPLETED'", s.itemId), 0, 'no phantom COMPLETED event');
+  assert.equal(itemRow(w, s.itemId).state, 'RETRYING');
+  // The not-COMPLETE branch too: no record, no info event, for an item that moved.
+  const failing = { ...body, edge_evidence: evidence(s.payload, result.slug, { checks: { v1: { ok: false, hard: true } } }) };
+  const before = count(w.raw, "SELECT COUNT(*) AS n FROM catalog_import_events WHERE item_id = ? AND code = 'IMPORT_VERIFY_DISAGREES'", s.itemId);
+  await assert.rejects(() => completeItem(env, `${ORIGIN}/x`, RUN, stale, w.bundle, failing), (e: unknown) => e instanceof OpsRefusal && e.code === 'IMPORT_ILLEGAL_TRANSITION');
+  assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM catalog_import_events WHERE item_id = ? AND code = 'IMPORT_VERIFY_DISAGREES'", s.itemId), before);
+});
+
+test('review 6b: a merge completes on the before_fp_equal its write recorded, and never without it', async () => {
+  const w = newWorld();
+  const x = sample('a1');
+  w.raw.exec(`INSERT INTO products (id, slug, name, name_ar, name_ku, status, price_iqd, category_id, options, colors, images)
+    VALUES ('p_a1m', 'bambu-a1-m', 'Bambu Lab A1', 'بامبو A1', 'بامبو A1', 'active', 0, 'cat_printers', '[]', '[]', '[]')`);
+  w.raw.exec("INSERT INTO product_catalogs (product_id, catalog_id, position) VALUES ('p_a1m', 'cat_printers', 1)");
+  w.matches.push({ source_product_id: x.sourceProductId, source_handle: x.handle, levonis_product_id: 'p_a1m', decision: 'merge', value_map: {}, unmapped_variants: [], reason: 'same_model', reviewed_by: 't', reviewed_at: 'd' });
+  const s = stage(w, 'a1', { writeMode: 'merge', mergeProductId: 'p_a1m' });
+  const { result } = await write(w, s);
+  await publishV2(w.raw, 'p_a1m'); // the owner's own price on the merged product (a merge keeps its own V2 state)
+  await finishPublishing(w.db, RUN, await itemBySource(w.db, RUN_ID, s.payload.source_product_id));
+  // A merged product keeps its own options: the runner checks the selections of ITS page (none beyond the default here).
+  const base = evidence(s.payload, result.slug, { selections: [] });
+  const merged = { ...base, checks: { ...base.checks, merge: { ok: true, hard: true } } };
+  // The record lost (as if the post-commit record had never landed): refused, whatever the runner says.
+  w.raw.prepare("UPDATE catalog_import_items SET stage_data = json_remove(stage_data, '$.before_fp_equal') WHERE id = ?").run(s.itemId);
+  const without = await complete(w, s.payload.source_product_id, { lease_token: 'lease_test_0001', live_url: URL_OF(result.slug), edge_evidence: merged });
+  assert.equal(without.state, 'VERIFYING_LIVE');
+  assert.ok(without.d1_checks.agreement.failed.includes('write.before_fp_equal'));
+  // As the write recorded it: COMPLETE.
+  w.raw.prepare("UPDATE catalog_import_items SET stage_data = json_set(stage_data, '$.before_fp_equal', json('true')) WHERE id = ?").run(s.itemId);
+  const ok = await complete(w, s.payload.source_product_id, { lease_token: 'lease_test_0001', live_url: URL_OF(result.slug), edge_evidence: merged });
+  assert.equal(ok.state, 'COMPLETE', JSON.stringify(ok.d1_checks.failed.concat(ok.d1_checks.agreement.failed)));
 });

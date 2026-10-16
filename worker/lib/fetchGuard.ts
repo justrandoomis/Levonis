@@ -213,6 +213,12 @@ export interface GuardedFetchOptions {
    * the list here, with no request to the landing page and no byte of it read.
    */
   allowHost?: (hostname: string) => boolean;
+  /**
+   * The same, over the whole validated address of every hop (scheme, port, credentials): a caller that may
+   * only speak https to its host (the catalogue import's media) refuses a redirect to http:// here, with
+   * HOST_NOT_ALLOWED and no request sent. Absent: every address the outbound guard accepts.
+   */
+  allowUrl?: (url: URL) => boolean;
 }
 
 export interface GuardedFetchResult {
@@ -257,6 +263,9 @@ export async function guardedFetchBytes(rawUrl: string, options: GuardedFetchOpt
       target = validateOutboundUrl(target.toString());
       if (options.allowHost && !options.allowHost(target.hostname)) {
         throw new GuardedFetchError('HOST_NOT_ALLOWED', `${target.hostname} is not on the allow-list`);
+      }
+      if (options.allowUrl && !options.allowUrl(target)) {
+        throw new GuardedFetchError('HOST_NOT_ALLOWED', `${target.protocol}//${target.host} is not on the allow-list`);
       }
       if (options.budget) {
         if (options.budget.fetches <= 0) {

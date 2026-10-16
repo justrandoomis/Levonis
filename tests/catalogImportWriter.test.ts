@@ -31,7 +31,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { maxParams, violations } from './fixtures/d1Limits';
-import { asD1, dbThrough } from './fixtures/app';
+import { asD1, dbThrough, get, stubApp } from './fixtures/app';
+import { mountCustomer } from './fixtures/catalogOnly';
 import {
   buildFor,
   complete,
@@ -64,6 +65,10 @@ import {
 } from '../worker/lib/catalogImport/writer';
 import { colourFacet } from '../packages/catalog/src/bambuImport/registry/colours';
 import { contradicts } from '../packages/catalog/src/bambuImport/media';
+import { collapseContentDuplicates as packageCollapse } from '../packages/catalog/src/bambuImport/mediaCollapse';
+import { itemBySource } from '../worker/lib/catalogImport/items';
+import { readbackItem } from '../worker/lib/catalogImport/runOps';
+import { OpsRefusal } from '../worker/lib/catalogImport/auth';
 import { IMPORT_INVOCATION_LIMIT } from '../worker/lib/catalogImport/budget';
 import { GUARDED_ROW_TABLES, IMPORT_GUARD_ID } from '../worker/lib/catalogImport/protectedTables';
 import { payloadSha256, parseReviewedBundle, emptyReviewedTexts, resolveTaxonomy } from '../worker/lib/catalogImport/reviewed';
@@ -932,4 +937,140 @@ test('the runner\'s document checks land on product_documents; a dead link is wr
   assert.equal(alive.active, 1);
   assert.equal(alive.check_status, 200);
   assert.equal(alive.tracker_source, 'https://e.bambulab.com/t?c=abc');
+});
+
+// ---------------------------------------------------------------- review 6b: what the write records for a resume, swatch ownership
+
+test('the written rows are the package rule\'s collapse and are recorded at the WRITTEN checkpoint (stage_data.images)', async () => {
+  const w = newWorld();
+  const s = stage(w, 'a1');
+  sameBytes(w, '698796116085157888', '753811089383063552');
+  sameBytes(w, '698796170866409472', '753811089272295424');
+  const { result } = await write(w, s);
+  // The rule itself, from the shared package, over the payload's images on their stored keys (what the runner recomputes).
+  const keyOf = new Map((w.raw.prepare('SELECT source_media_id, r2_key FROM catalog_import_media WHERE run_id = ? AND status = ?').all(RUN_ID, 'stored') as Array<{ source_media_id: string; r2_key: string }>).map((m) => [m.source_media_id, m.r2_key]));
+  const rows = s.payload.images.filter((i) => keyOf.has(i.source_media_id)).map((i) => ({ ...i, r2_key: keyOf.get(i.source_media_id)! }));
+  const rule = packageCollapse(rows).rows;
+  const shape = (xs: ReadonlyArray<{ id: string; sort_order: number; is_primary: boolean; option_value_id: string | null; variant_id: string | null; binding_rule: string; r2_key: string }>) =>
+    xs.map((x) => ({ id: x.id, sort_order: x.sort_order, is_primary: x.is_primary, option_value_id: x.option_value_id, variant_id: x.variant_id, binding_rule: x.binding_rule, r2_key: x.r2_key })).sort((a, b) => (a.id < b.id ? -1 : 1));
+  assert.equal(rule.length, s.payload.images.length - 2);
+  assert.deepEqual(shape(result.images), shape(rule), 'the /write answer is the package rule');
+  const recorded = JSON.parse(String(one(w, 'SELECT stage_data FROM catalog_import_items WHERE id = ?', s.itemId).stage_data)) as { images: typeof result.images };
+  assert.deepEqual(recorded.images, result.images, 'and stage_data.images holds the same rows for a resumed runner (/lease)');
+});
+
+test('the write records its own proof beside the readback: before_fp_equal for a merge, after_money_default for a create', async () => {
+  const w = newWorld();
+  await existingA1(w);
+  w.matches.push(a1Match());
+  const m = stage(w, 'a1', { writeMode: 'merge', mergeProductId: 'p_a1old' });
+  await write(w, m);
+  const merged = JSON.parse(String(one(w, 'SELECT stage_data FROM catalog_import_items WHERE id = ?', m.itemId).stage_data)) as Record<string, unknown>;
+  assert.equal(merged.before_fp_equal, true, 'a boolean, as the runner reads it on resume');
+  assert.equal('after_money_default' in merged, false);
+  assert.deepEqual(merged.readback, { ran: true, mismatches: 0, sections: [] });
+  const w2 = newWorld();
+  const c = stage(w2, 'ams-2-pro-feeder-unit');
+  await write(w2, c);
+  const created = JSON.parse(String(one(w2, 'SELECT stage_data FROM catalog_import_items WHERE id = ?', c.itemId).stage_data)) as Record<string, unknown>;
+  assert.equal(created.after_money_default, true);
+  assert.equal('before_fp_equal' in created, false);
+});
+
+/** A binding whose reads of `match` fail `times` times after `armed()` is called (a passing D1 error), batches unwrapped. */
+function flakyD1(inner: D1Database, match: RegExp, times: number): { db: D1Database; arm: () => void; failures: () => number } {
+  let armed = false;
+  let left = times;
+  let failed = 0;
+  const innerOf = new WeakMap<object, D1PreparedStatement>();
+  const wrap = (sql: string, st: D1PreparedStatement): D1PreparedStatement => {
+    const proxy = new Proxy(st as D1PreparedStatement & Record<string, unknown>, {
+      get(target, key) {
+        if (key === 'bind') return (...v: unknown[]) => wrap(sql, target.bind(...v));
+        if ((key === 'first' || key === 'all' || key === 'run') && armed && left > 0 && match.test(sql)) {
+          return async () => {
+            left--;
+            failed++;
+            throw new Error('D1_ERROR: Network connection lost.');
+          };
+        }
+        const v = Reflect.get(target, key);
+        return typeof v === 'function' ? (v as (...a: unknown[]) => unknown).bind(target) : v;
+      },
+    });
+    innerOf.set(proxy, st);
+    return proxy as D1PreparedStatement;
+  };
+  const db = new Proxy(inner as D1Database & Record<string, unknown>, {
+    get(target, key) {
+      if (key === 'prepare') return (sql: string) => wrap(sql, target.prepare(sql));
+      if (key === 'batch') return (sts: D1PreparedStatement[]) => target.batch(sts.map((s) => innerOf.get(s as object) ?? s));
+      const v = Reflect.get(target, key);
+      return typeof v === 'function' ? (v as (...a: unknown[]) => unknown).bind(target) : v;
+    },
+  });
+  return { db: db as D1Database, arm: () => (armed = true), failures: () => failed };
+}
+
+test('a passing read failure after the commit is retried; a verification that cannot run is recorded NOT RUN, and /readback answers transient', async () => {
+  // One failed read: retried in the same invocation, the record is a real verdict.
+  const w = newWorld();
+  const s = stage(w, 'ams-2-pro-feeder-unit');
+  const flaky = flakyD1(w.db, /^SELECT \* FROM products WHERE id = \?$/, 1);
+  const ctx = importWriteContext(flaky.db, w.media as never);
+  const p = await planImportWrite(ctx, { mode: 'write', payload: s.payload, bundle: w.bundle, runId: RUN_ID, itemId: s.itemId, leaseToken: LEASE });
+  flaky.arm();
+  const r = await runImportWrite(ctx, p);
+  assert.equal(flaky.failures(), 1);
+  assert.equal(r.readback_mismatches, 0, 'verified on the retry');
+  assert.deepEqual(JSON.parse(String(one(w, 'SELECT stage_data FROM catalog_import_items WHERE id = ?', s.itemId).stage_data)).readback, { ran: true, mismatches: 0, sections: [] });
+  // Every try fails: recorded as not run, never as a mismatch; /readback is a transient 503, not ok:false.
+  const w2 = newWorld();
+  const s2 = stage(w2, 'ams-2-pro-feeder-unit');
+  const always = flakyD1(w2.db, /^SELECT \* FROM products WHERE id = \?$/, 99);
+  const ctx2 = importWriteContext(always.db, w2.media as never);
+  const p2 = await planImportWrite(ctx2, { mode: 'write', payload: s2.payload, bundle: w2.bundle, runId: RUN_ID, itemId: s2.itemId, leaseToken: LEASE });
+  always.arm();
+  const r2 = await runImportWrite(ctx2, p2);
+  assert.equal(r2.readback_mismatches, -1);
+  assert.equal(JSON.parse(String(one(w2, 'SELECT stage_data FROM catalog_import_items WHERE id = ?', s2.itemId).stage_data)).readback.ran, false);
+  const item = await itemBySource(w2.db, RUN_ID, s2.payload.source_product_id);
+  await assert.rejects(
+    () => readbackItem({ DB: w2.db, BUCKET: w2.bucket as never, R2_PUBLIC: w2.bucket as never, R2_PRIVATE: w2.media.R2_PRIVATE as never }, item),
+    (e: unknown) => e instanceof OpsRefusal && e.status === 503 && e.code === 'IMPORT_READBACK_PENDING'
+  );
+});
+
+test('a swatch names only a value of this product\'s own groups (the swatch table is keyed by the value id alone)', async () => {
+  const w = newWorld();
+  const s = stage(w, 'pla-basic-filament', {
+    mutate: (p) => {
+      p.swatches[0] = { ...p.swatches[0], value_id: 'ov_b64ca3f6aaaaaaaaaaaaaaaa' };
+    },
+  });
+  const e = await refused(() => plan(w, s, { mode: 'stage' }), 'IMPORT_IDENTITY_AMBIGUOUS');
+  assert.equal(e.reason, 'swatch_value_not_this_product');
+  await refused(() => write(w, s), 'IMPORT_IDENTITY_AMBIGUOUS');
+  nothingWritten(w, s.payload.product_id);
+  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM product_option_value_swatches'), 0);
+});
+
+test('a written printer shows no spec row for identity.family: the product_family code stays a filter value only', async () => {
+  const w = newWorld();
+  const s = stage(w, 'h2d');
+  await write(w, s);
+  const pid = s.payload.product_id;
+  const family = one<{ value_text: string; visibility: string }>(w, "SELECT value_text, visibility FROM product_spec_values WHERE product_id = ? AND canonical_key = 'identity.family'", pid);
+  assert.equal(family.value_text, 'bambu_lab_3d_printers', 'kept as the facet\'s spec value');
+  // What a customer reads: the product's spec table through the storefront route.
+  const app = stubApp(w.db, null, mountCustomer, { publishV2: false });
+  const res = await get(app, `/api/products/${s.payload.handle}`);
+  assert.equal(res.status, 200);
+  const body = (await res.json()) as { product?: { spec_groups?: Array<{ rows: Array<{ label_en: string; value_en: string; value_ar: string; value_ckb: string }> }> }; spec_groups?: unknown };
+  const rows = (body.product?.spec_groups ?? []).flatMap((g) => g.rows);
+  assert.ok(rows.length > 10, 'the official specifications are shown');
+  for (const r of rows) {
+    assert.notEqual(r.label_en, 'Family');
+    for (const v of [r.value_en, r.value_ar, r.value_ckb]) assert.notEqual(v, family.value_text, 'the code never reaches a spec row');
+  }
 });

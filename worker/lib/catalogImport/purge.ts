@@ -18,8 +18,10 @@
  *     public API's list and records, the sitemap (worker/lib/edgePolicy.ts);
  *   - `/api/products/<slug>/knowledge` for each slug, named here explicitly;
  *   - the catalogue tree (`purgeCatalogTreeCache`);
- *   - `/api/catalog/<section>` for each section the products sit in;
- *   - the public v1 keys of `/products/<slug>` and `/sections/<section>`, built
+ *   - `/api/catalog/<section>` for each section the products sit in, and each
+ *     ancestor of it (a middle section lists the product too);
+ *   - the public v1 keys of `/products/<slug>` and `/sections/<section>` (the
+ *     same sections, ancestors included), built
  *     by `publicV1PurgeKeys` exactly as `serve` stores them.
  *
  * Best effort, like every purge of the codebase: a failed delete is logged and
@@ -68,10 +70,20 @@ export async function purgePlan(db: D1Database, productIds: readonly string[]): 
     )
     .bind(ids)
     .all<{ slug: string; root: string | null; leaf: string | null }>();
+  // Every section the products sit in AND every ancestor of it: a three-level placement (refurbished printers
+  // under fdm-printers under printers) is listed by the middle section's page too, through membership with
+  // ancestors (catalogPresentation.ts), so its page and its v1 record are purged as well.
   const { results: members } = await db
     .prepare(
-      `SELECT DISTINCT c.slug AS slug FROM product_catalogs pc JOIN catalogs c ON c.id = pc.catalog_id
-        WHERE pc.product_id IN (SELECT value FROM json_each(?))`
+      `WITH RECURSIVE seed(id) AS (
+         SELECT catalog_id FROM product_catalogs WHERE product_id IN (SELECT value FROM json_each(?1))
+         UNION SELECT category_id FROM products WHERE id IN (SELECT value FROM json_each(?1)) AND category_id IS NOT NULL
+         UNION SELECT sub_category_id FROM products WHERE id IN (SELECT value FROM json_each(?1)) AND sub_category_id IS NOT NULL
+       ), up(id, depth) AS (
+         SELECT id, 0 FROM seed
+         UNION SELECT c.parent_id, up.depth + 1 FROM catalogs c JOIN up ON c.id = up.id WHERE c.parent_id IS NOT NULL AND up.depth < 12
+       )
+       SELECT DISTINCT c.slug AS slug FROM up JOIN catalogs c ON c.id = up.id`
     )
     .bind(ids)
     .all<{ slug: string }>();

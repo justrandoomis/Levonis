@@ -11,11 +11,12 @@
  *
  *   visible            VISIBLE through catalog-only's own predicates (worker/lib/listing.ts)
  *   not_sellable       SELLABLE false — for a product the run CREATED (a merge keeps its own V2 state)
- *   category / sub     category_id and sub_category_id equal the taxonomy map's resolution (create),
+ *   category / sub     category_id and sub_category_id equal the taxonomy map's resolution of the manifest row (create),
  *                      or were left as they were / filled (merge)
  *   memberships        product_catalogs ⊇ the map's secondary memberships (and = primary + secondaries on a create)
  *   search             the current INDEX_STAMP row, the title's tokens and every searchable alias's tokens
  *   media              R2 HEAD of every image, swatch and in-the-box object (when the media bindings are given)
+ *   swatches_own       every swatch row of the product names one of its own option values
  *   counts             groups, values, variants, image bindings, spec statuses and regions, documents and
  *                      relations equal what the write recorded (stage_data.written)
  *   stock_decision     'not_configured' on a create (§B.10)
@@ -32,7 +33,7 @@ import { INDEX_STAMP } from '../search/store';
 import { isUsefulToken, tokenize } from '../search/normalize';
 import type { Env } from '../types';
 import { IMPORT_GUARD_ID } from './protectedTables';
-import { resolveTaxonomy, type ReviewedBundle } from './reviewed';
+import { taxonomyOfRow, type ReviewedBundle } from './reviewed';
 import type { WrittenCounts } from './writer';
 
 export interface CheckedSelection {
@@ -102,7 +103,10 @@ export async function recomputeD1Checks(db: D1Database, input: D1CheckInput): Pr
     .bind('bambu_us', productId)
     .first<{ name: string; category_id: string | null; sub_category_id: string | null; source_route: string | null; stock_decision: string | null; match_kind: string | null }>();
   checks.source_ref = !!product?.match_kind && (product.match_kind === 'created') === created;
-  const tax = resolveTaxonomy(input.bundle.taxonomy, item.handle, product?.source_route ?? '');
+  // The section the manifest row was REVIEWED for (reviewed.ts taxonomyOfRow), as the writer placed it — never the
+  // stored source_route, which only repeats what the write was sent.
+  const row = input.bundle.manifest.byHandle.get(item.handle);
+  const tax = row ? taxonomyOfRow(input.bundle, row) : null;
   const { results: memberRows } = await db.prepare('SELECT catalog_id FROM product_catalogs WHERE product_id = ?').bind(productId).all<{ catalog_id: string }>();
   const members = new Set((memberRows ?? []).map((r) => String(r.catalog_id)));
   if (!tax) {
@@ -161,8 +165,16 @@ export async function recomputeD1Checks(db: D1Database, input: D1CheckInput): Pr
   counts.specs_by_region = specsByRegion;
   counts.documents = await one(`SELECT COUNT(*) AS n FROM product_documents WHERE product_id = ? AND import_run_id <> ''`);
   counts.relations = await one(`SELECT COUNT(*) AS n FROM product_relations WHERE product_id = ? AND import_run_id <> ''`);
-  const { results: swatchRows } = await db.prepare('SELECT r2_key FROM product_option_value_swatches WHERE product_id = ?').bind(productId).all<{ r2_key: string }>();
+  const { results: swatchRows } = await db
+    .prepare(
+      `SELECT s.r2_key, EXISTS (SELECT 1 FROM product_option_values v WHERE v.id = s.option_value_id AND v.product_id = s.product_id) AS own
+         FROM product_option_value_swatches s WHERE s.product_id = ?`
+    )
+    .bind(productId)
+    .all<{ r2_key: string; own: number }>();
   counts.swatches = (swatchRows ?? []).length;
+  // §I.1.6: every swatch row this product holds is the swatch of one of its own values.
+  checks.swatches_own = (swatchRows ?? []).every((s) => Number(s.own) === 1);
   checks.counts =
     images.length === Number(written.images ?? -1) &&
     sameTally(written.image_bindings, bindings) &&

@@ -58,7 +58,7 @@ const workerFetch = (req: Request, env: Record<string, unknown>): Promise<Respon
   (worker as unknown as { fetch: (r: Request, e: unknown, c: unknown) => Promise<Response> }).fetch(req, env, ctx);
 
 /** Replaces the global fetch with the CDN double until `restoreFetch`. */
-export function installCdnDouble(world: Pick<OpsWorld, 'cdn'>, opts: { sameBytes?: boolean } = {}): void {
+export function installCdnDouble(world: Pick<OpsWorld, 'cdn'>, opts: { sameBytes?: boolean; bytesOf?: (url: string) => string } = {}): void {
   realFetch ??= globalThis.fetch;
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -68,7 +68,8 @@ export function installCdnDouble(world: Pick<OpsWorld, 'cdn'>, opts: { sameBytes
       throw new Error('the fetcher double refuses every host but store.bblcdn.com');
     }
     world.cdn.served.push(url);
-    const bytes = opts.sameBytes ? pngBytes(320, 240) : imageFor(url);
+    // `bytesOf`: serve another URL's picture under this one (a re-upload of the same file under a new name).
+    const bytes = opts.sameBytes ? pngBytes(320, 240) : imageFor(opts.bytesOf?.(url) ?? url);
     return new Response(bytes as unknown as BodyInit, { status: 200, headers: { 'content-type': 'image/png' } });
   }) as typeof fetch;
 }
