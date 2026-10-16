@@ -43,6 +43,7 @@ import { anonymousCached, type EdgeLifetime } from '../lib/edgePolicy';
 import { loadProductKnowledge } from '../lib/knowledge/productKnowledge';
 import { EMPTY_TRANSLATIONS, importedSlots, loadProductTranslationMap, overlayImportedText } from '../lib/translate/memory';
 import { withCardKnowledge } from '../lib/knowledge/cards';
+import { cardGallery } from '../lib/cardGallery';
 import { isConditionColumnMissing } from '../lib/conditionProjection';
 import { catalogSubtreeFilter, homeCategoryTree } from '../lib/catalogMembership';
 import { FACET_FIELD_IDS, parseListingParams } from '@levonis/catalog/discovery';
@@ -3252,7 +3253,9 @@ const CARD_FIELDS = [
   'name',
   'status',
   // `productImage.ts` prefers the primary media entry and falls back to the
-  // published `images` list, so a card needs both.
+  // published `images` list, so a card needs both — but only the ONE picture
+  // the card draws, never the gallery: `cardShape` projects both through
+  // `cardGallery` (worker/lib/cardGallery.ts).
   'media',
   'images',
   // «الصورة الرئيسية للوضع الفاتح» (0138): the light-theme main image, present
@@ -3339,6 +3342,13 @@ export function cardShape(out: Record<string, unknown>): Record<string, unknown>
   const card: Record<string, unknown> = {};
   for (const k of CARD_FIELDS) {
     if (out[k] !== undefined) card[k] = out[k];
+  }
+  // The card's picture, not the product's gallery (speed audit 2026-10-16):
+  // the entry and the URL every card reader picks, nothing else.
+  if (card.media !== undefined || card.images !== undefined) {
+    const gallery = cardGallery(out.media, out.images);
+    if (card.media !== undefined) card.media = gallery.media;
+    if (card.images !== undefined) card.images = gallery.images;
   }
   return card;
 }

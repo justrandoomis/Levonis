@@ -607,7 +607,14 @@ test('pictures are absolute URLs to the original public files — never a suppli
   ]);
   assert.equal(body.data.name.ar, 'منتج عام');
   const list = (await (await call('/api/public/v1/products?limit=50')).json()) as { data: Array<{ slug: string; image: { url: string } | null }> };
-  assert.equal(list.data.find((p) => p.slug === first.slug)?.image?.url, `${ORIGIN}/files/${GALLERY_KEY}`);
+  // The whole card picture — its size and its three alt texts too, which the API reads from the storefront
+  // card's one picture entry since cards stopped carrying the gallery (worker/lib/cardGallery.ts).
+  assert.deepEqual(list.data.find((p) => p.slug === first.slug)?.image, {
+    url: `${ORIGIN}/files/${GALLERY_KEY}`,
+    width: 1600,
+    height: 1600,
+    alt: { ar: 'صورة', en: 'Picture', ckb: '' },
+  });
 });
 
 test('the main site only: a store\'s subdomain does not serve the platform API', async () => {

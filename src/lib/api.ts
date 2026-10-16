@@ -461,7 +461,12 @@ export interface ApiProduct {
   description: string;
   description_ar: string;
   description_ku?: string;
-  /** Canonical media metadata. The explicit primary wins over legacy order. */
+  /**
+   * Canonical media metadata. The explicit primary wins over legacy order.
+   * On a CARD (`/api/products`, `/api/home`, `/api/catalog/*`, search, the
+   * finder) this and `images` hold only the picture the card draws
+   * (worker/lib/cardGallery.ts); the product detail carries the whole gallery.
+   */
   media?: Array<{
     id: string;
     url: string;
