@@ -17,9 +17,13 @@ Files checked (spec §A.3, §A.8, §B.6, §D.2, §E.1; worker/lib/catalogImport/
   data/bambu-import/taxonomy-map.json       snapshot_sha256, existing catalog ids, free slugs and cat_bi_<key> ids
 
 The value map rule (also used to build the file): a source variant maps when every value of a source group that
-has an exact counterpart on the target maps to exactly one ACTIVE option value (exact name) or ACTIVE colour (exact
-name, or the same Bambu colour code "(NNNNN)", or the colour name without its code when the Levonis colour carries
-none) of that target. A source group none of whose values has a counterpart is not a dimension of the target and
+has a counterpart on the target maps to exactly one ACTIVE option value or ACTIVE colour of that target:
+  - an option value by its exact name, else by the one widening the integrator approved (2026-10-16): the names
+    are equal after case-folding and removing whitespace and the separators - – — · , / ( )  ("0.2mm Stainless
+    Steel" = "0.2 mm — Stainless Steel"; nothing semantic: "P1S AMS 2 Pro Combo" is not "P1S AMS 2 Combo", and a
+    part code is not a name);
+  - a colour by its exact name, or the same Bambu colour code "(NNNNN)", or the colour name without its code when
+    the Levonis colour carries none. A source group none of whose values has a counterpart is not a dimension of the target and
 is not read. A variant that maps to nothing, or whose option values another source variant also maps to (two
 source products on one existing value), is unmapped. Colour-only targets may repeat (a colour is shared by its
 refill and spool variants).
@@ -61,6 +65,14 @@ def strip_code(s):
     return _CODE.sub('', clean(s)).strip()
 
 
+_SEPARATORS = re.compile(r'[\s\-\u2013\u2014\u00b7,/()]+')
+
+
+def loose_name(s):
+    """The approved widening for option values: case-folded, without whitespace and the separators - – — · , / ( )."""
+    return _SEPARATORS.sub('', clean(s)).casefold()
+
+
 def taxonomy_node_id(key):
     """worker/lib/catalogImport/reviewed.ts taxonomyNodeId."""
     return 'cat_bi_' + re.sub(r'[^a-z0-9]+', '_', re.sub(r'^@', '', key))
@@ -93,9 +105,9 @@ def value_map_for(page, option_values, colours):
                     elif code_of(t) and not code_of(n) and n == strip_code(t):
                         found.append(('c', c['id'], 'name_without_code'))
             else:
-                for o in act_ovs:
-                    if clean(o['name_en']) == t:
-                        found.append(('o', o['value_id'], 'exact'))
+                found = [('o', o['value_id'], 'exact') for o in act_ovs if clean(o['name_en']) == t]
+                if not found:
+                    found = [('o', o['value_id'], 'separators_case') for o in act_ovs if loose_name(o['name_en']) == loose_name(t)]
             if len(found) == 1:
                 hits[t] = found[0]
         claimed = {}
@@ -232,9 +244,19 @@ def main(argv):
             bad.append(e['source_handle'] + ' (slug)')
         if e['decision'] == 'merge' and 'levonis_slug' not in e:
             bad.append(e['source_handle'] + ' (merge without its public slug)')
-        if not a and any(k in e for k in ('levonis_slug', 'value_map', 'unmapped_variants')):
-            bad.append(e['source_handle'] + ' (non-active target carries more than its id)')
-    check('matches: a slug only for an active target and equal to it; a non-active target carries its id only (§A.8)', not bad, str(bad[:5]))
+        if e['decision'] == 'hold_owner_hidden' and any(k in e for k in ('levonis_slug', 'value_map', 'unmapped_variants', 'approval_ref')):
+            bad.append(e['source_handle'] + ' (a held non-active target carries more than its id)')
+        if e['decision'] == 'merge_publish' and not ('value_map' in e and 'unmapped_variants' in e):
+            bad.append(e['source_handle'] + ' (merge_publish without its value map)')
+    check('matches: a slug only for an active target and equal to it (never for merge_publish, §A.8 line 317); a held target carries its id only',
+          not bad, str(bad[:5]))
+    decisions_md = os.path.join(ROOT, 'docs', 'DECISIONS.md')
+    rows_md = set(re.findall(r'^\| (\d+) \|', open(decisions_md, encoding='utf-8').read(), re.M)) if os.path.exists(decisions_md) else set()
+    bad = [e['source_handle'] for e in entries if e['decision'] == 'merge_publish'
+           and not (re.fullmatch(r'DECISIONS row (\d+)', e.get('approval_ref', '')) and re.fullmatch(r'DECISIONS row (\d+)', e['approval_ref']).group(1) in rows_md)]
+    check('matches: every merge_publish names the owner\'s approval as an existing docs/DECISIONS.md row', not bad,
+          '%d merge_publish; refs %s; bad %s' % (sum(1 for e in entries if e['decision'] == 'merge_publish'),
+                                                 sorted({e['approval_ref'] for e in entries if e.get('approval_ref')}), bad[:5]))
     bad = []
     for e in entries:
         pid = e['levonis_product_id']
@@ -272,8 +294,8 @@ def main(argv):
             cov['colour_only'] += info['colour_only']
             for k, n in info['tiers'].items():
                 tiers[k] = tiers.get(k, 0) + n
-        check('matches: every merge accounts for each source variant of its parsed page, and its value map is the exact-name rule\'s',
-              not bad, '%s; value matches by %s; %s' % (cov, tiers, bad[:5]))
+        check('matches: every merge / merge_publish accounts for each source variant of its parsed page, and its value map is the reviewed rule\'s',
+              not bad, '%s; source values matched (before the conflation rule) by %s; %s' % (cov, tiers, bad[:5]))
     else:
         pend('matches: value maps recomputed from the parsed pages', 'pass --pages to recompute them')
     # every Bambu-signal product of the snapshot is either a target or a reviewed non-target
@@ -445,10 +467,14 @@ def main(argv):
                 if v:
                     checked += 1
                     leaks += sum(t.count(v) for t in texts.values())
-    hidden_ids = {v['value_id'] for p in na for v in ovs_of.get(p['id'], [])} | {c['id'] for p in na for c in cols_of.get(p['id'], [])}
+    # Option and colour ids of a non-active product appear only in the value map of the merge_publish entry that
+    # publishes that very product (the owner's decision); never anywhere else.
+    publishing = {e['levonis_product_id'] for e in entries if e['decision'] == 'merge_publish'}
+    hidden_ids = {v['value_id'] for p in na if p['id'] not in publishing for v in ovs_of.get(p['id'], [])} | {
+        c['id'] for p in na if p['id'] not in publishing for c in cols_of.get(p['id'], [])}
     in_map = {x for e in entries for m in e.get('value_map', {}).values() for x in m.get('option_value_ids', []) + ([m['color_id']] if m.get('color_id') else [])}
-    check('privacy: no name, SKU or slug of a non-active product (outside the public Bambu handles), no inactive catalog, no option or colour id of a non-active product in the three files',
-          leaks == 0 and not (hidden_ids & in_map), '%d non-active products, %d strings checked, %d hits' % (len(na), checked, leaks))
+    check('privacy: no name, SKU or slug of a non-active product (outside the public Bambu handles), no inactive catalog, no option or colour id of a non-active product outside its own merge_publish entry',
+          leaks == 0 and not (hidden_ids & in_map), '%d non-active products (%d being published), %d strings checked, %d hits' % (len(na), len(publishing), checked, leaks))
     forbid = re.compile(r'price|cost|stock|inventor|discount|msrp|currency|coupon|margin|profit|wallet|order', re.I)
     keys_hit = []
 
