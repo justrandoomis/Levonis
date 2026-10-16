@@ -165,9 +165,12 @@ test('it comes from the server’s cart and is refreshed by the add that changed
   // The add response IS the saved cart, so the note updates from the same
   // answer that proved the add worked — no second request, and no window in
   // which the badge and the note disagree.
-  const at = product.indexOf('const count = countCartItems(data.items);');
+  // (The success path and the re-read after a lost answer share one `landed(items)`,
+  // docs/ux/COLOUR-QUANTITIES.md §15.)
+  assert.match(product, /landed\(Array\.isArray\(data\.items\) \? data\.items : \[\]\);/, 'the add answer feeds it');
+  const at = product.indexOf('const count = countCartItems(items);');
   assert.ok(at > 0);
-  assert.ok(product.slice(at, at + 300).includes('setCartLines('));
+  assert.ok(product.slice(at, at + 400).includes('setCartLines(items);'));
   // A failed read leaves no note rather than a made-up number — the same rule
   // the nav badge follows.
   assert.match(product, /no note rather than a made-up one/);
