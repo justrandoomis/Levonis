@@ -24,7 +24,8 @@
  *   - a breadcrumb the tree does not name, and a hero frame with no picture,
  *     fail (an absence is never a match);
  *   - in Chromium, on the final markup: each control found by its
- *     `data-option-value` in its group's fieldset, the marks by
+ *     `data-option-value` in its group's VISIBLE fieldset (the page draws its
+ *     buy column twice, the hidden phone copy first), the marks by
  *     `data-offered`, a chip's own helper line and a swatch's name and group
  *     note, the selection read from what is pressed, the hero from
  *     `[data-gallery-hero]`, the thumbnails from `[data-gallery-strip]`, the
@@ -299,7 +300,7 @@ function stepSevenPage(payload: ImportPayload, media: Map<string, MediaAnswerRow
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"></head><body><main>
 <section aria-label="صور المنتج"><div class="hero" data-gallery-hero style="width:400px;height:400px"><img id="hero" style="object-fit:contain;width:400px;height:400px"><span><button type="button" aria-label="تكبير"><svg width="10" height="10"></svg></button></span></div><div id="thumbs" data-gallery-strip aria-label="صور المنتج"></div></section>
 <nav>الرئيسية / ${LEAF}</nav><div data-price-status="unpriced"><p>${UNPRICED_AR}</p><button type="button" data-price-request-cta="signed_out">${REQUEST_AR}</button></div>
-<div data-option-groups>${fieldsets}</div>
+<div data-option-groups style="display:none">${fieldsets}</div><div data-option-groups>${fieldsets}</div>
 <div style="height:1600px"></div>
 <div data-product-knowledge></div></main>
 <script>

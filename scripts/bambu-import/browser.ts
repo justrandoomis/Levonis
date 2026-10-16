@@ -94,7 +94,7 @@ interface PwLocator {
   innerText(): Promise<string>;
   evaluate<T>(fn: (el: Element) => T): Promise<T>;
   evaluateAll<T>(fn: (els: Element[]) => T): Promise<T>;
-  scrollIntoViewIfNeeded(): Promise<void>;
+  scrollIntoViewIfNeeded(opts?: { timeout?: number }): Promise<void>;
   filter(opts: { has?: PwLocator; hasText?: string | RegExp }): PwLocator;
   waitFor(opts?: { state?: string; timeout?: number }): Promise<void>;
 }
@@ -344,10 +344,23 @@ class PlaywrightProductPage implements ProductPageDriver {
 
   constructor(private readonly page: PwPage) {}
 
+  /**
+   * The VISIBLE copy of a hooked element. The page draws its buy column twice — a phone copy (`lg:hidden`) first
+   * in the document, then the desktop one (Product.tsx `selectionBlocks`) — so `.first()` alone can be the hidden
+   * copy, which no click reaches. The visible copy first, then any.
+   */
+  private async visible(selector: string): Promise<PwLocator | null> {
+    for (const s of [`${selector}:visible`, selector]) {
+      const hit = this.page.locator(s);
+      if ((await hit.count()) > 0) return hit.first();
+    }
+    return null;
+  }
+
   /** The hero frame (`[data-gallery-hero]`); a page without the hook: the gallery section's first box. */
   private async frame(): Promise<PwLocator> {
-    const hooked = this.page.locator('[data-gallery-hero]');
-    if ((await hooked.count()) > 0) return hooked.first();
+    const hooked = await this.visible('[data-gallery-hero]');
+    if (hooked) return hooked;
     return this.page.locator('section[aria-label]').first().locator(':scope > div').first();
   }
 
@@ -389,10 +402,9 @@ class PlaywrightProductPage implements ProductPageDriver {
     return (await cta.count()) > 0;
   }
 
-  /** The group's fieldset (`fieldset[data-option-group]`), or the body on a page that does not name it. */
+  /** The group's fieldset (`fieldset[data-option-group]`, its visible copy), or the body on a page that does not name it. */
   private async groupRoot(groupId: string): Promise<PwLocator> {
-    const fieldset = this.page.locator(`fieldset[data-option-group="${cssValue(groupId)}"]`);
-    return (await fieldset.count()) > 0 ? fieldset.first() : this.page.locator('body');
+    return (await this.visible(`fieldset[data-option-group="${cssValue(groupId)}"]`)) ?? this.page.locator('body');
   }
 
   async chip(group: ImportPayload['groups'][number], value: ImportPayload['groups'][number]['values'][number]): Promise<ChipDriver | null> {
@@ -429,7 +441,7 @@ class PlaywrightProductPage implements ProductPageDriver {
         return name.includes(NOT_OFFERED_AR) && (await note.count()) > 0 && (await note.first().innerText().catch(() => '')).includes(NOT_OFFERED_AR);
       },
       click: async () => {
-        await el.scrollIntoViewIfNeeded().catch(() => {});
+        await el.scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => {});
         await el.click({ timeout: 5000 }).catch(() => {});
       },
     };
@@ -438,7 +450,10 @@ class PlaywrightProductPage implements ProductPageDriver {
   async pressedValues(groups: ImportPayload['groups']): Promise<string[]> {
     const ids = await this.page
       .evaluate(() =>
-        Array.from(document.querySelectorAll('fieldset[data-option-group] button[aria-pressed="true"]')).map((b) => b.getAttribute('data-option-value') || b.getAttribute('data-swatch') || '')
+        Array.from(document.querySelectorAll('fieldset[data-option-group] button[aria-pressed="true"]'))
+          // The visible copy only (the hidden phone copy holds the same selection, but it is not what a reader sees).
+          .filter((b) => b.getClientRects().length > 0)
+          .map((b) => b.getAttribute('data-option-value') || b.getAttribute('data-swatch') || '')
       )
       .catch(() => [] as string[]);
     if (!ids.includes('')) return ids;
@@ -454,8 +469,8 @@ class PlaywrightProductPage implements ProductPageDriver {
   }
 
   async gallery(): Promise<string[]> {
-    const strip = this.page.locator('[data-gallery-strip]');
-    const thumbs = (await strip.count()) > 0 ? strip.first().locator('img') : this.page.locator('section[aria-label]').first().locator('button[aria-pressed] img');
+    const strip = await this.visible('[data-gallery-strip]');
+    const thumbs = strip ? strip.locator('img') : this.page.locator('section[aria-label]').first().locator('button[aria-pressed] img');
     return thumbs.evaluateAll((els) => els.map((e) => (e as HTMLImageElement).currentSrc || (e as HTMLImageElement).src)).catch(() => [] as string[]);
   }
 
