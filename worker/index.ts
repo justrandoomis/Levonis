@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, Env } from './lib/types';
-import { noStoreUnlessSet, purgeCatalogueFromJob } from './lib/edgePolicy';
+import { noStoreUnlessSet, purgeCatalogueFromJob, setEdgeRefreshDispatcher } from './lib/edgePolicy';
 import { securityEventsDoor } from './lib/securityEvents';
 import { HttpError, originCheck, requireMainHost, securityHeaders } from './lib/http';
 import { loadSessionUser, sessionFreePublicGet } from './lib/session';
@@ -179,6 +179,12 @@ import { decoyRoutes } from './routes/decoys';
 import { adminSecurityRoutes } from './routes/adminSecurity';
 
 const app = new Hono<AppContext>();
+
+// THE EDGE'S BACKGROUND REFRESH (worker/lib/edgePolicy.ts «STALE WHILE
+// REVALIDATE, AS DECLARED»): a copy served late or stale is rebuilt by a guest's
+// own request replayed through this whole Worker after the answer has left, so it
+// runs every middleware and the route exactly as a guest's miss would.
+setEdgeRefreshDispatcher((request, env, ctx) => app.fetch(request, env, ctx as never));
 
 /**
  * The inbound gateway assertion (`01-TARGET.md` §4 item 1, Phase 1.6). At
