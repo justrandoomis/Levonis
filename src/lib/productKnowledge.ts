@@ -26,9 +26,19 @@
  * L-20): a `us_110v` row, whatever its scope, sits only under the collapsed
  * «إصدارات أخرى» with its US note — in the specifications and in the packaging
  * tab alike — and a 220 V row of a key comes before its region-free row.
+ *
+ * THE IMPORTED ENGLISH IN ARABIC AND SORANI (docs/bambu-import/I18N-DESIGN.md
+ * §A.5): the answer carries the translation memory's words beside the English
+ * (`value_i18n`, `items_i18n`, `label_i18n`, `test_method_i18n`, a box item's
+ * `text_i18n`); `tx` picks them for ar/ckb and falls back to the English.
+ *
+ * COMPATIBILITY SAID ONCE (§C.3): when the Compatibility tab exists, the
+ * `compat.statement` row leaves the specifications (it is what the chips
+ * say); it is kept as the tab's note only when it says more than the chips.
  */
 import { REGION_LABELS, VALUE_STATE_LABELS, type Tri } from '../../packages/catalog/src/bambuImport/registry/labels';
 import { DOCUMENT_TITLES, type DocumentKind } from '../../packages/catalog/src/bambuImport/registry/documents';
+import { namesOnly } from '../../packages/catalog/src/bambuImport/i18n';
 
 export type { Tri };
 export type KnowledgeLang = 'ar' | 'en' | 'ckb';
@@ -56,19 +66,41 @@ export interface KnowledgeRow {
   test_condition: string;
   conflict: boolean;
   display?: boolean;
+  /** The translation memory's Arabic and Sorani of `value_text`, of each item, of an `x.*` label, of the test method. */
+  value_i18n?: I18n;
+  items_i18n?: Array<I18n | null>;
+  label_i18n?: I18n;
+  test_method_i18n?: I18n;
+}
+
+/** A translation of imported English (the answer's `*_i18n` fields). */
+export interface I18n {
+  ar: string;
+  ckb: string;
+}
+
+/** A product a compatibility item links to. */
+export interface CompatProduct {
+  id?: string;
+  slug: string;
+  name: Tri;
+  image: string;
 }
 
 export interface KnowledgeAnswer {
   specs: Array<{ group: string; label: Tri; rows: KnowledgeRow[] }>;
   logistics: { product: KnowledgeRow[]; package: KnowledgeRow[]; shipment: KnowledgeRow[]; carton: KnowledgeRow[] };
-  in_the_box: Array<{ text: string; qty: number | null; image?: string; scope: KnowledgeScope }>;
+  in_the_box: Array<{ text: string; qty: number | null; image?: string; scope: KnowledgeScope; text_i18n?: I18n }>;
   compatibility: Record<'compatible' | 'not_compatible' | 'requires' | 'related', Array<{
     relation: string;
     label: string;
     target_kind?: string;
     state?: string;
     scope: KnowledgeScope;
-    product?: { id?: string; slug: string; name: Tri; image: string };
+    /** The first visible target (by slug); the others in `more`. */
+    product?: CompatProduct;
+    more?: CompatProduct[];
+    label_i18n?: I18n;
   }>>;
   documents: Array<{ kind: string; title: Tri; url: string; host: string; scope: KnowledgeScope }>;
   completeness?: Record<string, number> | null;
@@ -122,6 +154,20 @@ export function documentTitle(doc: { kind: string; title?: Partial<Tri> | null }
 }
 
 export const w = (word: Tri, lang: KnowledgeLang): string => word[lang] || word.en;
+
+/** Imported English in the reader's language: the memory's translation for ar/ckb, else the English (§A.5). */
+export const tx = (text: string, i18n: Partial<I18n> | null | undefined, lang: KnowledgeLang): string =>
+  lang === 'en' ? text : (i18n?.[lang] ?? '').trim() || text;
+
+/** A row's label: the registry's three languages, or an `x.*` row's own words through the memory. */
+export const rowLabelText = (r: Pick<KnowledgeRow, 'label' | 'label_i18n'>, lang: KnowledgeLang): string =>
+  r.label_i18n ? tx(w(r.label, 'en'), r.label_i18n, lang) : w(r.label, lang);
+
+/** A row's test method in the reader's language. */
+export const testMethodText = (r: Pick<KnowledgeRow, 'test_method' | 'test_method_i18n'>, lang: KnowledgeLang): string => tx(r.test_method, r.test_method_i18n, lang);
+
+/** A box item's words in the reader's language. */
+export const boxItemText = (item: { text: string; text_i18n?: I18n }, lang: KnowledgeLang): string => tx(item.text, item.text_i18n, lang);
 
 // ------------------------------------------------------------------ the selection
 
@@ -196,32 +242,28 @@ export interface KnowledgeTabs {
   /** `other`: the logistics rows of other versions and the US 110 V table — «إصدارات أخرى», collapsed. */
   packaging: { lines: PackagingLine[]; other: KnowledgeRow[]; box: KnowledgeAnswer['in_the_box'] };
   compatibility: Array<{ bucket: keyof KnowledgeAnswer['compatibility']; label: Tri; items: KnowledgeAnswer['compatibility']['compatible'] }>;
+  /** The `compat.statement` row, under the chips, when it says more than they do (§C.3). */
+  compatibilityNote?: KnowledgeRow;
   documents: KnowledgeAnswer['documents'];
   /** The tabs with something to show, in the page's order. */
   order: KnowledgeTabId[];
 }
 
+/** The row that states compatibility in words; the Compatibility tab's chips say the same (§C.3). */
+export const COMPAT_STATEMENT_KEY = 'compat.statement';
+
+/**
+ * Does a compatibility statement say more than its chips? Every chip label (and every linked product's name)
+ * and the connectors removed, a Latin word of two letters or more is left (packages/catalog/src/bambuImport/i18n.ts
+ * `namesOnly`). A statement with no Latin word (already translated) is judged on its English.
+ */
+export function statementSaysMore(statement: string, chipLabels: readonly string[]): boolean {
+  if (!/[A-Za-z]{2,}/.test(statement)) return false;
+  return !namesOnly(statement, chipLabels);
+}
+
 /** Splits the answer into the five tabs (§G.2), each only when it has something to show. */
 export function knowledgeTabs(k: KnowledgeAnswer, sel: KnowledgeSelection): KnowledgeTabs {
-  const specs: KnowledgeTabs['specs'] = [];
-  const materials: KnowledgeTabs['materials'] = [];
-  const recommended: KnowledgeRow[] = [];
-  for (const g of k.specs ?? []) {
-    const own: KnowledgeRow[] = [];
-    const mat: KnowledgeRow[] = [];
-    for (const r of g.rows ?? []) {
-      if (r.display === false) continue;
-      if (PACKAGING_KEYS.has(r.key)) recommended.push(r);
-      else if (isMaterialRow(g.group, r.key)) mat.push(r);
-      else own.push(r);
-    }
-    if (own.length) specs.push({ group: g.group, label: g.label, rows: own });
-    if (mat.length) materials.push({ group: g.group, label: g.label, rows: mat });
-  }
-  const logistics = k.logistics ?? { product: [], package: [], shipment: [], carton: [] };
-  const lines = packagingLines(logistics, recommended, sel);
-  const other = packagingOther(logistics, recommended, sel);
-  const box = (k.in_the_box ?? []).filter((i) => scopeApplies(i.scope, sel));
   const buckets: Array<[keyof KnowledgeAnswer['compatibility'], Tri]> = [
     ['compatible', KNOWLEDGE_WORDS.compatible],
     ['not_compatible', KNOWLEDGE_WORDS.notCompatible],
@@ -231,6 +273,34 @@ export function knowledgeTabs(k: KnowledgeAnswer, sel: KnowledgeSelection): Know
   const compatibility = buckets
     .map(([bucket, label]) => ({ bucket, label, items: (k.compatibility?.[bucket] ?? []).filter((i) => scopeApplies(i.scope, sel)) }))
     .filter((b) => b.items.length > 0);
+  const specs: KnowledgeTabs['specs'] = [];
+  const materials: KnowledgeTabs['materials'] = [];
+  const recommended: KnowledgeRow[] = [];
+  const statements: KnowledgeRow[] = [];
+  for (const g of k.specs ?? []) {
+    const own: KnowledgeRow[] = [];
+    const mat: KnowledgeRow[] = [];
+    for (const r of g.rows ?? []) {
+      if (r.display === false) continue;
+      // Said once (§C.3): with the Compatibility tab on screen, the statement leaves the specifications.
+      if (r.key === COMPAT_STATEMENT_KEY && compatibility.length) {
+        statements.push(r);
+        continue;
+      }
+      if (PACKAGING_KEYS.has(r.key)) recommended.push(r);
+      else if (isMaterialRow(g.group, r.key)) mat.push(r);
+      else own.push(r);
+    }
+    if (own.length) specs.push({ group: g.group, label: g.label, rows: own });
+    if (mat.length) materials.push({ group: g.group, label: g.label, rows: mat });
+  }
+  const chips = compatibility.flatMap((b) => b.items.flatMap((i) => [i.label, ...[i.product, ...(i.more ?? [])].flatMap((p) => (p ? [p.name.en] : []))]));
+  const statement = rowsForSelection(statements, sel).shown[0];
+  const compatibilityNote = statement && statement.value_text && statementSaysMore(statement.value_text, chips) ? statement : undefined;
+  const logistics = k.logistics ?? { product: [], package: [], shipment: [], carton: [] };
+  const lines = packagingLines(logistics, recommended, sel);
+  const other = packagingOther(logistics, recommended, sel);
+  const box = (k.in_the_box ?? []).filter((i) => scopeApplies(i.scope, sel));
   const documents = (k.documents ?? []).filter((d) => scopeApplies(d.scope, sel));
   const order: KnowledgeTabId[] = [];
   if (specs.length) order.push('specs');
@@ -238,7 +308,7 @@ export function knowledgeTabs(k: KnowledgeAnswer, sel: KnowledgeSelection): Know
   if (lines.length || other.length || box.length) order.push('packaging');
   if (compatibility.length) order.push('compatibility');
   if (documents.length) order.push('documents');
-  return { specs, materials, packaging: { lines, other, box }, compatibility, documents, order };
+  return { specs, materials, packaging: { lines, other, box }, compatibility, ...(compatibilityNote ? { compatibilityNote } : {}), documents, order };
 }
 
 /** One line of the packaging tab: a weight, a set of three dimensions, the recommended space, a carton fact. */
@@ -340,8 +410,8 @@ const plainNumber = (n: number): string => {
  */
 export function valueText(r: KnowledgeRow, lang: KnowledgeLang): { text: string; absent: boolean } {
   if (ABSENT.has(r.status)) return { text: w(STATE_WORDS[r.status as Exclude<SpecStatus, 'verified' | 'unverified'>], lang), absent: true };
-  if (r.items && r.items.length) return { text: r.items.join(lang === 'en' ? ', ' : '، '), absent: false };
-  if (r.value_text) return { text: r.value_text, absent: false };
+  if (r.items && r.items.length) return { text: r.items.map((item, i) => tx(item, r.items_i18n?.[i], lang)).join(lang === 'en' ? ', ' : '، '), absent: false };
+  if (r.value_text) return { text: tx(r.value_text, r.value_i18n, lang), absent: false };
   if (r.value_num !== null && r.value_num !== undefined) {
     const n = r.value_num_max !== null && r.value_num_max !== undefined ? `${plainNumber(r.value_num)}–${plainNumber(r.value_num_max)}` : plainNumber(r.value_num);
     return { text: r.unit ? `${n} ${r.unit}` : n, absent: false };

@@ -106,6 +106,21 @@ import { quickBuyChrome } from '../components/quickBuy/chromeStrings';
 import type { QuickBuySheetMode } from '../components/quickBuy/quickBuyActions';
 import type { QuickBuyPrinterAcceptance, QuickBuyPrinterPolicy } from '../lib/quickBuy';
 import { afterCriticalPaint, allowsSpeculativeLoads } from '../lib/afterCriticalPaint';
+import BidiText from '../components/ui/BidiText';
+import { scriptDir } from '../lib/bidi';
+
+/**
+ * A chooser chip's label (an option or colour name, English by §7): its direction from its script, so a
+ * truncated name ellipsizes at its own end — «X1 Series and P1 Se…», never «… Series and P1 Series» — and
+ * it aligns with the RTL column (I18N-DESIGN §B.1 rules 6 and 7).
+ */
+function ChipLabel({ text, className }: { text: string; className: string }) {
+  return (
+    <span dir={scriptDir(text)} className={`${className} text-start rtl:text-right`}>
+      {text}
+    </span>
+  );
+}
 
 /** The pictures of a step: a 3–4 column grid in the left column. */
 const STEP_IMAGE_SIZES = '(min-width: 1024px) 180px, (min-width: 640px) 25vw, 33vw';
@@ -3125,7 +3140,7 @@ export default function Product() {
   const Chosen = ({ value }: { value: string | null | undefined }) =>
     value ? (
       <span className="ms-2 font-medium text-[12px] text-text-secondary" data-chosen>
-        · {value}
+        · <bdi dir={scriptDir(value)}>{value}</bdi>
       </span>
     ) : null;
 
@@ -3472,7 +3487,7 @@ export default function Product() {
                           />
                         ) : null}
                         <span className="min-w-0 text-start">
-                          <span className="block truncate max-w-[10rem]">{label}</span>
+                          <ChipLabel text={label} className="block truncate max-w-[10rem]" />
                           {/* No stock word beside «بلا سعر»: nobody claims stock for a choice with no price (row 240). */}
                           {chip && !unpricedChoice ? <span className={`block text-[10px] font-medium leading-tight ${chip.cls}`}>{chip.text}</span> : null}
                           {unpricedChoice ? noPriceTag : null}
@@ -3537,7 +3552,7 @@ export default function Product() {
                       bgClassName="bg-black"
                     />
                   ) : null}
-                  <span className="block truncate max-w-[12rem] text-start">{m.label}</span>
+                  <ChipLabel text={m.label} className="block truncate max-w-[12rem]" />
                   <span className="lv-choice-mark ms-auto"><Check aria-hidden="true" className="h-3 w-3" /></span>
                 </button>
               );
@@ -3668,7 +3683,7 @@ export default function Product() {
                     />
                   ) : null}
                   <span className="min-w-0 text-start">
-                    <span className="block truncate max-w-[10rem]">{label}</span>
+                    <ChipLabel text={label} className="block truncate max-w-[10rem]" />
                     {chip && <span className={`block text-[10px] font-medium leading-tight ${chip.cls}`}>{chip.text}</span>}
                     {noPrice ? noPriceTag : null}
                   </span>
@@ -3744,7 +3759,7 @@ export default function Product() {
                     />
                   )}
                   <span className="min-w-0 text-start">
-                    <span className="block truncate max-w-[9rem]">{label}</span>
+                    <ChipLabel text={label} className="block truncate max-w-[9rem]" />
                     {chip && <span className={`block text-[10px] font-medium leading-tight ${chip.cls}`}>{chip.text}</span>}
                     {noPrice ? noPriceTag : null}
                   </span>
@@ -4305,7 +4320,8 @@ export default function Product() {
                 h1) — see the top of the <aside> below. */}
             <div className="mt-5">
               <div className="lg:sr-only">
-              <h1 className="text-xl sm:text-2xl font-bold text-text-primary leading-snug">{name}</h1>
+              {/* The name is English on every surface (§3/§7): LTR, aligned with the column (I18N-DESIGN §B.1 rule 7). */}
+              <h1 className="text-xl sm:text-2xl font-bold text-text-primary leading-snug text-start rtl:text-right" dir={scriptDir(name)}>{name}</h1>
               <p className="mt-2 text-[12px] text-text-muted flex items-center gap-1.5">
                 <Store aria-hidden="true" className="w-3.5 h-3.5" />
                 {source === 'community' && product.merchant ? (
@@ -4374,7 +4390,8 @@ export default function Product() {
             <div className="mt-6 space-y-3 max-w-[68ch]">
               <Section title={s.description} icon={<FileText aria-hidden="true" className="w-5 h-5 text-text-secondary" />} defaultOpen>
                 {description ? (
-                  <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-line">{description}</p>
+                  // Mixed Arabic/Sorani and English, line by line, each line's direction from its script (I18N-DESIGN §B).
+                  <BidiText as="p" multiline className="text-sm text-text-secondary leading-relaxed" text={description} />
                 ) : (
                   <p className="text-sm text-text-muted">{s.noDescription}</p>
                 )}
@@ -4396,7 +4413,7 @@ export default function Product() {
                     {boxItems.map((item, i) => (
                       <li key={i} className="flex items-start gap-2 text-sm text-text-secondary leading-relaxed">
                         <span aria-hidden="true" className="mt-2 w-1.5 h-1.5 rounded-full bg-gold shrink-0" />
-                        <span dir="auto" className="min-w-0">{item}</span>
+                        <BidiText className="min-w-0" text={item} />
                       </li>
                     ))}
                   </ul>
@@ -4444,14 +4461,10 @@ export default function Product() {
                                     </span>
                                     <div className="min-w-0 flex-1">
                                       {pick(lang as Lang, st.title_ar, st.title, st.title_ckb) ? (
-                                        <h5 dir="auto" className="text-[13px] font-bold text-text-primary leading-snug">
-                                          {pick(lang as Lang, st.title_ar, st.title, st.title_ckb)}
-                                        </h5>
+                                        <BidiText as="h5" className="text-[13px] font-bold text-text-primary leading-snug" text={pick(lang as Lang, st.title_ar, st.title, st.title_ckb)} />
                                       ) : null}
                                       {pick(lang as Lang, st.body_ar, st.body, st.body_ckb) ? (
-                                        <p dir="auto" className="mt-1 text-[13px] text-text-secondary leading-relaxed whitespace-pre-line">
-                                          {pick(lang as Lang, st.body_ar, st.body, st.body_ckb)}
-                                        </p>
+                                        <BidiText as="p" multiline className="mt-1 text-[13px] text-text-secondary leading-relaxed" text={pick(lang as Lang, st.body_ar, st.body, st.body_ckb)} />
                                       ) : null}
                                     </div>
                                   </div>
@@ -4509,7 +4522,7 @@ export default function Product() {
                         ))}
                     </div>
                   ) : (
-                    <p dir="auto" className="text-sm text-text-secondary leading-relaxed whitespace-pre-line">{howToUse}</p>
+                    <BidiText as="p" multiline className="text-sm text-text-secondary leading-relaxed" text={howToUse} />
                   )}
                 </Section>
               ) : null}
