@@ -38,6 +38,12 @@ import { projectionFingerprint, projectionFromPayload, projectionFromSite, type 
 import type { ImportPayload } from '../packages/catalog/src/bambuImport/payload';
 import { specKey } from '../packages/catalog/src/bambuImport/registry/specKeys';
 import { reviewedBundleDigest, type ReviewedTexts } from '../worker/lib/catalogImport/reviewed';
+import { edgeEvidence, modelCodesOf, Site, verifyPublic, type VerifyOutcome } from '../scripts/bambu-import/verify';
+import { HostFetcher } from '../scripts/bambu-import/fetch';
+import { Deadline as RunnerDeadline } from '../scripts/bambu-import/deadline';
+import { writtenGallery } from '../scripts/bambu-import/gallery';
+import { NOT_APPLICABLE } from '../scripts/bambu-import/browser';
+import type { DocumentCheck as RunnerDocumentCheck, MediaAnswerRow, WrittenImage } from '../scripts/bambu-import/opsClient';
 import { createHash } from 'node:crypto';
 
 after(() => {
@@ -500,6 +506,106 @@ test('a collapse that hands the primary on: the hotend\'s general lead picture i
     const primary = o.write.images!.find((i) => i.is_primary)!;
     assert.notEqual(primary.id, lead.id, 'the payload\'s primary was collapsed away: the primary moved to the hero copy');
     assert.equal(o.write.images!.length, fx[0].payload.images.length - 1);
+  } finally {
+    restoreFetch();
+  }
+});
+
+// ---------------------------------------------------------------- the runner's own VERIFY over the real routes
+
+/**
+ * One item as run.ts sequences it, VERIFIED BY THE RUNNER'S OWN CODE: scripts/bambu-import/verify.ts `verifyPublic`
+ * reads the real public routes of this app — the v1 product, the anonymous structure answer, step 7's
+ * /api/products/<slug>/knowledge (fact by fact against the route's own assembly of the payload), the listings and
+ * the tree, search, the quote and the request door, every /files object, compare — and its `edgeEvidence` is what
+ * /complete judges. The browser has no place in-process: its part is recorded as the runner records a passing one.
+ */
+async function runItemVerifiedByRunner(w: OpsWorld, client: Client, f: Fixture, texts: ReviewedTexts, titles: string[]): Promise<{ outcome: VerifyOutcome; done: { state: string; d1_checks: Record<string, unknown> } }> {
+  const lease = await client.lease(f.sid);
+  const t = lease.lease_token;
+  await client.event(f.sid, t, { state: 'EXTRACTING', outcome: 'start' });
+  await client.event(f.sid, t, { state: 'ENRICHING', outcome: 'ok', detail: { source_fingerprint: f.payload.extraction_sha256 } });
+  await client.event(f.sid, t, { state: 'VALIDATING', outcome: 'ok', detail: { documents_checked: f.payload.documents.length } });
+  const checks = documentChecks(f.payload);
+  const staged = await client.stage(f.sid, t, f.payload, checks);
+  await client.event(f.sid, t, { state: 'INGESTING_MEDIA', outcome: 'ok', detail: { payload_sha256: staged.payload_sha256, invocation_estimate: staged.invocation_estimate } });
+  const media = await ingest(client, f.sid, t, f.payload);
+  await client.event(f.sid, t, { state: 'WRITING', outcome: 'ok', detail: { stored: [...media.values()].filter((m) => m.status === 'stored').length } });
+  const written = await client.write(f.sid, t, staged.payload_sha256, f.payload, checks);
+  const rows = (writeAnswers.get(f.sid)?.images ?? []) as WrittenImage[];
+  assert.equal((await client.publishFinish(f.sid, t)).state, 'VERIFYING_LIVE');
+  // The runner's site reader, spaced on a clock that does not sleep, through this app.
+  let now = Date.now();
+  const fakeClock = { now: () => now, sleep: async (ms: number) => void (now += ms) };
+  const fetcher = new HostFetcher({ fetch: (url, init) => w.fetch(url, init), clock: fakeClock, deadline: new RunnerDeadline(now + 6 * 3600_000, fakeClock), siteOrigin: 'https://levonis-iq.com' });
+  const site = new Site('https://levonis-iq.com', fetcher, () => 0);
+  const runnerMedia = media as unknown as Map<string, MediaAnswerRow>;
+  const gallery = writtenGallery(f.payload, runnerMedia, { rows, source: 'write' });
+  const outcome = await verifyPublic(site, {
+    payload: f.payload,
+    productId: written.product_id,
+    slug: written.slug,
+    media: runnerMedia,
+    images: gallery.images,
+    documentChecks: checks as unknown as RunnerDocumentCheck[],
+    leaf: String(f.row.leaf ?? ''),
+    also: (f.row.also as string[]) ?? [],
+    taxonomy: JSON.parse(texts.taxonomyMap) as Record<string, unknown>,
+    modelCodes: modelCodesOf(f.payload.product.title_en, titles),
+    merge: null,
+    readback: async () => {
+      const rb = await client.readback(f.sid);
+      return { ok: rb.ok, mismatches: rb.mismatches };
+    },
+  });
+  const browser = { ok: true, checks: { image_decodes: true, image_contain: true, selection_images: true }, counts: { values_checked: 1 }, selections: [], not_applicable: { ...NOT_APPLICABLE } };
+  const liveUrl = `https://levonis-iq.com/product/${written.slug}`;
+  const done = await client.complete(f.sid, t, liveUrl, edgeEvidence(outcome, browser, liveUrl, f.payload, 1));
+  return { outcome, done };
+}
+
+test('the runner\'s own VERIFY over the real routes (§I.1): H2D, PLA Basic and a collapsed hotend — every check passes, /knowledge fact by fact, COMPLETE on its evidence', async () => {
+  const w = opsWorld();
+  const fx = fixtures()
+    .filter((f) => ['h2d', 'pla-basic-filament', 'bambu-hotend-a1-a2'].includes(f.handle))
+    .map((f, i) => ({ ...f, row: { ...f.row, queue_position: i + 1 } }));
+  const texts = textsFor(fx.map((f) => f.row));
+  setBundle(texts);
+  openRun(w.raw);
+  // The hotend's general lead is the same file as its 0.4 mm hero: the writer collapses it (§C.4 step 1).
+  const hotend = fx.find((f) => f.handle === 'bambu-hotend-a1-a2')!.payload;
+  const lead = hotend.images.find((i) => i.sort_order === 0)!;
+  const hero = hotend.images.find((i) => i.sort_order === 2)!;
+  installCdnDouble(w, { bytesOf: (url) => (url === lead.source_url ? hero.source_url : url) });
+  try {
+    const client = await clientFor(w);
+    await client.hello();
+    await client.manifest(fx.map((f) => manifestRequestRow(f.row, new Date().toISOString())));
+    await client.prepareTaxonomy();
+    const titles = fx.map((f) => f.payload.product.title_en);
+    for (;;) {
+      const st = await client.status();
+      const ref = st.current ?? st.next;
+      if (!ref) break;
+      const f = fx.find((x) => x.sid === ref.source_product_id)!;
+      const { outcome, done } = await runItemVerifiedByRunner(w, client, f, texts, titles);
+      const line = Object.entries(outcome.checks)
+        .map(([name, c]) => `${name} ${c.ok ? 'ok' : 'FAILED'}${c.status ? ` (${c.status})` : ''}`)
+        .join(', ');
+      console.log(`catalogImportE2E runner VERIFY ${f.handle}: ${line}; knowledge ${JSON.stringify(outcome.checks.knowledge.counts)}; compare ${JSON.stringify(outcome.checks.compare.detail)}`);
+      for (const [name, c] of Object.entries(outcome.checks)) assert.ok(c.ok || !c.hard, `${f.handle}: ${name} ${JSON.stringify({ status: c.status, counts: c.counts, detail: name === 'fingerprint' ? undefined : c.detail })}`);
+      assert.equal(outcome.ok, true, f.handle);
+      for (const part of ['rows', 'box', 'documents', 'relations', 'swatches']) assert.equal(outcome.checks.knowledge.counts?.[`mismatched_${part}`], 0, `${f.handle}: /knowledge ${part}`);
+      assert.equal(outcome.checks.fingerprint.ok, true, `${f.handle}: the public fingerprint, its knowledge half included`);
+      assert.equal(done.state, 'COMPLETE', `${f.handle}: ${JSON.stringify(done.d1_checks)}`);
+    }
+    assert.deepEqual(
+      (w.raw.prepare('SELECT processing_state AS s, COUNT(*) AS n FROM catalog_import_items GROUP BY 1').all() as Array<{ s: string; n: number }>).map((r) => `${r.s}:${r.n}`),
+      ['COMPLETE:3']
+    );
+    // The collapse happened, and VERIFY expected the rows the writer wrote.
+    const pid = hotend.product_id;
+    assert.equal(Number((w.raw.prepare('SELECT COUNT(*) AS n FROM product_images WHERE product_id = ?').get(pid) as { n: number }).n), hotend.images.length - 1);
   } finally {
     restoreFetch();
   }
