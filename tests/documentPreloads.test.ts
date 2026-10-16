@@ -395,19 +395,24 @@ test("the platform's product page carries its chunk, its lead image and the apex
     'absent catalogue metadata preserves the existing community-on-product route');
 });
 
-test('a saved-theme-dependent hero is not speculatively preloaded into shared HTML', async () => {
+test('a light-theme main image: the lead is preloaded once per theme, under its media query — the same bytes for every visitor', async () => {
   const { call, raw } = realWorker();
   raw.prepare('UPDATE products SET light_image = ? WHERE id = ?')
     .run('/files/products/filament-pla/light.webp', 'p1');
   const anonymous = await call(APEX, '/product/filament-pla');
   const html = await anonymous.text();
-  assert.doesNotMatch(html, /<link rel="preload" as="image"/);
+  // Product.tsx: the primary at its stored size in the dark theme; the light main image, with no
+  // stored size, in its slot in the light theme (speed audit 2026-10-16: it used to preload neither).
+  const dark = productImagePreload('/files/products/filament-pla/main.webp');
+  const light = productImagePreload('/files/products/filament-pla/light.webp', { width: null, height: null });
+  assert.ok(html.includes(`href="/files/products/filament-pla/main.webp" imagesrcset="${dark.imageSrcSet}" imagesizes="${dark.imageSizes}" media="(prefers-color-scheme: dark)"`), html);
+  assert.ok(html.includes(`href="/files/products/filament-pla/light.webp" imagesrcset="${light.imageSrcSet}" imagesizes="${light.imageSizes}" media="not all and (prefers-color-scheme: dark)"`));
+  assert.equal((html.match(/<link rel="preload" as="image"/g) ?? []).length, 2);
   assert.match(html, /property="og:image" content="https:\/\/levonis-iq\.com\/files\/products\/filament-pla\/main\.webp"/);
   assert.ok(links(html, 'modulepreload').includes('/assets/Product-p1.js'), 'the page-code head start remains');
   assert.deepEqual(inline(html), { success: true, kind: 'main', store: null, root_domain: APEX });
-  assert.equal(html.includes('light.webp'), false, 'internal image metadata is not a new public payload');
-  // localStorage can override either system preference. Neither a system hint
-  // nor any visitor cookie may specialize this public document's image.
+  // localStorage can override either system preference: the browser chooses by media query,
+  // never the server. Neither a system hint nor any visitor cookie may specialize this public document.
   for (const preference of ['light', 'dark']) {
     const response = await call(APEX, '/product/filament-pla', {
       'Sec-CH-Prefers-Color-Scheme': preference,
@@ -455,7 +460,7 @@ test('every image preload of a public /files/ still picture carries its srcset; 
   assert.deepEqual(productImagePreload('/files/products/a.webp?token=x', { width: 1, height: 1 }), {});
   // The worker passes the media row and the store kinds through (worker/index.ts).
   const index = readFileSync(join(ROOT, 'worker/index.ts'), 'utf8');
-  assert.match(index, /productImagePreload\(image, product\?\.preloadMedia\)/);
+  assert.match(index, /images: leadImagePreloads\(lead\)/);
   assert.match(index, /storeImagePreload\(image, 'gallery'\)/);
   assert.match(index, /storeImagePreload\(image, 'hero'\)/);
 });

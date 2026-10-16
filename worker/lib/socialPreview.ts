@@ -53,6 +53,7 @@ import { listing } from './listing';
 import { canonicalProductMediaUrl, primaryMedia, upgradeMedia } from './productModel';
 import { isAnonymousPublicMediaKey } from './mediaStorage';
 import { productImageFromRelations } from './productSelectionImage';
+import type { OpeningLead } from './productOpeningLead';
 import { isActiveProductImageRow, type ImageRow } from './productOverlay';
 import { logoSourceKey, readStoreIconsQuietly, servableStoreIcons } from './storeIcons';
 import { cleanIdentityText, storeDescription } from './webManifest';
@@ -288,10 +289,13 @@ interface PreviewRow {
 
 /** Internal document metadata; never written into social tags or public JSON. */
 interface ProductPreview extends Pick<SocialPreview, 'title' | 'description' | 'image'> {
-  /** null explicitly suppresses a speculative catalogue preload; absent preserves merchant behaviour. */
-  preloadImage?: string | null;
-  /** The preloaded picture's stored size (its `product_images` row), which Product.tsx reads from the same row. */
-  preloadMedia?: { width: number | null; height: number | null } | null;
+  /**
+   * A catalogue product's opening picture in each theme when the preview's own
+   * rows make it certain (worker/lib/productOpeningLead.ts); null when a
+   * selection can change it — the document then asks the page's own answer.
+   * Absent for a merchant product (its preload is unchanged).
+   */
+  lead?: OpeningLead | null;
 }
 
 /** Arabic first — the store's own default language — then English, then any. */
@@ -409,25 +413,28 @@ async function previewFrom(
     : primaryMedia(upgradeMedia(row.images))?.url ?? '';
   const lightImage = product ? canonicalProductMediaUrl(product.light_image) : '';
   // Product may open on a shelf-backed option/colour/variant instead of the
-  // primary. Its saved theme also lives only in this browser, so a system
-  // media query cannot choose the light override reliably. Preload only when
-  // every possible opening selection/theme must use this same image. False
-  // negatives cost a head start; a wrong preload costs a second full request.
+  // primary: then this read alone cannot say which picture leads (the document
+  // asks the page's own answer instead — worker/lib/productOpeningLead.ts). A
+  // wrong preload costs a second full request; a missing one, a head start.
   const selectionCanChangeImage = new Set(images.map((entry) => entry.url)).size > 1 &&
     images.some((entry) => entry.option_value_id || entry.color_id || entry.variant_id);
-  const preloadImage = image && !selectionCanChangeImage && (!lightImage || lightImage === image)
-    ? image
-    : null;
   // The same row the page's media JSON is built from (worker/lib/productOverlay.ts),
   // so the preload's candidates and `sizes` are the ones the lead picture renders.
-  const leadRow = preloadImage ? images.find((entry) => entry.url === preloadImage) : undefined;
-  const preloadMedia = leadRow ? { width: leadRow.width ?? null, height: leadRow.height ?? null } : null;
+  // In the light theme Product.tsx shows the light main image in that slot, with
+  // no stored size: each theme's picture is written under its own `media`.
+  const leadRow = image && !selectionCanChangeImage ? images.find((entry) => entry.url === image) : undefined;
+  const lead: OpeningLead | null = image && !selectionCanChangeImage
+    ? {
+        dark: { url: image, width: leadRow?.width ?? null, height: leadRow?.height ?? null },
+        light: lightImage ? { url: lightImage, width: null, height: null } : null,
+      }
+    : null;
 
   return {
     title,
     description: shortDescription(pickText(row.description_ar, row.description, row.description_en)),
     image: absoluteImageUrl(image, origin),
-    ...(product ? { preloadImage, preloadMedia } : {}),
+    ...(product ? { lead } : {}),
   };
 }
 
@@ -882,6 +889,8 @@ export interface DocumentPreloads {
   /** The same candidates/sizes the page's lead picture renders (`productImagePreload`, `storeImagePreload`). */
   imageSrcSet?: string;
   imageSizes?: string;
+  /** In place of `image`: the lead picture once per theme, each under its `media` (`leadImagePreloads`). */
+  images?: LeadImagePreload[];
   /** The anonymous resolve answer, or null when the document must not carry one. */
   resolve: unknown | null;
 }
@@ -909,6 +918,45 @@ export function productImagePreload(
   if (!path) return {};
   const imageSrcSet = variantSrcSet(path, { width: media?.width ?? null });
   return imageSrcSet ? { imageSrcSet, imageSizes: productGallerySizes(mediaAspect(media)) } : {};
+}
+
+/** One image preload line: the picture, its candidates and `sizes`, and the `media` it is for. */
+export interface LeadImagePreload {
+  href: string;
+  imageSrcSet?: string;
+  imageSizes?: string;
+  media?: string;
+}
+
+/**
+ * THE THEME QUERIES, as the theme boot script decides (worker/lib/securityPolicy.ts
+ * THEME_BOOT_SCRIPT): dark when the device prefers dark, light otherwise. A visitor
+ * whose saved choice differs from the device's gets the other picture early and
+ * theirs at its usual time — never a wrong picture on screen.
+ */
+export const THEME_MEDIA = { dark: '(prefers-color-scheme: dark)', light: 'not all and (prefers-color-scheme: dark)' } as const;
+
+/**
+ * A PRODUCT PAGE'S LEAD PICTURE, ONCE PER THEME (speed audit 2026-10-16).
+ * Each candidate is preloaded exactly as Product.tsx renders it in that theme
+ * (`productImagePreload`: the light main image has no stored size there); when
+ * both themes render the same thing, one line with no `media`. Public same-origin
+ * `/files/` pictures only — a theme whose picture is not one is simply not preloaded.
+ */
+export function leadImagePreloads(lead: OpeningLead | null | undefined): LeadImagePreload[] {
+  if (!lead) return [];
+  const line = (pic: OpeningLead['dark']): LeadImagePreload | null => {
+    const href = preloadImagePath(pic.url);
+    return href ? { href, ...productImagePreload(href, { width: pic.width, height: pic.height }) } : null;
+  };
+  const dark = line(lead.dark);
+  if (!lead.light) return dark ? [dark] : [];
+  const light = line(lead.light);
+  if (dark && light && dark.href === light.href && dark.imageSrcSet === light.imageSrcSet && dark.imageSizes === light.imageSizes) return [dark];
+  return [
+    ...(dark ? [{ ...dark, media: THEME_MEDIA.dark }] : []),
+    ...(light ? [{ ...light, media: THEME_MEDIA.light }] : []),
+  ];
 }
 
 /**
@@ -939,11 +987,13 @@ export function injectDocumentPreloads(html: string, p: DocumentPreloads): strin
   }
   for (const href of p.scripts) lines.push(`<link rel="modulepreload" crossorigin href="${escapeAttribute(href)}">`);
   for (const href of p.styles) lines.push(`<link rel="preload" as="style" crossorigin href="${escapeAttribute(href)}">`);
-  if (p.image) {
-    const responsive = p.imageSrcSet && p.imageSizes
-      ? ` imagesrcset="${escapeAttribute(p.imageSrcSet)}" imagesizes="${escapeAttribute(p.imageSizes)}"`
+  const images: LeadImagePreload[] = p.images ?? (p.image ? [{ href: p.image, imageSrcSet: p.imageSrcSet, imageSizes: p.imageSizes }] : []);
+  for (const img of images) {
+    const responsive = img.imageSrcSet && img.imageSizes
+      ? ` imagesrcset="${escapeAttribute(img.imageSrcSet)}" imagesizes="${escapeAttribute(img.imageSizes)}"`
       : '';
-    lines.push(`<link rel="preload" as="image" fetchpriority="high" href="${escapeAttribute(p.image)}"${responsive}>`);
+    const media = img.media ? ` media="${escapeAttribute(img.media)}"` : '';
+    lines.push(`<link rel="preload" as="image" fetchpriority="high" href="${escapeAttribute(img.href)}"${responsive}${media}>`);
   }
   if (p.resolve !== null && p.resolve !== undefined) lines.push(inlineJsonScript(INLINE_RESOLVE_ID, p.resolve));
   if (!lines.length) return html;
