@@ -30,13 +30,24 @@ import { FINGERPRINT_QUERIES, readbackFromTarget } from './writer';
 
 // ---------------------------------------------------------------- /hello
 
-/** Which migrations the import needs are installed: one presence probe per table. */
-export async function migrationsPresent(db: D1Database): Promise<Record<'0193' | '0194' | '0195', boolean>> {
+/**
+ * Which migrations the import needs are installed: one presence probe per table. 0196 (the translation memory,
+ * worker/lib/catalogImport/translations.ts) is reported for mode `translations`; the item runner requires only
+ * 0193–0195.
+ */
+export async function migrationsPresent(db: D1Database): Promise<Record<'0193' | '0194' | '0195' | '0196', boolean>> {
   const { results } = await db
-    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('product_price_requests','product_spec_values','catalog_import_runs')")
+    .prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('product_price_requests','product_spec_values','catalog_import_runs','catalog_translations')"
+    )
     .all<{ name: string }>();
   const have = new Set((results ?? []).map((r) => r.name));
-  return { '0193': have.has('product_price_requests'), '0194': have.has('product_spec_values'), '0195': have.has('catalog_import_runs') };
+  return {
+    '0193': have.has('product_price_requests'),
+    '0194': have.has('product_spec_values'),
+    '0195': have.has('catalog_import_runs'),
+    '0196': have.has('catalog_translations'),
+  };
 }
 
 export const WORKER_BUILD = `catalog-import-ops/${IMPORT_PROTOCOL};${EXPECTED_MIGRATION}`;

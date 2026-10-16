@@ -57,6 +57,11 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // the product_import_items precedent above.
     'catalog_import_runs', 'catalog_import_items', 'catalog_import_events', 'catalog_import_media',
     'catalog_import_conflicts', 'catalog_import_protected',
+    // 0196 — the catalogue translation memory (docs/bambu-import/I18N-DESIGN.md
+    // §A.2): the Arabic and Sorani of the imported English, which product shows
+    // which string, and the loader's ledger. Written by the import door, read
+    // beside the product it describes.
+    'catalog_translations', 'catalog_translation_refs', 'catalog_translation_parts',
     /**
      * 0098 — THE COST LAYERS UNDER THE STOCK COUNTERS.
      *
