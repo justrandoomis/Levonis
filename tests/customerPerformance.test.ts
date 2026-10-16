@@ -123,14 +123,16 @@ test('product preload matches the gallery candidates and sizes; private, animate
 
 test('opening catalogue requests start before React only on the canonical main host, with exact query identity', () => {
   const start = (path: string, host: string, inline: { kind?: unknown } | null = { kind: 'main' }, search = '') => bootRequests(path, inline, () => {}, search, host);
-  assert.deepEqual(start('/products', 'levonis-iq.com', null, '?category=x&search=PLA&offset=50&sort=old'), ['/api/storefront/resolve', '/api/products?search=PLA&category=x&limit=50']);
-  assert.deepEqual(start('/product/bambu-lab-a1', 'www.levonis-iq.com'), ['/api/products/bambu-lab-a1']);
+  // The session (/api/auth/me) is asked on every page, after the page's own reads (src/lib/bootFetch.ts AUTH_ME_PATH).
+  const ME = '/api/auth/me';
+  assert.deepEqual(start('/products', 'levonis-iq.com', null, '?category=x&search=PLA&offset=50&sort=old'), ['/api/storefront/resolve', '/api/products?search=PLA&category=x&limit=50', ME]);
+  assert.deepEqual(start('/product/bambu-lab-a1', 'www.levonis-iq.com'), ['/api/products/bambu-lab-a1', ME]);
   for (const host of ['shop.levonis-iq.com', 'printer.example', 'levonis-iq.com.evil.example']) {
-    assert.deepEqual(start('/products', host), []);
-    assert.deepEqual(start('/product/x', host), []);
+    assert.deepEqual(start('/products', host), [ME]);
+    assert.deepEqual(start('/product/x', host), [ME]);
   }
-  assert.deepEqual(start('/product/x', 'levonis-iq.com', { kind: 'merchant' }), []);
-  assert.deepEqual(start('/admin/finance', 'levonis-iq.com'), []);
+  assert.deepEqual(start('/product/x', 'levonis-iq.com', { kind: 'merchant' }), [ME]);
+  assert.deepEqual(start('/admin/finance', 'levonis-iq.com'), [ME]);
 });
 
 test('a navigation intent starts only the target same-origin catalogue read with its exact query', () => {

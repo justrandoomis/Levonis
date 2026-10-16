@@ -47,7 +47,7 @@ import { STORE_GALLERY_SIZES, STORE_HERO_SIZES, variantSrcSet } from '../package
 import { productGallerySizes } from '../packages/contracts/src/imageSizes';
 import { DOCUMENT_CACHE_CONTROL } from '../worker/lib/securityPolicy';
 import { ARABIC_FONT_PRELOAD as SCRIPT_FONT, earlyHintsLink as scriptEarlyHintsLink, entryStylesheets as scriptEntryStylesheets, withEarlyHints } from '../scripts/write-asset-headers.mjs';
-import { HOME_PATH, RESOLVE_PATH, bootRequests } from '../src/lib/bootFetch';
+import { AUTH_ME_PATH, HOME_PATH, RESOLVE_PATH, bootRequests } from '../src/lib/bootFetch';
 import { fetchPublished } from './fixtures/autoPublish';
 
 // ---------------------------------------------------------------- fixtures
@@ -290,11 +290,12 @@ test('dist/_headers gains the Link on the catch-all and unsets it on every rule 
 
 test('the client starts only what the document did not answer', () => {
   const started = (path: string, inl: { kind?: unknown } | null) => bootRequests(path, inl, () => undefined);
-  assert.deepEqual(started('/', null), [RESOLVE_PATH, HOME_PATH]);
-  assert.deepEqual(started('/product/x', null), [RESOLVE_PATH]);
-  assert.deepEqual(started('/', { kind: 'main' }), [HOME_PATH], 'the apex product/store documents answer resolve, not home');
-  assert.deepEqual(started('/', { kind: 'merchant' }), [], "a store's / is its own home");
-  assert.deepEqual(started('/p/x', { kind: 'merchant' }), []);
+  // The session is asked on every page, last (src/lib/bootFetch.ts AUTH_ME_PATH).
+  assert.deepEqual(started('/', null), [RESOLVE_PATH, HOME_PATH, AUTH_ME_PATH]);
+  assert.deepEqual(started('/product/x', null), [RESOLVE_PATH, AUTH_ME_PATH]);
+  assert.deepEqual(started('/', { kind: 'main' }), [HOME_PATH, AUTH_ME_PATH], 'the apex product/store documents answer resolve, not home');
+  assert.deepEqual(started('/', { kind: 'merchant' }), [AUTH_ME_PATH], "a store's / is its own home");
+  assert.deepEqual(started('/p/x', { kind: 'merchant' }), [AUTH_ME_PATH]);
   assert.equal(RESOLVE_PATH, '/api/storefront/resolve');
   assert.equal(HOME_PATH, '/api/home');
 });

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from 'react';
 import { api, ApiUser, clearApiSessionRequests } from './lib/api';
 import { clearPageCache } from './lib/pageCache';
-import { clearPrimedRequests } from './lib/bootFetch';
+import { AUTH_ME_PATH, clearPrimedRequests, takePrimedJson } from './lib/bootFetch';
 import { privateDrafts, purgeLegacyPrivateDrafts } from './lib/privateDrafts';
 
 /**
@@ -52,8 +52,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    api
-      .get<{ user: ApiUser | null }>('/api/auth/me')
+    // Usually already on its way: src/lib/bootFetch.ts started it with the
+    // entry, before React existed. Taken once; a remount asks again.
+    (takePrimedJson<{ user: ApiUser | null }>(AUTH_ME_PATH) ?? api.get<{ user: ApiUser | null }>(AUTH_ME_PATH))
       .then((data) => {
         if (!cancelled) setUser(data.user);
       })
