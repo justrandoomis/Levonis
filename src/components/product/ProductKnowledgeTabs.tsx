@@ -22,13 +22,28 @@
  * only). The desktop strip WRAPS rather than clip a label at the column's
  * edge (the section is capped at 68ch beside the buy column).
  *
+ * MIXED SCRIPTS (docs/bambu-import/I18N-DESIGN.md §B): every value, label,
+ * box item, title and note goes through `BidiText` — its direction from its
+ * script, its Latin and number runs isolated inside an RTL line — and the
+ * imported English reads in Arabic or Sorani when the answer carries the
+ * translation memory's words (`tx`).
+ *
+ * COMPATIBILITY (§C.4): one item per label (the server merges the rows). A
+ * VISIBLE target is a chip that links to its page (the router's, no reload),
+ * with its picture and a chevron — a family's label a plain prefix before its
+ * members' chips; a target not on the site yet (pending, unresolvable) is
+ * plain text, «، »-separated, never a pill that looks tappable. The
+ * `compat.statement` row is said under the chips only when it says more.
+ *
  * Nothing here is a price, a cost or a stock fact: the answer carries none.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Box, ChevronDown, ExternalLink, FileText, Info, Link2, Package, Settings2, Thermometer } from 'lucide-react';
+import { Box, ChevronDown, ChevronRight, ExternalLink, FileText, Info, Link2, Package, Settings2, Thermometer } from 'lucide-react';
 import { api } from '../../lib/api';
+import { scriptDir } from '../../lib/bidi';
 import { useMediaQuery } from '../../lib/useMediaQuery';
+import BidiText from '../ui/BidiText';
 import SafeImage from '../ui/SafeImage';
 import { TabPanels, TabStrip } from '../ui/Tabs';
 import Section from './Section';
@@ -37,13 +52,18 @@ import {
   STATE_WORDS,
   TAB_WORDS,
   US_110V_NOTE,
+  boxItemText,
   documentTitle,
   knowledgeCovers,
   knowledgeTabs,
+  rowLabelText,
   rowsForSelection,
   sourceLine,
+  testMethodText,
+  tx,
   valueText,
   w,
+  type CompatProduct,
   type KnowledgeAnswer,
   type KnowledgeLang,
   type KnowledgeRow,
@@ -189,34 +209,57 @@ export function TabBody({
   }
   if (id === 'packaging') return <PackagingBody lines={tabs.packaging.lines} other={tabs.packaging.other} box={tabs.packaging.box} lang={lang} scopeNames={scopeNames} />;
   if (id === 'compatibility') {
+    const note = tabs.compatibilityNote;
     return (
       <div className="space-y-4" data-knowledge-tab="compatibility">
-        {tabs.compatibility.map((b) => (
-          <div key={b.bucket}>
-            <h4 className="text-text-primary font-bold text-[13px] mb-2">{w(b.label, lang)}</h4>
-            <ul className="flex flex-wrap gap-2">
-              {b.items.map((item, i) => (
-                <li key={`${item.label}-${i}`}>
-                  {item.product ? (
-                    <Link
-                      to={`/product/${encodeURIComponent(item.product.slug)}`}
-                      className="lv-choice inline-flex min-h-[44px] items-center gap-2 px-3 py-1.5 text-sm"
-                    >
-                      {item.product.image ? (
-                        <SafeImage src={item.product.image} alt="" aspect="square" fit="contain" className="h-8 w-8 shrink-0 rounded-md" sizes="32px" bgClassName="bg-surface-raised" />
-                      ) : null}
-                      <span dir="auto">{w(item.product.name, lang) || item.label}</span>
-                    </Link>
+        {tabs.compatibility.map((b) => {
+          const linked = b.items.filter((item) => item.product);
+          const plain = b.items.filter((item) => !item.product);
+          return (
+            <div key={b.bucket}>
+              <h4 className="text-text-primary font-bold text-[13px] mb-2">{w(b.label, lang)}</h4>
+              <ul className="flex flex-wrap items-center gap-2">
+                {linked.map((item, i) => {
+                  const targets = [item.product!, ...(item.more ?? [])];
+                  return item.target_kind === 'family' ? (
+                    <li key={`${item.label}-${i}`} className="flex flex-wrap items-center gap-2" data-knowledge-family>
+                      <span className="text-sm text-text-secondary">
+                        <bdi dir="ltr">{item.label}</bdi>:
+                      </span>
+                      {targets.map((p) => (
+                        <CompatLink key={p.slug} p={p} fallback={item.label} lang={lang} />
+                      ))}
+                    </li>
                   ) : (
-                    <span className="inline-flex min-h-[36px] items-center rounded-full border border-border-subtle px-3 py-1 text-sm text-text-secondary" dir="auto">
-                      {item.label}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+                    targets.map((p) => (
+                      <li key={`${item.label}-${p.slug}`}>
+                        <CompatLink p={p} fallback={item.label} lang={lang} />
+                      </li>
+                    ))
+                  );
+                })}
+                {plain.length ? (
+                  // Not on the site (yet): words, never a pill that looks tappable.
+                  <BidiText
+                    as="li"
+                    className="text-sm text-text-secondary"
+                    text={plain.map((item) => tx(item.label, item.label_i18n, lang)).join(lang === 'en' ? ', ' : '، ')}
+                  />
+                ) : null}
+              </ul>
+            </div>
+          );
+        })}
+        {note ? (
+          <p className="text-[12px] text-text-muted" data-knowledge-compat-note>
+            <BidiText text={valueText(note, lang).text} />
+            {note.status === 'unverified' ? (
+              <span className="ms-2 inline-flex items-center rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] font-semibold text-text-secondary align-middle" data-unverified>
+                {w(STATE_WORDS.unverified, lang)}
+              </span>
+            ) : null}
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -232,7 +275,7 @@ export function TabBody({
           >
             <FileText aria-hidden="true" className="h-5 w-5 shrink-0 text-text-secondary" />
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold text-text-primary" dir="auto">{documentTitle(d, lang)}</span>
+              <BidiText className="block text-sm font-semibold text-text-primary" text={documentTitle(d, lang)} />
               <span className="block text-[11px] text-text-muted">
                 <bdi>{d.host}</bdi> · {w(KNOWLEDGE_WORDS.opensExternal, lang)}
               </span>
@@ -242,6 +285,19 @@ export function TabBody({
         </li>
       ))}
     </ul>
+  );
+}
+
+/** A compatible product on the site: a chip that links to its page — its picture, its name (always Latin, B.7), a chevron. */
+function CompatLink({ p, fallback, lang }: { p: CompatProduct; fallback: string; lang: KnowledgeLang }) {
+  return (
+    <Link to={`/product/${encodeURIComponent(p.slug)}`} className="lv-choice inline-flex min-h-[44px] items-center gap-2 px-3 py-1.5 text-sm" data-knowledge-link>
+      {p.image ? <SafeImage src={p.image} alt="" aspect="square" fit="contain" className="h-8 w-8 shrink-0 rounded-md" sizes="32px" bgClassName="bg-surface-raised" /> : null}
+      <span dir="ltr" className="text-start rtl:text-right">
+        {w(p.name, lang) || fallback}
+      </span>
+      <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-text-muted rtl:rotate-180" />
+    </Link>
   );
 }
 
@@ -302,7 +358,9 @@ function Row({ r, lang, scopeNames, label }: { r: KnowledgeRow; lang: KnowledgeL
   const scoped = r.scope.kind !== 'product' && r.scope.id;
   return (
     <div className={`py-2 border-b border-border-subtle last:border-0 ${ROW_GRID}`} data-knowledge-row={r.key} data-status={r.status}>
-      <dt className="text-text-muted min-w-0 [overflow-wrap:anywhere]">{label ?? w(r.label, lang)}</dt>
+      <dt className="text-text-muted min-w-0 [overflow-wrap:anywhere]">
+        <BidiText text={label ?? rowLabelText(r, lang)} />
+      </dt>
         <dd className={`text-end min-w-0 [overflow-wrap:anywhere] ${v.absent ? 'text-text-muted' : 'text-text-primary'}`}>
           {r.status === 'not_found' && r.checked_sources?.length ? (
             <details className="inline-block text-start">
@@ -314,7 +372,7 @@ function Row({ r, lang, scopeNames, label }: { r: KnowledgeRow; lang: KnowledgeL
                 <p className="font-semibold text-text-primary">{w(KNOWLEDGE_WORDS.sourcesChecked, lang)}</p>
                 <ul className="mt-1 space-y-0.5">
                   {r.checked_sources.map((c, i) => (
-                    <li key={i} dir="auto">
+                    <li key={i} dir={scriptDir(c.title || w(KNOWLEDGE_WORDS.official, lang))}>
                       {c.url ? (
                         <a href={c.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
                           {c.title || w(KNOWLEDGE_WORDS.official, lang)}
@@ -330,7 +388,7 @@ function Row({ r, lang, scopeNames, label }: { r: KnowledgeRow; lang: KnowledgeL
           ) : v.absent ? (
             v.text
           ) : (
-            <bdi>{v.text}</bdi>
+            <BidiText as="bdi" text={v.text} />
           )}
           {r.status === 'unverified' ? (
             <span className="ms-2 inline-flex items-center rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] font-semibold text-text-secondary align-middle" data-unverified>
@@ -341,12 +399,12 @@ function Row({ r, lang, scopeNames, label }: { r: KnowledgeRow; lang: KnowledgeL
       {r.region === 'us_110v' ? <dd className={NOTE} data-knowledge-note="us_110v">{w(US_110V_NOTE, lang)}</dd> : null}
       {scoped && scopeNames[r.scope.id] ? (
         <dd className={NOTE} data-knowledge-note="applies-to">
-          {w(KNOWLEDGE_WORDS.appliesTo, lang)} <bdi>{scopeNames[r.scope.id]}</bdi>
+          {w(KNOWLEDGE_WORDS.appliesTo, lang)} <BidiText as="bdi" text={scopeNames[r.scope.id]} />
         </dd>
       ) : null}
       {r.test_method ? (
         <dd className={NOTE}>
-          {w(KNOWLEDGE_WORDS.testMethod, lang)}: <bdi>{r.test_method}</bdi>
+          {w(KNOWLEDGE_WORDS.testMethod, lang)}: <BidiText as="bdi" text={testMethodText(r, lang)} />
         </dd>
       ) : null}
       {src ? (
@@ -411,7 +469,7 @@ function PackagingBody({
                 ) : (
                   <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-gold shrink-0 mx-1" />
                 )}
-                <span dir="auto" className="min-w-0 flex-1">{item.text}</span>
+                <BidiText className="min-w-0 flex-1" text={boxItemText(item, lang)} />
                 {item.qty && item.qty > 1 ? (
                   <bdi className="tabular-nums text-text-muted" aria-label={`${w(KNOWLEDGE_WORDS.qty, lang)} ${item.qty}`}>
                     ×{item.qty}

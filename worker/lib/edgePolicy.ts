@@ -109,8 +109,12 @@ export const ANONYMOUS_CACHE_CONTROL = cacheControlFor(ANONYMOUS_LIFETIME);
  * adjustment in `displayUsdRate`, a picture's supplier link and the estimate's
  * quantity curve left the public answers.
  * 2026-10-15 (DECISIONS row 240): catalog-only cards and pages (`price_status`,
- * null prices) — a body cached before could say the product is absent. */
-export const PUBLIC_PROJECTION_REVISION = 'catalog-only-2026-10-15';
+ * null prices) — a body cached before could say the product is absent.
+ * 2026-10-16 (docs/bambu-import/I18N-DESIGN.md §A.5, §C): the knowledge
+ * answer's compatibility is one item per label with `more`, and the imported
+ * English carries the translation memory's words — a pre-release copy would
+ * still show the repeated chips. */
+export const PUBLIC_PROJECTION_REVISION = 'i18n-dedupe-2026-10';
 const PROJECTION_HEADER = 'X-Levonis-Public-Projection';
 
 /**

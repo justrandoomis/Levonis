@@ -308,6 +308,22 @@ test('compatibility: a link only to a VISIBLE target; a hidden or pending target
   assert.deepEqual(body.compatibility.not_compatible, []);
 });
 
+test('I18N §C: the same label twice (product + value scope) is one item; the statement the chips repeat leaves the tabs; a pending «يتطلب» is words', async () => {
+  const w = world();
+  w.raw.exec(`
+    INSERT INTO product_relations (id, product_id, relation, target_kind, target_product_id, target_source, target_source_handle, target_label, state, evidence_kind, scope_kind, scope_id)
+      VALUES ('rel_a1_v', '${H2D.id}', 'compatible_with', 'printer', '${A1.id}', 'bambu_us', 'a1', 'Bambu Lab A1', 'resolved', 'option_value', 'option_value', 'v_k_std');
+  `);
+  insertSpecValue(w.raw, H2D.id, 'compat.statement', { value_text: 'Bambu Lab A1 and Bambu Lab X2D', status: 'unverified', group_key: 'compat', sort: 20 });
+  const { body } = await knowledgeOf(w);
+  assert.deepEqual(body.compatibility.compatible.map((c: Body) => [c.label, c.scope.kind]), [['Bambu Lab A1', 'product'], ['Bambu Lab X2D', 'product']], 'one chip per label');
+  assert.ok(rowByKey(body, 'compat.statement'), 'the answer still carries the row (VERIFY reads every public row)');
+  const tabs = knowledgeTabs(body as KnowledgeAnswer, { optionValueIds: ['v_k_std'], variantId: null });
+  assert.ok(!tabs.specs.some((g) => g.rows.some((r) => r.key === 'compat.statement')), 'the tabs say it once, as chips');
+  assert.equal(tabs.compatibilityNote, undefined);
+  assert.equal(tabs.compatibility.find((b) => b.bucket === 'requires')?.items[0].product, undefined, '«AMS 2 Pro» is not on the site: no link');
+});
+
 test('swatches: our own picture, its size and the published hex — never its source', async () => {
   const { body } = await knowledgeOf(world());
   assert.deepEqual(body.swatches, [{ option_value_id: 'v_k_std', url: SWATCH_URL, width: 128, height: 128, published_hex: '#112233' }]);

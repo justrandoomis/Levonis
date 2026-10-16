@@ -29,6 +29,8 @@ import { lensStrings, type LensStrings } from './lensStrings';
 import RowBar from './RowBars';
 import { columnGap, columnsTemplate } from './grid';
 import { useIsWide } from './useIsWide';
+import BidiText from '../ui/BidiText';
+import { ARABIC_SCRIPT } from '../../lib/bidi';
 
 /**
  * THE TABLE (CATALOG_DISCOVERY §10.1, §10.3; mockup 8).
@@ -100,8 +102,10 @@ function ValueText({ row, value, lang }: { row: CompareRow; value: CompareValue;
   // of the value (CompareValue.i18n); the finder's few options otherwise.
   const own = lang === 'ar' || lang === 'ckb' ? value.i18n?.[lang] : undefined;
   const shown = own ?? (row.parse === 'boolean' || row.parse === 'text' || row.parse === 'ordinal' ? specValue(value.text, lang) : value.text);
-  // A Latin value (an English option, a model name) is an LTR island inside Arabic.
-  return /[A-Za-z]/.test(shown) && !/[؀-ۿ]/.test(shown) ? <bdi dir="ltr">{shown}</bdi> : <>{shown}</>;
+  // A Latin value (an English option, a model name) is an LTR island inside Arabic; a value with Arabic script (the
+  // translation memory's or the dictionary's) reads right to left with its Latin and number runs isolated (I18N-DESIGN §B).
+  if (/[A-Za-z]/.test(shown) && !ARABIC_SCRIPT.test(shown)) return <bdi dir="ltr">{shown}</bdi>;
+  return ARABIC_SCRIPT.test(shown) ? <BidiText as="bdi" text={shown} /> : <>{shown}</>;
 }
 
 function Cell({

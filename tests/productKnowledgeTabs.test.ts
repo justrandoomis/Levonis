@@ -245,7 +245,7 @@ test('the component: lazy-loaded data, the accordion on phones and tabs on deskt
   const blanks = [...src.matchAll(/target="_blank"/g)].length;
   const safe = [...src.matchAll(/target="_blank"\s+rel="noopener noreferrer"/g)].length;
   assert.ok(blanks > 0 && blanks === safe, 'every new-tab link carries noopener noreferrer');
-  assert.match(src, /<bdi>\{v\.text\}<\/bdi>/, 'numbers in <bdi>');
+  assert.match(src, /<BidiText as="bdi" text=\{v\.text\} \/>/, 'a value is an isolate: its direction from its script, numbers and Latin runs isolated (I18N-DESIGN §B)');
   assert.match(src, /KNOWLEDGE_WORDS\.opensExternal/);
   const page = readFileSync(join(ROOT, 'src/pages/Product.tsx'), 'utf8');
   assert.match(page, /React\.lazy\(\(\) => import\('\.\.\/components\/product\/ProductKnowledgeTabs'\)\)/, 'a lazy chunk of its own');
@@ -393,8 +393,8 @@ test('the markup: each fact is one div of its <dl> holding only <dt> and <dd> �
   }
   // The notes ride in the row: the US note, «Applies to», the test method, the source.
   assert.match(html, /<dd class="col-span-2[^"]*" data-knowledge-note="us_110v">US version \(100–120 V\)<\/dd>/);
-  assert.match(html, /data-knowledge-note="applies-to">Applies to <bdi>H2D AMS Combo<\/bdi><\/dd>/);
-  assert.match(html, /<dd class="col-span-2[^"]*">Test method: <bdi>Bench<\/bdi><\/dd>/);
+  assert.match(html, /data-knowledge-note="applies-to">Applies to <bdi dir="ltr">H2D AMS Combo<\/bdi><\/dd>/);
+  assert.match(html, /<dd class="col-span-2[^"]*">Test method: <bdi dir="ltr">Bench<\/bdi><\/dd>/);
 });
 
 test('«إصدارات أخرى» says it opens: a chevron that turns, the native marker hidden — in the specifications and the packaging tab', () => {
@@ -425,7 +425,7 @@ test('a compatible product is the router’s link (no reload), its slug encoded;
   const html = render(createElement(TabBody, { id: 'compatibility', tabs, lang: 'en', selection: { optionValueIds: [], variantId: null }, scopeNames: {} }));
   assert.match(html, /<a [^>]*href="\/product\/bambu-lab-a1"[^>]*>/);
   const src = readFileSync(join(ROOT, 'src/components/product/ProductKnowledgeTabs.tsx'), 'utf8');
-  assert.match(src, /<Link\s+to=\{`\/product\/\$\{encodeURIComponent\(item\.product\.slug\)\}`\}/, 'react-router’s Link, the slug encoded');
+  assert.match(src, /<Link\s+to=\{`\/product\/\$\{encodeURIComponent\(p\.slug\)\}`\}/, 'react-router’s Link, the slug encoded');
   assert.doesNotMatch(src, /href=\{`\/product\//, 'no raw anchor to a product page');
 });
 
@@ -434,4 +434,94 @@ test('the desktop tab strip wraps instead of clipping its last label (no hidden 
   const strip = /<TabStrip\b[\s\S]*?\/>/.exec(src)?.[0] ?? '';
   assert.match(strip, /className="flex-wrap\b/);
   assert.doesNotMatch(strip, /overflow-x-auto|hide-scrollbar/);
+});
+
+// ------------------------------------------------------------------ 9. the owner's note on /product/filament-buffer (I18N-DESIGN §B, §C.3, §C.4)
+
+/** The canary's answer as the route gives it after the dedupe: two chips, «يتطلب AMS Hub», the statement row. */
+function canary(linked: boolean): KnowledgeAnswer {
+  const k = empty();
+  k.specs = [
+    {
+      group: 'electrical',
+      label: { ar: 'الكهرباء', en: 'Electrical', ckb: 'کارەبا' },
+      rows: [
+        row({ key: 'electrical.voltage', label: { ar: 'الجهد الكهربائي', en: 'Voltage', ckb: 'ڤۆڵتیە' }, value_text: '24V' }),
+        row({ key: 'electrical.current', label: { ar: 'التيار', en: 'Current', ckb: 'تەزوو' }, value_text: 'Below 10mA', value_i18n: { ar: 'أقل من 10mA', ckb: 'کەمتر لە 10mA' } }),
+      ],
+    },
+    {
+      group: 'part',
+      label: { ar: 'القطعة', en: 'Part', ckb: 'پارچە' },
+      rows: [
+        row({ key: 'part.material', value_text: 'Plastics, PCBA' }),
+        row({ key: 'part.color', value_text: 'Gray', value_i18n: { ar: 'رمادي', ckb: 'خۆڵەمێشی' } }),
+      ],
+    },
+    { group: 'compat', label: { ar: 'التوافق', en: 'Compatibility', ckb: 'گونجاوی' }, rows: [row({ key: 'compat.statement', value_text: 'X1 Series and P1 Series', status: 'unverified' })] },
+  ];
+  const p1s = { id: 'p_p1s', slug: 'p1s', name: { ar: 'Bambu Lab P1S', en: 'Bambu Lab P1S', ckb: 'Bambu Lab P1S' }, image: '' };
+  const rp1s = { id: 'p_rp1s', slug: 'refurbished-p1s', name: { ar: 'Refurbished P1S', en: 'Refurbished P1S', ckb: 'Refurbished P1S' }, image: '' };
+  const hub = { id: 'p_hub', slug: 'ams-hub', name: { ar: 'AMS Hub', en: 'AMS Hub', ckb: 'AMS Hub' }, image: '/files/hub.webp' };
+  k.compatibility.compatible = [
+    { relation: 'compatible_with', label: 'P1 Series', target_kind: 'family', scope: { kind: 'product', id: '' }, ...(linked ? { product: p1s, more: [rp1s] } : {}) },
+    { relation: 'compatible_with', label: 'X1 Series', target_kind: 'family', scope: { kind: 'product', id: '' } },
+  ];
+  k.compatibility.requires = [{ relation: 'requires', label: 'AMS Hub', target_kind: 'hub', scope: { kind: 'product', id: '' }, ...(linked ? { product: hub } : {}) }];
+  return k;
+}
+
+const SEL = { optionValueIds: ['ov_8de61959ea1a198354b199e2'], variantId: null };
+
+test('compatibility said once: the statement leaves the specifications when the chips say it; kept as a note only when it says more', () => {
+  const tabs = knowledgeTabs(canary(false), SEL);
+  assert.ok(!tabs.specs.some((g) => g.rows.some((r) => r.key === 'compat.statement')), 'not in the specifications');
+  assert.ok(!tabs.specs.some((g) => g.group === 'compat'), 'an emptied group disappears');
+  assert.equal(tabs.compatibilityNote, undefined, '«X1 Series and P1 Series» says nothing the chips do not');
+  // A statement that says more stays, under the chips.
+  const more = canary(false);
+  more.specs[2].rows[0] = row({ key: 'compat.statement', value_text: 'X1 Series and P1 Series (not the A1 mini)', status: 'unverified' });
+  const t2 = knowledgeTabs(more, SEL);
+  assert.equal(t2.compatibilityNote?.value_text, 'X1 Series and P1 Series (not the A1 mini)');
+  const html = render(createElement(TabBody, { id: 'compatibility', tabs: t2, lang: 'ar', selection: SEL, scopeNames: {} }));
+  assert.match(html, /data-knowledge-compat-note="true"><span dir="ltr">X1 Series and P1 Series \(not the A1 mini\)<\/span><span[^>]*data-unverified="true">غير مؤكَّد<\/span>/);
+  // Without a Compatibility tab, the statement stays where it was.
+  const none = canary(false);
+  none.compatibility = { compatible: [], not_compatible: [], requires: [], related: [] };
+  assert.ok(knowledgeTabs(none, SEL).specs.some((g) => g.rows.some((r) => r.key === 'compat.statement')));
+});
+
+test('«يتطلب AMS Hub» not on the site yet: plain words, no link, no pill; on the site: a link to its page; a family: its label, then its members', () => {
+  const plain = render(createElement(TabBody, { id: 'compatibility', tabs: knowledgeTabs(canary(false), SEL), lang: 'ar', selection: SEL, scopeNames: {} }));
+  assert.doesNotMatch(plain, /<a\b/, 'nothing to follow');
+  assert.doesNotMatch(plain, /rounded-full|border-border-subtle|min-h-\[36px\]|lv-choice/, 'no pill, no border, no tappable height');
+  assert.match(plain, /<li dir="rtl" class="text-sm text-text-secondary"><bdi dir="ltr">P1 Series<\/bdi>، <bdi dir="ltr">X1 Series<\/bdi><\/li>/, 'one line of words, «، » between them');
+  assert.match(plain, /يتطلب[\s\S]*<li dir="ltr" class="text-sm text-text-secondary">AMS Hub<\/li>/);
+  assert.equal((plain.match(/P1 Series/g) ?? []).length, 1, 'each label once');
+  const en = render(createElement(TabBody, { id: 'compatibility', tabs: knowledgeTabs(canary(false), SEL), lang: 'en', selection: SEL, scopeNames: {} }));
+  assert.match(en, /<li dir="ltr" class="text-sm text-text-secondary">P1 Series, X1 Series<\/li>/);
+  const linked = render(createElement(TabBody, { id: 'compatibility', tabs: knowledgeTabs(canary(true), SEL), lang: 'ar', selection: SEL, scopeNames: {} }));
+  assert.match(linked, /<a [^>]*data-knowledge-link="true" href="\/product\/ams-hub"/, 'the hub, once imported, is a link');
+  assert.match(linked, /data-knowledge-family="true"><span class="text-sm text-text-secondary"><bdi dir="ltr">P1 Series<\/bdi>:<\/span><a [^>]*href="\/product\/p1s"[\s\S]*?<a [^>]*href="\/product\/refurbished-p1s"/, 'a family: its label, then each member');
+  assert.match(linked, /<span dir="ltr" class="text-start rtl:text-right">Bambu Lab P1S<\/span>/, 'a name reads LTR, aligned with the column');
+  assert.match(linked, /lucide-chevron-right[^"]*rtl:rotate-180/, 'a chevron says it goes somewhere');
+  assert.match(linked, /<li dir="ltr" class="text-sm text-text-secondary">X1 Series<\/li>/, 'the label with no page stays words');
+});
+
+test('mixed scripts: «أقل من 10mA» is RTL with 10mA isolated LTR; an English fallback reads LTR; Sorani the same', () => {
+  const tabs = knowledgeTabs(canary(false), SEL);
+  const ar = render(createElement(TabBody, { id: 'specs', tabs, lang: 'ar', selection: SEL, scopeNames: {} }));
+  assert.match(ar, /<bdi dir="rtl">أقل من <bdi dir="ltr">10mA<\/bdi><\/bdi>/);
+  assert.match(ar, /<bdi dir="ltr">Plastics, PCBA<\/bdi>/, 'no translation: the English reads LTR');
+  assert.match(ar, /<bdi dir="rtl">رمادي<\/bdi>/);
+  assert.match(ar, /<bdi dir="ltr">24V<\/bdi>/);
+  const ckb = render(createElement(TabBody, { id: 'specs', tabs, lang: 'ckb', selection: SEL, scopeNames: {} }));
+  assert.match(ckb, /<bdi dir="rtl">کەمتر لە <bdi dir="ltr">10mA<\/bdi><\/bdi>/);
+  const en = render(createElement(TabBody, { id: 'specs', tabs, lang: 'en', selection: SEL, scopeNames: {} }));
+  assert.match(en, /<bdi dir="ltr">Below 10mA<\/bdi>/, 'English reads the English');
+  assert.equal(valueText(canary(false).specs[1].rows[1], 'ckb').text, 'خۆڵەمێشی');
+  // A list joins its translated items; a box item and a test method read in the reader's language.
+  const list = row({ key: 'printing.supported_filament', items: ['Gray', 'PLA'], items_i18n: [{ ar: 'رمادي', ckb: 'خۆڵەمێشی' }, null] });
+  assert.equal(valueText(list, 'ar').text, 'رمادي، PLA');
+  assert.equal(valueText(list, 'en').text, 'Gray, PLA');
 });
