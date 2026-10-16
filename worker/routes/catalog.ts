@@ -21,7 +21,8 @@
  * `json_each(?)` parameter; the membership CTE is three terms.
  */
 import { withCacheEpoch } from '../lib/publicApi/cache';
-import { listing } from '../lib/listing';
+import { completenessAbsentLately, listing, optimisticSellableFlag, runListed } from '../lib/listing';
+import { membershipCte } from '../lib/catalogMembership';
 import { Hono, type Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { HttpError, str } from '../lib/http';
@@ -39,7 +40,7 @@ import {
   type CatalogIndex,
   type ShelfCandidate,
 } from '../lib/catalogPresentation';
-import { pricingCtx, resolveProductCards, type PricingCtx } from './products';
+import { pricingCtx, pricingCtxForUser, resolveProductCards, type PricingCtx } from './products';
 import { safeParse } from '../lib/types';
 import { cardLeadPhoto } from '../lib/cardPhoto';
 import type { CatalogTreeNode, CategoryPayload } from '@levonis/catalog/discoveryTypes';
@@ -204,53 +205,65 @@ export function assignTreePhotos(
 export const TREE_PHOTO_SHORTLIST = 3;
 
 /**
- * The map's photographs when the catalogue is past TREE_AVAILABILITY_CAP and
- * no card was read for the counts: the products in the shop's order (priced
- * first), the first few of each section, and only those resolved to cards.
+ * THE PHOTOGRAPHS' SHORT LIST, IN THE MAP'S FIRST WAVE (speed review
+ * 2026-10-16). Past TREE_AVAILABILITY_CAP no card is read for the counts, so
+ * the photographs need cards of their own. They were found AFTER the
+ * memberships — a short list, then its rows, then their cards: three
+ * dependent round trips more than the bare map, paid by the first visitor of
+ * each colo every five minutes once the Bambu import passed the cap.
+ *
+ * Now ONE statement leaves beside the catalogs and the memberships and
+ * answers the rows themselves: the first TREE_PHOTO_SHORTLIST products of
+ * every section a product is placed or classified in DIRECTLY, in the shop's
+ * order (priced first, then `display_order`, then the newest), VISIBLE, each
+ * with its SELLABLE flag. That covers every section's own first few, its
+ * ancestors' included: a product among a section's first three is among the
+ * first three of the direct section it sits in, which lies inside it. Only
+ * the cards are left for the second wave.
+ *
+ * Gated in SQL: at or under the cap — where every card is read for the counts
+ * anyway — it answers no row (SQLite evaluates the constant term once,
+ * before its loop). Optimistic and through `runListed` like the memberships
+ * (CLAUDE.md rule 2: a database without 0184 or 0189 runs it without the held
+ * clause, or with nothing sellable).
  */
-async function treePhotosByShortlist(
+function photoShortlistRows(db: D1Database): Promise<Record<string, unknown>[]> {
+  const flag = optimisticSellableFlag(db, 'p');
+  const sql = `WITH ${membershipCte(!completenessAbsentLately(db))},
+    member(product_id, catalog_id) AS (
+      SELECT m.product_id, m.catalog_id FROM membership m JOIN products p ON p.id = m.product_id AND p.composition = ''
+    ),
+    ranked(product_id, rn) AS (
+      SELECT m.product_id, ROW_NUMBER() OVER (PARTITION BY m.catalog_id ORDER BY ${flag} DESC, p.display_order ASC, p.created_at DESC, p.id ASC)
+        FROM member m JOIN products p ON p.id = m.product_id
+    )
+    SELECT p.*, ${flag} AS sellable_now FROM products p
+     WHERE (SELECT COUNT(DISTINCT product_id) FROM member) > ?2
+       AND p.id IN (SELECT product_id FROM ranked WHERE rn <= ?1)
+     ORDER BY sellable_now DESC, p.display_order ASC, p.created_at DESC, p.id ASC`;
+  return runListed(db, sql, (q) =>
+    db.prepare(q).bind(TREE_PHOTO_SHORTLIST, TREE_AVAILABILITY_CAP).all<Record<string, unknown>>()
+  ).then((r) => r.results ?? []);
+}
+
+/**
+ * The map's photographs past TREE_AVAILABILITY_CAP, from the short list's rows
+ * (`photoShortlistRows`, already in the shop's order): their cards, then the
+ * explorer's rule over them.
+ */
+async function treePhotosFromShortlist(
   db: D1Database,
   ctxPromise: Promise<PricingCtx>,
   roots: CatalogTreeNode[],
   byProduct: Map<string, Set<string>>,
-  idx: CatalogIndex
+  idx: CatalogIndex,
+  rows: Record<string, unknown>[]
 ): Promise<void> {
-  const L = await listing(db);
-  const { results } = await db.prepare(
-    `SELECT id, ${L.sellableFlag('products')} AS sellable_now FROM products WHERE ${L.visible('products')} AND composition = '' AND id IN (SELECT value FROM json_each(?))
-      ORDER BY sellable_now DESC, display_order ASC, created_at DESC`
-  )
-    .bind(JSON.stringify([...byProduct.keys()]))
-    .all<{ id: string; sellable_now: unknown }>();
-  const ordered = (results ?? []).map((r) => String(r.id));
-  const sellable = new Map((results ?? []).map((r) => [String(r.id), r.sellable_now]));
-  const onMap = new Set<string>();
-  const walk = (nodes: CatalogTreeNode[]) => nodes.forEach((n) => (onMap.add(n.id), walk(n.children ?? [])));
-  walk(roots);
-  const seats = new Map<string, number>();
-  const shortlist: string[] = [];
-  for (const id of ordered) {
-    let wanted = false;
-    for (const cat of byProduct.get(id) ?? []) {
-      if (!onMap.has(cat) || (seats.get(cat) ?? 0) >= TREE_PHOTO_SHORTLIST) continue;
-      seats.set(cat, (seats.get(cat) ?? 0) + 1);
-      wanted = true;
-    }
-    if (wanted) shortlist.push(id);
-  }
-  if (shortlist.length === 0) return;
-  // Already read VISIBLE above; each row keeps the SELLABLE flag it was read with there.
-  const rows = (
-    (
-      await db.prepare(`SELECT * FROM products WHERE id IN (SELECT value FROM json_each(?))`)
-        .bind(JSON.stringify(shortlist))
-        .all<Record<string, unknown>>()
-    ).results ?? []
-  ).map((r) => ({ ...r, sellable_now: sellable.get(String(r.id)) }));
+  if (rows.length === 0) return;
   const cards = await resolveProductCards(db, rows, await ctxPromise, idx, 'flag');
   const photos = new Map<string, { src: string; light?: string } | null>();
   for (const [id, card] of cards) photos.set(id, cardLeadPhoto(card));
-  assignTreePhotos(roots, shortlist, (id) => byProduct.get(id), (id) => photos.get(id) ?? null);
+  assignTreePhotos(roots, rows.map((r) => String(r.id)), (id) => byProduct.get(id), (id) => photos.get(id) ?? null);
 }
 
 /**
@@ -264,7 +277,11 @@ export async function buildCatalogTree(
   /** `photos`: one borrowed photograph per section (`assignTreePhotos`) — the storefront's map; the public API describes sections without them. */
   opts: { photos?: boolean } = {}
 ): Promise<{ roots: CatalogTreeNode[]; totals: { products: number; available: number | null } }> {
-  const [records, memberships] = await Promise.all([loadCatalogRecords(db), loadMemberships(db)]);
+  const [records, memberships, shortlist] = await Promise.all([
+    loadCatalogRecords(db),
+    loadMemberships(db),
+    opts.photos ? photoShortlistRows(db) : Promise.resolve([]),
+  ]);
   const idx = indexCatalogs(records);
   const byProduct = membershipByProduct(memberships, idx);
   const { available, ordered } = await availableProductIds(db, ctxPromise, [...byProduct.keys()], idx);
@@ -275,7 +292,7 @@ export async function buildCatalogTree(
       const photos = new Map(ordered.map((o) => [o.id, cardLeadPhoto(o.card)]));
       assignTreePhotos(roots, ordered.map((o) => o.id), (id) => byProduct.get(id), (id) => photos.get(id) ?? null);
     } else {
-      await treePhotosByShortlist(db, ctxPromise, roots, byProduct, idx);
+      await treePhotosFromShortlist(db, ctxPromise, roots, byProduct, idx, shortlist);
     }
   }
   // Totals over what the explorer SHOWS: products under an active root.
@@ -290,9 +307,17 @@ export async function buildCatalogTree(
   return { roots, totals: { products, available: available ? avail : null } };
 }
 
+/**
+ * ONE MAP FOR EVERY VIEWER, BUILT WITHOUT THE VIEWER (speed review
+ * 2026-10-16). The answer is cached for everyone, so nothing in it may depend
+ * on who asked — and nothing does: its counts, «متوفرة الآن» and photographs
+ * read the cards' stock and pictures, never a price. Built with the GUEST's
+ * pricing inputs, a signed-in visitor's miss no longer waits for their tier
+ * (three dependent reads) before the cards.
+ */
 catalogRoutes.get('/tree', (c) =>
   cached(c, treeCacheKey(c.req.url), TREE_CACHE, async () =>
-    c.json({ success: true, ...(await buildCatalogTree(c.env.DB, pricingCtx(c), { photos: true })) })
+    c.json({ success: true, ...(await buildCatalogTree(c.env.DB, pricingCtxForUser(c.env.DB, null), { photos: true })) })
   )
 );
 
