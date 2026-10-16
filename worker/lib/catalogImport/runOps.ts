@@ -27,6 +27,7 @@ import { currentAndNext } from './report';
 import { taxonomyNodeId, type ReviewedBundle, type TaxonomyCreateNode } from './reviewed';
 import { stageDataOf, type ItemRow } from './items';
 import { FINGERPRINT_QUERIES, readbackFromTarget } from './writer';
+import { forgetSearchSynonyms } from '../search/store';
 
 // ---------------------------------------------------------------- /hello
 
@@ -196,6 +197,8 @@ export async function prepareTaxonomy(db: D1Database, bundle: ReviewedBundle): P
   const synAt = statements.length;
   statements.push(...packedInserts(db, 'INSERT OR IGNORE INTO search_synonyms (term, canonical)', '(?, ?)', bundle.synonyms.map((s) => [s.term, s.canonical])));
   const results = (statements.length ? await db.batch(statements) : []) as Array<{ meta?: { changes?: number } }>;
+  // The import's words are searchable at once in this isolate (worker/lib/search/store.ts `synonymsFor`).
+  forgetSearchSynonyms(db);
   const changes = (i: number) => Number(results[i]?.meta?.changes ?? 0);
   return {
     created_nodes: nodeAt.reduce((n, i) => n + changes(i), 0),

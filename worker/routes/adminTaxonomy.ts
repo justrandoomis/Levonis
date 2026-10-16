@@ -42,7 +42,7 @@ import {
   siteMediaKey,
 } from '../lib/siteMedia';
 import { normalizeText } from '../lib/search/normalize';
-import { backfillSearchIndex, planSearchRestamp, searchIndexInstalled } from '../lib/search/store';
+import { backfillSearchIndex, forgetSearchSynonyms, planSearchRestamp, searchIndexInstalled } from '../lib/search/store';
 import { degradeIfSchemaMissing } from '../lib/membershipBenefits';
 import { allCategoryDeliveryRules, parseCategoryRuleInput } from '../lib/categoryDelivery';
 import { forgetCatalogIndex } from '../lib/catalogPresentation';
@@ -1401,6 +1401,7 @@ adminTaxonomyRoutes.post('/search-vocabulary', async (c) => {
     .prepare('INSERT OR REPLACE INTO search_synonyms (term, canonical, owner_added) VALUES (?, ?, 1)')
     .bind(term, canonical)
     .run();
+  forgetSearchSynonyms(c.env.DB);
   await audit(c.env.DB, admin.id, 'search.vocabulary.set', term, { term, canonical });
   return c.json({ success: true, term, canonical });
 });
@@ -1410,6 +1411,7 @@ adminTaxonomyRoutes.delete('/search-vocabulary/:term', async (c) => {
   const term = normalizeText(c.req.param('term'));
   if (!term) throw badRequest('term is required');
   const res = await c.env.DB.prepare('DELETE FROM search_synonyms WHERE term = ?').bind(term).run();
+  forgetSearchSynonyms(c.env.DB);
   await audit(c.env.DB, admin.id, 'search.vocabulary.delete', term, { term });
   return c.json({ success: true, deleted: (res.meta.changes ?? 0) > 0 });
 });
