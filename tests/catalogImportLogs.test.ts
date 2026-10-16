@@ -214,6 +214,7 @@ for (const planted of PLANTED) {
       assert.match(readFileSync(output, 'utf8'), /^more=false\nblocked=false\nrun_id=cir_[0-9a-f]{24}\n$/);
       assert.ok(readFileSync(summary, 'utf8').length > 0, 'the summary was written');
       assert.ok(w.calls.some((c) => c.path === '/run/protect-snapshot'), 'the open mode ran against the planted Worker');
+      assert.match(stdout, /local dry run: 0 requests to a host other than 127\.0\.0\.1 refused, never sent/, 'a local site: the importer\'s requests were held to 127.0.0.1');
       clean('stdout', stdout, planted);
       clean('stderr', stderr, planted);
       // Every file the job left in its temporary directory: the token file is gone, the rest is clean or sealed.

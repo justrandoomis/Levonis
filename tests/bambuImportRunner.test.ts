@@ -34,7 +34,7 @@ import { Deadline, WRITE_RESERVE, ITEM_RESERVE, backoff, retryAfterMs, WORST } f
 import { classify, normaliseCode, OpsClient } from '../scripts/bambu-import/opsClient';
 import { parseRobots, robotsAllows } from '../scripts/bambu-import/robots';
 import { ImportStop, StoreFetcher } from '../scripts/bambu-import/fetch';
-import { ExtractGate, stageAfter } from '../scripts/bambu-import/run';
+import { ExtractGate, localOnlyFetch, stageAfter } from '../scripts/bambu-import/run';
 import { reviewedDifferences } from '../scripts/bambu-import/discover';
 import { expectedFacts } from '../scripts/bambu-import/verify';
 import type { MediaAnswerRow } from '../scripts/bambu-import/opsClient';
@@ -1022,4 +1022,20 @@ test('the breadcrumb travels as not applicable (§1 row 28): in the evidence bes
   } finally {
     w.dispose();
   }
+});
+
+test('a local dry run: the importer\'s own requests reach 127.0.0.1 only — anything else is refused unsent and counted (§K step 10)', async () => {
+  const sent: string[] = [];
+  const refused = { count: 0 };
+  const f = localOnlyFetch(async (url) => {
+    sent.push(url);
+    return new Response('ok');
+  }, refused);
+  assert.equal(await (await f('http://127.0.0.1:8857/api/public/v1/products/x', {})).text(), 'ok');
+  assert.equal(await (await f('http://127.0.0.1:8858/products/filament-buffer', {})).text(), 'ok');
+  for (const url of ['https://store.bblcdn.com/s7/manual.pdf', 'https://wiki.bambulab.com/en/ams-2-pro', 'http://localhost:8857/', 'http://127.0.0.1.example.com/', 'https://127.0.0.1:8857/', 'not a url']) {
+    await assert.rejects(f(url, { method: 'HEAD' }), /a local dry run sends no request off 127\.0\.0\.1/, url);
+  }
+  assert.deepEqual(sent, ['http://127.0.0.1:8857/api/public/v1/products/x', 'http://127.0.0.1:8858/products/filament-buffer']);
+  assert.equal(refused.count, 6);
 });

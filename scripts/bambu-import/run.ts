@@ -76,6 +76,27 @@ import { sealBuffer } from './seal.mjs';
 
 export const SITE_ORIGIN = 'https://levonis-iq.com';
 const LOCAL_ORIGIN = /^http:\/\/127\.0\.0\.1:\d{2,5}$/;
+
+/**
+ * A local dry run (§K step 10 (b) and (c): the site is http://127.0.0.1:<port>): the importer's own
+ * requests reach 127.0.0.1 only. Anything else — a document check, a tracker, a wiki page on the store's
+ * CDNs — is refused before it is sent (the check records it dead, as an unreachable host) and counted;
+ * main() logs the count at the job's end, and the dry run requires that line.
+ */
+export function localOnlyFetch(inner: FetchLike, refused: { count: number }): FetchLike {
+  return (url, init) => {
+    let host = '';
+    try {
+      const u = new URL(url);
+      host = u.protocol === 'http:' ? u.hostname : '';
+    } catch {
+      host = '';
+    }
+    if (host === '127.0.0.1') return inner(url, init);
+    refused.count++;
+    return Promise.reject(new TypeError('a local dry run sends no request off 127.0.0.1'));
+  };
+}
 const MEDIA_SPACING_MS = 1000;
 const HELLO_EVERY = 50;
 /** The wait before the run status is read again after /lease refused a queued item (another one is in flight). */
@@ -1479,9 +1500,12 @@ export async function main(env: NodeJS.ProcessEnv = process.env): Promise<number
   }
   const summary = new SummaryWriter(env.GITHUB_STEP_SUMMARY);
   if (env.GITHUB_STEP_SUMMARY && existsSync(env.GITHUB_STEP_SUMMARY)) summary.begin(readFileSync(env.GITHUB_STEP_SUMMARY, 'utf8'));
+  const local = LOCAL_ORIGIN.test(cfg.siteOrigin);
+  const refused = { count: 0 };
+  const network: FetchLike = (url, init) => fetch(url, init);
   const importer = new Importer(cfg, {
     clock: realClock,
-    fetch: (url, init) => fetch(url, init),
+    fetch: local ? localOnlyFetch(network, refused) : network,
     log,
     token,
     bundle,
@@ -1495,7 +1519,9 @@ export async function main(env: NodeJS.ProcessEnv = process.env): Promise<number
       return BrowserChecker.launch(cfg.siteOrigin, env);
     },
   });
-  return importer.main();
+  const code = await importer.main();
+  if (local) log.info('local_only', { refused: refused.count });
+  return code;
 }
 
 /** A digest that names a token without revealing it (tests compare it with the stored hash). */

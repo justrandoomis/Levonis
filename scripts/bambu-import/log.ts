@@ -105,6 +105,7 @@ export const TEMPLATES = {
   browser: 'browser: {checks} checks, {failed} failed, {screens} screenshots',
   preflight: 'preflight: public context carries products_priced {priced}',
   order_violation: 'EXTRACT refused: the previous item has no committed COMPLETE (runner bug); the job stops',
+  local_only: 'local dry run: {refused} requests to a host other than 127.0.0.1 refused, never sent',
   note: '{code}',
 } as const;
 export type TemplateKey = keyof typeof TEMPLATES;
