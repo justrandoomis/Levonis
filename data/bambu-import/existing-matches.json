@@ -1,4 +1,1089 @@
 {
   "version": 1,
-  "entries": []
+  "status": "REVIEWED (P0 step 3 e) against the sealed live snapshot named by snapshot_sha256. One entry per source. merge: an active Levonis product, value_map by exact names (colours also by the Bambu colour code). hold_owner_hidden: the target is owner-hidden (L-7 default, no owner decision yet); such an entry carries the id only.",
+  "reviewed_by": "p0-step-3e-review",
+  "reviewed_at": "2026-10-16",
+  "snapshot_sha256": "1215895671756da4011dbdc1f310f95f4543d8d0ad9b0b71f1deb3928557ef8c",
+  "entries": [
+    {
+      "source_product_id": "581025672328126464",
+      "source_handle": "h2d",
+      "levonis_product_id": "prd_7387063972434aab9f92",
+      "levonis_slug": "bambu-lab-h2d",
+      "decision": "merge",
+      "value_map": {
+        "581025672340709400": {
+          "option_value_ids": [
+            "h2d"
+          ]
+        }
+      },
+      "unmapped_variants": [
+        "581025672340709385",
+        "581025672340709390",
+        "581025672340709395",
+        "622679274382356483",
+        "622679274382356488"
+      ],
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "580876092009701376",
+      "source_handle": "ams-2-pro",
+      "levonis_product_id": "prd_372ecceb3fcc4a90a89e",
+      "decision": "hold_owner_hidden",
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "6945419460744",
+      "source_handle": "pla-basic-filament",
+      "levonis_product_id": "prd_643b67b68bf048d7913f",
+      "levonis_slug": "bambu-lab-pla-basic-filament",
+      "decision": "merge",
+      "value_map": {
+        "40475106640008": {
+          "color_id": "jade-white-10100"
+        },
+        "40475106672776": {
+          "color_id": "orange-10300"
+        },
+        "40475106705544": {
+          "color_id": "blue-10601"
+        },
+        "40475106738312": {
+          "color_id": "gray-10103"
+        },
+        "40475106771080": {
+          "color_id": "beige-10201"
+        },
+        "40475106803848": {
+          "color_id": "silver-10102"
+        },
+        "40475106836616": {
+          "color_id": "yellow-10400"
+        },
+        "40475106869384": {
+          "color_id": "blue-grey-10602"
+        },
+        "40475106902152": {
+          "color_id": "pink-10203"
+        },
+        "40475106967688": {
+          "color_id": "brown-10800"
+        },
+        "40475107000456": {
+          "color_id": "red-10200"
+        },
+        "40988815556744": {
+          "color_id": "black-10101"
+        },
+        "41078274621576": {
+          "color_id": "red-10200"
+        },
+        "41078274654344": {
+          "color_id": "black-10101"
+        },
+        "41078274687112": {
+          "color_id": "jade-white-10100"
+        },
+        "41135419228296": {
+          "color_id": "bambu-green-10501"
+        },
+        "41142110093448": {
+          "color_id": "blue-10601"
+        },
+        "41211562819720": {
+          "color_id": "gray-10103"
+        },
+        "41884190146696": {
+          "color_id": "bambu-green-10501"
+        },
+        "41884190703752": {
+          "color_id": "bronze-10801"
+        },
+        "41884191195272": {
+          "color_id": "gold-10401"
+        },
+        "41884191752328": {
+          "color_id": "purple-10700"
+        },
+        "41884192211080": {
+          "color_id": "magenta-10202"
+        },
+        "41884192571528": {
+          "color_id": "cyan-10603"
+        },
+        "41884193030280": {
+          "color_id": "mistletoe-green-10502"
+        },
+        "42844628975752": {
+          "color_id": "light-gray-10104"
+        },
+        "42844629008520": {
+          "color_id": "dark-gray-10105"
+        },
+        "43045591679112": {
+          "color_id": "maroon-red-10205"
+        },
+        "43045596233864": {
+          "color_id": "sunflower-yellow-10402"
+        },
+        "43045596921992": {
+          "color_id": "turquoise-10605"
+        },
+        "43045597446280": {
+          "color_id": "indigo-purple-10701"
+        },
+        "43045598167176": {
+          "color_id": "bright-green-10503"
+        },
+        "43045598724232": {
+          "color_id": "cocoa-brown-10802"
+        },
+        "43045599019144": {
+          "color_id": "hot-pink-10204"
+        },
+        "43045599215752": {
+          "color_id": "cobalt-blue-10604"
+        },
+        "43045599543432": {
+          "color_id": "pumpkin-orange-10301"
+        },
+        "43257238290568": {
+          "color_id": "mistletoe-green-10502"
+        },
+        "43257238749320": {
+          "color_id": "cyan-10603"
+        },
+        "565815336288092161": {
+          "color_id": "sunflower-yellow-10402"
+        },
+        "565815336288092167": {
+          "color_id": "pumpkin-orange-10301"
+        },
+        "565815336288092173": {
+          "color_id": "hot-pink-10204"
+        },
+        "565815336288092179": {
+          "color_id": "indigo-purple-10701"
+        },
+        "565815336288092185": {
+          "color_id": "cocoa-brown-10802"
+        }
+      },
+      "unmapped_variants": [],
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "7503970893960",
+      "source_handle": "bambu-hotend-a1-a2",
+      "levonis_product_id": "prd_543be33251174072a97f",
+      "decision": "hold_owner_hidden",
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "7445173272712",
+      "source_handle": "p1s",
+      "levonis_product_id": "prd_b1e2ff5081a34f3f9389",
+      "levonis_slug": "bambu-lab-p1s",
+      "decision": "merge",
+      "value_map": {
+        "732843418674327558": {
+          "option_value_ids": [
+            "p1s"
+          ]
+        },
+        "732843418674327562": {
+          "option_value_ids": [
+            "p1s-ams-combo"
+          ]
+        }
+      },
+      "unmapped_variants": [
+        "732843418674327566"
+      ],
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "7528371585160",
+      "source_handle": "a1-mini",
+      "levonis_product_id": "prd_c7dc934872d648d08dbc",
+      "decision": "hold_owner_hidden",
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "7706060161160",
+      "source_handle": "a1",
+      "levonis_product_id": "prd_e6ece48322114d37a931",
+      "decision": "hold_owner_hidden",
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "635402263682289664",
+      "source_handle": "h2s",
+      "levonis_product_id": "prd_65182590e9284a97a3e2",
+      "decision": "hold_owner_hidden",
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "664977091363467264",
+      "source_handle": "p2s",
+      "levonis_product_id": "prd_eb3ed76daf8c4c50ad68",
+      "decision": "hold_owner_hidden",
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "667505441249849344",
+      "source_handle": "h2c",
+      "levonis_product_id": "prd_e71ab7217435490fb43a",
+      "levonis_slug": "bambu-lab-h2c",
+      "decision": "merge",
+      "value_map": {
+        "667505441262432266": {
+          "option_value_ids": [
+            "h2c-ams-combo"
+          ]
+        },
+        "761030943904460802": {
+          "option_value_ids": [
+            "h2c-vortek-ultimate-bundle"
+          ]
+        }
+      },
+      "unmapped_variants": [
+        "667505441262432276",
+        "667505441262432281"
+      ],
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "720069852718190592",
+      "source_handle": "x2d",
+      "levonis_product_id": "prd_04aa310272f943f3b51b",
+      "decision": "hold_owner_hidden",
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "736733711752556544",
+      "source_handle": "a2l",
+      "levonis_product_id": "prd_907dea50ea694380bcf6",
+      "decision": "hold_owner_hidden",
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "7688884256904",
+      "source_handle": "ams-lite",
+      "levonis_product_id": "prd_f533251df4fd4f80ae27",
+      "decision": "hold_owner_hidden",
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "580889722122383360",
+      "source_handle": "ams-ht",
+      "levonis_product_id": "prd_e21b44ce06194f68b288",
+      "decision": "hold_owner_hidden",
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "777338703507927040",
+      "source_handle": "r1",
+      "levonis_product_id": "prd_d758fd70cd8048eabdc3",
+      "decision": "hold_owner_hidden",
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "6951916929160",
+      "source_handle": "pla-matte",
+      "levonis_product_id": "prd_b9a297b7686d4e1a993d",
+      "decision": "hold_owner_hidden",
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "7225380929672",
+      "source_handle": "pla-sparkle",
+      "levonis_product_id": "prd_cf47be74b6474c6d9471",
+      "levonis_slug": "bambu-lab-pla-sparkle",
+      "decision": "merge",
+      "value_map": {
+        "41002885349512": {
+          "color_id": "alpine-green-sparkle-13501"
+        },
+        "41002885382280": {
+          "color_id": "crimson-red-sparkle-13200"
+        },
+        "41002885415048": {
+          "color_id": "onyx-black-sparkle-13101"
+        },
+        "41158137544840": {
+          "color_id": "slate-gray-sparkle-13102"
+        },
+        "41158137577608": {
+          "color_id": "royal-purple-sparkle-13700"
+        },
+        "42259081789576": {
+          "color_id": "classic-gold-sparkle-13402"
+        }
+      },
+      "unmapped_variants": [],
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "7225684033672",
+      "source_handle": "pla-marble",
+      "levonis_product_id": "prd_1d0377ec2a6c460085af",
+      "levonis_slug": "bambu-lab-pla-marble",
+      "decision": "merge",
+      "value_map": {
+        "41003162992776": {
+          "color_id": "white-marble-13103"
+        },
+        "41143160668296": {
+          "color_id": "red-granite-13201"
+        }
+      },
+      "unmapped_variants": [],
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "7225727975560",
+      "source_handle": "pla-cf",
+      "levonis_product_id": "prd_edd27b15562d40799fde",
+      "levonis_slug": "bambu-lab-pla-cf",
+      "decision": "merge",
+      "value_map": {
+        "41003202248840": {
+          "color_id": "black-14100"
+        },
+        "41145212043400": {
+          "color_id": "jeans-blue-14600"
+        },
+        "41145212076168": {
+          "color_id": "burgundy-red-14200"
+        },
+        "41145212108936": {
+          "color_id": "lava-gray-14101"
+        },
+        "41158283591816": {
+          "color_id": "matcha-green-14500"
+        },
+        "41286543245448": {
+          "color_id": "iris-purple-14700"
+        },
+        "41286543278216": {
+          "color_id": "royal-blue-14601"
+        },
+        "42831855714440": {
+          "color_id": "lava-gray-14101"
+        },
+        "42831855747208": {
+          "color_id": "black-14100"
+        }
+      },
+      "unmapped_variants": [],
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "7448646221960",
+      "source_handle": "pla-basic-gradient",
+      "levonis_product_id": "prd_d37bdc0637374aacb98a",
+      "levonis_slug": "bambu-lab-pla-basic-gradient",
+      "decision": "merge",
+      "value_map": {
+        "41215835570312": {
+          "color_id": "arctic-whisper-10900"
+        },
+        "41215835603080": {
+          "color_id": "solar-breeze-10901"
+        },
+        "41215835635848": {
+          "color_id": "ocean-to-meadow-10902"
+        },
+        "43158301180040": {
+          "color_id": "cotton-candy-cloud-10907"
+        },
+        "43158301212808": {
+          "color_id": "blueberry-bubblegum-10905"
+        },
+        "43158301245576": {
+          "color_id": "mint-lime-10904"
+        },
+        "43158301278344": {
+          "color_id": "pink-citrus-10903"
+        },
+        "43176275312776": {
+          "color_id": "dusk-glare-10906"
+        }
+      },
+      "unmapped_variants": [],
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "7473435377800",
+      "source_handle": "pla-aero",
+      "levonis_product_id": "prd_b2c4d7af370d4d4ab3a0",
+      "levonis_slug": "bambu-lab-pla-aero",
+      "decision": "merge",
+      "value_map": {
+        "41238296625288": {
+          "color_id": "white-14102"
+        },
+        "42742670524552": {
+          "color_id": "gray-14104"
+        }
+      },
+      "unmapped_variants": [],
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "7689010839688",
+      "source_handle": "pla-glow",
+      "levonis_product_id": "prd_9699984642364c07afb8",
+      "levonis_slug": "bambu-lab-pla-glow",
+      "decision": "merge",
+      "value_map": {
+        "41558487793800": {
+          "color_id": "glow-orange-15300"
+        },
+        "41558487826568": {
+          "color_id": "glow-blue-15600"
+        },
+        "41558487859336": {
+          "color_id": "glow-green-15500"
+        },
+        "41558487892104": {
+          "color_id": "glow-pink-15200"
+        },
+        "41558487924872": {
+          "color_id": "glow-yellow-15400"
+        }
+      },
+      "unmapped_variants": [],
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "7735562240136",
+      "source_handle": "pla-silk-multi-color",
+      "levonis_product_id": "prd_5c69bd5527484381a695",
+      "levonis_slug": "bambu-lab-pla-silk-multi-color",
+      "decision": "merge",
+      "value_map": {
+        "41629533307016": {
+          "color_id": "gilded-rose-13901"
+        },
+        "41629533339784": {
+          "color_id": "midnight-blaze-13902"
+        },
+        "41629533372552": {
+          "color_id": "neon-city-13903"
+        },
+        "41629533405320": {
+          "color_id": "blue-hawaii-13904"
+        },
+        "43097174704264": {
+          "color_id": "velvet-eclipse-13905"
+        },
+        "601310725769670660": {
+          "color_id": "dawn-radiance-13912"
+        },
+        "601310725769670666": {
+          "color_id": "aurora-purple-13909"
+        },
+        "601310725769670672": {
+          "color_id": "south-beach-13906"
+        },
+        "665320147333804035": {
+          "color_id": "mystic-magenta-13913"
+        },
+        "665320147333804041": {
+          "color_id": "phantom-blue-13916"
+        }
+      },
+      "unmapped_variants": [],
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "7854551662728",
+      "source_handle": "pla-galaxy",
+      "levonis_product_id": "prd_7c422ae46a074669a074",
+      "levonis_slug": "bambu-lab-pla-galaxy",
+      "decision": "merge",
+      "value_map": {
+        "41834260037768": {
+          "color_id": "brown-13203"
+        },
+        "41834260070536": {
+          "color_id": "green-13503"
+        },
+        "41834260103304": {
+          "color_id": "nebulae-13504"
+        },
+        "41834260168840": {
+          "color_id": "purple-13602"
+        }
+      },
+      "unmapped_variants": [],
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "8417654014088",
+      "source_handle": "pla-wood",
+      "levonis_product_id": "prd_70cd51e74e1c4f5f9b6b",
+      "levonis_slug": "bambu-lab-pla-wood",
+      "decision": "merge",
+      "value_map": {
+        "43075831955592": {
+          "color_id": "black-walnut-13107"
+        },
+        "43075831988360": {
+          "color_id": "rosewood-13204"
+        },
+        "43075832021128": {
+          "color_id": "clay-brown-13801"
+        },
+        "43075832053896": {
+          "color_id": "classic-birch-13505"
+        },
+        "43075832086664": {
+          "color_id": "white-oak-13106"
+        },
+        "43075832119432": {
+          "color_id": "ochre-yellow-13403"
+        }
+      },
+      "unmapped_variants": [],
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "8430923579528",
+      "source_handle": "pla-silk-upgrade",
+      "levonis_product_id": "prd_767f571888e64782997e",
+      "levonis_slug": "bambu-lab-pla-silk-plus",
+      "decision": "merge",
+      "value_map": {
+        "43128679628936": {
+          "color_id": "blue-13604"
+        },
+        "43128679661704": {
+          "color_id": "purple-13702"
+        },
+        "43128679694472": {
+          "color_id": "pink-13207"
+        },
+        "43128679727240": {
+          "color_id": "white-13110"
+        },
+        "43128679760008": {
+          "color_id": "silver-13109"
+        },
+        "43128679792776": {
+          "color_id": "gold-13405"
+        },
+        "43128679825544": {
+          "color_id": "mint-13507"
+        },
+        "43128679858312": {
+          "color_id": "titan-gray-13108"
+        },
+        "43128679891080": {
+          "color_id": "rose-gold-13206"
+        },
+        "43128679923848": {
+          "color_id": "champagne-13404"
+        },
+        "43128679956616": {
+          "color_id": "baby-blue-13603"
+        },
+        "43128679989384": {
+          "color_id": "candy-green-13506"
+        },
+        "43128680022152": {
+          "color_id": "candy-red-13205"
+        },
+        "669699942791499778": {
+          "color_id": "gold-13405"
+        },
+        "669699942791499784": {
+          "color_id": "titan-gray-13108"
+        },
+        "669699942791499790": {
+          "color_id": "silver-13109"
+        },
+        "669699942791499796": {
+          "color_id": "white-13110"
+        }
+      },
+      "unmapped_variants": [],
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "593999615810912256",
+      "source_handle": "pla-translucent",
+      "levonis_product_id": "prd_563f94f05afc422ba025",
+      "levonis_slug": "bambu-lab-pla-translucent",
+      "decision": "merge",
+      "value_map": {
+        "593999615827689487": {
+          "color_id": "teal-13612"
+        },
+        "593999615827689493": {
+          "color_id": "blue-13611"
+        },
+        "593999615827689499": {
+          "color_id": "purple-13710"
+        },
+        "593999615827689505": {
+          "color_id": "orange-13301"
+        },
+        "593999615827689511": {
+          "color_id": "red-13210"
+        },
+        "593999615827689517": {
+          "color_id": "light-jade-13510"
+        },
+        "593999615827689523": {
+          "color_id": "mellow-yellow-13410"
+        },
+        "593999615827689529": {
+          "color_id": "cherry-pink-13211"
+        },
+        "593999615827689535": {
+          "color_id": "ice-blue-13610"
+        },
+        "593999615827689541": {
+          "color_id": "lavender-13711"
+        }
+      },
+      "unmapped_variants": [],
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "624483921959202816",
+      "source_handle": "pla-tough-upgrade",
+      "levonis_product_id": "prd_f43b2d0e75da4ba1b512",
+      "levonis_slug": "bambu-lab-pla-tough-plus",
+      "decision": "merge",
+      "value_map": {
+        "624483921975980044": {
+          "color_id": "white-12107"
+        },
+        "624483921975980050": {
+          "color_id": "yellow-12401"
+        },
+        "624483921975980056": {
+          "color_id": "orange-12301"
+        },
+        "624483921975980062": {
+          "color_id": "gray-12105"
+        },
+        "624483921975980068": {
+          "color_id": "silver-12106"
+        },
+        "624483921975980074": {
+          "color_id": "cyan-12601"
+        },
+        "624483921975980080": {
+          "color_id": "black-12104"
+        },
+        "656734648064118786": {
+          "color_id": "white-12107"
+        },
+        "656734648064118792": {
+          "color_id": "gray-12105"
+        },
+        "656734648064118798": {
+          "color_id": "black-12104"
+        }
+      },
+      "unmapped_variants": [],
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "703099511284281344",
+      "source_handle": "petg-basic",
+      "levonis_product_id": "prd_b9cbaba1ecc944959057",
+      "levonis_slug": "bambu-lab-petg-basic",
+      "decision": "merge",
+      "value_map": {
+        "703099511296864269": {
+          "option_value_ids": [
+            "refill"
+          ],
+          "color_id": "black"
+        },
+        "703099511296864275": {
+          "option_value_ids": [
+            "with-spool"
+          ],
+          "color_id": "black"
+        },
+        "703099511296864281": {
+          "option_value_ids": [
+            "refill"
+          ],
+          "color_id": "white"
+        },
+        "703099511296864287": {
+          "option_value_ids": [
+            "with-spool"
+          ],
+          "color_id": "white"
+        },
+        "703099511296864293": {
+          "option_value_ids": [
+            "refill"
+          ],
+          "color_id": "gray"
+        },
+        "703099511296864299": {
+          "option_value_ids": [
+            "with-spool"
+          ],
+          "color_id": "gray"
+        },
+        "703099511296864305": {
+          "option_value_ids": [
+            "refill"
+          ],
+          "color_id": "red"
+        },
+        "703099511296864311": {
+          "option_value_ids": [
+            "with-spool"
+          ],
+          "color_id": "red"
+        },
+        "703099511296864317": {
+          "option_value_ids": [
+            "refill"
+          ],
+          "color_id": "yellow"
+        },
+        "703099511296864323": {
+          "option_value_ids": [
+            "with-spool"
+          ],
+          "color_id": "yellow"
+        },
+        "703099511296864329": {
+          "option_value_ids": [
+            "refill"
+          ],
+          "color_id": "reflex-blue"
+        },
+        "703099511296864335": {
+          "option_value_ids": [
+            "with-spool"
+          ],
+          "color_id": "reflex-blue"
+        },
+        "703099511296864341": {
+          "option_value_ids": [
+            "refill"
+          ],
+          "color_id": "dark-brown"
+        },
+        "703099511296864347": {
+          "option_value_ids": [
+            "with-spool"
+          ],
+          "color_id": "dark-brown"
+        },
+        "738167451007287296": {
+          "option_value_ids": [
+            "refill"
+          ],
+          "color_id": "orange"
+        },
+        "738167451007287302": {
+          "option_value_ids": [
+            "with-spool"
+          ],
+          "color_id": "orange"
+        },
+        "738167451007287308": {
+          "option_value_ids": [
+            "refill"
+          ],
+          "color_id": "green"
+        },
+        "738167451007287314": {
+          "option_value_ids": [
+            "with-spool"
+          ],
+          "color_id": "green"
+        },
+        "738167451007287320": {
+          "option_value_ids": [
+            "refill"
+          ],
+          "color_id": "navy-blue"
+        },
+        "738167451007287326": {
+          "option_value_ids": [
+            "with-spool"
+          ],
+          "color_id": "navy-blue"
+        },
+        "738167451007287332": {
+          "option_value_ids": [
+            "refill"
+          ],
+          "color_id": "dark-beige"
+        },
+        "738167451007287338": {
+          "option_value_ids": [
+            "with-spool"
+          ],
+          "color_id": "dark-beige"
+        },
+        "738167451007287344": {
+          "option_value_ids": [
+            "refill"
+          ],
+          "color_id": "misty-blue"
+        },
+        "738167451007287350": {
+          "option_value_ids": [
+            "with-spool"
+          ],
+          "color_id": "misty-blue"
+        },
+        "738167451007287356": {
+          "option_value_ids": [
+            "refill"
+          ],
+          "color_id": "pine-green"
+        },
+        "738167451007287362": {
+          "option_value_ids": [
+            "with-spool"
+          ],
+          "color_id": "pine-green"
+        }
+      },
+      "unmapped_variants": [],
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "738885389474230272",
+      "source_handle": "pla-pure",
+      "levonis_product_id": "prd_a95a2f624e3c4990aa86",
+      "levonis_slug": "bambu-lab-pla-pure",
+      "decision": "merge",
+      "value_map": {
+        "738885389516173323": {
+          "color_id": "milky-pink-17200"
+        },
+        "738885389516173329": {
+          "color_id": "milky-pink-17200"
+        },
+        "738885389516173335": {
+          "color_id": "baby-blue-17600"
+        },
+        "738885389516173341": {
+          "color_id": "baby-blue-17600"
+        },
+        "738885389516173347": {
+          "color_id": "apricot-17300"
+        },
+        "738885389516173353": {
+          "color_id": "apricot-17300"
+        },
+        "738885389516173359": {
+          "color_id": "pure-white-17100"
+        },
+        "738885389516173365": {
+          "color_id": "pure-white-17100"
+        },
+        "738885389516173371": {
+          "color_id": "absolute-black-17101"
+        },
+        "738885389516173377": {
+          "color_id": "absolute-black-17101"
+        }
+      },
+      "unmapped_variants": [],
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "576603245171335168",
+      "source_handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+      "levonis_product_id": "prd_04b5f3bc920545c09362",
+      "decision": "hold_owner_hidden",
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "576603246408654848",
+      "source_handle": "bambu-hotend-h2-p2s",
+      "levonis_product_id": "prd_c1d2ebe72024422888e4",
+      "levonis_slug": "bambu-hotend-h2-p2s-x2d-standard-flow",
+      "decision": "merge",
+      "value_map": {},
+      "unmapped_variants": [
+        "720440262071091201",
+        "720440262071091213",
+        "720440262071091225",
+        "720440262071091231",
+        "720440262071091237",
+        "775921387696074752",
+        "775924445524066304",
+        "775924445524066310",
+        "775924445524066316",
+        "775924445524066322",
+        "775924445524066328",
+        "775924445524066334",
+        "775924445524066340",
+        "775924445524066346",
+        "775924445524066352",
+        "775924445524066358",
+        "775924445524066364",
+        "775924445524066370",
+        "775924445524066376",
+        "775924445524066382",
+        "775924445524066388",
+        "775924445524066394",
+        "775924445524066400",
+        "775924445524066406",
+        "775924445524066412",
+        "775969560946847745",
+        "775969560946847751",
+        "775969560946847757",
+        "775969560946847763",
+        "775969560946847769",
+        "775969560946847775",
+        "775969560946847781",
+        "775969560946847787",
+        "775969560946847793",
+        "775969833228500993"
+      ],
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "657373128544849920",
+      "source_handle": "tungsten-carbide-nozzle-h2-p2s",
+      "levonis_product_id": "prd_4c75ab2e37fa48a98140",
+      "decision": "hold_owner_hidden",
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "625124848570171392",
+      "source_handle": "bambu-reusable-spool",
+      "levonis_product_id": "prd_174dda847b9d4f73a262",
+      "levonis_slug": "bambu-reusable-spool",
+      "decision": "merge",
+      "value_map": {
+        "625124848578560003": {
+          "option_value_ids": [
+            "low-temp"
+          ]
+        }
+      },
+      "unmapped_variants": [
+        "625124848582754304"
+      ],
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    },
+    {
+      "source_product_id": "7968059621512",
+      "source_handle": "round-magnet",
+      "levonis_product_id": "prd_a0a11184ad40423b95b3",
+      "levonis_slug": "bambu-lab-round-magnet",
+      "decision": "merge",
+      "value_map": {},
+      "unmapped_variants": [
+        "42102911074440",
+        "42424856281224",
+        "42424856313992",
+        "42424856346760",
+        "42424856379528",
+        "42424856412296",
+        "42424856445064",
+        "42424856477832",
+        "42424856510600",
+        "42424856543368",
+        "42424856576136",
+        "42424856608904",
+        "42424856641672",
+        "42844509962376",
+        "42844509995144",
+        "42844510027912",
+        "42844510060680",
+        "42844510093448",
+        "42844510126216",
+        "42844510158984",
+        "42844510191752"
+      ],
+      "reason": "same_model",
+      "reviewed_by": "p0-step-3e-review",
+      "reviewed_at": "2026-10-16"
+    }
+  ]
 }
