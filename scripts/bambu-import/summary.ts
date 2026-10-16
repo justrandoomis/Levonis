@@ -13,7 +13,8 @@
  * No name, no id, no source URL, no conflict text.
  *
  * WORDING (§I.3): the summary says "partial" and names the exact BLOCKED and
- * WITHDRAWN items when any exists. It never says «تم» or "100 %": completion is
+ * WITHDRAWN items when any exists, and the items the reviewed manifest holds
+ * (end-of-queue holds: never counted as open work). It never says «تم» or "100 %": completion is
  * stated as a count ("1,115 of 1,115 complete") and only when the counts prove
  * it.
  */
@@ -106,6 +107,11 @@ export interface SummaryInput {
   /** BLOCKED and WITHDRAWN items of the whole run (handles and codes), when known. */
   blocked: ReadonlyArray<{ handle: string; code: string }>;
   withdrawn: readonly string[];
+  /**
+   * Items the reviewed manifest holds (`/run/status` and `/run/finish` `held`), named by the reviewed manifest's
+   * handle and hold code: never open work, always named, and the run that ends with them is partial.
+   */
+  held?: ReadonlyArray<{ handle: string; code: string }>;
   more: boolean;
   closedState?: string;
 }
@@ -118,12 +124,14 @@ export function renderSummary(inp: SummaryInput): string {
   const blockedCount = typeof progress.blocked_count === 'number' ? progress.blocked_count : counts.BLOCKED ?? inp.blocked.length;
   const withdrawnCount = typeof progress.withdrawn_count === 'number' ? progress.withdrawn_count : counts.WITHDRAWN_AT_SOURCE ?? inp.withdrawn.length;
   const total = typeof progress.discovered_total === 'number' ? progress.discovered_total : Object.values(counts).reduce((a, b) => a + b, 0);
-  const partial = (typeof blockedCount === 'number' && blockedCount > 0) || (typeof withdrawnCount === 'number' && withdrawnCount > 0) || inp.closedState === 'partial';
+  const held = inp.held ?? [];
+  const partial = (typeof blockedCount === 'number' && blockedCount > 0) || (typeof withdrawnCount === 'number' && withdrawnCount > 0) || held.length > 0 || inp.closedState === 'partial';
   const headline = inp.closedState === 'closed' && !partial ? HEADLINES.closed : partial ? HEADLINES.partial : HEADLINES.running;
   const lines: string[] = [`## ${headline.en} — ${headline.ar} — ${headline.ckb}`, ''];
   lines.push(`Mode \`${/^[a-z]+$/.test(inp.mode) ? inp.mode : '-'}\`, run \`${/^cir_[0-9a-f]{24}$/.test(inp.runId) ? inp.runId : '-'}\`.`);
   if (typeof complete === 'number' && total > 0) lines.push(`${count(complete)} of ${count(total)} items complete.`);
   if (partial) lines.push('The run is **partial**: the items below are BLOCKED or withdrawn at the source and are named here.');
+  if (held.length) lines.push(`${count(held.length)} items are held by the reviewed manifest (an owner decision is pending): they are not open work, and are named below.`);
   lines.push('', '| field | value |', '|---|---|');
   for (const field of PROGRESS_FIELDS) {
     const v = progress[field];
@@ -157,6 +165,10 @@ export function renderSummary(inp: SummaryInput): string {
     for (const b of inp.blocked) lines.push(`- BLOCKED \`${ImportLog.handle(b.handle)}\` ${code(b.code)}`);
     for (const w of inp.withdrawn) lines.push(`- WITHDRAWN_AT_SOURCE \`${ImportLog.handle(w)}\``);
     lines.push('', `${RESUME_INSTRUCTION.ar}`, `${RESUME_INSTRUCTION.en}`, `${RESUME_INSTRUCTION.ckb}`);
+  }
+  if (held.length) {
+    lines.push('', '### Held by the reviewed manifest');
+    for (const h of held) lines.push(`- HELD \`${ImportLog.handle(h.handle)}\` ${code(h.code)}`);
   }
   lines.push('', `More to do: ${inp.more ? 'yes' : 'no'}.`);
   return `${lines.join('\n')}\n`;

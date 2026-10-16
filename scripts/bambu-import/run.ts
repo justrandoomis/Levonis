@@ -65,7 +65,7 @@ import {
 import { curatedGate, enrich, type EnrichReport } from './enrich';
 import { blockedStop, HostFetcher, ImportStop, StoreFetcher, transientStop, type FetchLike } from './fetch';
 import { ImportLog, type LogStage } from './log';
-import { OpsClient, OpsError, writtenImagesOf, type DocumentCheck, type MediaAnswerRow, type MediaRequest, type StatusAnswer, type WriteAnswer, type WrittenImage } from './opsClient';
+import { OpsClient, OpsError, writtenImagesOf, type DocumentCheck, type HeldRef, type MediaAnswerRow, type MediaRequest, type StatusAnswer, type WriteAnswer, type WrittenImage } from './opsClient';
 import { writtenGallery, type Gallery } from './gallery';
 import { NO_ROBOTS, parseRobots, robotsAllows, SITEMAP_PATHS, type Robots } from './robots';
 import { renderSummary, SummaryWriter, type SummaryItem } from './summary';
@@ -78,6 +78,8 @@ export const SITE_ORIGIN = 'https://levonis-iq.com';
 const LOCAL_ORIGIN = /^http:\/\/127\.0\.0\.1:\d{2,5}$/;
 const MEDIA_SPACING_MS = 1000;
 const HELLO_EVERY = 50;
+/** The wait before the run status is read again after /lease refused a queued item (another one is in flight). */
+const LEASE_CLASH_WAIT_MS = 30_000;
 /** The Worker's lease is 15 minutes; the runner renews it before 10 have passed since the last item call. */
 export const LEASE_KEEP_MS = 10 * 60_000;
 /** A transition outside a stage's retries: this many tries (30 s × 2^k apart) before the item is left to the next job. */
@@ -315,6 +317,8 @@ export class Importer {
   private browserChecker: BrowserLike | null | undefined;
   private readonly items: SummaryItem[] = [];
   private status: StatusAnswer | null = null;
+  /** The held items /run/finish named (close): the summary names them. */
+  private finishedHeld: HeldRef[] | null = null;
   private runId: string;
   private resumeUsed = false;
   /** The item whose lease this job holds, and when an item call last renewed it (null between items). */
@@ -403,6 +407,11 @@ export class Importer {
 
   private writeSummary(more: boolean, closedState?: string): void {
     const blocked = this.items.filter((i) => i.outcome === 'blocked').map((i) => ({ handle: i.handle, code: i.code ?? '' }));
+    // Held items, named by the REVIEWED manifest (its handle and hold code), never by the Worker's text.
+    const held = (this.finishedHeld ?? this.status?.held ?? []).flatMap((h) => {
+      const row = this.deps.bundle.bySid.get(h.source_product_id);
+      return row ? [{ handle: row.handle, code: row.hold_code ?? '' }] : [];
+    });
     this.deps.summary.write(
       renderSummary({
         mode: this.cfg.mode,
@@ -413,6 +422,7 @@ export class Importer {
         items: this.items,
         blocked,
         withdrawn: [],
+        held,
         more,
         closedState,
       })
@@ -477,7 +487,15 @@ export class Importer {
       blocked = true;
       more = false;
       code = 1;
-      if (err instanceof JobStop) this.log.error('note', { code: err.code });
+      if (this.cfg.mode === 'run' && err instanceof OpsError && err.kind === 'transient') {
+        // A door that did not settle between items (/hello, /run/status: a 503 D1_OVERLOADED on the token read, a
+        // 5xx, a 429) is passing, never "token gone" and never a block: this job holds nothing open, and the next
+        // job resumes where D1 says (the chain stays bounded by its count).
+        blocked = false;
+        more = true;
+        code = 0;
+        this.log.error('door_unsettled', { call: err.call, code: err.code, status: err.status });
+      } else if (err instanceof JobStop) this.log.error('note', { code: err.code });
       else if (err instanceof OpsError) this.log.error('ops_error', { call: err.call, code: err.code, status: err.status });
       else if (err instanceof ImportStop) this.log.error('note', { code: err.code });
       else this.log.exception('JOB', err);
@@ -586,8 +604,18 @@ export class Importer {
     try {
       lease = await this.ops.lease(sid);
     } catch (err) {
+      // §A.3: /lease refuses a queued item while another item of the run is in flight (409, stale): the status read
+      // before it is out of date. Wait a moment and read it again — it names the item in flight — never block; the
+      // run loop stops the job after a few such answers in a row (STATUS_INCONSISTENT) rather than spin.
+      if (err instanceof OpsError && err.kind === 'stale') {
+        const wait = LEASE_CLASH_WAIT_MS;
+        if (!this.deadline.fits(wait, WORST.EXTRACT)) return { kind: 'deadline' };
+        this.log.item(row.queue_position, row.handle, 'LEASE', 'lease_refused', { seconds: Math.round(wait / 1000) });
+        await this.pause(wait);
+        return { kind: 'skip' };
+      }
       // No settled answer (its in-call retries spent): the item is left to the next job, never reported BLOCKED.
-      if (err instanceof OpsError && (err.kind === 'transient' || err.kind === 'stale')) {
+      if (err instanceof OpsError && err.kind === 'transient') {
         this.log.item(row.queue_position, row.handle, 'LEASE', 'ops_unsettled', { call: 'lease', attempts: 1 });
         return { kind: 'deadline' };
       }
@@ -1227,10 +1255,12 @@ export class Importer {
    * committed had a guard trigger seen a protected column move (§A.5, §E.3). A resumed runner never fails a
    * hard check on a value it cannot have.
    */
-  private mergeEvidence(w: ItemWork): { before_fp_equal: boolean | null; source: 'write' | 'stage_data' | 'committed_write' } {
+  private mergeEvidence(w: ItemWork): { before_fp_equal: boolean | null; source: 'write' | 'stage_data' | 'not_recorded' } {
     if (w.write) return { before_fp_equal: w.write.before_fp_equal, source: 'write' };
     if (w.stageFpEqual !== null) return { before_fp_equal: w.stageFpEqual, source: 'stage_data' };
-    return { before_fp_equal: true, source: 'committed_write' };
+    // The Worker records the write's own result in stage_data after its commit, and completes a merge only on that
+    // record (complete.ts: `write.before_fp_equal`). Without it there is no proof here either: the check fails.
+    return { before_fp_equal: null, source: 'not_recorded' };
   }
 
   /** Drops a rebuilt work so the next attempt reads the page again. */
@@ -1274,8 +1304,11 @@ export class Importer {
     await this.hello();
     this.status = await this.ops.status();
     const c = this.status.counts;
-    const open = (c.DISCOVERED ?? 0) + (c.RETRYING ?? 0) + STAGES.reduce((n, s) => n + (c[s] ?? 0), 0);
-    this.log.info('status', { complete: c.COMPLETE ?? 0, blocked: c.BLOCKED ?? 0, withdrawn: c.WITHDRAWN_AT_SOURCE ?? 0, remaining: open });
+    // The items the reviewed manifest holds are DISCOVERED for good (the first blocks at its turn and the in-flight
+    // index keeps the rest queued): not open work. /run/finish closes the run partial around them and names them.
+    const held = this.status.held.length;
+    const open = Math.max(0, (c.DISCOVERED ?? 0) - held) + (c.RETRYING ?? 0) + STAGES.reduce((n, s) => n + (c[s] ?? 0), 0);
+    this.log.info('status', { complete: c.COMPLETE ?? 0, blocked: c.BLOCKED ?? 0, withdrawn: c.WITHDRAWN_AT_SOURCE ?? 0, held, remaining: open });
     if (open > 0) {
       this.log.error('note', { code: 'QUEUE_NOT_EMPTY' });
       this.writeSummary(true);
@@ -1301,6 +1334,7 @@ export class Importer {
     this.log.info('protect', { phase: 'after', subjects: after.subjects });
     const fin = await this.ops.finish();
     this.log.info('finish', { state: fin.state });
+    if (fin.held.length) this.finishedHeld = fin.held;
     let gone = false;
     try {
       await this.ops.hello();
@@ -1363,7 +1397,18 @@ export class Importer {
       return 1;
     }
     const approval = `workflow-60-run-${this.cfg.githubRunId || 'local'}`;
-    const a = await this.ops.withdraw(row.source_product_id, approval, { second_fetch: second, sitemap_absent: absent });
+    let a: { state: string };
+    try {
+      a = await this.ops.withdraw(row.source_product_id, approval, { second_fetch: second, sitemap_absent: absent });
+    } catch (err) {
+      // The withdrawal is fenced on BLOCKED SOURCE_WITHDRAWN: a 409 means the item moved since the owner looked.
+      // Read where it is now and report it; an irreversible, owner-approved step is never sent again on a guess.
+      if (!(err instanceof OpsError) || err.kind !== 'stale') throw err;
+      this.status = await this.ops.status().catch(() => this.status);
+      const now = this.status?.current?.source_product_id === row.source_product_id ? this.status.current.state : '';
+      this.log.item(row.queue_position, row.handle, 'WITHDRAW', 'withdraw_refused', { state: now });
+      return 1;
+    }
     this.log.item(row.queue_position, row.handle, 'WITHDRAW', 'withdrawn', { state: a.state });
     return a.state === 'WITHDRAWN_AT_SOURCE' ? 0 : 1;
   }

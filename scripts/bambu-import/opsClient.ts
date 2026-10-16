@@ -95,6 +95,9 @@ export const TRANSIENT_CODES: ReadonlySet<string> = new Set([
   'MEDIA_TIMEOUT',
   'CURATION_PENDING',
   'VERIFY_STALE',
+  // The write committed but its read-back has not run yet; the media storage did not answer (both 503).
+  'IMPORT_READBACK_PENDING',
+  'IMPORT_STORAGE_UNAVAILABLE',
 ]);
 
 /** The Worker's code → the code the runner records. `IMPORT_` codes of §C.11 name the same blockers. */
@@ -151,11 +154,24 @@ export interface ItemRef {
   last_completed_stage: string;
 }
 
+/**
+ * A DISCOVERED item the bundled manifest holds (an end-of-queue hold, §K.2 step 13): it waits for the owner, not the
+ * queue. `/run/status` lists them as `held` and `/run/finish` closes the run partial around them and names them.
+ * Only the source id, the position and the code are read; the reviewed manifest names the item.
+ */
+export interface HeldRef {
+  source_product_id: string;
+  queue_position: number;
+  hold_code: string;
+}
+
 export interface StatusAnswer {
   run: { id: string; state: string } | null;
   counts: Record<string, number>;
   current: ItemRef | null;
   next: ItemRef | null;
+  /** The held items (none from a Worker that does not send them). */
+  held: HeldRef[];
   last_verified_url: string;
   /** The §H.3 progress fields, when the Worker sends them (counts only). */
   progress: Record<string, unknown>;
@@ -284,6 +300,14 @@ export function writtenImagesOf(raw: unknown): WrittenImage[] | null {
     });
   }
   return out;
+}
+
+function heldRefs(v: unknown): HeldRef[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter(isRec).flatMap((r) => {
+    const sid = str(r.source_product_id);
+    return sid ? [{ source_product_id: sid, queue_position: num(r.queue_position), hold_code: str(r.hold_code) }] : [];
+  });
 }
 
 function itemRef(v: unknown): ItemRef | null {
@@ -537,21 +561,23 @@ export class OpsClient {
     return { subjects: num(a.subjects), changed: typeof a.changed === 'number' ? a.changed : null };
   }
 
-  async finish(): Promise<{ state: string }> {
+  /** closed, or partial (BLOCKED, withdrawn or held items); the held ones named by source id. */
+  async finish(): Promise<{ state: string; held: HeldRef[] }> {
     const a = await this.send('run/finish', 'POST', '/run/finish', {}, false);
-    return { state: str(a.state) };
+    return { state: str(a.state), held: heldRefs(a.held) };
   }
 
   async status(): Promise<StatusAnswer> {
     const a = await this.send('run/status', 'GET', '/run/status', null, true);
     const run = isRec(a.run) ? { id: str(a.run.id), state: str(a.run.state) } : null;
     const counts = isRec(a.counts) ? Object.fromEntries(Object.entries(a.counts).filter(([, v]) => typeof v === 'number') as Array<[string, number]>) : {};
-    const known = new Set(['run', 'counts', 'current', 'next', 'last_verified_url']);
+    const known = new Set(['run', 'counts', 'current', 'next', 'held', 'last_verified_url']);
     return {
       run,
       counts,
       current: itemRef(a.current),
       next: itemRef(a.next),
+      held: heldRefs(a.held),
       last_verified_url: str(a.last_verified_url),
       progress: Object.fromEntries(Object.entries(a).filter(([k]) => !known.has(k))),
     };

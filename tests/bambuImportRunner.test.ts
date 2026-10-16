@@ -28,6 +28,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { RUN_ID, STORE, TOKEN, UA, World } from './fixtures/bambuImportWorld';
 import { Deadline, WRITE_RESERVE, ITEM_RESERVE, backoff, retryAfterMs, WORST } from '../scripts/bambu-import/deadline';
 import { classify, normaliseCode, OpsClient } from '../scripts/bambu-import/opsClient';
@@ -701,9 +702,9 @@ test('a created product BLOCKED at VERIFY (hidden, §A.10) and resumed: /publish
   }
 });
 
-test('a merge resumed after its /write (a lost answer, or a later job) completes: the committed write is the protected-fields proof', async () => {
+test('a merge resumed after its /write (a lost answer, or a later job) completes on the proof the write recorded; with none recorded it never completes', async () => {
   const matches = [{ source_product_id: '6945416380552', decision: 'merge', levonis_product_id: 'p_existing_buffer_0001' }];
-  // In this job: the /write committed, its answer was lost.
+  // In this job: the /write committed, its answer was lost; the Worker recorded the protected-fields result in stage_data.
   const a = new World({ handles: ['filament-buffer'], matches });
   try {
     a.loseAnswer(/\/items\/6945416380552\/write$/);
@@ -711,9 +712,21 @@ test('a merge resumed after its /write (a lost answer, or a later job) completes
     assert.equal(writeCalls(a).length, 1, 'the committed write is not sent again');
     assert.equal(a.item('filament-buffer').state, 'COMPLETE', a.logLines.join('\n'));
     const merge = (callsTo(a, /\/complete$/)[0].body!.edge_evidence as { checks: Record<string, { ok: boolean; detail: unknown }> }).checks.merge;
-    assert.deepEqual({ ok: merge.ok, detail: merge.detail }, { ok: true, detail: { before_fp_equal: true, source: 'committed_write' } });
+    assert.deepEqual({ ok: merge.ok, detail: merge.detail }, { ok: true, detail: { before_fp_equal: true, source: 'stage_data' } });
   } finally {
     a.dispose();
+  }
+  // A write that recorded no result: the Worker completes a merge only on that record (complete.ts
+  // write.before_fp_equal), so the runner holds no proof either — the check fails and the item never completes.
+  const none = new World({ handles: ['filament-buffer'], matches, noFpRecord: true });
+  try {
+    none.loseAnswer(/\/items\/6945416380552\/write$/);
+    await none.importer().main();
+    assert.equal(none.item('filament-buffer').state, 'BLOCKED');
+    assert.equal(none.item('filament-buffer').blocker_code, 'VERIFY_FAILED_PERSISTENT');
+    assert.equal(callsTo(none, /\/complete$/).length, 0, 'no evidence with a failed hard check is ever sent');
+  } finally {
+    none.dispose();
   }
   // Across jobs: job 1 parks at VERIFY, job 2 resumes there without any /write answer.
   const b = new World({ handles: ['filament-buffer'], matches });
@@ -867,5 +880,133 @@ test('byte-identical gallery images on a resume after /write: the rows from stag
     } finally {
       b.dispose();
     }
+  }
+});
+
+// ---------------------------------------------------------------- step 6b's door answers (writer 73aa4c9)
+
+test('close with end-of-queue holds: the held items are not open work; /run/finish closes partial and the summary names them', async () => {
+  const sid = '6945416380552';
+  const w = new World({ items: { [sid]: { state: 'COMPLETE', last_completed: 'VERIFYING_LIVE' } }, holds: { 'ams-2-pro': 'OWNER_HIDDEN' } });
+  try {
+    const before = w.calls.length;
+    const code = await w.importer({ mode: 'close' }).main();
+    assert.equal(code, 0, w.logLines.join('\n'));
+    assert.deepEqual(w.calls.slice(before).map((c) => c.path), ['/hello', '/run/status', '/run/protect-snapshot', '/run/finish', '/hello']);
+    assert.ok(w.logLines.some((l) => /run status: 1 complete, 0 blocked, 0 withdrawn, 1 held by the manifest, 0 remaining/.test(l)), w.logLines.join('\n'));
+    assert.ok(w.logLines.some((l) => /run finished: state partial/.test(l)));
+    const summary = readFileSync(w.summaryFile, 'utf8');
+    assert.match(summary, /The run is \*\*partial\*\*/);
+    assert.match(summary, /- HELD `ams-2-pro` OWNER_HIDDEN/);
+  } finally {
+    w.dispose();
+  }
+  // A queued item the manifest does not hold is still open work: the close is refused, nothing irreversible sent.
+  const open = new World({ items: { [sid]: { state: 'COMPLETE', last_completed: 'VERIFYING_LIVE' } } });
+  try {
+    assert.equal(await open.importer({ mode: 'close' }).main(), 1);
+    assert.equal(callsTo(open, /\/run\/finish$/).length, 0);
+  } finally {
+    open.dispose();
+  }
+});
+
+test('/lease refuses a queued item while another is in flight (409): the runner reads the status again and goes on, nothing blocks', async () => {
+  const first = '6945416380552';
+  const w = new World({ items: { [first]: { state: 'RETRYING', last_completed: 'ENRICHING', retry_at: '2026-10-16T07:00:00.000Z', stage_attempts: 1 } } });
+  try {
+    const ams = w.sid('ams-2-pro');
+    // One status answer out of date: no item in flight, the queued AMS next.
+    w.inject(/\/run\/status$/, 1, () =>
+      json(200, { run: { id: RUN_ID, state: 'running' }, counts: {}, current: null, next: { source_product_id: ams, handle: 'ams-2-pro', queue_position: 2, state: 'DISCOVERED', last_completed_stage: '' }, held: [], last_verified_url: '' })
+    );
+    assert.equal(await w.importer().main(), 0, w.logLines.join('\n'));
+    const leases = callsTo(w, /\/lease$/);
+    assert.equal(leases[0].path, `/items/${ams}/lease`, 'the stale status named the queued item');
+    assert.ok(w.logLines.some((l) => /lease refused: another item of the run is in flight; the run status is read again in 30 s/.test(l)));
+    assert.equal(w.item('filament-buffer').state, 'COMPLETE', w.logLines.join('\n'));
+    assert.equal(w.item('ams-2-pro').state, 'COMPLETE');
+    assert.equal(w.outputs.blocked, 'false');
+  } finally {
+    w.dispose();
+  }
+});
+
+test('/complete fenced out (409: the item moved under the call): the runner re-reads the item, verifies again, and never re-sends blindly', async () => {
+  const w = new World({ handles: ['filament-buffer'] });
+  try {
+    w.inject(/\/items\/6945416380552\/complete$/, 1, () => json(409, { code: 'IMPORT_ILLEGAL_TRANSITION', message: 'complete' }));
+    assert.equal(await w.importer().main(), 0, w.logLines.join('\n'));
+    assert.equal(w.item('filament-buffer').state, 'COMPLETE');
+    const completes = callsTo(w, /\/complete$/);
+    assert.equal(completes.length, 2);
+    const between = w.calls.filter((c) => c.seq > completes[0].seq && c.seq < completes[1].seq).map((c) => c.path);
+    assert.ok(between.includes('/items/6945416380552/lease'), 'the item is re-read first');
+    const reads = w.siteRequests.filter((r) => r.seq > completes[0].seq && r.seq < completes[1].seq);
+    assert.ok(reads.some((r) => r.path === '/api/products/bambu-filament-buffer/knowledge'), 'and verified again before the second /complete');
+  } finally {
+    w.dispose();
+  }
+});
+
+test('/withdraw fenced out (409: the item is no longer BLOCKED SOURCE_WITHDRAWN): the status is read, the call is never sent again', async () => {
+  const w = new World({
+    handles: ['filament-buffer'],
+    items: { '6945416380552': { state: 'RETRYING', last_completed: 'EXTRACTING', blocker_code: '' } },
+    storePage: () => new Response('gone', { status: 410 }),
+    sitemapExclude: ['filament-buffer'],
+  });
+  try {
+    assert.equal(await w.importer({ mode: 'withdraw', item: '6945416380552' }).main(), 1);
+    const withdraws = callsTo(w, /\/withdraw$/);
+    assert.equal(withdraws.length, 1);
+    assert.ok(w.calls.some((c) => c.seq > withdraws[0].seq && c.path === '/run/status'), 'where the item is now is read');
+    assert.ok(w.logLines.some((l) => /withdraw refused: the item is no longer BLOCKED SOURCE_WITHDRAWN \(now RETRYING\)/.test(l)), w.logLines.join('\n'));
+    assert.equal(w.item('filament-buffer').state, 'RETRYING');
+  } finally {
+    w.dispose();
+  }
+});
+
+test('a door that does not settle between items (503 D1_OVERLOADED on the token read) is passing: the job ends more=true, never gone, never blocked', async () => {
+  const w = new World({ handles: ['filament-buffer'] });
+  try {
+    w.inject(/\/hello$/, 9, () => json(503, { code: 'D1_OVERLOADED', message: 'busy' }));
+    assert.equal(await w.importer().main(), 0);
+    assert.deepEqual({ more: w.outputs.more, blocked: w.outputs.blocked }, { more: 'true', blocked: 'false' });
+    assert.equal(callsTo(w, /\/lease$/).length, 0, 'nothing was claimed');
+    assert.ok(w.logLines.some((l) => /ops hello: D1_OVERLOADED \(HTTP 503\) after its retries/.test(l)), w.logLines.join('\n'));
+    assert.equal(classify(503, 'D1_OVERLOADED'), 'transient');
+    assert.equal(classify(503, 'IMPORT_READBACK_PENDING'), 'transient');
+    assert.equal(classify(503, 'IMPORT_STORAGE_UNAVAILABLE'), 'transient');
+    assert.equal(classify(404, ''), 'gone', 'only a 404 with no code is the token gone');
+  } finally {
+    w.dispose();
+  }
+  // The token really gone: the job stops blocked (nothing to resume with).
+  const g = new World({ handles: ['filament-buffer'] });
+  try {
+    g.inject(/\/hello$/, 9, () => new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: { 'content-type': 'application/json' } }));
+    assert.equal(await g.importer().main(), 1);
+    assert.equal(g.outputs.blocked, 'true');
+  } finally {
+    g.dispose();
+  }
+});
+
+test('the read-back not run yet (503 IMPORT_READBACK_PENDING) and media pending on a storage error (IMAGE_STORAGE_FAILED) are waited out, never a block', async () => {
+  const w = new World({ handles: ['filament-buffer'] });
+  try {
+    w.inject(/\/readback$/, 3, () => json(503, { code: 'IMPORT_READBACK_PENDING', message: 'not yet' }));
+    // One /media answer leaves every medium pending (an R2 HEAD that did not answer): sent again, then stored.
+    w.inject(/\/media$/, 1, (body) =>
+      json(200, { media: ((body?.media ?? []) as Array<{ source_media_id: string }>).map((m) => ({ source_media_id: m.source_media_id, status: 'pending', r2_key: '', width: null, height: null, error_code: 'IMAGE_STORAGE_FAILED' })) })
+    );
+    assert.equal(await w.importer().main(), 0, w.logLines.join('\n'));
+    assert.equal(w.item('filament-buffer').state, 'COMPLETE', w.logLines.join('\n'));
+    assert.equal(w.item('filament-buffer').blocker_code, '');
+    assert.ok(w.logLines.some((l) => /retrying IMPORT_READBACK_PENDING/.test(l)), 'the pending read-back is a stage retry');
+  } finally {
+    w.dispose();
   }
 });

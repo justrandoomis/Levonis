@@ -268,6 +268,8 @@ test('the summary: §H.3 counts only, "partial" names the BLOCKED items, never �
     counts: { COMPLETE: 3, BLOCKED: 1 },
     current: { source_product_id: '580876092009701376', handle: 'bambu-lab-a1-mini-owner-hidden', queue_position: 4, state: 'BLOCKED', last_completed_stage: 'VALIDATING' },
     next: null,
+    // The Worker names its held items; the summary names them only from the reviewed manifest (run.ts writeSummary).
+    held: [{ source_product_id: '580876092009701377', queue_position: 6, hold_code: 'PLANTED_DRAFT_SKU' }],
     last_verified_url: 'https://us.store.bambulab.com/products/a1',
     progress: {
       complete_count: 3,
@@ -304,6 +306,13 @@ test('the summary: §H.3 counts only, "partial" names the BLOCKED items, never �
   assert.doesNotMatch(done, /partial|100 ?%|تم/);
   assert.match(done, /4 of 4 items complete\./);
   assert.match(done, /closed/);
+  // Held by the reviewed manifest: named by its handle and its code, never counted as done, and the run is partial.
+  const held = renderSummary({ ...base, status: { ...status, counts: { COMPLETE: 4, DISCOVERED: 2 }, progress: { complete_count: 4, discovered_total: 6 } }, items: [], blocked: [], held: [{ handle: 'cyberbrick-timelapse-kit', code: 'OWNER_HIDDEN' }, { handle: 'a1', code: 'PLANTED_DRAFT_SKU' }], closedState: 'partial' });
+  assert.match(held, /The run is \*\*partial\*\*/);
+  assert.match(held, /2 items are held by the reviewed manifest/);
+  assert.match(held, /- HELD `cyberbrick-timelapse-kit` OWNER_HIDDEN/);
+  assert.match(held, /- HELD `a1` \n|- HELD `a1` $/m, 'a code outside the fixed lists prints nothing');
+  assert.ok(!held.includes('PLANTED_DRAFT_SKU'));
 });
 
 test("the importer's sealer writes only <name>.sealed, never over a file, never a name it does not know", () => {

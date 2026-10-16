@@ -91,6 +91,8 @@ export interface FakeItem {
   title: string;
   /** What /write did: a new product or a merge into a reviewed existing one. */
   match_kind: '' | 'created' | 'merged';
+  /** A merge's protected-fields result as the write recorded it in stage_data (null: not recorded). */
+  fp_equal: boolean | null;
   /** §A.10: a product this run created, hidden by a BLOCKED event after WRITTEN. */
   hidden: boolean;
   /** The edge still serves the hidden answers until /publish-finish purges them. */
@@ -101,7 +103,8 @@ export interface Injection {
   method?: string;
   path: RegExp;
   times: number;
-  respond: () => Response;
+  /** The answer instead of the Worker's (it sees the request body: an answer about what was sent). */
+  respond: (body: Record<string, unknown> | null) => Response;
 }
 
 export interface WorldEvent {
@@ -148,6 +151,10 @@ export interface WorldOptions {
   contentOf?: (handle: string, sourceMediaId: string) => string;
   /** The lease answers the written image rows in stage_data.images (a Worker that records them there). */
   recordImages?: boolean;
+  /** A merge's write records no `before_fp_equal` in stage_data (a Worker before step 6b's review). */
+  noFpRecord?: boolean;
+  /** Manifest rows the reviewed bundle holds (handle → hold code): end-of-queue holds. */
+  holds?: Record<string, 'OWNER_HIDDEN' | 'ORDER_TYPE_WORD'>;
 }
 
 export class World {
@@ -176,7 +183,7 @@ export class World {
     this.dir = mkdtempSync(join(tmpdir(), 'levonis-runner-world-'));
     const { text, rows } = fixtureBundle() as { text: Record<string, string>; rows: Array<{ source_product_id: string; handle: string; queue_position: number; title: string }> };
     const handles = opts.handles ?? rows.map((r) => r.handle);
-    const kept = rows.filter((r) => handles.includes(r.handle));
+    const kept = rows.filter((r) => handles.includes(r.handle)).map((r) => (opts.holds?.[r.handle] ? { ...r, hold_code: opts.holds[r.handle] } : r));
     const manifest = JSON.parse(text['manifest.json']);
     manifest.rows = kept;
     text['manifest.json'] = `${JSON.stringify(manifest, null, 2)}\n`;
@@ -210,6 +217,7 @@ export class World {
         written: null,
         title: r.title,
         match_kind: '',
+        fp_equal: null,
         hidden: false,
         cachedHidden: false,
         ...(opts.items?.[r.source_product_id] ?? {}),
@@ -232,7 +240,7 @@ export class World {
     return this.items.get(this.sid(handle))!;
   }
 
-  inject(path: RegExp, times: number, respond: () => Response, method?: string): void {
+  inject(path: RegExp, times: number, respond: (body: Record<string, unknown> | null) => Response, method?: string): void {
     this.injections.push({ path, times, respond, method });
   }
 
@@ -259,7 +267,7 @@ export class World {
       for (const inj of this.injections) {
         if (inj.times > 0 && inj.path.test(u.pathname) && (!inj.method || inj.method === method)) {
           inj.times--;
-          return inj.respond();
+          return inj.respond(body);
         }
       }
       if (headers.authorization !== `Bearer ${TOKEN}` || headers['x-levonis-import-protocol'] !== '2' || this.runState === 'closed') return json(404, { error: 'Not found' });
@@ -308,6 +316,16 @@ export class World {
 
   // ---------------------------------------------------------------- the fake ops endpoint
 
+  /** The reviewed manifest's hold code of an item ('' when it holds none). */
+  private holdOf(i: FakeItem): string {
+    return this.bundle.bySid.get(i.sid)?.hold_code ?? '';
+  }
+
+  /** The DISCOVERED items the bundled manifest holds (runOps.ts heldItems). */
+  private held(): FakeItem[] {
+    return [...this.items.values()].filter((i) => i.state === 'DISCOVERED' && this.holdOf(i) !== '').sort((a, b) => a.queue_position - b.queue_position);
+  }
+
   private inFlight(): FakeItem | null {
     for (const i of this.items.values()) if (!['DISCOVERED', 'COMPLETE', 'WITHDRAWN_AT_SOURCE'].includes(i.state)) return i;
     return null;
@@ -324,6 +342,7 @@ export class World {
       stage_data: {
         ...(this.opts.planted ? { note: this.planted() } : {}),
         ...(this.opts.recordImages && i.written ? { images: i.written.map((r) => this.writtenRow(r)) } : {}),
+        ...(i.fp_equal !== null ? { before_fp_equal: i.fp_equal } : {}),
       },
       blocker_code: i.blocker_code,
       levonis_product_id: i.levonis_product_id,
@@ -357,6 +376,7 @@ export class World {
         counts,
         current: ref(current),
         next: ref(next),
+        held: this.held().map((i) => ({ source_product_id: i.sid, handle: planted || i.handle, queue_position: i.queue_position, hold_code: planted || this.holdOf(i) })),
         last_verified_url: '',
         complete_count: counts.COMPLETE ?? 0,
         discovered_total: this.items.size,
@@ -375,9 +395,14 @@ export class World {
     if (path === '/run/prepare-taxonomy') return json(200, { created_nodes: 2, brand_created: false, synonyms_inserted: 5 });
     if (path === '/run/protect-snapshot') return json(200, { subjects: 43 });
     if (path === '/run/finish') {
-      const partial = [...this.items.values()].some((i) => i.state === 'BLOCKED' || i.state === 'WITHDRAWN_AT_SOURCE');
+      // The Worker's finishRun (step 6b): partial around BLOCKED, withdrawn and held items, the held ones named.
+      const held = this.held();
+      const partial = held.length > 0 || [...this.items.values()].some((i) => i.state === 'BLOCKED' || i.state === 'WITHDRAWN_AT_SOURCE');
       this.runState = 'closed';
-      return json(200, { state: planted || (partial ? 'partial' : 'closed') });
+      return json(200, {
+        state: planted || (partial ? 'partial' : 'closed'),
+        held: held.map((i) => ({ source_product_id: i.sid, handle: planted || i.handle, queue_position: i.queue_position, hold_code: planted || this.holdOf(i) })),
+      });
     }
     const m = /^\/items\/(\d+)\/([a-z-]+)$/.exec(path);
     if (!m) return json(404, { code: 'NO_ROUTE', message: 'no route' });
@@ -389,6 +414,9 @@ export class World {
       i.lease_until = this.clock.now() + 15 * MIN;
     };
     if (action === 'lease') {
+      // Step 6b: a queued item is not leased while another item of the run is in flight (ux_cii_inflight).
+      const other = this.inFlight();
+      if (i.state === 'DISCOVERED' && other && other.sid !== i.sid) return json(409, { code: 'IMPORT_ILLEGAL_TRANSITION', message: `item ${planted}` });
       // The Worker's leaseItem (worker/lib/catalogImport/items.ts): the presented token is renewed while its lease
       // is live; any other caller — a new job after a lost one, a /lease retried after its answer was lost —
       // takes the item over with a fresh token, which makes the old one stale.
@@ -475,6 +503,8 @@ export class World {
       i.last_completed = 'WRITING';
       const merged = i.payload!.write_mode === 'merge';
       i.match_kind = merged ? 'merged' : 'created';
+      // Step 6b: the write records a merge's protected-fields result in stage_data after its commit.
+      i.fp_equal = merged && !this.opts.noFpRecord ? true : null;
       // The Worker's step 7: the payload's rows on their stored objects, then the content-duplicate collapse.
       const rows = i.payload!.images.flatMap((x) => (i.media.get(x.source_media_id) ? [{ ...x, r2_key: i.media.get(x.source_media_id)!.r2_key }] : []));
       i.written = collapseContentDuplicates(rows).rows;
@@ -505,6 +535,11 @@ export class World {
     }
     if (action === 'complete') {
       if (i.state !== 'VERIFYING_LIVE') return json(409, { code: 'IMPORT_ILLEGAL_TRANSITION', message: 'complete' });
+      // Step 6b (complete.ts agreementOf): no COMPLETE without the browser's check, nor a merge without the write's
+      // own recorded proof; the disagreement is answered, the item stays where it is.
+      const evidence = (body?.edge_evidence ?? {}) as Rec;
+      const checks = (evidence.checks ?? {}) as Rec;
+      if (!checks.browser || (i.match_kind === 'merged' && i.fp_equal !== true)) return json(200, { state: 'VERIFYING_LIVE', seq: null, d1_checks: {} });
       i.state = 'COMPLETE';
       i.last_completed = 'VERIFYING_LIVE';
       const seq = ++this.seq;
