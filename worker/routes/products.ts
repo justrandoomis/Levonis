@@ -2242,8 +2242,35 @@ function legacyAliases(doc: ProductDoc) {
   };
 }
 
+/**
+ * THE SPEC TABLE IS SENT ONCE (speed audit 2026-10-16, finding 24).
+ *
+ * `specifications` is the flat legacy view of `doc.spec_groups`, and the public
+ * `spec_groups` (`projectPublic`) is `doc.spec_groups` plus the family fields'
+ * groups — so every row the flat list would hold is already in the answer, its
+ * label and value in three languages. The product page draws the flat list
+ * only when `spec_groups` has no row (src/pages/Product.tsx: `specGroups.length
+ * > 0 ? … : legacySpecs`), and an older bundle did the same, so on every
+ * product with a table it was a second copy nobody drew, on the critical
+ * download beside the page's code: the live bambu-lab-h2d detail 237.4 → 193.6
+ * KB of JSON, 34.2 → 30.3 KB brotli (H2C −4.2 KB, P1S −2.4 KB).
+ *
+ * So it rides only when the groups have no row — where the page would read it —
+ * and is otherwise an empty list: the key stays, so a reader that iterates it
+ * (`ApiProduct.specifications`, a cached bundle) still gets an array. The
+ * admin document keeps the flat view (`adminShape`); the public API builds its
+ * own table from `spec_groups`.
+ */
+export function publicSpecifications(
+  groups: ReadonlyArray<{ rows?: readonly unknown[] }>,
+  doc: ProductDoc
+): Array<{ key: string; value: string }> {
+  return groups.some((g) => (g.rows ?? []).length > 0) ? [] : legacySpecs(doc);
+}
+
 function publicShape(doc: ProductDoc, coarse = false): Record<string, unknown> {
-  return { ...projectPublic(doc, coarse), ...legacyAliases(doc) };
+  const projected = projectPublic(doc, coarse);
+  return { ...projected, ...legacyAliases(doc), specifications: publicSpecifications(projected.spec_groups, doc) };
 }
 
 function adminShape(doc: ProductDoc): Record<string, unknown> {
