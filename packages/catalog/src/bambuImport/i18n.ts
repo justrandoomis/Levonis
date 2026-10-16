@@ -166,9 +166,18 @@ const CONNECTORS = new Set(['and', 'or', 'with', 'series', 'printers', 'printer'
  * with no Latin word at all is not "only names" (there was nothing to match).
  */
 export function namesOnly(text: string, names: Iterable<string>): boolean {
+  return namesOnlyIn(text, nameForms(names));
+}
+
+/** The match forms of a set of names (`labelKey`, distinct, longest first): computed once for many `namesOnlyIn` calls. */
+export function nameForms(names: Iterable<string>): string[] {
+  return [...new Set([...names].map((n) => labelKey(String(n ?? ''))).filter(Boolean))].sort((a, b) => b.length - a.length || (a < b ? -1 : a > b ? 1 : 0));
+}
+
+/** `namesOnly` over forms already computed by `nameForms`. */
+export function namesOnlyIn(text: string, forms: readonly string[]): boolean {
   const key = labelKey(String(text ?? ''));
   if (!/[a-z]{2,}/.test(key)) return false;
-  const forms = [...new Set([...names].map((n) => labelKey(String(n ?? ''))).filter(Boolean))].sort((a, b) => b.length - a.length);
   let k = ` ${key} `;
   for (const f of forms) {
     const needle = ` ${f} `;
