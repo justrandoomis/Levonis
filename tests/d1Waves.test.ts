@@ -85,17 +85,19 @@ const CEILINGS: Array<{ path: string; host?: string; waves: [warm: number, cold:
   { path: '/api/print-quote/printers', waves: [2, 2, 3], prepares: 3 },
   { path: '/api/print-quote/accessories', waves: [1, 1, 1], prepares: 1 },
   { path: '/api/marketplace/print/catalog', waves: [1, 1, 1], prepares: 3 },
-  // The Bambu import (spec §G.1): the knowledge answer — the VISIBLE gate, then its six reads in one wave
-  // (the relation targets' pictures among them). Measured 2 / 2 / 2; the relation path has its own test below.
-  { path: `/api/products/${LIVE_PRODUCTS[0].slug}/knowledge`, waves: [2, 2, 2], prepares: 7 },
+  // The Bambu import (spec §G.1): the knowledge answer — the VISIBLE gate, then its seven reads in one wave
+  // (the relation targets' pictures among them, and the translation memory, 0196 — I18N-DESIGN §A.5).
+  // Measured 2 / 2 / 2; the relation path has its own test below.
+  { path: `/api/products/${LIVE_PRODUCTS[0].slug}/knowledge`, waves: [2, 2, 2], prepares: 8 },
 ];
 
 /**
  * THE COMPARISON (not first paint; the Bambu import spec §G.5): the knowledge model's facts for the
- * compare-flagged keys are ONE `IN` read in the wave that already reads the taxonomy and the pictures.
- * Measured with 0194 on the database: warm 5, cold 6, member 8 waves; 25 statements cold.
+ * compare-flagged keys are ONE `IN` read in the wave that already reads the taxonomy and the pictures, and
+ * so is the compared products' translation memory (0196, I18N-DESIGN §A.5).
+ * Measured with 0194 and 0196 on the database: warm 5, cold 6, member 8 waves; 26 statements cold.
  */
-const COMPARE = { path: `/api/compare?ids=${P.H2D},${P.X2D}`, waves: [5, 6, 8] as const, prepares: 25 };
+const COMPARE = { path: `/api/compare?ids=${P.H2D},${P.X2D}`, waves: [5, 6, 8] as const, prepares: 26 };
 
 test('every hot public route stays under its measured wave and prepare ceilings — cold isolate, warm isolate, signed in', async () => {
   const w = world();
@@ -127,6 +129,7 @@ test('the comparison stays under its measured ceiling with the knowledge read, w
     assert.ok(cold.prepares <= COMPARE.prepares, `${cold.prepares} prepares`);
     // (the adapter keeps a statement's first 90 characters)
     assert.ok(cold.sqls.some((q) => q.startsWith('SELECT product_id, canonical_key, scope_kind')), `the knowledge read is sent\n${cold.sqls.join('\n')}`);
+    assert.ok(cold.sqls.some((q) => q.startsWith('SELECT r.product_id, t.en, t.ar, t.ckb FROM catalog_translation_refs')), `the translation read is sent\n${cold.sqls.join('\n')}`);
   } finally {
     Math.random = random;
   }
@@ -161,7 +164,8 @@ test('the Bambu import adds no wave: the page body carries swatches and source v
 /**
  * THE KNOWLEDGE ANSWER OF AN IMPORTED PRODUCT, measured on the path it really takes: a relation resolved to
  * a VISIBLE product links it with its picture (nearly every imported printer, AMS, hotend, plate and filament).
- * The picture rides the first wave — 2 / 2 / 2 and 7 statements, the same as a product with no relation.
+ * The picture rides the first wave — 2 / 2 / 2 and 8 statements (the translation memory's read among them),
+ * the same as a product with no relation.
  * (It was a third, dependent wave; the ceiling above was measured on a product with no knowledge row.)
  */
 test('the knowledge answer with a relation to a VISIBLE target: its picture rides the first wave — no third round trip', async () => {
@@ -181,7 +185,7 @@ test('the knowledge answer with a relation to a VISIBLE target: its picture ride
   const member = await w.measure(path, MEMBER);
   for (const [name, c] of [['cold', cold], ['warm', warm], ['member', member]] as const) {
     assert.ok(c.waves <= 2, `${name}: ${c.waves} waves\n${c.sqls.join('\n')}`);
-    assert.ok(c.prepares <= 7, `${name}: ${c.prepares} prepares\n${c.sqls.join('\n')}`);
+    assert.ok(c.prepares <= 8, `${name}: ${c.prepares} prepares\n${c.sqls.join('\n')}`);
   }
   const body = (await (await get(stubApp(w.db, null, mount, { env: ENV }), path)).json()) as {
     compatibility: { compatible: Array<{ label: string; product?: { slug: string; image: string } }> };
@@ -237,4 +241,42 @@ test('the shopfront reads the owner\'s tier ONCE, and its stats in one batch', a
   assert.equal(p.waves, 2, p.sqls.join('\n'));
   const home = await w.measure('/api/home');
   assert.equal(home.waves, 3, home.sqls.join('\n'));
+});
+
+/**
+ * THE PAGE OF AN IMPORTED PRODUCT (I18N-DESIGN §A.5): its translation memory is ONE statement in the wave
+ * the page already spends — 2 / 2 / 5 waves and 24 statements cold, one more than an ordinary product,
+ * which reads nothing (the ceiling above: 23). The read binds one parameter.
+ */
+test('an imported product page reads its translation memory in the existing wave: 2 / 2 / 5, 24 statements', async () => {
+  const w = world();
+  const live = LIVE_PRODUCTS.find((p) => p.id === P.H2D)!;
+  const en = 'The buffer smooths the filament path.';
+  const h = 'a'.repeat(64);
+  w.raw.prepare(`UPDATE products SET description = ?, translation_meta = ? WHERE id = ?`).run(
+    en,
+    JSON.stringify({ description: { ar: { status: 'imported', src_rev: 1 }, ckb: { status: 'imported', src_rev: 1 } } }),
+    P.H2D
+  );
+  w.raw.prepare(`INSERT INTO catalog_translations (h, en, ar, ckb, kind, status, part) VALUES (?, ?, ?, ?, 'short_description', 'reviewed', 'p001')`).run(
+    h,
+    en,
+    'يُنعّم المخزن المؤقت مسار الخيط.',
+    'بافەرەکە ڕێڕەوی فیلامێنتەکە نەرم دەکات.'
+  );
+  w.raw.prepare('INSERT INTO catalog_translation_refs (product_id, h) VALUES (?, ?)').run(P.H2D, h);
+  const path = `/api/products/${live.slug}`;
+  const cold = await w.measure(path);
+  const warm = await w.measure(path);
+  const member = await w.measure(path, MEMBER);
+  assert.ok(cold.waves <= 2 && warm.waves <= 2 && member.waves <= 5, `waves ${cold.waves}/${warm.waves}/${member.waves}\n${cold.sqls.join('\n')}`);
+  assert.ok(cold.prepares <= 24, `${cold.prepares} prepares\n${cold.sqls.join('\n')}`);
+  assert.ok(member.prepares <= 24 + 5, `${member.prepares} prepares`);
+  assert.equal(cold.sqls.filter((q) => q.includes('catalog_translation_refs')).length, 1, 'one translation read');
+  const body = (await (await get(stubApp(w.db, null, mount, { env: ENV }), path)).json()) as { product: Record<string, unknown> };
+  assert.equal(body.product.description_ar, 'يُنعّم المخزن المؤقت مسار الخيط.');
+  assert.equal(body.product.description_ckb, 'بافەرەکە ڕێڕەوی فیلامێنتەکە نەرم دەکات.');
+  // An ordinary product reads no memory at all.
+  const plain = await w.measure(`/api/products/${LIVE_PRODUCTS.find((p) => p.id === P.A1)!.slug}`);
+  assert.equal(plain.sqls.filter((q) => q.includes('catalog_translation')).length, 0, 'an ordinary product pays nothing');
 });

@@ -21,9 +21,26 @@
  *     allow-listed host gets a URL;
  *   - a conflict's text (only `conflict: true`), `derived_from`,
  *     `original_value`; a relation's source handle or evidence.
+ *
+ * THE IMPORTED ENGLISH IN ARABIC AND SORANI (docs/bambu-import/I18N-DESIGN.md
+ * §A.5): with a translation memory (`AssembleOptions.translations`, the rows
+ * of 0196 the product's refs name) a value, a list item, an `x.*` label, a
+ * test method, a box item or a relation label that has a translation carries
+ * it in an OPTIONAL `*_i18n` field beside the English, and a document's title
+ * takes it for ar/ckb. Without one the answer is exactly as before. VERIFY's
+ * projection never reads a `*_i18n` field.
+ *
+ * COMPATIBILITY IS ONE ITEM PER TARGET LABEL (§C.1): rows of a bucket, a
+ * relation and a label (`labelKey`) are one item — a product-wide fact covers
+ * every selection, so it absorbs the same label scoped to a value or a
+ * variant — and every visible target of the group rides on it as links
+ * (`product`, then `more`). The grouping never reads visibility, so the
+ * runner's expectation (no targets) and the route's answer (links) agree.
  */
 import { DOCUMENT_HOSTS, DOCUMENT_TITLES, type DocumentKind } from '@levonis/catalog/bambuImport/registry/documents';
 import { specKey } from '@levonis/catalog/bambuImport/registry/specKeys';
+import { normalizeSource, type Tr } from '@levonis/catalog/bambuImport/i18n';
+import { labelKey } from '@levonis/catalog/bambuImport/normalize';
 import { completenessOf, type CompletenessCounts } from './completeness';
 import { GROUP_ORDER, groupLabel, isSpecStatus, type SpecStatus, type Tri } from './labels';
 
@@ -75,6 +92,13 @@ export interface KnowledgeRow {
   conflict: boolean;
   /** false: a code for filters (the product family), not a line for the specifications table. */
   display: boolean;
+  /** The memory's Arabic and Sorani of `value_text`, when it has them (§A.5). */
+  value_i18n?: Tr;
+  /** Per item of `items`, its translation or null; present only when one item has one. */
+  items_i18n?: Array<Tr | null>;
+  /** The translation of an `x.*` row's own label (a registry key's label is authored). */
+  label_i18n?: Tr;
+  test_method_i18n?: Tr;
 }
 
 export interface KnowledgeGroup {
@@ -91,6 +115,8 @@ export interface InTheBoxItem {
   scope: KnowledgeScope;
   region: Region;
   status: SpecStatus;
+  /** The memory's Arabic and Sorani of `text`, when it has them. */
+  text_i18n?: Tr;
 }
 
 export type CompatibilityBucket = 'compatible' | 'not_compatible' | 'requires' | 'related';
@@ -103,8 +129,19 @@ export interface CompatibilityItem {
   target_kind: string;
   state: 'resolved' | 'pending' | 'unresolvable';
   scope: KnowledgeScope;
-  /** Only while the target is VISIBLE: the link. */
-  product?: { id: string; slug: string; name: Tri; image: string };
+  /** Only while a target is VISIBLE: the link (the first visible target by slug). */
+  product?: CompatibilityTarget;
+  /** The other visible targets of the same label (a family that names several products), by slug. */
+  more?: CompatibilityTarget[];
+  /** The memory's Arabic and Sorani of a label that is not a name. */
+  label_i18n?: Tr;
+}
+
+export interface CompatibilityTarget {
+  id: string;
+  slug: string;
+  name: Tri;
+  image: string;
 }
 
 export interface KnowledgeDocument {
@@ -372,9 +409,125 @@ export interface KnowledgeMedia {
   targetPicture?(productId: string): string;
 }
 
-/** The answer for one product, from its rows (§G.1). */
-export function assembleKnowledge(rows: KnowledgeRows, media: KnowledgeMedia): ProductKnowledge {
+/** What else the Worker knows: the translation memory of the product (normalized English → ar/ckb, §A.5). */
+export interface AssembleOptions {
+  translations?: ReadonlyMap<string, Tr>;
+}
+
+/** One text's translation in the memory, or undefined. */
+function trOf(tm: ReadonlyMap<string, Tr> | undefined, s: string): Tr | undefined {
+  if (!tm || tm.size === 0 || !s) return undefined;
+  const t = tm.get(normalizeSource(s));
+  return t && t.ar && t.ckb ? { ar: t.ar, ckb: t.ckb } : undefined;
+}
+
+/** A row with the memory's translations of its own words, as optional fields (absent without one). */
+function withRowTranslations(row: KnowledgeRow, tm: ReadonlyMap<string, Tr> | undefined): KnowledgeRow {
+  if (!tm || tm.size === 0) return row;
+  const value = row.value_text ? trOf(tm, row.value_text) : undefined;
+  if (value) row.value_i18n = value;
+  if (row.items?.length) {
+    const items = row.items.map((x) => trOf(tm, x) ?? null);
+    if (items.some(Boolean)) row.items_i18n = items;
+  }
+  if (!specKey(row.key)) {
+    const label = trOf(tm, row.label.en);
+    if (label) row.label_i18n = label;
+  }
+  const method = row.test_method ? trOf(tm, row.test_method) : undefined;
+  if (method) row.test_method_i18n = method;
+  return row;
+}
+
+/**
+ * COMPATIBILITY, ONE ITEM PER TARGET LABEL (I18N-DESIGN §C.1). Rows are grouped
+ * by bucket, relation and `labelKey(label)`; a group holding a product-scoped
+ * row yields one product-scoped item (a product-wide fact already applies to
+ * every selection), any other group one item per distinct scope. The item's
+ * label is the code-point-smallest of its rows (any input order, the same
+ * answer), its target kind the smallest, its state `resolved` if any row is,
+ * else `pending`, else `unresolvable`; its visible targets, distinct by id and
+ * ordered by slug, are `product` and then `more`. Nothing here reads which
+ * target is visible to decide WHAT the items are — only to decorate them — so
+ * the runner's expectation (rows without targets) and the route's answer
+ * (rows with links) are the same items.
+ */
+export interface CompatRow {
+  bucket: CompatibilityBucket;
+  relation: string;
+  label: string;
+  target_kind: string;
+  state: CompatibilityItem['state'];
+  scope: KnowledgeScope;
+  target?: CompatibilityTarget;
+}
+
+const cpLess = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+export function dedupeCompatibility(list: readonly CompatRow[], tm?: ReadonlyMap<string, Tr>): Record<CompatibilityBucket, CompatibilityItem[]> {
+  const out: Record<CompatibilityBucket, CompatibilityItem[]> = { compatible: [], not_compatible: [], requires: [], related: [] };
+  const groups = new Map<string, CompatRow[]>();
+  for (const r of list) {
+    const k = `${r.bucket}|${r.relation}|${labelKey(r.label)}`;
+    const g = groups.get(k);
+    if (g) g.push(r);
+    else groups.set(k, [r]);
+  }
+  const STATE_RANK: Record<CompatibilityItem['state'], number> = { resolved: 0, pending: 1, unresolvable: 2 };
+  const items: Array<{ bucket: CompatibilityBucket; item: CompatibilityItem }> = [];
+  for (const rowsOfGroup of groups.values()) {
+    const productWide = rowsOfGroup.some((r) => r.scope.kind === 'product');
+    const byScope = new Map<string, CompatRow[]>();
+    for (const r of rowsOfGroup) {
+      if (productWide && r.scope.kind !== 'product') continue;
+      const k = productWide ? 'product|' : `${r.scope.kind}|${r.scope.id}`;
+      const g = byScope.get(k);
+      if (g) g.push(r);
+      else byScope.set(k, [r]);
+    }
+    for (const rs of byScope.values()) {
+      // The visible targets of the label: every row's of a product-wide item (the scoped rows it absorbed name the
+      // same products), this scope's rows' otherwise.
+      const targets = new Map<string, CompatibilityTarget>();
+      for (const r of productWide ? rowsOfGroup : rs) if (r.target && !targets.has(r.target.id)) targets.set(r.target.id, r.target);
+      const sortedTargets = [...targets.values()].sort((a, b) => cpLess(a.slug, b.slug) || cpLess(a.id, b.id));
+      const label = rowsOfGroup.map((r) => r.label).sort(cpLess)[0];
+      const kind = rowsOfGroup.map((r) => r.target_kind).sort(cpLess)[0];
+      const state = rowsOfGroup.map((r) => r.state).sort((a, b) => STATE_RANK[a] - STATE_RANK[b])[0];
+      const first = rs[0];
+      const labelTr = trOf(tm, label);
+      items.push({
+        bucket: first.bucket,
+        item: {
+          relation: first.relation,
+          label,
+          target_kind: kind,
+          state,
+          scope: productWide ? { kind: 'product', id: '' } : first.scope,
+          ...(sortedTargets.length ? { product: sortedTargets[0] } : {}),
+          ...(sortedTargets.length > 1 ? { more: sortedTargets.slice(1) } : {}),
+          ...(labelTr ? { label_i18n: labelTr } : {}),
+        },
+      });
+    }
+  }
+  // A stable order whatever the rows' order: relation, then label, then scope.
+  items.sort(
+    (a, b) =>
+      cpLess(a.item.relation, b.item.relation) ||
+      cpLess(labelKey(a.item.label), labelKey(b.item.label)) ||
+      cpLess(a.item.label, b.item.label) ||
+      cpLess(a.item.scope.kind, b.item.scope.kind) ||
+      cpLess(a.item.scope.id, b.item.scope.id)
+  );
+  for (const { bucket, item } of items) out[bucket].push(item);
+  return out;
+}
+
+/** The answer for one product, from its rows (§G.1), with the memory's translations when given (§A.5). */
+export function assembleKnowledge(rows: KnowledgeRows, media: KnowledgeMedia, opts: AssembleOptions = {}): ProductKnowledge {
   const out = emptyKnowledge();
+  const tm = opts.translations && opts.translations.size ? opts.translations : undefined;
 
   // -------------------------------------------------- specifications, logistics, the box
   const publicRows = rows.specs.filter((r) => !isOwnerOnlyKey(r.canonical_key, r.group_key));
@@ -382,11 +535,15 @@ export function assembleKnowledge(rows: KnowledgeRows, media: KnowledgeMedia): P
   for (const r of publicRows) {
     const place = placementOf(r.canonical_key, r.group_key);
     if (place.kind === 'box') {
-      out.in_the_box.push(...boxItemsWith(r, media.url));
+      for (const item of boxItemsWith(r, media.url)) {
+        const t = trOf(tm, item.text);
+        out.in_the_box.push(t ? { ...item, text_i18n: t } : item);
+      }
       continue;
     }
-    const row = knowledgeRowOf(r);
-    if (!row) continue;
+    const plain = knowledgeRowOf(r);
+    if (!plain) continue;
+    const row = withRowTranslations(plain, tm);
     if (place.kind === 'logistics') {
       out.logistics[place.part].push(row);
       continue;
@@ -426,32 +583,36 @@ export function assembleKnowledge(rows: KnowledgeRows, media: KnowledgeMedia): P
     if (text(d.host, 200).toLowerCase() !== host) continue;
     const kind = text(d.kind, 40) as DocumentKind;
     const fallback = DOCUMENT_TITLES[kind] ?? DOCUMENT_TITLES.other;
+    const titleTr = trOf(tm, text(d.title_en, 300));
     out.documents.push({
       kind,
-      title: { ar: text(d.title_ar, 300) || fallback.ar, en: text(d.title_en, 300) || fallback.en, ckb: text(d.title_ckb, 300) || fallback.ckb },
+      title: titleTr
+        ? { ar: titleTr.ar, en: text(d.title_en, 300), ckb: titleTr.ckb }
+        : { ar: text(d.title_ar, 300) || fallback.ar, en: text(d.title_en, 300) || fallback.en, ckb: text(d.title_ckb, 300) || fallback.ckb },
       url,
       host,
       scope: scopeOf(d.scope_kind, d.scope_id),
     });
   }
 
-  // -------------------------------------------------- compatibility (a link only to a VISIBLE target)
+  // -------------------------------------------------- compatibility (one item per label; a link only to a VISIBLE target)
+  const compat: CompatRow[] = [];
   for (const r of rows.relations) {
     const bucket = compatibilityBucketOf(r.relation);
     if (!bucket) continue;
     const state = r.state === 'resolved' || r.state === 'pending' || r.state === 'unresolvable' ? r.state : 'pending';
     const id = typeof r.t_id === 'string' ? r.t_id : '';
-    out.compatibility[bucket].push({
+    compat.push({
+      bucket,
       relation: text(r.relation, 40),
       label: text(r.target_label, 300),
       target_kind: text(r.target_kind, 40),
       state,
       scope: scopeOf(r.scope_kind, r.scope_id),
-      ...(id
-        ? { product: { id, slug: text(r.t_slug, 200), name: tri(r.t_name_ar, r.t_name, r.t_name_ku), image: media.targetPicture?.(id) ?? '' } }
-        : {}),
+      ...(id ? { target: { id, slug: text(r.t_slug, 200), name: tri(r.t_name_ar, r.t_name, r.t_name_ku), image: media.targetPicture?.(id) ?? '' } } : {}),
     });
   }
+  out.compatibility = dedupeCompatibility(compat, tm);
 
   // -------------------------------------------------- swatches (the same facts the page body's relations carry: active values of active groups)
   for (const s of rows.swatches) {

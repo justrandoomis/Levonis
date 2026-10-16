@@ -40,6 +40,7 @@ import { pricingTierContext } from '../lib/entitlements';
 import { ancestryFor, degradeIfSchemaMissing, fallbackFor, pricingInputsFor } from '../lib/membershipBenefits';
 import { anonymousCached, type EdgeLifetime } from '../lib/edgePolicy';
 import { loadProductKnowledge } from '../lib/knowledge/productKnowledge';
+import { EMPTY_TRANSLATIONS, importedSlots, loadProductTranslationMap, overlayImportedText } from '../lib/translate/memory';
 import { withCardKnowledge } from '../lib/knowledge/cards';
 import { isConditionColumnMissing } from '../lib/conditionProjection';
 import { catalogSubtreeFilter, homeCategoryTree } from '../lib/catalogMembership';
@@ -3949,7 +3950,7 @@ export async function catalogProductDetail(
       path: idx?.byId.has(MAINTENANCE_ROOT_ID) ? `${idx.path(MAINTENANCE_ROOT_ID)}/all` : null,
     } : null;
   });
-  const [ctx, brandRow, relations, isPrinter, salesBadge, ratingRow, poolMember, offer, fitsMap, maintenanceParts] = await Promise.all([
+  const [ctx, brandRow, relations, isPrinter, salesBadge, ratingRow, poolMember, offer, fitsMap, maintenanceParts, translations] = await Promise.all([
     ctxPromise,
     parsed.brand_id
       ? db.prepare('SELECT id, name_ar, name_en, name_ckb FROM brands WHERE id = ? AND active = 1')
@@ -3985,6 +3986,9 @@ export async function catalogProductDetail(
     // 0148 — the ACTIVE printers the admin linked (see `fits_printers` below).
     activeFitsFor(db, [productId]),
     maintenancePromise,
+    // The catalogue translation memory (0196, docs/bambu-import/I18N-DESIGN.md §A.5): only for a product the
+    // import wrote prose for — an ordinary product pays nothing. Empty without 0196; never fails the page.
+    importedSlots(parsed.translation_meta) ? loadProductTranslationMap(db, productId) : Promise.resolve(EMPTY_TRANSLATIONS),
   ]);
   /**
    * The linked new product's live price, when this listing is a used copy.
@@ -4011,6 +4015,8 @@ export async function catalogProductDetail(
     const product = catalogOnlyCard(applyRelations(parsed, relations), poolMember);
     product.is_printer = isPrinter;
     product.warranty_plans = [];
+    // The imported prose in Arabic and Sorani, on the outgoing body only (a slot a human approved stays).
+    overlayImportedText(product, translations, parsed.translation_meta);
     return {
       ctx,
       ...(opts.lowestSku ? { lowestSku: { option: {}, color: {} } } : {}),
@@ -4115,6 +4121,8 @@ export async function catalogProductDetail(
   // is the server's sentence, never the browser's arithmetic. Empty for a
   // non-printer: the cart would refuse the plan (WARRANTY_NOT_PRINTER).
   out.warranty_plans = pricedPlans(doc.warranty_plans, resolved.regular_iqd, doc.warranty_base_months, isPrinter);
+  // The imported prose in Arabic and Sorani (0196): `out` is re-shaped from the row, so the overlay is applied here.
+  overlayImportedText(out, translations, parsed.translation_meta);
 
   /**
    * 0148 — WHICH PRINTER THIS FITS, AND WHAT FITS THIS PRINTER.
