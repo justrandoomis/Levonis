@@ -39,6 +39,7 @@ import type { Tier, ProPricingPolicy, ResolvedPrice } from '../lib/pricing';
 import { pricingTierContext } from '../lib/entitlements';
 import { ancestryFor, degradeIfSchemaMissing, fallbackFor, pricingInputsFor } from '../lib/membershipBenefits';
 import { anonymousCached, type EdgeLifetime } from '../lib/edgePolicy';
+import { cardLeadPhoto } from '../lib/cardPhoto';
 import { loadProductKnowledge } from '../lib/knowledge/productKnowledge';
 import { withCardKnowledge } from '../lib/knowledge/cards';
 import { isConditionColumnMissing } from '../lib/conditionProjection';
@@ -4708,6 +4709,34 @@ function logServedByRegion(c: Context<AppContext>, meta: D1Meta | undefined): vo
 // A GUEST'S FIRST SCREEN IS ONE BODY FOR EVERY GUEST (P2a): served from the
 // colo's cache; a signed-in customer's carries their prices and is built.
 homeRoutes.get('/', (c) => anonymousCached(c, { perViewer: true }, () => homePage(c)));
+
+/**
+ * THE GRADED SHELF, COUNTED — `GET /api/home/graded` (speed audit 2026-10-16).
+ * «كل الفئات» draws a «المستعمل» banner while graded stock exists: how many
+ * (the home shelf's own rows, `openBoxShelf`, at most 12) and one photograph.
+ * It read the WHOLE /api/home for those two facts — 10 KB on the wire and
+ * 47 KB of JSON beside the page's own map. This answers them from the same
+ * rows and the same cards (the photograph after the relational image
+ * overlay): no price, no stock figure, nothing per viewer. Purged with
+ * /api/home (worker/lib/edgePolicy.ts `cataloguePaths`).
+ */
+homeRoutes.get('/graded', (c) => anonymousCached(c, {}, () => gradedSummary(c)));
+
+async function gradedSummary(c: Context<AppContext>): Promise<Response> {
+  const rows = await openBoxShelf(c.env.DB);
+  let photo: { src: string; product_id: string } | null = null;
+  if (rows.length > 0) {
+    const cards = await resolveProductCards(c.env.DB, rows, await pricingCtx(c), null, 'sellable');
+    for (const r of rows) {
+      const lead = cardLeadPhoto(cards.get(String(r.id)) ?? {});
+      if (lead) {
+        photo = { src: lead.src, product_id: String(r.id) };
+        break;
+      }
+    }
+  }
+  return c.json({ success: true, count: rows.length, photo });
+}
 
 async function homePage(c: Context<AppContext>): Promise<Response> {
   /**
