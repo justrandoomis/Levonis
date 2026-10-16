@@ -35,8 +35,30 @@ export const IMAGE_SIZES = {
   card: '(min-width: 1280px) 230px, (min-width: 1024px) 20vw, (min-width: 640px) 30vw, (min-resolution: 2.5dppx) 41vw, 45vw',
   /** The feed column's card: the phone's full width, 672 px on a desktop. Its cover is cropped to fill it — see `feedCoverSizes`. */
   feedCover: '(min-width: 1024px) 672px, (min-width: 640px) calc(100vw - 32px), 100vw',
-  /** A category banner's photograph (`CropPhoto`): phone 192–222, desktop 449–495 CSS px. */
-  cropBanner: '(min-width: 1024px) 500px, (min-width: 640px) 40vw, 230px',
+  /**
+   * A category ROW BANNER's photograph (`CropPhoto`'s default): drawn
+   * clamp(205, (100vw − 32) × 0.62, 223) CSS px on a phone, 302 at 640–1023,
+   * 419–495 from 1024 (measured 2026-10-16). The phone clause follows that
+   * box: a 320–375 px phone at DPR 3 needs ≤ 638 device px and takes the 640
+   * copy (it asked for 690 and took 800: +39 % of /categories' first-screen
+   * picture bytes); 390–430 px at DPR 3 (666–670) still take 800; DPR
+   * 2.625–2.75 keep 640, DPR 2 keeps 480.
+   */
+  cropBanner: '(min-width: 1024px) 500px, (min-width: 640px) 40vw, (max-width: 375px) 213px, 224px',
+  /**
+   * The COMPACT category hero's product photograph (a department that is its
+   * own listing): 192–194 CSS px on every phone — its zone follows the hero's
+   * height, not the screen's width. A DPR-3 phone of any width takes the 640
+   * copy (577–583 device px), not 800.
+   */
+  cropHeroCompact: '(min-width: 1024px) 500px, (min-width: 640px) 40vw, 195px',
+  /**
+   * The FULL category hero's product photograph (a department with shelves):
+   * 279 CSS px on every phone. Deliberately the old banner value: the truthful
+   * 280 px would move a DPR-3 phone from the 800 copy (0.95 image px per
+   * device px) to 1080 — about +40 % on that page's largest picture.
+   */
+  cropHeroFull: '(min-width: 1024px) 500px, (min-width: 640px) 40vw, 230px',
   /** Full-bleed. */
   full: '100vw',
   /** Half a page on a wide screen, the whole width on a phone. */
