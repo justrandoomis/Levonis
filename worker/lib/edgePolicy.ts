@@ -338,13 +338,17 @@ function scheduleRefresh(c: Context<AppContext>, cache: Cache, key: Request): bo
   return true;
 }
 
-async function purgeMarkers(): Promise<Cache | null> {
-  try {
-    const open = (caches as unknown as { open?: (name: string) => Promise<Cache> }).open;
-    return typeof open === 'function' ? await open.call(caches, PURGE_MARKER_CACHE) : null;
-  } catch {
-    return null;
+/** The markers' cache, opened once per isolate (per `caches` object: a fresh one per test). */
+const markerCaches = new WeakMap<object, Promise<Cache | null>>();
+function purgeMarkers(): Promise<Cache | null> {
+  if (typeof caches === 'undefined') return Promise.resolve(null);
+  const scope = caches as unknown as { open?: (name: string) => Promise<Cache> };
+  let opened = markerCaches.get(scope);
+  if (!opened) {
+    opened = typeof scope.open === 'function' ? scope.open.call(caches, PURGE_MARKER_CACHE).catch(() => null) : Promise.resolve(null);
+    markerCaches.set(scope, opened);
   }
+  return opened;
 }
 
 function purgeMarkerKey(host: string, path: string): Request {
