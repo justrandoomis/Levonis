@@ -708,7 +708,8 @@ function segmentForApi(raw: string): string | null {
  *   /categories/<slug>         CategoryPage: /api/catalog/<slug> (src/lib/catalog/data.ts)
  *   /categories/<a>/<b>        CategoryListing: /api/catalog/tree (its listing needs the
  *                              section id the tree answers, so it stays one step behind)
- *   /community                 Community: /api/community/access (the gate's question)
+ *   /community                 /api/community/access, the gate's question (no page code:
+ *                              the gate decides whether Community renders at all)
  *
  * Mirrors src/App.tsx's routes and the pages' own reads; tests/documentPreloads.test.ts
  * holds the two together, so a renamed page or a changed read fails a test, not a visitor.
@@ -736,7 +737,10 @@ export function mainOpeningFor(pathname: string, search = ''): MainOpening | nul
     return { route: 'src/pages/CategoryPage.tsx', fetches: section ? [`/api/catalog/${section}`] : [] };
   }
   if (/^\/categories\/[^/]+\/[^/]+$/.test(path)) return { route: 'src/pages/CategoryListing.tsx', fetches: ['/api/catalog/tree'] };
-  if (path === '/community') return { route: 'src/pages/Community.tsx', fetches: ['/api/community/access'] };
+  // The gate's question only, not the page's code: while the community is shut (live today) the
+  // gate draws «تحت الصيانة» and the 32-file Community closure is never asked for — naming it in the
+  // document cost the notice ≈0.2 s of a Slow-4G link (local lab, 2026-10-16).
+  if (path === '/community') return { route: null, fetches: ['/api/community/access'] };
   return null;
 }
 

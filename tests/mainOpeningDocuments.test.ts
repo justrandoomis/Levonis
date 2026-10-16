@@ -103,7 +103,7 @@ test('the opening map: each document, its page module and the first read that pa
   assert.deepEqual(mainOpeningFor('/categories/printer-accessories'), { route: 'src/pages/CategoryPage.tsx', fetches: ['/api/catalog/printer-accessories'] });
   assert.deepEqual(mainOpeningFor('/categories/printing-materials/fdm-materials'), { route: 'src/pages/CategoryListing.tsx', fetches: ['/api/catalog/tree'] });
   assert.deepEqual(mainOpeningFor('/categories/printers/all'), { route: 'src/pages/CategoryListing.tsx', fetches: ['/api/catalog/tree'] });
-  assert.deepEqual(mainOpeningFor('/community'), { route: 'src/pages/Community.tsx', fetches: ['/api/community/access'] });
+  assert.deepEqual(mainOpeningFor('/community'), { route: null, fetches: ['/api/community/access'] }, 'the gate decides whether the page code is needed at all');
   // The two that had it already keep exactly what they had.
   assert.deepEqual(mainOpeningFor('/'), { route: null, fetches: ['/api/home'] });
   assert.deepEqual(mainOpeningFor('/products', '?category=cat%26x&search=PLA&debug=1'), {
@@ -184,14 +184,15 @@ test('a category page carries its page code, its first read and the resolve answ
 
 test('the explorer, a listing and the community home each name their own page and read', async () => {
   const { call } = realWorker();
-  const cases: Array<[string, string, string[]]> = [
+  const cases: Array<[string, string | null, string[]]> = [
     ['/categories', '/assets/CategoriesExplorer-e1.js', ['/api/catalog/tree']],
     ['/categories/printing-materials/fdm-materials', '/assets/CategoryListing-l1.js', ['/api/catalog/tree']],
-    ['/community', '/assets/Community-k1.js', ['/api/community/access']],
+    ['/community', null, ['/api/community/access']],
   ];
   for (const [path, chunk, reads] of cases) {
     const html = await (await call(APEX, path)).text();
-    assert.ok(links(html, 'modulepreload').includes(chunk), `${path}: ${chunk}`);
+    if (chunk) assert.ok(links(html, 'modulepreload').includes(chunk), `${path}: ${chunk}`);
+    else assert.deepEqual(links(html, 'modulepreload'), ['/assets/vendor-react-r1.js'], `${path}: the shell's own only`);
     assert.deepEqual(fetches(html), reads, path);
     assert.equal(inline(html)?.kind, 'main', path);
   }
