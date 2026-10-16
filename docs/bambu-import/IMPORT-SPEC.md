@@ -101,6 +101,7 @@ All line references below are at `0988169f`.
 | 25 | §G.3 "Cards keep the house 1:1 frame with `contain` for imported products" | Not done: imported products keep the house compact card (6:5 photo, top-anchored cover). | The house card is 6:5, not 1:1 (DECISIONS row 142); a 1:1 frame for some cards breaks the fixed card height in mixed rows. `contain` needs an import marker on every listing statement (`product_source_refs`, behind a 0194 fallback) and leaves charcoal bars beside a white-background photo: an owner decision. |
 | 26 | §G.5 "one muted line under the name" | The line's row is reserved on every compact card and on its skeleton, drawn or not, and the home page's cards carry the line too: the fixed card height is 280 px at 174 px wide (it was 262, DECISIONS row 142); `lv-cv` and the browser checks follow (6:5 photo + 137 px body). | A line on some cards only stairstepped the rails and grids and shifted the skeleton (review of step 7). |
 | 27 | §G.3 "a value that forms no active variant … is shown disabled" | It says «غير متاح مع هذا الاختيار» (dimmed) and stays pressable: pressing it selects it and lets go of the other groups' values that clash with it (a group left with exactly one fitting value takes it) — `src/lib/productChooser.ts` `chooseValue`. | Disabled, the H2D opened with two of its three versions unreachable (review of step 7). |
+| 28 | §I.1.7 "the breadcrumb contains the leaf section name" | Not checked: the browser check records `breadcrumb` as not applicable («the product page draws no breadcrumb», `scripts/bambu-import/browser.ts` `NOT_APPLICABLE`) and never fails on it. The section is proven by check 3 (the leaf, root and secondary listings, the tree count) and check 10 (the Worker's `category_id` / `sub_category_id` and `product_catalogs` recompute). No breadcrumb is added to the live page; the owner is told. | The product page draws no breadcrumb and never has (step-8 integration, a local run against the built page): the check could only fail, every product. |
 
 Row 9 in detail:
 
@@ -1777,7 +1778,7 @@ The public v1 product DTO has no option-value or group ids, no variant `combo_ke
    - «السعر غير متوفر حالياً» is visible, «طلب السعر» is present, there is no add-to-cart, buy-now or Quick Buy control, and no `0` followed by a dinar unit;
    - the default selection is applied when the product has one;
    - for each colour, version or size value (at most 12 per product; all of them for the audit classes): click it and assert that **the hero URL equals the expected binding** and that **no image bound to another value of the same group, or to a contradicted variant, is present in the gallery**. A disabled impossible value shows the helper;
-   - the breadcrumb contains the leaf section name;
+   - the breadcrumb: not applicable, the page draws none (§1 row 28; the section is checks 3 and 10);
    - screenshots for the 8 audit classes, 1 in 25, and every failure, sealed.
 8. **Existing products:** for a merge, `before_fp_equal` is true and the V2 status is unchanged (§E.3).
 9. **Cache:** a stale answer makes the runner re-call `/publish-finish` (which purges the site, knowledge and v1 keys) and wait up to `s-maxage + 60 s` (max 360 s, within the deadline rules) before failing the check. A persistent failure → BLOCKED `VERIFY_FAILED_PERSISTENT`.

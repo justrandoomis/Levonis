@@ -1010,3 +1010,16 @@ test('the read-back not run yet (503 IMPORT_READBACK_PENDING) and media pending 
     w.dispose();
   }
 });
+
+test('the breadcrumb travels as not applicable (§1 row 28): in the evidence beside the browser\'s checks, never one of them', async () => {
+  const w = new World({ handles: ['filament-buffer'] });
+  try {
+    assert.equal(await w.importer().main(), 0, w.logLines.join('\n'));
+    const browser = (callsTo(w, /\/complete$/)[0].body!.edge_evidence as { checks: { browser: { ok: boolean; checks: Record<string, boolean>; not_applicable?: Record<string, string> } } }).checks.browser;
+    assert.equal(browser.ok, true);
+    assert.deepEqual(browser.not_applicable, { breadcrumb: 'the product page draws no breadcrumb' });
+    assert.equal('breadcrumb' in browser.checks, false);
+  } finally {
+    w.dispose();
+  }
+});

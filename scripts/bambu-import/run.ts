@@ -1203,7 +1203,6 @@ export class Importer {
           payload: w.payload!,
           media: w.media,
           images: gallery.images,
-          leafName: outcome.leafName,
           allValues: audit,
           // The knowledge answer VERIFY expected: the tabs the page must draw for it.
           knowledge: outcome.knowledge ? { ...outcome.knowledge, completeness: null } : null,
@@ -1218,7 +1217,13 @@ export class Importer {
       w.browser = browser;
       const allOk = outcome.ok && browser !== null && browser.ok;
       if (allOk && browser) {
-        const evidence = edgeEvidence(outcome, browser ? { ok: browser.ok, checks: browser.checks, counts: browser.counts, selections: browser.selections } : null, this.liveUrl(w), w.payload!, round);
+        const evidence = edgeEvidence(
+          outcome,
+          browser ? { ok: browser.ok, checks: browser.checks, counts: browser.counts, selections: browser.selections, not_applicable: browser.not_applicable } : null,
+          this.liveUrl(w),
+          w.payload!,
+          round
+        );
         const done = await this.ops.complete(w.sid, w.leaseToken, this.liveUrl(w), evidence);
         if (done.state === 'COMPLETE') {
           this.gate.noteComplete(w.sid, done.seq);

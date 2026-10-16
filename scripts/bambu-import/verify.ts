@@ -175,7 +175,7 @@ export interface VerifyContext {
 export interface VerifyOutcome {
   ok: boolean;
   checks: Record<string, CheckResult>;
-  /** The breadcrumb name of the leaf in Arabic (the browser check), when the tree gave it. */
+  /** The Arabic name of the leaf the product is filed under, when the tree gives it (recorded; the page draws no breadcrumb, §1 row 28). */
   leafName: string;
   /** Section slugs the listings were checked under. */
   sections: { leaf: string; root: string; secondary: string[] };
@@ -790,7 +790,7 @@ export async function verifyPublic(site: Site, ctx: VerifyContext): Promise<Veri
   });
 
   const ok = Object.values(checks).every((c) => c.ok || !c.hard);
-  // The breadcrumb names the section the product IS in (the leaf of its public sections); none named, none matched.
+  // The section the product IS in (the leaf of its public sections), by the tree's Arabic name.
   const leafName = tree.find((n) => n.slug === leafSlug)?.name_ar ?? '';
   return { ok, checks, leafName, sections: { leaf: leafSlug, root: rootSlug, secondary }, cacheMs: cacheMs || CACHE_WAIT_MAX, knowledge: merge ? null : exp.knowledge };
 }

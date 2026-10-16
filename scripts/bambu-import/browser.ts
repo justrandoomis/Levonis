@@ -34,11 +34,13 @@
  *     the page's own `knowledgeTabs` gives the expected answer for the
  *     selection on screen, and every US 110 V row sits under «إصدارات أخرى»
  *     (`details[data-knowledge-other]`, L-20) in every tab;
- *   - the breadcrumb names the leaf section (a leaf the tree does not name
- *     fails it: nothing is not a match).
+ *   - the breadcrumb is NOT APPLICABLE (§1 row 28): the product page draws
+ *     none. It is recorded so (`not_applicable`), never a failure; the section
+ *     is proven by VERIFY's listings (check 3) and the Worker's recompute of
+ *     the placement (check 10).
  * For a MERGE into an existing product the chooser, the price and the buying
  * controls are the existing product's own (§E.2): only the main image, the
- * dinar text, the breadcrumb and the store requests are checked.
+ * dinar text and the store requests are checked.
  *
  * The checks read the page through `ProductPageDriver`, so they run in tests
  * against a model of the page; `BrowserChecker` drives the real one.
@@ -61,6 +63,8 @@ export const NOT_OFFERED_AR = 'غير متاح مع هذا الاختيار';
 const BUYING = /أضف إلى السلة|اشترِ الآن|اشتر الآن|شراء سريع|سجّل الدخول للشراء/;
 const ZERO_DINAR = /(^|[^0-9٠-٩.,])[0٠]\s*(?:د\.ع|دينار|IQD)/;
 const STORE_HOSTS = /(^|\.)bambulab\.com$|(^|\.)bblcdn\.com$|(^|\.)shopify\.com$/i;
+/** Checks §I.1.7 names that this page cannot carry, with the reason (§1 row 28): recorded, never a failure. */
+export const NOT_APPLICABLE: Readonly<Record<string, string>> = { breadcrumb: 'the product page draws no breadcrumb' };
 const SELECTION_KINDS = new Set(['color', 'version', 'size', 'nozzle', 'plate', 'spool', 'pack', 'printer']);
 
 /** The sandbox's Chromium (a symlink to the real binary) when present; on the runner, Playwright's own. */
@@ -124,8 +128,6 @@ export interface BrowserInput {
   media: ReadonlyMap<string, MediaAnswerRow>;
   /** The gallery as written (gallery.ts): what the page's images are expected from. */
   images: readonly ImportPayload['images'][number][];
-  /** The Arabic name of the section the product is filed under ('' when the tree does not name it: a failure). */
-  leafName: string;
   /** All values (audit classes) or at most 12. */
   allValues: boolean;
   /**
@@ -155,6 +157,8 @@ export interface BrowserResult {
   counts: BrowserCounts;
   /** Every selection the page held when it was checked: the opening one, then the whole selection after each press. */
   selections: string[][];
+  /** §I.1.7 checks this page cannot carry, with the reason (NOT_APPLICABLE): in the evidence, never in `checks`. */
+  not_applicable: Record<string, string>;
   screenshots: Buffer[];
 }
 
@@ -206,7 +210,6 @@ export interface PageCheckInput {
   media: ReadonlyMap<string, MediaAnswerRow>;
   /** The gallery as written (gallery.ts: after the Worker's content-duplicate collapse), never the payload's list. */
   images: readonly ImportPayload['images'][number][];
-  leafName: string;
   allValues: boolean;
   /** The expected knowledge answer; null skips the tabs check (unknown). */
   knowledge?: KnowledgeAnswer | null;
@@ -243,7 +246,7 @@ export async function inspectProductPage(page: ProductPageDriver, input: PageChe
     checks.no_buying_control = !BUYING.test(text);
   }
   checks.no_zero_dinar = !ZERO_DINAR.test(text);
-  checks.breadcrumb = !!input.leafName && text.includes(input.leafName);
+  // §1 row 28: the page draws no breadcrumb — not checked here, recorded as not applicable (BrowserResult).
   if (merge) return { checks, counts, selections };
 
   const { groups, variants } = payload;
@@ -577,7 +580,7 @@ export class BrowserChecker {
       const checks = { ...r.checks, never_the_store: counts.store_requests === 0 };
       const ok = Object.values(checks).every(Boolean);
       if (input.screenshot || !ok) screenshots.push(await page.screenshot({ fullPage: false }).catch(() => Buffer.alloc(0)));
-      return { ok, checks, counts, selections: r.selections, screenshots: screenshots.filter((b) => b.length > 0) };
+      return { ok, checks, counts, selections: r.selections, not_applicable: { ...NOT_APPLICABLE }, screenshots: screenshots.filter((b) => b.length > 0) };
     } finally {
       await ctx.close().catch(() => {});
     }

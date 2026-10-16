@@ -21,8 +21,8 @@
  *   - the knowledge tabs are the ones the page's `knowledgeTabs` gives the
  *     expected answer, and a US 110 V row outside «إصدارات أخرى» fails;
  *   - a merge checks only what the import owns on the page;
- *   - a breadcrumb the tree does not name, and a hero frame with no picture,
- *     fail (an absence is never a match);
+ *   - the breadcrumb is not applicable (§1 row 28: the page draws none) and
+ *     recorded so, never failing; a hero frame with no picture fails;
  *   - in Chromium, on the final markup: each control found by its
  *     `data-option-value` in its group's VISIBLE fieldset (the page draws its
  *     buy column twice, the hidden phone copy first), the marks by
@@ -45,7 +45,7 @@ import type { KnowledgeAnswer } from '../src/lib/productKnowledge';
 import { fixtureJson, sample, type SampleHandle } from './fixtures/bambu/load';
 import { ModelProductPage } from './fixtures/bambuProductPage';
 import { routeKnowledge } from './fixtures/bambuKnowledgeRoute';
-import { BrowserChecker, chromiumPath, inspectProductPage, NOT_OFFERED_AR, playwrightModule, REQUEST_AR, UNPRICED_AR } from '../scripts/bambu-import/browser';
+import { BrowserChecker, chromiumPath, inspectProductPage, NOT_APPLICABLE, NOT_OFFERED_AR, playwrightModule, REQUEST_AR, UNPRICED_AR } from '../scripts/bambu-import/browser';
 import { formsVariant, pageDefaultSelection, pressValue } from '../scripts/bambu-import/selection';
 import { expectedKnowledge } from '../scripts/bambu-import/verify';
 import type { MediaAnswerRow } from '../scripts/bambu-import/opsClient';
@@ -77,7 +77,7 @@ test('R6 over the whole selection: every value of PLA Basic on the final page pa
   const payload = payloadOf('pla-basic-filament');
   const media = mediaOf(payload);
   const page = new ModelProductPage(payload, media, { breadcrumb: LEAF });
-  const r = await inspectProductPage(page, { payload, media, images: payload.images, leafName: LEAF, allValues: true });
+  const r = await inspectProductPage(page, { payload, media, images: payload.images, allValues: true });
   for (const name of ['default_selection', 'selection_images', 'selection_held', 'not_offered_marks', 'not_offered_helper', 'no_dead_end']) assert.equal(r.checks[name], true, `${name}: ${JSON.stringify(r.counts)}`);
   assert.equal(r.counts.values_failed, 0);
   assert.ok(r.counts.values_checked >= 30, `${r.counts.values_checked} values checked`);
@@ -107,7 +107,7 @@ test('R6 the other way: a page that leads with another colour\'s picture once Bl
     breadcrumb: LEAF,
     heroFor: (sel, right) => (sel.includes(black.id) && sel.includes(spool.id) ? wrong : right),
   });
-  const r = await inspectProductPage(page, { payload, media, images: payload.images, leafName: LEAF, allValues: true });
+  const r = await inspectProductPage(page, { payload, media, images: payload.images, allValues: true });
   assert.equal(r.checks.selection_images, false);
   assert.ok(r.counts.values_failed >= 1);
 });
@@ -119,7 +119,7 @@ test('§G.3 opening selection, read from the page: the defaults while they form 
   const opening = pageDefaultSelection(payload);
   assert.equal(opening.length, payload.groups.length, 'the single-value weight group is part of it');
   assert.ok(payload.variants.some((v) => v.value_ids.length === opening.length && opening.every((id) => v.value_ids.includes(id))));
-  const r = await inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF }), { payload, media, images: payload.images, leafName: LEAF, allValues: false });
+  const r = await inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF }), { payload, media, images: payload.images, allValues: false });
   assert.equal(r.checks.default_selection, true);
   assert.deepEqual(r.selections[0], opening, 'the opening selection is recorded first, whole');
 
@@ -131,10 +131,10 @@ test('§G.3 opening selection, read from the page: the defaults while they form 
   const odd: ImportPayload = JSON.parse(JSON.stringify(payload));
   odd.groups.find((g) => g.id === colours.id)!.default_value_id = pair[0];
   odd.groups.find((g) => g.id === spools.id)!.default_value_id = pair[1];
-  const right = await inspectProductPage(new ModelProductPage(odd, media, { breadcrumb: LEAF }), { payload: odd, media, images: odd.images, leafName: LEAF, allValues: false });
+  const right = await inspectProductPage(new ModelProductPage(odd, media, { breadcrumb: LEAF }), { payload: odd, media, images: odd.images, allValues: false });
   assert.equal(right.checks.default_selection, true, 'the page that follows §G.3 passes');
   assert.ok(right.selections[0].includes(pair[0]) && !right.selections[0].includes(pair[1]));
-  const old = await inspectProductPage(new ModelProductPage(odd, media, { breadcrumb: LEAF, allDefaults: true }), { payload: odd, media, images: odd.images, leafName: LEAF, allValues: false });
+  const old = await inspectProductPage(new ModelProductPage(odd, media, { breadcrumb: LEAF, allDefaults: true }), { payload: odd, media, images: odd.images, allValues: false });
   assert.equal(old.checks.default_selection, false, 'a page that presses defaults forming no variant does not');
 });
 
@@ -158,14 +158,14 @@ test('unoffered values (H2D): marked, said, pressed — the page holds chooseVal
   const media = mediaOf(payload);
   const laser = payload.groups.find((g) => g.kind === 'version')!.values.find((v) => v.name_en === 'H2D Laser Full Combo')!;
   const page = new ModelProductPage(payload, media, { breadcrumb: LEAF });
-  const r = await inspectProductPage(page, { payload, media, images: payload.images, leafName: LEAF, allValues: true });
+  const r = await inspectProductPage(page, { payload, media, images: payload.images, allValues: true });
   assert.ok(r.counts.values_not_offered >= 1, 'H2D has values not offered with the opening choice');
   for (const name of ['not_offered_helper', 'not_offered_marks', 'selection_held', 'no_dead_end', 'selection_images']) assert.equal(r.checks[name], true, `${name}: ${JSON.stringify(r.counts)}`);
   assert.equal(r.counts.values_failed, 0);
   assert.ok(r.selections.some((s) => s.length === 1 && s[0] === laser.id), 'the unoffered «H2D Laser Full Combo» was pressed, and «Standard» let go');
   for (const s of r.selections) assert.ok(formsVariant(s, payload.variants), `a recorded selection the page could not hold: ${s.join(',')}`);
   const knob = async (k: ConstructorParameters<typeof ModelProductPage>[2]) =>
-    inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF, ...k }), { payload, media, images: payload.images, leafName: LEAF, allValues: true });
+    inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF, ...k }), { payload, media, images: payload.images, allValues: true });
   assert.equal((await knob({ noHelper: true })).checks.not_offered_helper, false);
   assert.equal((await knob({ noMarks: true })).checks.not_offered_marks, false);
   const dead = await knob({ disableUnoffered: true });
@@ -181,7 +181,7 @@ test('the knowledge tabs: the ones knowledgeTabs gives the expected answer; a US
   const expected = asAnswer(expectedKnowledge(payload, media, []));
   const served = asAnswer(routeKnowledge(payload, media));
   const run = (knobs: ConstructorParameters<typeof ModelProductPage>[2]) =>
-    inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF, ...knobs }), { payload, media, images: payload.images, leafName: LEAF, allValues: false, knowledge: expected });
+    inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF, ...knobs }), { payload, media, images: payload.images, allValues: false, knowledge: expected });
   const r = await run({ knowledge: served });
   assert.equal(r.checks.knowledge_tabs, true);
   assert.equal(r.checks.us_110v_other_versions, true);
@@ -194,28 +194,30 @@ test('the knowledge tabs: the ones knowledgeTabs gives the expected answer; a US
     payload,
     media,
     images: payload.images,
-    leafName: LEAF,
     allValues: false,
     knowledge: { specs: [], logistics: { product: [], package: [], shipment: [], carton: [] }, in_the_box: [], compatibility: { compatible: [], not_compatible: [], requires: [], related: [] }, documents: [] },
   });
   assert.equal(bare.checks.knowledge_tabs, true);
 });
 
-test('a merge: the existing product keeps its chooser and money; only the main image, the dinar text and the breadcrumb are checked', async () => {
+test('a merge: the existing product keeps its chooser and money; only the main image and the dinar text are checked', async () => {
   const payload = payloadOf('a1', 'p_existing_a1_0001');
   const media = mediaOf(payload);
-  const r = await inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF }), { payload, media, images: payload.images, leafName: LEAF, allValues: true });
-  assert.deepEqual(Object.keys(r.checks).sort(), ['breadcrumb', 'image_contain', 'image_decodes', 'no_zero_dinar']);
+  const r = await inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF }), { payload, media, images: payload.images, allValues: true });
+  assert.deepEqual(Object.keys(r.checks).sort(), ['image_contain', 'image_decodes', 'no_zero_dinar']);
   assert.ok(Object.values(r.checks).every(Boolean));
   assert.deepEqual(r.selections, []);
 });
 
-test('an absence is never a match: no leaf name fails the breadcrumb; a hero frame without its picture fails image_decodes', async () => {
+test('the breadcrumb is not applicable (§1 row 28: the page draws none) and never fails; a hero frame without its picture fails image_decodes', async () => {
   const payload = payloadOf('pla-basic-filament');
   const media = mediaOf(payload);
-  const noLeaf = await inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF }), { payload, media, images: payload.images, leafName: '', allValues: false });
-  assert.equal(noLeaf.checks.breadcrumb, false);
-  const broken = await inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF, brokenHero: true }), { payload, media, images: payload.images, leafName: LEAF, allValues: false });
+  // A page with no section name anywhere passes every check it can carry.
+  const r = await inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: 'الرئيسية' }), { payload, media, images: payload.images, allValues: false });
+  assert.equal('breadcrumb' in r.checks, false, 'never a check: it cannot fail');
+  assert.ok(Object.values(r.checks).every(Boolean), JSON.stringify(r.checks));
+  assert.deepEqual(NOT_APPLICABLE, { breadcrumb: 'the product page draws no breadcrumb' });
+  const broken = await inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF, brokenHero: true }), { payload, media, images: payload.images, allValues: false });
   assert.equal(broken.checks.image_decodes, false);
 });
 
@@ -369,7 +371,7 @@ test('in Chromium, on the final step-7 markup: controls by data-option-value, ma
     const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
     const checker = await BrowserChecker.launch(origin);
     try {
-      const r = await checker.check({ slug: 'small-pla', payload, media, images: payload.images, leafName: LEAF, allValues: true, knowledge: smallKnowledge(), screenshot: false });
+      const r = await checker.check({ slug: 'small-pla', payload, media, images: payload.images, allValues: true, knowledge: smallKnowledge(), screenshot: false });
       if (variant.brokenHero) {
         assert.equal(r.checks.image_decodes, false, 'the thumbnails decode, the main image does not: the check reads the main one');
         continue;
@@ -388,6 +390,8 @@ test('in Chromium, on the final step-7 markup: controls by data-option-value, ma
       assert.deepEqual(r.selections, [['ov_white', 'ov_refill'], ['ov_white', 'ov_refill'], ['ov_black', 'ov_spool'], ['ov_white', 'ov_refill'], ['ov_white', 'ov_spool']]);
       assert.equal(r.counts.values_failed, 0);
       assert.deepEqual([r.counts.knowledge_tabs, r.counts.us_110v_notes], [2, 1]);
+      // This page names its section in a nav; the real one does not (§1 row 28): either way, never a check.
+      assert.deepEqual(r.not_applicable, { breadcrumb: 'the product page draws no breadcrumb' });
       assert.ok(r.ok, JSON.stringify(r.checks));
     } finally {
       await checker.close();
