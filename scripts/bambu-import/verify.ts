@@ -14,9 +14,10 @@
  *                     unpriced; option groups (ids, order, labels, defaults),
  *                     variants (combo keys, nothing extra), images (bindings,
  *                     the primary, /files/…webp), swatches;
- *                     GET /api/products/<slug>/knowledge: counts by status and
- *                     region, documents, relations, in-the-box; and the public
- *                     fingerprint (fingerprint.ts) of both answers;
+ *                     GET /api/products/<slug>/knowledge: the whole answer the
+ *                     route gives for what was written (rows, logistics, box,
+ *                     documents, relations, swatches — see below); and the
+ *                     public fingerprint (fingerprint.ts) of both answers;
  *   3  listings       GET /api/products?category=<slug>&search=<title> for the
  *                     leaf, its root and each secondary membership (the next
  *                     page while a page is full); the leaf is the reviewed
@@ -32,16 +33,37 @@
  *   8  merge          before_fp_equal from /write;
  *   11 compare        GET /api/compare?ids=<id> → 200 with the card; the
  *                     candidates when the type has ≥ 3 compare keys with values.
- *                     With fewer, a product with nothing to compare on is
- *                     answered 400 COMPARE_NO_SPECS (worker/routes/compare.ts):
- *                     exactly that answer, naming this product, is the absence
- *                     §I.1.11 expects for the type (`not_applicable`); with ≥ 3
- *                     it fails, and any other refusal fails either way.
+ *                     The keys are counted by the route's own rule
+ *                     (worker/lib/knowledge/compareKeys.ts `comparedFields`: the
+ *                     facts a single-id column stands on — public, product
+ *                     scope, never US 110 V, a compare key on a real template
+ *                     field, never the family filter's code). With fewer, a
+ *                     product with nothing to compare on is answered 400
+ *                     COMPARE_NO_SPECS (worker/routes/compare.ts): exactly that
+ *                     answer, naming this product, is the absence §I.1.11
+ *                     expects for the type (`not_applicable`); with ≥ 3 it
+ *                     fails, and any other refusal fails either way.
  *
  * THE GALLERY AS WRITTEN. The Worker collapses byte-identical gallery images
  * into the earliest position (§C.4 step 1), so the images, the bindings, the
  * primary and the fingerprint are expected from the rows it wrote
  * (gallery.ts), never from the payload's pre-collapse list.
+ *
+ * THE KNOWLEDGE ANSWER IS THE ROUTE'S OWN. The expectation is built by the
+ * route's own assembly (worker/lib/knowledge/answer.ts `assembleKnowledge`: the
+ * row shaping, the owner-only keys, the box, the logistics parts, the
+ * compatibility buckets, the document hosts) over the rows the payload makes
+ * — public, on a LIVE scope (the product, a value of its groups, one of its
+ * variants: nothing else is ever on the page, productKnowledge.ts
+ * `scopeLive`), documents not found dead — and compared with the live answer
+ * fact by fact: every spec and logistics row with its value text (a weight as
+ * published, «31 kg», §G.2), numbers, unit, state, region (the US 110 V table
+ * included, as the route sends it) and scope; every box item; every document;
+ * every relation in its list; every swatch of a live value. Left out only what
+ * the payload cannot state: a relation's state and target (D1 resolves them,
+ * §B.6), a source's document address and a not-found row's checked sources
+ * (the writer derives them), a document's titles (the writer's Sorani rule),
+ * and the completeness counts.
  *
  * WHAT THE PUBLIC SITE CAN SHOW. A document whose ENRICH check found it dead
  * is stored inactive and never shown (§C.7, §G.2): it is not expected. A
@@ -61,10 +83,11 @@
  * listing (`products`, `total`, `truncated`) and the tree (`roots` of nodes
  * with `id`, `slug`, `name_*`, `product_count`, `children`).
  */
-import { mediaPath, projectionFingerprint, type Projection } from '@levonis/catalog/bambuImport/fingerprint';
+import { canonicalJson, mediaPath, projectionFingerprint, type Projection } from '@levonis/catalog/bambuImport/fingerprint';
 import { modelsInText } from '@levonis/catalog/bambuImport/registry/models';
-import { specKey } from '@levonis/catalog/bambuImport/registry/specKeys';
-import type { ImportPayload } from '@levonis/catalog/bambuImport/payload';
+import type { ImportPayload, PayloadBoxItem } from '@levonis/catalog/bambuImport/payload';
+import { assembleKnowledge, isOwnerOnlyKey, type KnowledgeRows, type ProductKnowledge, type SpecValueDbRow } from '../../worker/lib/knowledge/answer';
+import { comparedFields } from '../../worker/lib/knowledge/compareKeys';
 import { CACHE_WAIT_MAX, VERIFY_AFTER_CACHE_WAIT } from './deadline';
 import { HostFetcher, ImportStop } from './fetch';
 import type { GalleryImage } from './gallery';
@@ -158,16 +181,15 @@ export interface VerifyOutcome {
   sections: { leaf: string; root: string; secondary: string[] };
   /** The longest s-maxage seen on a failing answer (the cache rule), in ms. */
   cacheMs: number;
+  /** The knowledge answer expected (the browser checks the tabs it gives); null for a merge (not the payload's ids). */
+  knowledge: ProductKnowledge | null;
 }
 
 // ------------------------------------------------------------------ expectations
 
-/** Owner-only keys never reach /knowledge, whatever a row's visibility says (CBM, warranty notes). */
+/** A spec row the route can ever send: public, and not one of the keys a customer never reads (answer.ts). */
 export function isPublicSpec(s: { key: string; group: string; visibility: string }): boolean {
-  if (s.visibility !== 'public') return false;
-  if (specKey(s.key)?.ownerOnly) return false;
-  if (s.group === 'manufacturer_terms' || s.key.startsWith('manufacturer_terms.')) return false;
-  return !/volume_m3|(^|[._])cbm($|[._])/i.test(s.key);
+  return s.visibility === 'public' && !isOwnerOnlyKey(s.key, s.group);
 }
 
 const tally = (xs: readonly string[]) => xs.reduce<Record<string, number>>((m, x) => ((m[x] = (m[x] ?? 0) + 1), m), {});
@@ -188,6 +210,174 @@ export function documentShown(doc: { id: string }, checks: readonly DocumentChec
 }
 
 /**
+ * Is a scope LIVE on the page — the product, a value of one of its groups, one of its variants (productKnowledge.ts
+ * `scopeLive`: an active value of an active group, an active variant)? A create writes every group, value and
+ * variant of the payload active, so a scope the payload does not hold is never on the page.
+ */
+export function liveScopeOf(payload: Pick<ImportPayload, 'groups' | 'variants'>): (kind: string, id: string) => boolean {
+  const values = new Set(payload.groups.flatMap((g) => g.values.map((v) => v.id)));
+  const variants = new Set(payload.variants.map((v) => v.id));
+  return (kind, id) => (kind === 'option_value' ? values.has(id) : kind === 'variant' ? variants.has(id) : true);
+}
+
+/**
+ * A stored `/files/…` address as a customer's picture URL (worker/lib/productModel.ts `canonicalProductMediaUrl`:
+ * an owned, safe media key, served as WebP), else ''.
+ */
+export function customerMediaUrl(raw: string): string {
+  if (typeof raw !== 'string' || !raw.startsWith('/files/')) return '';
+  const key = raw.slice('/files/'.length);
+  const safe = key.length >= 5 && key.length <= 500 && !key.endsWith('/') && !key.includes('%') && /^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(key) && key.split('/').every((p) => p !== '' && p !== '.' && p !== '..');
+  return safe && key.endsWith('.webp') ? raw : '';
+}
+
+/**
+ * The 0194 rows the knowledge route reads for this product, as the payload makes them: public spec rows on a live
+ * scope (one per key, scope and region, the first kept — the writer's `ON CONFLICT DO NOTHING`), each box item on its
+ * stored object (`media_key`); active documents on a live scope (one per address and scope); relations on a live
+ * scope, never to the product itself; swatches of live values with a stored picture. The route narrows its own reads
+ * the same way before it hands them to the same assembly.
+ */
+export function knowledgeRowsOf(payload: ImportPayload, media: ReadonlyMap<string, MediaAnswerRow>, documentChecks: readonly DocumentCheck[]): KnowledgeRows {
+  const live = liveScopeOf(payload);
+  const stored = (id: string) => {
+    const m = media.get(id);
+    return m && m.status === 'stored' && m.r2_key ? m.r2_key : '';
+  };
+  const boxItem = (x: PayloadBoxItem) => {
+    const key = x.source_media_id ? stored(x.source_media_id) : '';
+    return { text: x.text, qty: x.qty, ...(key ? { media_key: key } : {}) };
+  };
+  const seen = new Set<string>();
+  const specs: SpecValueDbRow[] = [];
+  for (const s of payload.specs) {
+    if (s.visibility !== 'public' || !live(s.scope_kind, s.scope_id)) continue;
+    const at = `${s.key}|${s.scope_kind}|${s.scope_id}|${s.region}`;
+    if (seen.has(at)) continue;
+    seen.add(at);
+    specs.push({
+      canonical_key: s.key,
+      group_key: s.group,
+      scope_kind: s.scope_kind,
+      scope_id: s.scope_id,
+      region: s.region,
+      data_type: s.data_type,
+      original_label: s.original_label,
+      value_text: s.value_text,
+      value_num: s.value_num,
+      value_num_max: s.value_num_max,
+      value_bool: s.value_bool,
+      value_list: JSON.stringify(s.value_list.map((x) => (x && typeof x === 'object' ? boxItem(x) : x))),
+      unit: s.unit,
+      status: s.status,
+      source_kind: s.source_kind,
+      // A document's own address is the writer's to derive (owner-side for the store's pages): not compared.
+      source_ref: '',
+      source_title: s.source_title,
+      source_locator: s.source_locator,
+      source_excerpt: s.source_excerpt,
+      test_method: s.test_method,
+      test_condition: s.test_condition,
+      checked_sources: JSON.stringify(s.checked_sources),
+      conflict: s.conflict,
+      sort: s.sort,
+    });
+  }
+  const docSeen = new Set<string>();
+  const documents = payload.documents.filter((d) => {
+    const at = `${d.url}|${d.scope_kind}|${d.scope_id}`;
+    if (!documentShown(d, documentChecks) || !live(d.scope_kind, d.scope_id) || docSeen.has(at)) return false;
+    docSeen.add(at);
+    return true;
+  });
+  return {
+    specs,
+    documents: documents.map((d) => ({ kind: d.kind, title_en: d.title_en, title_ar: d.title_ar, title_ckb: d.title_ckb, url: d.url, host: d.host, scope_kind: d.scope_kind, scope_id: d.scope_id })),
+    relations: payload.relations
+      .filter((r) => live(r.scope_kind, r.scope_id) && r.target_product_id !== payload.product_id)
+      .map((r) => ({ relation: r.relation, target_kind: r.target_kind, target_label: r.target_label, state: r.state, scope_kind: r.scope_kind, scope_id: r.scope_id })),
+    swatches: payload.swatches
+      .filter((w) => live('option_value', w.value_id) && stored(w.source_media_id))
+      .map((w) => ({ option_value_id: w.value_id, url: `/files/${stored(w.source_media_id)}`, width: media.get(w.source_media_id)?.width ?? null, height: media.get(w.source_media_id)?.height ?? null, published_hex: '' })),
+    sourceRoute: payload.route || null,
+  };
+}
+
+/** The knowledge answer the route gives for what was written (§G.1): its own assembly over `knowledgeRowsOf`. */
+export function expectedKnowledge(payload: ImportPayload, media: ReadonlyMap<string, MediaAnswerRow>, documentChecks: readonly DocumentCheck[]): ProductKnowledge {
+  return assembleKnowledge(knowledgeRowsOf(payload, media, documentChecks), { url: customerMediaUrl });
+}
+
+/** The comparable facts of a knowledge answer, per part, each a sorted list of canonical facts (a multiset). */
+export interface KnowledgeProjection {
+  rows: string[];
+  box: string[];
+  documents: string[];
+  relations: string[];
+  swatches: string[];
+}
+
+const scopeFact = (v: unknown) => (isRec(v) ? { kind: str(v.kind) || 'product', id: str(v.id) } : { kind: 'product', id: '' });
+const numFact = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+/** One spec or logistics row's facts: everything the payload states and the route sends (not a document address). */
+function rowFact(r: Rec): Rec {
+  const src = isRec(r.source) ? r.source : {};
+  return {
+    key: str(r.key),
+    label: isRec(r.label) ? { ar: str(r.label.ar), en: str(r.label.en), ckb: str(r.label.ckb) } : null,
+    value_text: str(r.value_text),
+    value_num: numFact(r.value_num),
+    value_num_max: numFact(r.value_num_max),
+    value_bool: typeof r.value_bool === 'boolean' ? r.value_bool : null,
+    items: Array.isArray(r.items) ? r.items.map(String) : [],
+    unit: str(r.unit),
+    status: str(r.status),
+    region: str(r.region),
+    scope: scopeFact(r.scope),
+    source: { kind: str(src.kind), title: str(src.title), locator: str(src.locator), excerpt: str(src.excerpt) },
+    test_method: str(r.test_method),
+    test_condition: str(r.test_condition),
+    conflict: r.conflict === true,
+    display: r.display !== false,
+  };
+}
+
+/** The knowledge answer (live, or expected) as comparable facts. */
+export function knowledgeProjection(k: Rec): KnowledgeProjection {
+  const sorted = (xs: string[]) => xs.sort();
+  const rows: string[] = [];
+  for (const g of list(k.specs)) for (const r of list(g.rows)) rows.push(`group:${str(g.group)}|${canonicalJson(rowFact(r))}`);
+  if (isRec(k.logistics)) for (const [part, items] of Object.entries(k.logistics)) for (const r of list(items)) rows.push(`logistics:${part}|${canonicalJson(rowFact(r))}`);
+  const box = list(k.in_the_box).map((i) =>
+    canonicalJson({ text: str(i.text), qty: numFact(i.qty), image: i.image ? mediaPath(str(i.image)) : '', scope: scopeFact(i.scope), region: str(i.region), status: str(i.status) })
+  );
+  const documents = list(k.documents).map((d) => canonicalJson({ kind: str(d.kind), url: str(d.url), host: str(d.host), scope: scopeFact(d.scope) }));
+  const compat = isRec(k.compatibility) ? k.compatibility : {};
+  const relations = Object.entries(compat).flatMap(([bucket, items]) =>
+    list(items).map((r) => canonicalJson({ bucket, relation: str(r.relation), label: str(r.label), target_kind: str(r.target_kind), scope: scopeFact(r.scope) }))
+  );
+  const swatches = list(k.swatches).map((w) => canonicalJson({ option_value_id: str(w.option_value_id), url: mediaPath(str(w.url)) }));
+  return { rows: sorted(rows), box: sorted(box), documents: sorted(documents), relations: sorted(relations), swatches: sorted(swatches) };
+}
+
+/** Facts in one projection and not the other, per part (missing plus extra; 0 everywhere is equality). */
+export function knowledgeDiff(expected: KnowledgeProjection, live: KnowledgeProjection): Record<keyof KnowledgeProjection, number> {
+  const diff = (a: readonly string[], b: readonly string[]) => {
+    const left = tally(a);
+    for (const x of b) left[x] = (left[x] ?? 0) - 1;
+    return Object.values(left).reduce((n, c) => n + Math.abs(c), 0);
+  };
+  return {
+    rows: diff(expected.rows, live.rows),
+    box: diff(expected.box, live.box),
+    documents: diff(expected.documents, live.documents),
+    relations: diff(expected.relations, live.relations),
+    swatches: diff(expected.swatches, live.swatches),
+  };
+}
+
+/**
  * The facts the public answers must show, from the payload, the gallery as written (the image rows the Worker
  * wrote after the content-duplicate collapse, gallery.ts), the stored media and the document checks.
  */
@@ -202,9 +392,9 @@ export function expectedFacts(
     return m && m.status === 'stored' && m.r2_key ? `/files/${m.r2_key}` : '';
   };
   const images = gallery.filter((i) => stored(i.source_media_id));
-  const publicSpecs = payload.specs.filter(isPublicSpec);
-  const shownDocuments = payload.documents.filter((d) => documentShown(d, documentChecks));
-  const box = publicSpecs.filter((s) => s.key === 'package.contents');
+  const knowledge = expectedKnowledge(payload, media, documentChecks);
+  const kf = knowledgeFacts(knowledge as unknown as Rec);
+  const box = payload.specs.filter((s) => isPublicSpec(s) && s.key === 'package.contents');
   return {
     groups: payload.groups.map((g) => ({ id: g.id, sort: g.sort, name_en: g.name_en, default_value_id: g.default_value_id, values: g.values.map((v) => v.id) })),
     comboKeys: payload.variants.map((v) => v.combo_key).sort(),
@@ -213,12 +403,14 @@ export function expectedFacts(
     distinctImages: new Set(images.map((i) => stored(i.source_media_id))).size,
     bindings: tally(images.map((i) => bindingOf(i))),
     primaryId: images.find((i) => i.is_primary)?.id ?? '',
-    swatches: payload.swatches.filter((s) => stored(s.source_media_id)).map((s) => ({ value_id: s.value_id, url: stored(s.source_media_id) })),
-    specsByStatus: tally(publicSpecs.filter((s) => s.key !== 'package.contents').map((s) => s.status)),
-    specsByRegion: tally(publicSpecs.filter((s) => s.key !== 'package.contents' && s.region).map((s) => s.region)),
-    documents: shownDocuments.length,
-    relations: payload.relations.length,
-    inTheBox: box.reduce((n, s) => n + s.value_list.length, 0),
+    swatches: kf.swatches.map((s) => ({ value_id: s.value_id, url: s.url })),
+    knowledge,
+    knowledgeProjection: knowledgeProjection(knowledge as unknown as Rec),
+    specsByStatus: kf.specsByStatus,
+    specsByRegion: kf.specsByRegion,
+    documents: kf.documents.length,
+    relations: kf.relations.length,
+    inTheBox: kf.inTheBox,
     files: [
       ...new Set([
         ...images.map((i) => stored(i.source_media_id)),
@@ -230,12 +422,10 @@ export function expectedFacts(
       groups: payload.groups.map((g) => ({ id: g.id, sort: g.sort, default_value_id: g.default_value_id, values: g.values.map((v) => ({ id: v.id, sort: v.sort })) })),
       variants: payload.variants.map((v) => ({ id: v.id, combo_key: v.combo_key })),
       images: images.map((i) => ({ id: i.id, url: stored(i.source_media_id), is_primary: i.is_primary, option_value_id: i.option_value_id ?? '', variant_id: i.variant_id ?? '', via_variant_id: i.via_variant_id ?? '' })),
-      swatches: payload.swatches.filter((s) => stored(s.source_media_id)).map((s) => ({ value_id: s.value_id, url: stored(s.source_media_id) })),
-      specs: publicSpecs
-        .filter((s) => s.key !== 'package.contents')
-        .map((s) => ({ key: s.key, scope_kind: s.scope_kind, scope_id: s.scope_id, region: s.region, status: s.status, unit: s.unit, value_num: s.value_num })),
-      documents: shownDocuments.map((d) => ({ kind: d.kind, url: d.url })),
-      relations: payload.relations.map((r) => ({ relation: r.relation, scope_kind: r.scope_kind, scope_id: r.scope_id, label: r.target_label, state: r.state, target: '' })),
+      swatches: kf.swatches,
+      specs: kf.specs,
+      documents: kf.documents,
+      relations: kf.relations,
     }),
   };
 }
@@ -446,21 +636,23 @@ export async function verifyPublic(site: Site, ctx: VerifyContext): Promise<Veri
   // A merge writes a scoped row only where the reviewed value map names the existing option (§E.2: an unmapped
   // one is a `variant_not_merged` conflict), so its counts are the write's, not the payload's: the Worker's recompute
   // compares D1 with what the write recorded (§I.1.10); here the answer must exist and is recorded.
-  const knowledgeOk =
-    know.status === 200 &&
-    (merge ||
-      (sameTally(kf.specsByStatus, exp.specsByStatus) &&
-        sameTally(kf.specsByRegion, exp.specsByRegion) &&
-        kf.documents.length === exp.documents &&
-        kf.relations.length === exp.relations &&
-        kf.inTheBox === exp.inTheBox));
+  // The whole answer, fact by fact, against the route's own assembly of what was written (see the head of this file).
+  const mismatched = knowledgeDiff(exp.knowledgeProjection, knowledgeProjection(know.json ?? {}));
+  const knowledgeOk = know.status === 200 && (merge || (Object.values(mismatched).every((n) => n === 0) && sameTally(kf.specsByStatus, exp.specsByStatus)));
   record(
     'knowledge',
     {
       ok: knowledgeOk,
       hard: true,
       status: know.status,
-      counts: { documents: kf.documents.length, relations: kf.relations.length, in_the_box: kf.inTheBox, ...Object.fromEntries(Object.entries(kf.specsByStatus).map(([k, v]) => [`specs_${k}`, v])) },
+      counts: {
+        documents: kf.documents.length,
+        relations: kf.relations.length,
+        in_the_box: kf.inTheBox,
+        ...Object.fromEntries(Object.entries(kf.specsByStatus).map(([k, v]) => [`specs_${k}`, v])),
+        // How many facts differ, per part (0 when the answer is the expected one; a merge is not compared).
+        ...(merge ? {} : Object.fromEntries(Object.entries(mismatched).map(([k, v]) => [`mismatched_${k}`, v]))),
+      },
     },
     know
   );
@@ -600,15 +792,35 @@ export async function verifyPublic(site: Site, ctx: VerifyContext): Promise<Veri
   const ok = Object.values(checks).every((c) => c.ok || !c.hard);
   // The breadcrumb names the section the product IS in (the leaf of its public sections); none named, none matched.
   const leafName = tree.find((n) => n.slug === leafSlug)?.name_ar ?? '';
-  return { ok, checks, leafName, sections: { leaf: leafSlug, root: rootSlug, secondary }, cacheMs: cacheMs || CACHE_WAIT_MAX };
+  return { ok, checks, leafName, sections: { leaf: leafSlug, root: rootSlug, secondary }, cacheMs: cacheMs || CACHE_WAIT_MAX, knowledge: merge ? null : exp.knowledge };
 }
 
 /** §I.1.11: with this many compare keys with values, the compare card and the candidates are hard checks. */
 export const COMPARE_HARD_KEYS = 3;
 
-/** The registry's compare keys the product states a public value for (verified or unverified), each counted once. */
+/**
+ * The compare keys with values the compare route's single-id answer (`?ids=<product>`) stands on — counted by the
+ * route's own rule (worker/lib/knowledge/compareKeys.ts `comparedFields`): public, the product's own scope, never
+ * the US 110 V table, a compare key on a real template field, never the family filter's code, a stated value. A
+ * value-scoped or US-only fact is never read for a bare product id, so it never counts toward §I.1.11's three.
+ */
 export function compareKeysOf(payload: Pick<ImportPayload, 'specs'>): number {
-  return new Set(payload.specs.filter((s) => isPublicSpec(s) && (s.status === 'verified' || s.status === 'unverified') && specKey(s.key)?.compare).map((s) => s.key)).size;
+  return comparedFields(
+    payload.specs.map((s) => ({
+      canonical_key: s.key,
+      scope_kind: s.scope_kind,
+      scope_id: s.scope_id,
+      region: s.region,
+      value_text: s.value_text,
+      value_num: s.value_num,
+      value_num_max: s.value_num_max,
+      unit: s.unit,
+      status: s.status,
+      test_method: s.test_method,
+      visibility: s.visibility,
+    })),
+    null
+  ).length;
 }
 
 /**

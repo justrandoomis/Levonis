@@ -21,7 +21,7 @@ import { assertImportPayload, type ImportPayload } from '../../packages/catalog/
 import { canonicalJson } from '../../packages/catalog/src/bambuImport/fingerprint';
 import { ROOT } from './d1';
 import type { Clock } from '../../scripts/bambu-import/deadline';
-import { isPublicSpec } from '../../scripts/bambu-import/verify';
+import { routeKnowledge } from './bambuKnowledgeRoute';
 import { collapseContentDuplicates, type StoredGalleryRow } from '../../scripts/bambu-import/gallery';
 import { loadReviewedBundle, type ReviewedBundle } from '../../scripts/bambu-import/discover';
 import { ImportLog } from '../../scripts/bambu-import/log';
@@ -587,24 +587,7 @@ export class World {
       });
     }
     if (siteP?.[2] === '/quote') return json(409, { success: false, error: 'not available', code: 'PRICE_NOT_AVAILABLE', details: { price_status: 'unpriced' } });
-    if (siteP?.[2] === '/knowledge') {
-      const pub = pay.specs.filter((s) => isPublicSpec(s));
-      const groups = new Map<string, Rec[]>();
-      for (const s of pub.filter((x) => x.key !== 'package.contents')) {
-        const list = groups.get(s.group) ?? [];
-        list.push({ key: s.key, scope: { kind: s.scope_kind, id: s.scope_id }, region: s.region, status: s.status, unit: s.unit, value_num: s.value_num });
-        groups.set(s.group, list);
-      }
-      const box = pub.filter((s) => s.key === 'package.contents').flatMap((s) => s.value_list.map((x) => ({ text: typeof x === 'object' ? x.text : String(x), scope: { kind: s.scope_kind, id: s.scope_id } })));
-      return json(200, {
-        specs: [...groups].map(([group, rows]) => ({ group, rows })),
-        logistics: { product: [], package: [], shipment: [], carton: [] },
-        in_the_box: box,
-        compatibility: { compatible: pay.relations.map((r) => ({ relation: r.relation, label: r.target_label, state: r.state, scope: { kind: r.scope_kind, id: r.scope_id } })), not_compatible: [], requires: [], related: [] },
-        documents: pay.documents.map((d) => ({ kind: d.kind, url: d.url })),
-        swatches: pay.swatches.filter((s) => this.files(i, s.source_media_id)).map((s) => ({ option_value_id: s.value_id, url: this.files(i, s.source_media_id) })),
-      });
-    }
+    if (siteP?.[2] === '/knowledge') return json(200, routeKnowledge(pay, i.media));
     return json(200, {
       price_status: 'unpriced',
       relations: {

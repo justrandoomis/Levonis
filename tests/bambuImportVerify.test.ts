@@ -38,12 +38,15 @@ import assert from 'node:assert/strict';
 import { buildImportPayload, type ImportPayload } from '../packages/catalog/src/bambuImport/payload';
 import { extractionFingerprint } from '../packages/catalog/src/bambuImport/fingerprint';
 import { fixtureJson, sample, type SampleHandle } from './fixtures/bambu/load';
-import { edgeEvidence, isPublicSpec, Site, verifyPublic, type VerifyContext } from '../scripts/bambu-import/verify';
+import { compareKeysOf, edgeEvidence, expectedKnowledge, Site, verifyPublic, type VerifyContext } from '../scripts/bambu-import/verify';
+import { COMPARE_KEY_FIELDS, comparedFields, knowledgeCellsFor } from '../worker/lib/knowledge/compareKeys';
+import { FILTER_ONLY_FIELDS } from '../worker/lib/templateFamilies';
 import type { HostFetcher } from '../scripts/bambu-import/fetch';
 import { writtenImagesOf, type DocumentCheck, type MediaAnswerRow, type WrittenImage } from '../scripts/bambu-import/opsClient';
 import { collapseContentDuplicates, recomputedGallery, writtenGallery, type GalleryImage, type StoredGalleryRow } from '../scripts/bambu-import/gallery';
 import { pageDefaultSelection } from '../scripts/bambu-import/selection';
 import { RUN_ID, World } from './fixtures/bambuImportWorld';
+import { routeKnowledge, type StoredKnowledgeKnobs } from './fixtures/bambuKnowledgeRoute';
 
 const SITE = 'https://levonis-iq.com';
 type Rec = Record<string, unknown>;
@@ -60,14 +63,15 @@ function payloadOf(handle: SampleHandle, merge?: string): ImportPayload {
   }).payload;
 }
 
+/** A stored key as the Worker names one (content-addressed, a safe media key: `swatch:123` is not). */
+const keyOf = (id: string) => `products/import/gallery/${id.replace(/[^A-Za-z0-9._-]/g, '_')}.webp`;
+
 function mediaOf(p: ImportPayload): Map<string, MediaAnswerRow> {
   const m = new Map<string, MediaAnswerRow>();
-  for (const i of p.images) m.set(i.source_media_id, { source_media_id: i.source_media_id, status: 'stored', r2_key: `products/import/gallery/${i.source_media_id}.webp`, width: 1000, height: 1000, error_code: '' });
-  for (const s of p.swatches) m.set(s.source_media_id, { source_media_id: s.source_media_id, status: 'stored', r2_key: `products/import/gallery/${s.source_media_id}.webp`, width: 128, height: 128, error_code: '' });
+  for (const i of p.images) m.set(i.source_media_id, { source_media_id: i.source_media_id, status: 'stored', r2_key: keyOf(i.source_media_id), width: 1000, height: 1000, error_code: '' });
+  for (const s of p.swatches) m.set(s.source_media_id, { source_media_id: s.source_media_id, status: 'stored', r2_key: keyOf(s.source_media_id), width: 128, height: 128, error_code: '' });
   return m;
 }
-
-const BUCKET: Record<string, string> = { compatible_with: 'compatible', not_compatible_with: 'not_compatible', requires: 'requires' };
 
 /** The live product as the public routes answer it. */
 interface Live {
@@ -91,6 +95,10 @@ interface Live {
   written?: GalleryImage[];
   /** The compare route's answer for `?ids=<id>` (default: 200 with the card). */
   compare?: () => { status: number; body: unknown };
+  /** What D1 holds beside the payload (tests/fixtures/bambuKnowledgeRoute.ts knobs). */
+  stored?: StoredKnowledgeKnobs;
+  /** A route that answers otherwise than the real one (one fault at a time). */
+  knowledgeEdit?: (k: Rec) => Rec;
 }
 
 const files = (l: Live, id: string) => {
@@ -98,28 +106,10 @@ const files = (l: Live, id: string) => {
   return m ? `/files/${m.r2_key}` : '';
 };
 
+/** The knowledge route's answer for what was written (tests/fixtures/bambuKnowledgeRoute.ts: the writer's rows, the route's assembly). */
 function knowledge(l: Live): Rec {
-  const p = l.payload;
-  const pub = p.specs.filter(isPublicSpec);
-  const groups = new Map<string, Rec[]>();
-  for (const r of pub.filter((x) => x.key !== 'package.contents')) {
-    const rows = groups.get(r.group) ?? [];
-    rows.push({ key: r.key, value_num: r.value_num, unit: r.unit, status: r.status, region: r.region, scope: { kind: r.scope_kind, id: r.scope_id } });
-    groups.set(r.group, rows);
-  }
-  const compatibility: Record<string, Rec[]> = { compatible: [], not_compatible: [], requires: [], related: [] };
-  for (const r of p.relations) {
-    compatibility[BUCKET[r.relation] ?? 'related'].push({ relation: r.relation, label: r.target_label, target_kind: r.target_kind, state: l.relationState ? l.relationState(r) : r.state, scope: { kind: r.scope_kind, id: r.scope_id } });
-  }
-  const box = pub.filter((x) => x.key === 'package.contents').flatMap((x) => x.value_list.map((v) => ({ text: typeof v === 'object' && v ? v.text : String(v), scope: { kind: x.scope_kind, id: x.scope_id } })));
-  return {
-    specs: [...groups].map(([group, rows]) => ({ group, rows })),
-    logistics: { product: [], package: [], shipment: [], carton: [] },
-    in_the_box: box,
-    compatibility,
-    documents: p.documents.filter((d) => !l.inactive?.has(d.id)).map((d) => ({ kind: d.kind, url: d.url, scope: { kind: d.scope_kind, id: d.scope_id } })),
-    swatches: l.existing ? [] : p.swatches.map((s) => ({ option_value_id: s.value_id, url: files(l, s.source_media_id) })),
-  };
+  const k = routeKnowledge(l.payload, l.media, { inactiveDocuments: l.inactive, relationState: l.relationState, ...l.stored }) as unknown as Rec;
+  return l.knowledgeEdit ? l.knowledgeEdit(JSON.parse(JSON.stringify(k))) : k;
 }
 
 function siteAnswer(l: Live): Rec {
@@ -432,10 +422,10 @@ test('compare: COMPARE_NO_SPECS is the expected absence for a type with fewer th
   assert.ok(!reads.some((r) => r.includes('/api/compare/candidates')), 'no candidates are expected for the type');
   const ev = edgeEvidence(o, null, `${SITE}/product/build-plate-combo`, payload, 1) as { checks: Record<string, { detail?: Record<string, unknown> }> };
   assert.equal(ev.checks.compare.detail?.compare, 'not_applicable');
-  // Two compare keys with values are still fewer than 3.
-  const two = await verify(live('pla-basic-filament', { sections: ['filament', 'pla'], compare: noSpecs(payloadOf('pla-basic-filament').product_id) }));
-  assert.equal(two.checks.compare.counts?.compare_keys, 2);
-  assert.equal(two.checks.compare.ok, true);
+  // PLA Basic: its diameter is a product fact; its net weight is its «1kg» value's, which a bare product id never reads.
+  const one = await verify(live('pla-basic-filament', { sections: ['filament', 'pla'], compare: noSpecs(payloadOf('pla-basic-filament').product_id) }));
+  assert.equal(one.checks.compare.counts?.compare_keys, 1);
+  assert.equal(one.checks.compare.ok, true);
   // The card answered: passes too, and says so.
   const card = await verify(live('build-plate-combo', { payload }));
   assert.equal(card.checks.compare.detail?.compare, 'card');
@@ -463,4 +453,105 @@ test('compare: a type with 3 or more compare keys must show the card and the can
     const bad = await verify(live('build-plate-combo', { payload: plate, compare }));
     assert.deepEqual(failed(bad), ['compare'], JSON.stringify(compare()));
   }
+});
+
+test('compare keys are counted by the route\'s own rule (R4): a value-scoped, a US 110 V or an owner fact never counts toward the three', async () => {
+  const base = payloadOf('pla-basic-filament');
+  const fact = (key: string, extra: Partial<ImportPayload['specs'][number]>) => ({ ...base.specs.find((x) => x.key === 'material.diameter')!, id: `ps_${key}_${extra.region ?? ''}${extra.scope_id ?? ''}`, key, value_num: 1.24, value_text: '1.24', ...extra });
+  const colour = base.groups.find((g) => g.kind === 'color')!.values[0].id;
+  const p: ImportPayload = {
+    ...base,
+    specs: [
+      ...base.specs,
+      fact('material.density', { region: 'us_110v' }),
+      fact('mechanical.tensile_strength', { scope_kind: 'option_value', scope_id: colour, group: 'mechanical' }),
+      fact('mechanical.tensile_strength', { visibility: 'owner', group: 'mechanical' }),
+    ],
+  };
+  // Counted any scope and region, these were four keys (diameter, net weight, density, tensile strength): "typed",
+  // and the route's honest COMPARE_NO_SPECS failed the product. The single-id answer reads one of them.
+  assert.equal(compareKeysOf(p), 1);
+  const o = await verify(live('pla-basic-filament', { payload: p, sections: ['filament', 'pla'], compare: noSpecs(p.product_id) }));
+  assert.equal(o.checks.compare.ok, true, JSON.stringify(o.checks.compare));
+  assert.equal(o.checks.compare.detail?.compare, 'not_applicable');
+  // The same rule as the route's single-id column: the cells a bare product id stands on.
+  const rows = p.specs.map((s) => ({ canonical_key: s.key, scope_kind: s.scope_kind, scope_id: s.scope_id, region: s.region, value_text: s.value_text, value_num: s.value_num, value_num_max: s.value_num_max, unit: s.unit, status: s.status, test_method: s.test_method, visibility: s.visibility }));
+  assert.deepEqual(comparedFields(rows, null), ['diameter']);
+  assert.ok(!('density' in knowledgeCellsFor(rows.filter((r) => r.region === 'us_110v'), null)), 'a US 110 V fact is no cell at all');
+  // The family filter's code is never a compare key (FILTER_ONLY_FIELDS).
+  assert.ok(![...COMPARE_KEY_FIELDS.values()].some((f) => FILTER_ONLY_FIELDS.has(f)));
+  // Three product facts with values do make the type comparable (R2 stays: only < 3 accepts COMPARE_NO_SPECS).
+  // (PLA Basic already states its density «not found» at product scope: that row stands, and states no value.)
+  const three: ImportPayload = { ...p, specs: [...p.specs, fact('motion.max_acceleration', { group: 'motion' }), fact('mechanical.tensile_strength', { group: 'mechanical' })] };
+  assert.equal(compareKeysOf(three), 3);
+  const refused = await verify(live('pla-basic-filament', { payload: three, sections: ['filament', 'pla'], compare: noSpecs(three.product_id) }));
+  assert.deepEqual(failed(refused), ['compare']);
+});
+
+// ---------------------------------------------------------------- the knowledge answer, fact by fact (W3)
+
+test('the knowledge answer is the route\'s own for what was written: weights as published, the US 110 V table, logistics in their parts', async () => {
+  const p = payloadOf('h2d');
+  const l = live('h2d', { payload: p, sections: ['printers', 'fdm-printers'] });
+  const o = await verify(l);
+  assert.deepEqual(failed(o), [], JSON.stringify(o.checks.knowledge));
+  const k = expectedKnowledge(p, l.media, []);
+  assert.equal(k.logistics.product.find((r) => r.key === 'product.net_weight')?.value_text, '31 kg', 'the weight as published, never 31000 g');
+  assert.deepEqual(k.logistics.shipment.filter((r) => r.region === 'us_110v').map((r) => r.value_text).sort(), ['40.6 kg', '44.2 kg', '48.2 kg']);
+  assert.ok(k.specs.flatMap((g) => g.rows).some((r) => r.region === 'us_110v'), 'the US 110 V rows are in the answer (the page puts them under «إصدارات أخرى»)');
+  // A writer that stored a weight's text from its grams: the row differs, the check fails.
+  const grams = await verify({ ...l, stored: { storeSpec: (r) => (r.unit === 'g' && r.value_num !== null ? { ...r, value_text: `${r.value_num} g` } : r) } });
+  assert.ok(failed(grams).includes('knowledge'));
+  assert.ok((grams.checks.knowledge.counts?.mismatched_rows ?? 0) > 0);
+  // A route that dropped the US 110 V table, or filed a logistics row among the specifications: fails.
+  const noUs = await verify({ ...l, knowledgeEdit: (a) => ({ ...a, specs: (a.specs as Rec[]).map((g) => ({ ...g, rows: (g.rows as Rec[]).filter((r) => r.region !== 'us_110v') })) }) });
+  assert.ok(failed(noUs).includes('knowledge'));
+  const misfiled = await verify({
+    ...l,
+    knowledgeEdit: (a) => {
+      const L = a.logistics as Record<string, Rec[]>;
+      return { ...a, logistics: { ...L, shipment: [] }, specs: [...(a.specs as Rec[]), { group: 'physical', rows: L.shipment }] };
+    },
+  });
+  assert.ok(failed(misfiled).includes('knowledge'));
+});
+
+test('live scopes only: facts on a value, variant or group the page does not hold are never expected; a value left inactive is a failure', async () => {
+  const base = payloadOf('h2d');
+  const gone = (s: ImportPayload['specs'][number]) => ({ ...s, id: `${s.id}_gone`, scope_kind: 'option_value' as const, scope_id: 'ov_not_on_this_product' });
+  const p: ImportPayload = {
+    ...base,
+    specs: [...base.specs, gone(base.specs[0])],
+    documents: [...base.documents, { ...base.documents[0], id: 'pd_gone', url: `${base.documents[0].url}?v=gone`, scope_kind: 'variant', scope_id: 'pv_not_on_this_product' }],
+    relations: [
+      ...base.relations,
+      { id: 'prel_gone', scope_kind: 'option_value', scope_id: 'ov_not_on_this_product', relation: 'compatible_with', target_kind: 'printer', target_product_id: null, target_source: 'bambu_us', target_source_handle: 'a1', target_family: '', target_label: 'A1', state: 'pending', evidence_kind: 'compat_section', evidence_text: '' },
+      // A relation the answer has no list for.
+      { id: 'prel_fits', scope_kind: 'product', scope_id: '', relation: 'fits', target_kind: 'printer', target_product_id: null, target_source: 'bambu_us', target_source_handle: 'a1', target_family: '', target_label: 'A1', state: 'pending', evidence_kind: 'compat_section', evidence_text: '' },
+    ],
+    // A swatch of a value the product does not hold.
+    swatches: [...base.swatches, { value_id: 'ov_not_on_this_product', source_media_id: base.images[0].source_media_id, source_url: '' }],
+  };
+  const l = live('h2d', { payload: p, sections: ['printers', 'fdm-printers'] });
+  const o = await verify(l);
+  assert.deepEqual(failed(o), [], JSON.stringify(o.checks.knowledge));
+  // The H2D's per-version facts: a version the writer left inactive takes its rows off the page — VERIFY sees it.
+  const scoped = p.specs.find((s) => s.scope_kind === 'option_value' && s.visibility === 'public')!;
+  const off = await verify({ ...l, stored: { inactiveValues: new Set([scoped.scope_id]) } });
+  assert.ok(failed(off).includes('knowledge'));
+});
+
+test('the box as the route draws it: an item with no text is not an item, and a picture is the stored object\'s', async () => {
+  const base = payloadOf('a1');
+  const box = base.specs.find((s) => s.key === 'package.contents' && s.visibility === 'public')!;
+  assert.ok(box, 'A1 has a box');
+  const p: ImportPayload = { ...base, specs: base.specs.map((s) => (s === box ? { ...s, value_list: [...s.value_list, { text: '  ', qty: 1, source_media_id: '', source_url: '', section: '' }] } : s)) };
+  const l = live('a1', { payload: p, sections: ['printers', 'fdm-printers'] });
+  const o = await verify(l);
+  assert.deepEqual(failed(o), [], JSON.stringify(o.checks.knowledge));
+  const items = base.specs.filter((s) => s.key === 'package.contents' && s.visibility === 'public').reduce((n, s) => n + s.value_list.length, 0);
+  assert.equal(o.checks.knowledge.counts?.in_the_box, items, 'every item of every version\'s box, the empty one left out');
+  const lost = await verify({ ...l, knowledgeEdit: (a) => ({ ...a, in_the_box: (a.in_the_box as Rec[]).slice(1) }) });
+  assert.ok(failed(lost).includes('knowledge'));
+  assert.equal(lost.checks.knowledge.counts?.mismatched_box, 1);
 });
