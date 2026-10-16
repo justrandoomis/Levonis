@@ -704,7 +704,7 @@ test('a merge resumed after its /write (a lost answer, or a later job) completes
     assert.equal(await a.importer().main(), 0, a.logLines.join('\n'));
     assert.equal(writeCalls(a).length, 1, 'the committed write is not sent again');
     assert.equal(a.item('filament-buffer').state, 'COMPLETE', a.logLines.join('\n'));
-    const merge = (callsTo(a, /\/complete$/)[0].body!.edge_evidence as Record<string, any>).checks.merge;
+    const merge = (callsTo(a, /\/complete$/)[0].body!.edge_evidence as { checks: Record<string, { ok: boolean; detail: unknown }> }).checks.merge;
     assert.deepEqual({ ok: merge.ok, detail: merge.detail }, { ok: true, detail: { before_fp_equal: true, source: 'committed_write' } });
   } finally {
     a.dispose();
@@ -727,7 +727,7 @@ test('a merge resumed after its /write (a lost answer, or a later job) completes
   const c = new World({ handles: ['filament-buffer'], matches });
   try {
     await c.importer().main();
-    const merge = (callsTo(c, /\/complete$/)[0].body!.edge_evidence as Record<string, any>).checks.merge;
+    const merge = (callsTo(c, /\/complete$/)[0].body!.edge_evidence as { checks: Record<string, { ok: boolean; detail: unknown }> }).checks.merge;
     assert.deepEqual(merge.detail, { before_fp_equal: true, source: 'write' });
   } finally {
     c.dispose();
