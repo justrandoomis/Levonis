@@ -451,7 +451,7 @@ export function resolveCartLine(
   }
   const withOffer =
     offer && offer.eligible && (doc.composition ?? '') === ''
-      ? applyOfferToResolved(resolved, offer.view, tier, tierActive, offer.nowMs)
+      ? applyOfferToResolved(resolved, offer.view, tier, tierActive, offer.nowMs, doc)
       : { resolved, offer_id: offer?.view?.window?.id ?? null, source: 'ladder' as const, plus_iqd: null };
 
   return {

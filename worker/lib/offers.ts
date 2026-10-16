@@ -30,12 +30,20 @@
  * the same two-layer contract the coupons already follow.
  */
 
-import { clampMemberLadder, TIER_RANK, type ResolvedPrice, type Tier } from './pricing';
+import { clampMemberLadder, TIER_RANK, type ResolvedPrice, type SkuPriceRow, type Tier } from './pricing';
+import { fixedUsdLine, loadOfferUsdPrices, usdCentsFor, usdTextOfCents, type FixedUsdAnswer, type OfferUsdPrice } from './offerUsd';
 import { benefits, tierInherits, TIER_INHERITANCE, type TierStatus } from './entitlements';
 import { safeParse } from './types';
 import { newId } from './crypto';
 
 export type ScheduleState = 'upcoming' | 'live' | 'ended';
+
+/** The window's price modes. `fixed_usd` (0197) is a dollar sale price on an ordinary V2 product. */
+export type OfferPriceMode = '' | 'fixed' | 'discount_percent' | 'discount_iqd' | 'fixed_usd';
+
+/** Is this a price mode the reader knows? An unknown one reads as '' (no price). */
+export const isOfferPriceMode = (v: unknown): v is OfferPriceMode =>
+  v === '' || v === 'fixed' || v === 'discount_percent' || v === 'discount_iqd' || v === 'fixed_usd';
 
 export type OfferReason =
   | 'OFFER_INACTIVE'
@@ -51,13 +59,19 @@ export interface OfferWindow {
   ends_at: string | null;
   /** The ALLOWED SET. [] = public, including a signed-out visitor. */
   required_tiers: Tier[];
-  offer_price_mode: '' | 'fixed' | 'discount_percent' | 'discount_iqd';
+  offer_price_mode: OfferPriceMode;
   offer_price_iqd: number | null;
   discount_percent: number | null;
   discount_iqd: number | null;
   plus_price_iqd: number | null;
   locked_preview: boolean;
   active: boolean;
+  /**
+   * A DOLLAR SALE PRICE (`offer_price_mode = 'fixed_usd'`, migration 0197): one row for the whole
+   * product (`model_id = ''`) or one per model, in whole cents. [] for every other mode, and when
+   * 0197 is absent — then a `fixed_usd` window prices nothing (docs/ux/PRODUCT-DISCOUNT.md §4.7).
+   */
+  usd_prices?: ReadonlyArray<OfferUsdPrice>;
   /**
    * The clean start (DECISIONS row 222, spec addendum A.5): the window was last saved before the new
    * dollar pricing began (`admin_settings.pricingV2CleanStart`). It is SUSPENDED — read as inactive
@@ -166,6 +180,8 @@ export function resolveOfferPrice(input: {
    *  for a composition subject, 1 for an ordinary product (§4.3). A resolved
    *  price under it does NOT clamp and does NOT sell. */
   floorIqd?: number;
+  /** A `fixed_usd` window's answer for this line (`applyOfferToResolved` computes it, §4.5). */
+  usd?: FixedUsdAnswer;
 }): {
   applied_iqd: number;
   regular_iqd: number;
@@ -197,14 +213,41 @@ export function resolveOfferPrice(input: {
   }
 
   const w = window as OfferWindow;
+  const ladder = (errors: string[]) => ({
+    applied_iqd: base.applied_iqd,
+    regular_iqd: base.regular_iqd,
+    prime_iqd: base.prime_iqd,
+    pro_iqd: base.pro_iqd,
+    plus_iqd: null,
+    offer_id: w.id,
+    source: 'ladder' as const,
+    errors,
+  });
   let regular = base.regular_iqd;
-  if (mode === 'fixed') regular = Math.max(0, Math.trunc(w.offer_price_iqd ?? base.regular_iqd));
+  if (mode === 'fixed_usd') {
+    // A DOLLAR SALE PRICE (docs/ux/PRODUCT-DISCOUNT.md §4.5): `none` — a model with no row, a SKU that
+    // does not sell direct, no rate, after ≥ before — is no sale and no error: the line sells at its
+    // regular price. `below_floor` keeps the existing semantics: the line does not sell.
+    const usd = input.usd ?? { kind: 'none' };
+    if (usd.kind === 'none') return ladder([]);
+    if (usd.kind === 'below_floor') return ladder(['DERIVED_PRICE_BELOW_FLOOR', 'OFFER_INACTIVE']);
+    regular = usd.regular_iqd;
+  } else if (mode === 'fixed') regular = Math.max(0, Math.trunc(w.offer_price_iqd ?? base.regular_iqd));
   else if (mode === 'discount_percent') {
     const p = Math.min(90, Math.max(1, Math.trunc(w.discount_percent ?? 0)));
     regular = Math.max(0, Math.floor((base.regular_iqd * (100 - p)) / 100));
   } else if (mode === 'discount_iqd') {
     regular = base.regular_iqd - Math.max(0, Math.trunc(w.discount_iqd ?? 0));
   }
+
+  /**
+   * NEVER ≥ BEFORE (docs/ux/PRODUCT-DISCOUNT.md D4). A window whose price for this line is not
+   * strictly below the line's regular price contributes no price: no strike, no badge, no error —
+   * the line sells at its regular price. The strikethrough is always honest. In practice only a
+   * dollar price reaches this (a percent and an amount off always lower; a typed dinar `fixed` price
+   * on an ordinary product is refused since the clean start).
+   */
+  if (regular >= base.regular_iqd) return ladder([]);
 
   /**
    * A WINDOW PRICE HAS A FLOOR, exactly as a derived bundle price does (§4.3).
@@ -301,16 +344,16 @@ export function windowFromRow(r: WindowRow): OfferWindow {
     starts_at: r.starts_at ?? null,
     ends_at: r.ends_at ?? null,
     required_tiers: parseRequiredTiers(r.required_tiers),
-    offer_price_mode:
-      r.offer_price_mode === 'fixed' || r.offer_price_mode === 'discount_percent' || r.offer_price_mode === 'discount_iqd'
-        ? r.offer_price_mode
-        : '',
+    // An unknown mode reads as '' (no price) — the same rule an older Worker applies to 'fixed_usd'.
+    offer_price_mode: isOfferPriceMode(r.offer_price_mode) ? r.offer_price_mode : '',
     offer_price_iqd: r.offer_price_iqd ?? null,
     discount_percent: r.discount_percent ?? null,
     discount_iqd: r.discount_iqd ?? null,
     plus_price_iqd: r.plus_price_iqd ?? null,
     locked_preview: !!r.locked_preview,
     active: !!r.active && Number(r.pre_clean_start ?? 0) !== 1,
+    // Filled by `loadOffers` for a 'fixed_usd' window (0197); every other reader leaves it empty.
+    usd_prices: [],
     ...(Number(r.pre_clean_start ?? 0) === 1 ? { suspended: true as const } : {}),
   };
 }
@@ -385,6 +428,22 @@ export async function loadOffers(db: D1Database, subjects: Subject[]): Promise<M
         max_per_user: r.max_per_user ?? null,
         max_global: r.max_global ?? null,
       };
+    }
+  }
+  /**
+   * THE DOLLAR SALE PRICES (0197, docs/ux/PRODUCT-DISCOUNT.md §4.7): only when some window prices in
+   * dollars, one more read (chunked) behind the presence probe. Without 0197 the set stays [] and those
+   * windows price nothing; no other page of windows pays a statement for it.
+   */
+  const usdSubjects = [...out.entries()]
+    .filter(([, v]) => v.window?.offer_price_mode === 'fixed_usd')
+    .map(([key]) => key);
+  if (usdSubjects.length) {
+    const ids = usdSubjects.map((key) => key.slice(key.indexOf(':') + 1));
+    const prices = await loadOfferUsdPrices(db, ids);
+    for (const key of usdSubjects) {
+      const view = out.get(key)!;
+      view.window = { ...view.window!, usd_prices: prices.get(key.slice(key.indexOf(':') + 1)) ?? [] };
     }
   }
   return out;
@@ -566,12 +625,9 @@ export function offerWindowStatements(
     return [];
   }
   const tiers = [...new Set(offer.required_tiers.filter((t): t is Tier => t in INHERITS))].sort();
-  const mode =
-    offer.offer_price_mode === 'fixed' ||
-    offer.offer_price_mode === 'discount_percent' ||
-    offer.offer_price_mode === 'discount_iqd'
-      ? offer.offer_price_mode
-      : '';
+  // 'fixed_usd' (0197): the dollar prices live in `offer_usd_prices` (`offerUsdStatements`); the
+  // three dinar price columns are NULL for it.
+  const mode = isOfferPriceMode(offer.offer_price_mode) ? offer.offer_price_mode : '';
   return [
     db
       .prepare(
@@ -665,7 +721,14 @@ export function applyOfferToResolved(
   view: OfferView | null,
   tier: Tier,
   tierActive: boolean,
-  nowMs: number
+  nowMs: number,
+  /**
+   * The line's document, for a dollar sale price (`fixed_usd`, docs/ux/PRODUCT-DISCOUNT.md §4.6): its
+   * `sku_prices` give the SKU's direct price, its channel price and the rate. EVERY caller passes it
+   * (tests/productDiscountResolver.test.ts lists them); one that does not gets "no sale" for
+   * `fixed_usd` — never a guessed price.
+   */
+  doc?: { sku_prices?: readonly SkuPriceRow[] | null } | null
 ): { resolved: ResolvedPrice; offer_id: string | null; source: 'ladder' | 'offer'; plus_iqd: number | null } {
   const window = view?.window ?? null;
   if (!window) return { resolved, offer_id: null, source: 'ladder', plus_iqd: null };
@@ -675,6 +738,7 @@ export function applyOfferToResolved(
     scheduleState: scheduleState(window.starts_at, window.ends_at, nowMs),
     tier,
     tierActive,
+    ...(window.offer_price_mode === 'fixed_usd' ? { usd: fixedUsdAnswerFor(resolved, window, doc ?? null) } : {}),
   });
   if (priced.source === 'ladder') {
     // A window whose price fell below the floor contributes NO price, and says
@@ -698,16 +762,58 @@ export function applyOfferToResolved(
       // `applied_tier` stays inside the shared three-value union: the PLUS
       // rung is offer-scoped and is named beside the offer, never on a field
       // every ordinary line in the cart also carries (§4.4).
+      //
+      // A RUNG IS NAMED ONLY WHERE IT IS BELOW THE OFFER PRICE (docs/ux/PRODUCT-DISCOUNT.md §9 F5): a
+      // member whose rule price was clamped UP to the offer price pays the offer price, and «سعر PRO»
+      // on it would credit the membership with the offer's saving. Labels only — no amount moves.
       applied_tier:
-        priced.applied_iqd === priced.pro_iqd && priced.pro_iqd !== null
+        priced.pro_iqd !== null && priced.applied_iqd === priced.pro_iqd && priced.pro_iqd < priced.regular_iqd
           ? 'pro'
-          : priced.applied_iqd === priced.prime_iqd && priced.prime_iqd !== null
+          : priced.prime_iqd !== null && priced.applied_iqd === priced.prime_iqd && priced.prime_iqd < priced.regular_iqd
             ? 'prime'
             : 'regular',
       unit_subtotal_iqd: priced.applied_iqd + fees,
+      // THE STRUCK PRICE (§4.6, §9): the line's regular price immediately before the window replaced
+      // it — by D4 always strictly above the offer regular. Every surface strikes this, never a typed
+      // number; it is frozen into the order snapshot with the rest of the answer.
+      offer_before_iqd: resolved.regular_iqd,
     },
     offer_id: priced.offer_id,
     source: 'offer',
     plus_iqd: priced.plus_iqd,
   };
+}
+
+/**
+ * A `fixed_usd` window's answer for ONE resolved line (docs/ux/PRODUCT-DISCOUNT.md §4.6): the SKU
+ * rung that priced it (`resolved.sku`), that SKU's live V2 `direct_sale` row (the before price on
+ * direct, and the rate) and the window's row for the SKU's model, else its whole-product row. A line
+ * the ladder priced, a document without SKU rows, or a V1 row (no rate): `none`.
+ */
+export function fixedUsdAnswerFor(
+  resolved: ResolvedPrice,
+  window: OfferWindow,
+  doc: { sku_prices?: readonly SkuPriceRow[] | null } | null
+): FixedUsdAnswer {
+  const sku = resolved.sku;
+  const rows = doc?.sku_prices ?? null;
+  if (!sku || !rows || !rows.length) return { kind: 'none' };
+  const direct = rows.find((r) => r.combo_key === sku.combo_key && r.channel === 'direct_sale' && r.v2 === true) ?? null;
+  return fixedUsdLine({
+    cents: usdCentsFor(window.usd_prices ?? [], sku.model_id),
+    rate: direct?.usd_iqd_rate ?? null,
+    directIqd: direct ? direct.regular_price_iqd : null,
+    channelIqd: resolved.regular_iqd,
+  });
+}
+
+/**
+ * The dollar sale price a line was sold under, for the order snapshot (§8.1, §12): the typed price
+ * (2-decimal text) and the model row it came from ('' = the whole-product row). Admin-side only.
+ */
+export function offerUsdSnapshot(window: OfferWindow, resolved: ResolvedPrice): { offer_price_usd: string; offer_model_id: string } | Record<string, never> {
+  const modelId = resolved.sku?.model_id ?? null;
+  const own = modelId ? (window.usd_prices ?? []).find((p) => p.model_id === modelId) : undefined;
+  const row = own ?? (window.usd_prices ?? []).find((p) => p.model_id === '');
+  return row ? { offer_price_usd: usdTextOfCents(row.cents), offer_model_id: row.model_id } : {};
 }

@@ -61,7 +61,7 @@ import { effectiveAvailability } from './availability';
 import { unitDiscountIqd, type BenefitRule } from './membershipBenefits';
 import { effectiveBaseMonths, planFee, planTotalMonths } from './warrantyPlanMath';
 import type { PhysicalDimensionOverrides } from './physicalDimensions';
-import { skuComboKey } from './skuChannel';
+import { skuComboKey, type SkuChannel } from './skuChannel';
 
 export type { PhysicalDimensionOverrides, PhysicalDimensions } from './physicalDimensions';
 
@@ -579,6 +579,18 @@ export interface ResolvedPrice {
   warranty: ResolvedWarranty | null;
   unit_subtotal_iqd: number; // applied + effective commission + effective direct surcharge + warranty fee
   errors: string[]; // non-empty = selection invalid, reject server-side
+  /**
+   * The SKU rung that priced this line; null/absent when the ladder did (docs/ux/PRODUCT-DISCOUNT.md
+   * §4.1). Server identity for the offer resolver: `model_id` is the first option value in relation
+   * order, the id Pricing V2 calls the model. Never in a customer payload (allow-lists).
+   */
+  sku?: { combo_key: string; channel: SkuChannel; model_id: string | null } | null;
+  /**
+   * The line's regular price immediately before a live offer replaced it. Set by
+   * `applyOfferToResolved` only when the offer lowered it (§4.5): the struck price, always the
+   * published price of that SKU and channel at this instant. Frozen into the order snapshot.
+   */
+  offer_before_iqd?: number;
 }
 
 /** How a pre-order line is being paid, which decides its availability fee. */
@@ -874,6 +886,12 @@ export interface SkuPriceRow {
    * row under cash on delivery even with no direct cell. V1 rows never carry it.
    */
   v2?: true;
+  /**
+   * PRICING V2 rows only (docs/ux/PRODUCT-DISCOUNT.md §4.3): the `usd_iqd_rate` of the row's own
+   * `pricing_v2_sku_results` twin — the rate its published price was computed at. The offer resolver
+   * converts a dollar sale price at it. Server-side only; a FINANCIAL_FIELDS key, never projected.
+   */
+  usd_iqd_rate?: string;
 }
 
 /**
@@ -1423,6 +1441,11 @@ export function resolveUnitPrice(input: {
     pricing_basis: pricingBasis,
     warranty,
     unit_subtotal_iqd: unitSubtotal,
+    // The SKU rung's identity, when it answered (docs/ux/PRODUCT-DISCOUNT.md §4.1).
+    // Absent (not null) when the ladder answered, so a ladder line's answer is unchanged.
+    ...(skuRegular !== null && skuChannel !== null
+      ? { sku: { combo_key: skuKey, channel: skuChannel as SkuChannel, model_id: option?.id ?? null } }
+      : {}),
     components: {
       base_iqd: regular.at.base ?? regularIqd,
       option_iqd: regular.at.option ?? regularIqd,

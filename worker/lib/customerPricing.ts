@@ -33,6 +33,7 @@
  * hold every other occurrence at zero.
  */
 import type { ResolvedPrice, ResolvedWarranty } from './pricing';
+import { offerSavingPercent } from './offerUsd';
 
 /**
  * Arithmetic a customer payload must never carry: the steps of a price, not
@@ -59,6 +60,16 @@ export const CUSTOMER_ARITHMETIC_KEYS = [
   'regular_adjust_iqd',
   'prime_adjust_iqd',
   'pro_adjust_iqd',
+  // a dollar sale price (docs/ux/PRODUCT-DISCOUNT.md §11): a customer is shown dinars only — the typed
+  // dollars (÷ the dinars = the approved rate), the rate itself and the model rows never reach them
+  'usd_iqd_rate',
+  'offer_usd_prices',
+  'usd_prices',
+  'price_usd_cents',
+  'offer_price_usd',
+  'offer_model_id',
+  'before_usd',
+  'after_usd',
 ] as const;
 
 /**
@@ -134,6 +145,14 @@ export interface CustomerLinePrice {
   transport: { method: string } | null;
   warranty: CustomerWarranty | null;
   errors: string[];
+  /**
+   * A LIVE OFFER'S STRUCK PRICE (docs/ux/PRODUCT-DISCOUNT.md §8.1): the published regular price the
+   * window replaced for THIS viewer, or null — no window, a window that lowered nothing, or a
+   * members-only window this viewer may not take. IQD only: never the typed dollars, never a rate.
+   */
+  offer_before_iqd: number | null;
+  /** D9: round((before − applied) × 100 / before) of the two figures printed together; null below 1. */
+  offer_saving_percent: number | null;
 }
 
 /**
@@ -165,7 +184,14 @@ export function customerLinePrice(r: ResolvedPrice): CustomerLinePrice {
     transport: r.transport ? { method: r.transport.method } : null,
     warranty: customerWarranty(r.warranty),
     errors: r.errors.filter((e) => !CUSTOMER_HIDDEN_ERRORS.has(e)),
+    ...offerFigures(r.offer_before_iqd, r.applied_iqd),
   };
+}
+
+/** The struck before price and its percent, from the two numbers a customer is shown (§8.1, D9). */
+export function offerFigures(before: unknown, applied: number): { offer_before_iqd: number | null; offer_saving_percent: number | null } {
+  const b = typeof before === 'number' && Number.isSafeInteger(before) && before > applied ? before : null;
+  return { offer_before_iqd: b, offer_saving_percent: b === null ? null : offerSavingPercent(b, applied) };
 }
 
 /**
@@ -181,6 +207,9 @@ export function customerOrderPricing(snapshot: unknown): Record<string, unknown>
     if (num(s[k]) !== null) out[k] = s[k];
   }
   if (typeof s.applied_tier === 'string') out.applied_tier = s.applied_tier;
+  // The offer the line was sold under (§8.1): the FROZEN before price, and the percent recomputed from
+  // it and the frozen applied price — never the typed dollars, the model row or a rate.
+  if (num(s.applied_iqd) !== null) Object.assign(out, offerFigures(s.offer_before_iqd, s.applied_iqd as number));
   const f = rec(s.fulfillment);
   if (f && (f.type === 'direct_sale' || f.type === 'pre_order')) {
     out.fulfillment = {

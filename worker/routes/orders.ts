@@ -100,7 +100,7 @@ import {
   refuseComposition,
   refusePhysicalLines,
 } from '../lib/bundleCart';
-import { loadOffers, offerEligible, offerKey, offerPriceRefusal, offerRedemptionStatement, subjectOf } from '../lib/offers';
+import { loadOffers, offerEligible, offerKey, offerPriceRefusal, offerRedemptionStatement, offerUsdSnapshot, subjectOf } from '../lib/offers';
 import {
   allowedPaymentMethods,
   isBnpl,
@@ -1351,6 +1351,8 @@ function priceCompositionLine(
         transport: null,
         warranty: null,
         errors: [],
+        offer_before_iqd: null,
+        offer_saving_percent: null,
       } satisfies ReturnType<typeof publicBreakdown>,
       is_printer: printerIds.has(cand.product_id),
       pricing_basis: basis,
@@ -2924,6 +2926,10 @@ export async function computeCheckout(
               offer_discount_percent: offerView.window.discount_percent,
               offer_applied_iqd: resolved.applied_iqd,
               price_source: 'offer',
+              // A DOLLAR SALE PRICE (docs/ux/PRODUCT-DISCOUNT.md §8.1, §12): the typed price and the
+              // model row it came from, frozen — the window is a mutable row. Admin-side only:
+              // `customerOrderPricing` serves the buyer `offer_before_iqd` and the percent, never this.
+              ...(offerView.window.offer_price_mode === 'fixed_usd' ? offerUsdSnapshot(offerView.window, resolved) : {}),
             }
           : null;
       lines.push({
@@ -4192,6 +4198,11 @@ function quoteLines(lines: ComputedLine[]) {
         line_total_iqd: l.line,
         is_printer: l.is_printer,
         breakdown: l.breakdown,
+        // A live offer that lowered this line (docs/ux/PRODUCT-DISCOUNT.md §8.1, §8.5): the struck UNIT
+        // before price and its «−N٪», beside the bundle's two figures — IQD only.
+        ...(l.breakdown && typeof l.breakdown.offer_before_iqd === 'number'
+          ? { offer_before_iqd: l.breakdown.offer_before_iqd, offer_saving_percent: l.breakdown.offer_saving_percent }
+          : {}),
         // A gift (0175): 0 IQD, with what it is worth and which gift it is.
         ...(l.gift ? { kind: 'gift' as const, is_gift: true, gift: { id: l.gift.gift_id, level: l.gift.level, value_iqd: l.gift.value_iqd } } : {}),
         ...(kids.length

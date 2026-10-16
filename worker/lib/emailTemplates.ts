@@ -105,6 +105,8 @@ interface Copy {
   lineTotalLabel: string;
   transportFeeLabel: string;
   directFeeLabel: string;
+  /** A line sold under a live offer (docs/ux/PRODUCT-DISCOUNT.md §8.7): the frozen before price, per unit. */
+  offerBeforeLine: (amount: string, percent: number) => string;
   warrantyFeeLabel: string;
   subtotalLabel: string;
   deliveryLabel: string;
@@ -178,6 +180,7 @@ const COPY_AR: Copy = {
   lineTotalLabel: 'الإجمالي',
   transportFeeLabel: 'عمولة النقل (طلب مسبق)',
   directFeeLabel: 'زيادة البيع المباشر',
+  offerBeforeLine: (amount, n) => `السعر قبل العرض: ${amount} للقطعة (−${n}٪)`,
   warrantyFeeLabel: 'رسوم تمديد الضمان',
   subtotalLabel: 'مجموع المنتجات',
   deliveryLabel: 'رسوم التوصيل',
@@ -258,6 +261,7 @@ const COPY_EN: Copy = {
   lineTotalLabel: 'Total',
   transportFeeLabel: 'Transport commission (preorder)',
   directFeeLabel: 'Direct Sale Extra',
+  offerBeforeLine: (amount, n) => `Before the offer: ${amount} each (−${n}%)`,
   warrantyFeeLabel: 'Warranty extension fee',
   subtotalLabel: 'Items subtotal',
   deliveryLabel: 'Delivery fee',
@@ -340,6 +344,7 @@ const COPY_CKB: Copy = {
   lineTotalLabel: 'کۆ',
   transportFeeLabel: 'کرێی گواستنەوە (پێش‌داواکاری)',
   directFeeLabel: 'زیادەی فرۆشتنی ڕاستەوخۆ',
+  offerBeforeLine: (amount, n) => `نرخی پێش ئۆفەر: ${amount} بۆ هەر دانەیەک (−${n}٪)`,
   warrantyFeeLabel: 'کرێی درێژکردنەوەی گەرەنتی',
   subtotalLabel: 'کۆی کاڵاکان',
   deliveryLabel: 'کرێی گەیاندن',
@@ -563,6 +568,13 @@ export interface InvoiceEmailLine {
   warranty_fee_iqd: number; // per-unit warranty extension fee (0 = none)
   warranty_label: string;
   /**
+   * A line sold under a live offer (docs/ux/PRODUCT-DISCOUNT.md §8.7): the per-unit price the offer
+   * replaced, and its «−N٪», read from the line's own frozen snapshot. Absent on every other line and
+   * on invoices issued before the field existed (they are immutable).
+   */
+  offer_before_iqd?: number;
+  offer_saving_percent?: number;
+  /**
    * A BUNDLE'S PARTS, listed UNDER the priced line rather than beside it
    * (docs/BUNDLES_MYSTERY.md §6.3). They are real order items — the physical
    * truth a return and a warranty clock key on — but they carry no price, so
@@ -621,6 +633,17 @@ function invoiceMetaHtml(t: Copy, inv: InvoiceEmailData): string {
   );
 }
 
+const hasOfferBefore = (l: InvoiceEmailLine): boolean =>
+  typeof l.offer_before_iqd === 'number' && l.offer_before_iqd > 0 && typeof l.offer_saving_percent === 'number' && l.offer_saving_percent >= 1;
+
+/** «السعر قبل العرض: 900,000 د.ع للقطعة (−17٪)», muted under the variant; the amount an LTR island. */
+function offerBeforeHtml(t: Copy, l: InvoiceEmailLine, ltr: string): string {
+  if (!hasOfferBefore(l)) return '';
+  const marker = '\u0000AMOUNT\u0000';
+  const [head, tail] = t.offerBeforeLine(marker, l.offer_saving_percent!).split(marker);
+  return `${escapeHtml(head ?? '')}<span ${ltr} style="text-decoration:line-through;">${escapeHtml(iqd(l.offer_before_iqd!))}</span>${escapeHtml(tail ?? '')}`;
+}
+
 function invoiceLinesHtml(t: Copy, inv: InvoiceEmailData): string {
   const head =
     `<tr style="background-color:#111111;color:#d4af37;">` +
@@ -633,6 +656,8 @@ function invoiceLinesHtml(t: Copy, inv: InvoiceEmailData): string {
     .map((l) => {
       const details: string[] = [];
       if (l.variant) details.push(escapeHtml(l.variant));
+      const before = offerBeforeHtml(t, l, 'dir="ltr"');
+      if (before) details.push(before);
       if (l.transport_commission_iqd > 0)
         details.push(`${escapeHtml(t.transportFeeLabel)}: <span dir="ltr">${escapeHtml(iqd(l.transport_commission_iqd))}</span>`);
       if ((l.direct_surcharge_iqd ?? 0) > 0)
@@ -712,6 +737,7 @@ function invoiceText(t: Copy, inv: InvoiceEmailData): string {
   out.push('');
   for (const l of inv.lines) {
     out.push(`- ${l.name}${l.variant ? ` (${l.variant})` : ''} x${l.qty} @ ${iqd(l.unit_price_iqd)} = ${iqd(l.line_total_iqd)}`);
+    if (hasOfferBefore(l)) out.push(`  ${t.offerBeforeLine(iqd(l.offer_before_iqd!), l.offer_saving_percent!)}`);
     if (l.transport_commission_iqd > 0) out.push(`  ${t.transportFeeLabel}: ${iqd(l.transport_commission_iqd)}`);
     if (l.warranty_fee_iqd > 0) out.push(`  ${t.warrantyFeeLabel}: ${iqd(l.warranty_fee_iqd)}`);
   }
@@ -788,6 +814,8 @@ export function renderInvoiceHtmlDocument(lang: EmailLang, inv: InvoiceEmailData
     .map((l) => {
       const details: string[] = [];
       if (l.variant) details.push(escapeHtml(l.variant));
+      const before = offerBeforeHtml(t, l, 'class="ltr"');
+      if (before) details.push(before);
       if (l.transport_commission_iqd > 0)
         details.push(`${escapeHtml(t.transportFeeLabel)}: <span class="ltr">${escapeHtml(iqd(l.transport_commission_iqd))}</span>`);
       if ((l.direct_surcharge_iqd ?? 0) > 0)
