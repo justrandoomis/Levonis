@@ -24,6 +24,13 @@ export interface CourierSummaryItem {
   name_snapshot: string;
   option_snapshot?: string | null;
   qty: number;
+  /**
+   * A bundle or mystery PARENT (it has child lines). Its stored selection is
+   * the list of what is inside the box (orders.ts `compositionOptionSnapshot`),
+   * and a courier is a third party: it gets the parent's name and count only
+   * (docs/BUNDLES_MYSTERY.md, the courier row).
+   */
+  composition_parent?: number | boolean | null;
 }
 
 /** How long a product name may be once the summary has to shrink. */
@@ -40,7 +47,7 @@ function shortName(name: string, max: number): string {
 function lineText(item: CourierSummaryItem, nameMax: number | null): string {
   const raw = String(item.name_snapshot ?? '').trim();
   const name = nameMax === null ? raw : shortName(raw, nameMax);
-  const selection = String(item.option_snapshot ?? '').trim();
+  const selection = item.composition_parent ? '' : String(item.option_snapshot ?? '').trim();
   const qty = Math.max(0, Math.trunc(Number(item.qty) || 0));
   return selection ? `${name} [${selection}] x${qty}` : `${name} x${qty}`;
 }

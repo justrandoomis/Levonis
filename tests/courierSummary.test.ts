@@ -71,8 +71,8 @@ test('the waybill reads the stored selection and leaves bundle parts out', () =>
   const src = readFileSync(join(ROOT, 'worker/routes/admin.ts'), 'utf8');
   assert.match(
     src,
-    /SELECT name_snapshot, option_snapshot, qty FROM order_items WHERE order_id = \? AND bundle_parent_item_id IS NULL/,
-    'the courier query must read option_snapshot and still exclude bundle children'
+    /SELECT name_snapshot, option_snapshot, qty,\s*EXISTS \(SELECT 1 FROM order_items k WHERE k\.order_id = order_items\.order_id AND k\.bundle_parent_item_id = order_items\.id\) AS composition_parent\s*FROM order_items WHERE order_id = \? AND bundle_parent_item_id IS NULL/,
+    'the courier query must read option_snapshot, mark a composition parent, and still exclude bundle children'
   );
   assert.match(src, /itemsSummary: courierItemsSummary\(items \?\? \[\], 500\)/);
   assert.ok(!/\.join\(', '\)\.slice\(0, 500\)/.test(src), 'the mid-line cut is gone');
@@ -81,4 +81,52 @@ test('the waybill reads the stored selection and leaves bundle parts out', () =>
 test('the packing caption speaks Sorani', () => {
   const src = readFileSync(join(ROOT, 'src/components/adminOrders/OrderDetailModal.tsx'), 'utf8');
   assert.ok(src.includes("loc('الخيار واللون المطلوبان', 'Selected option and colour', 'هەڵبژاردە و ڕەنگی داواکراو')"));
+});
+
+test('a bundle or mystery PARENT gives the courier its name and count only: its stored selection lists what is inside the box', () => {
+  assert.equal(
+    courierItemsSummary([
+      { name_snapshot: 'Starter Bundle', option_snapshot: 'Printer X1 · PLA Basic ×2 · ABS Spool Black', qty: 1, composition_parent: 1 },
+      { name_snapshot: PLA, option_snapshot: 'With spool — 1 kg / BLACK', qty: 50, composition_parent: 0 },
+    ]),
+    `Starter Bundle x1, ${PLA} [With spool — 1 kg / BLACK] x50`
+  );
+});
+
+test('the waybill route: a bundle order reaches the courier as «Starter Bundle x1», never its members', async () => {
+  const { json, post } = await import('./fixtures/app');
+  const { world, order } = await import('./fixtures/serialPrep');
+  const w = world();
+  w.raw.prepare("INSERT INTO admin_settings (key, value) VALUES ('deliveryConfig', ?)").run(
+    JSON.stringify({ createPath: '/create', createFields: { orderId: 'ref', itemsSummary: 'type_name', itemCount: 'items_number' } })
+  );
+  order(w.raw, 'ORD-BUN', [
+    { id: 'bp', product: 'pA1', name: 'Starter Bundle' },
+    { id: 'bc1', product: 'pA1', name: 'Printer X1' },
+    { id: 'bc2', product: 'pPLA', name: 'PLA Basic', qty: 2 },
+    { id: 'pl', product: 'pPLA', name: 'PLA Basic' },
+  ]);
+  // The rows as checkout writes them: the parent's option_snapshot is the composition list
+  // (orders.ts compositionOptionSnapshot), its members are child rows.
+  w.raw.exec(`UPDATE order_items SET option_snapshot = 'Printer X1 · PLA Basic ×2' WHERE id = 'bp'`);
+  w.raw.exec(`UPDATE order_items SET bundle_parent_item_id = 'bp', unit_price_iqd = 0, line_total_iqd = 0 WHERE id IN ('bc1','bc2')`);
+  w.raw.exec(`UPDATE order_items SET option_snapshot = 'With spool — 1 kg / BEIGE' WHERE id = 'pl'`);
+  const sent: Record<string, unknown>[] = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (_u: string, init?: RequestInit) => {
+    sent.push(JSON.parse(String(init?.body ?? '{}')));
+    return new Response(JSON.stringify({ id: 'AW-1', tracking_number: 'T-1' }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }) as typeof fetch;
+  try {
+    const res = await post(
+      w.as('adm', { ALWASEET_BASE_URL: 'https://courier.invalid', ALWASEET_USERNAME: 'u', ALWASEET_PASSWORD: 'p' }),
+      '/api/admin/orders/ORD-BUN/delivery',
+      {}
+    );
+    assert.equal(res.status, 200, JSON.stringify(await json(res)));
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].type_name, 'Starter Bundle x1, PLA Basic [With spool — 1 kg / BEIGE] x1');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });

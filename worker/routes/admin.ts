@@ -3154,10 +3154,14 @@ adminRoutes.post('/orders/:id/delivery', async (c) => {
   //
   // AND IT CARRIES THE SELECTION (docs/ux/COLOUR-QUANTITIES.md §7): three
   // colours of one filament are three different things in the box, and the
-  // stored `option_snapshot` is the authority for which ones were sold.
+  // stored `option_snapshot` is the authority for which ones were sold. Only
+  // for an ORDINARY line: a bundle parent's snapshot is its member list, so a
+  // parent (a line with child lines) is printed as its name and count.
   const { results: items } = await c.env.DB.prepare(
-    'SELECT name_snapshot, option_snapshot, qty FROM order_items WHERE order_id = ? AND bundle_parent_item_id IS NULL'
-  ).bind(id).all<{ name_snapshot: string; option_snapshot: string | null; qty: number }>();
+    `SELECT name_snapshot, option_snapshot, qty,
+            EXISTS (SELECT 1 FROM order_items k WHERE k.order_id = order_items.order_id AND k.bundle_parent_item_id = order_items.id) AS composition_parent
+       FROM order_items WHERE order_id = ? AND bundle_parent_item_id IS NULL`
+  ).bind(id).all<{ name_snapshot: string; option_snapshot: string | null; qty: number; composition_parent: number }>();
 
   const res = await driver.createShipment({
     orderId: String(order.id),
