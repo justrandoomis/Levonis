@@ -21,7 +21,7 @@ import { ROOT } from './fixtures/d1';
 import { APEX, asD1, ctx, dbThrough, freshDb, json, stubApp } from './fixtures/app';
 import { homeRoutes } from '../worker/routes/products';
 import { cataloguePaths } from '../worker/lib/edgePolicy';
-import { loadGradedSummary } from '../src/lib/catalog/data';
+import { loadGradedSummary } from '../src/lib/catalog/graded';
 import { clearApiSessionRequests } from '../src/lib/api';
 
 const app = (db: unknown) =>

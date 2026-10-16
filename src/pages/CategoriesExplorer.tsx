@@ -11,7 +11,8 @@ import CategoryRowBanners, { CategoryRowBanner, ROW_BANNER_SIZE } from '../compo
 import { useBannerPhotos } from '../components/catalog/useBannerPhotos';
 import DiscoveryFooterTiles from '../components/catalog/DiscoveryFooterTiles';
 import { useScrolledPast } from '../components/catalog/useScrolledPast';
-import { cachedTree, loadGradedSummary, loadPhotoPool, loadTree, type GradedSummary } from '../lib/catalog/data';
+import { cachedTree, loadPhotoPool, loadTree } from '../lib/catalog/data';
+import { loadGradedSummary, type GradedSummary } from '../lib/catalog/graded';
 import { bannerRows, type BannerPhoto, type PhotoCandidate } from '../lib/catalog/explorerModel';
 import { countNoun, explorerSubline } from '../lib/catalog/copy';
 import type { CatalogTreeResponse } from '../lib/catalog/types';

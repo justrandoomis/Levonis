@@ -810,3 +810,22 @@ test('the compare tray is a lazy chunk of its own, never in the initial payload'
   console.log(`bundle: compare tray ${kb(own)} gzip`);
   assert.ok(own <= COMPARE_TRAY_CHUNK_BUDGET, `the compare tray chunk is ${kb(own)} gzip, over ${kb(COMPARE_TRAY_CHUNK_BUDGET)}`);
 });
+
+/**
+ * «كل الفئات» CARRIES NO LISTING (speed audit 2026-10-16). The explorer's
+ * doors share src/lib/catalog/prefetch.ts with every category page; when that
+ * module imported the listing grammar to start a FILTERED list early, the
+ * grammar (packages/catalog/src/discovery.ts) rode into the explorer's static
+ * closure: +3.1 KB gzip on a page that draws no list. The prefetch now starts
+ * only the default list (its URL needs no grammar), and this holds it there.
+ */
+test('the category explorer\'s static closure carries neither the listing grammar nor the listing view', () => {
+  const files = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
+  const explorer = files.find((f) => f.startsWith('CategoriesExplorer-'));
+  assert.ok(explorer, 'the explorer has its own route chunk');
+  const closure = staticClosure(explorer!);
+  for (const name of ['discovery', 'ListingView', 'listingQuery']) {
+    const hit = [...closure].find((f) => f.startsWith(`${name}-`));
+    assert.equal(hit, undefined, `${name} is a static dependency of the explorer`);
+  }
+});

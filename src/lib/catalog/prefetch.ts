@@ -12,8 +12,7 @@
  * swallowed — the page will simply fetch (and report) on its own.
  */
 import { cachedCategory, cachedTree, loadCategory, loadTree } from './data';
-import { listingFirstPagePath, parseListing } from './listingQuery';
-import { primeGet } from '../bootFetch';
+import { categoryListingPath, primeGet } from '../bootFetch';
 
 const started = new Set<string>();
 
@@ -36,14 +35,17 @@ export function prefetchCategory(slug: string): void {
 
 /**
  * `/categories/<cat>/<sub>` — the listing chunk, the tree it resolves against,
- * and the list itself, by the section's slug and with the door's own filters
- * (a smart shelf's «عرض الكل» lands on `…/all?avail=1`): the page takes that
- * request when its listing mounts (src/components/listing/useListing.ts).
+ * and the list itself, by the section's slug: the page takes that request
+ * when its listing mounts (src/components/listing/useListing.ts).
  */
 export function prefetchListing(slug = '', search = ''): void {
   once(`chunk:listing`, () => import('../../pages/CategoryListing'));
   if (!cachedTree()) once('data:tree', () => loadTree({ mascot: 'silent' }));
-  if (slug) primeGet(listingFirstPagePath(parseListing(search), slug));
+  // The default list only: its URL needs no listing grammar, which would
+  // otherwise ride in every page that has a door (the explorer has none). A
+  // filtered door (`…/all?avail=1`) starts its list beside the map when the
+  // page mounts (src/pages/CategoryListing.tsx).
+  if (slug && new URLSearchParams(search).toString() === '') primeGet(categoryListingPath(slug));
 }
 
 /** `/categories` — the explorer chunk and the tree. */
