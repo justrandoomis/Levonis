@@ -366,6 +366,34 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ckb: 'ژمارەی داواکراو ئێستا بەردەست نییە. بڕەکە کەم بکەرەوە.',
   },
 
+  // ---- several colours in one add (docs/ux/COLOUR-QUANTITIES.md §4.5) -----
+  /**
+   * The batch door adds every line or none, so each of these says that nothing
+   * was added and what to do next. CART_LINES_CHANGED is the guard that makes a
+   * press whose answer was lost safe to press again — a code of its own, apart
+   * from the store checkout's CART_CHANGED (another sentence for another door).
+   */
+  CART_LINES_CHANGED: {
+    ar: 'تغيّرت سلتك من مكان آخر، فلم يُضَف شيء. راجع الكميات ثم اضغط مرة أخرى.',
+    en: 'Your cart changed somewhere else, so nothing was added. Check the quantities and tap again.',
+    ckb: 'سەبەتەکەت لە شوێنێکی ترەوە گۆڕا، بۆیە هیچ شتێک زیاد نەکرا. بڕەکان بپشکنە و دووبارە کرتە بکە.',
+  },
+  BATCH_DUPLICATE_LINE: {
+    ar: 'اللون نفسه مكرر في هذه الإضافة.',
+    en: 'The same colour appears twice in this add.',
+    ckb: 'هەمان ڕەنگ دوو جار لەم زیادکردنەدا هاتووە.',
+  },
+  BATCH_TOO_MANY_LINES: {
+    ar: 'يمكن إضافة 40 لونًا على الأكثر في المرة الواحدة.',
+    en: 'At most 40 colours can be added at once.',
+    ckb: 'لە یەک جاردا زۆرترین 40 ڕەنگ زیاد دەکرێت.',
+  },
+  BATCH_NOT_SUPPORTED: {
+    ar: 'هذا المنتج لا يُضاف بعدة ألوان دفعة واحدة — أضفه من صفحته.',
+    en: 'This product cannot be added in several colours at once — add it from its page.',
+    ckb: 'ئەم بەرهەمە ناتوانرێت بە چەند ڕەنگێک پێکەوە زیاد بکرێت — لە پەڕەکەیەوە زیادی بکە.',
+  },
+
   // ---- the two counters behind one basket (migration 0075) ----------------
   /**
    * THE ONE REFUSAL A CUSTOMER MUST NOT READ AS "SOLD OUT".

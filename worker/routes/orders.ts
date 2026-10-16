@@ -43,6 +43,7 @@ import {
   refuseIncompleteSelection,
   giftLineFacts,
   giftRefusalError,
+  type ColorTag,
 } from './cart';
 import {
   giftCheckoutRefusalCode,
@@ -121,8 +122,8 @@ import { giniSplit, giniHoldUntil, giniStateOf } from '../lib/gini';
 import { refuseNonPrinterWarranty } from '../lib/warrantyPlans';
 import { lineOrderType, saleAvailability } from './products';
 import { capacityFrom, EMPTY_RELATIONS, loadRelationsViews, snapshotFrom } from '../lib/productOverlay';
+import { demandByCounter } from '../lib/aggregateDemand';
 import {
-  isCapacityScope,
   planInventory,
   reservationFenceStatement,
   resolveForOrderType,
@@ -1667,36 +1668,21 @@ function priceCompositionLine(
  * cart nobody is racing and no screen can explain.
  */
 function refuseAggregateDemand(lines: ComputedLine[], poolMemberIds: ReadonlySet<string>): void {
-  const demand = new Map<
-    string,
-    { needed: number; available: number | null; name: string; coarse: boolean; preorder: boolean }
-  >();
-  for (const l of lines) {
-    for (const t of l.stock_targets) {
-      // BASE stock lives on the product row itself, so its scope_id is '' and
-      // the product id identifies the row — exactly as `planInventory` resolves
-      // it. Keying on the scope alone would merge unrelated rows into one.
-      const key = `${t.scope}:${t.scope_id || l.product_id}`;
-      const available = t.stock === null ? null : Math.max(0, t.stock - Math.max(0, t.reserved));
-      const coarse = poolMemberIds.has(l.product_id);
-      const found = demand.get(key);
-      if (found) {
-        found.needed += l.qty;
-        found.coarse = found.coarse || coarse;
-      } else
-        demand.set(key, {
-          needed: l.qty,
-          available,
-          name: l.name_ar || l.name,
-          coarse,
-          // 0075: a capacity row is aggregated exactly like a stock row — two
-          // lines sharing one pre-order pool sum before they are judged — but
-          // it is not a shelf, so the refusal must not call it one.
-          preorder: isCapacityScope(t.scope),
-        });
-    }
-  }
-  for (const [, d] of demand) {
+  // The keying (`${scope}:${scope_id || product_id}`) and the sum live in
+  // worker/lib/aggregateDemand.ts, shared with the cart's batch door so the
+  // two can never judge one counter differently. A capacity row (0075) is
+  // aggregated exactly like a stock row — two lines sharing one pre-order pool
+  // sum before they are judged — but it is not a shelf, so the refusal below
+  // must not call it one.
+  for (const [, counter] of demandByCounter(lines)) {
+    const first = counter.lines[0];
+    const d = {
+      needed: counter.needed,
+      available: counter.available,
+      name: first.name_ar || first.name,
+      coarse: counter.lines.some((l) => poolMemberIds.has(l.product_id)),
+      preorder: counter.preorder,
+    };
     if (d.available !== null && d.needed > d.available) {
       if (d.preorder) {
         /**
@@ -1775,6 +1761,14 @@ export interface ComputedLine {
   name_ar: string;
   image: string;
   variant: string;
+  /**
+   * docs/ux/COLOUR-QUANTITIES.md §4.6: the colour as a field and the label
+   * without it, for the checkout screen. DISPLAY ONLY — no column is written
+   * from either; `variant` stays the order's authority. Absent on lines that
+   * are not ordinary products.
+   */
+  color_tag?: ColorTag | null;
+  options_label?: string;
   option_id: string;
   /** §7 full multi-group selection, stored on the order item. */
   option_value_ids: string[];
@@ -2697,7 +2691,7 @@ export async function computeCheckout(
           required_tiers: offerCheck.required_tiers,
         });
       }
-      const { doc, resolved: resolvedLive, variantLabel, selectionErrors, offerId } = resolveCartLine(
+      const { doc, resolved: resolvedLive, variantLabel, selectionErrors, offerId, colorTag, optionsLabel } = resolveCartLine(
         row,
         sel,
         tierStatus.tier,
@@ -2939,6 +2933,9 @@ export async function computeCheckout(
           colorId: sel.colorId || null,
         }, view),
         variant: variantLabel,
+        // docs/ux/COLOUR-QUANTITIES.md §4.6 — display only, never written to the order row.
+        color_tag: colorTag,
+        options_label: optionsLabel,
         option_id: String(row.option_id ?? ''),
         color_id: String(row.color_id ?? ''),
         shipping_method_id: String(row.shipping_method_id ?? ''),
@@ -4187,6 +4184,7 @@ function quoteLines(lines: ComputedLine[]) {
         name_ar: l.name_ar,
         image: l.image,
         variant: l.variant,
+        ...(l.color_tag !== undefined ? { color_tag: l.color_tag, options_label: l.options_label ?? '' } : {}),
         qty: l.qty,
         unit_price_iqd: l.unit,
         line_total_iqd: l.line,

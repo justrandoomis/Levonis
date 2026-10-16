@@ -55,6 +55,8 @@ const CUSTOMER_FILES = [
   'worker/lib/publicApi/resources/catalog.ts',
   'worker/lib/publicApi/meta.ts',
   'worker/routes/cart.ts',
+  // docs/ux/COLOUR-QUANTITIES.md §4.2: the add door's rules, extracted so the batch door shares them.
+  'worker/lib/cartAdd.ts',
   'worker/routes/orders.ts',
   'worker/lib/quickBuy/session.ts',
   'worker/lib/quickBuy/finalize.ts',
@@ -151,7 +153,10 @@ function countCalls(file: string): { visible: number; sellable: number; states: 
  * PRICE_NOT_AVAILABLE, else the door's own 404" — counted here.
  */
 const SELLABLE_ONLY: Record<string, number> = {
-  'worker/routes/cart.ts': 1,
+  // The add door's product read moved to worker/lib/cartAdd.ts (`loadAddProduct`), which both cart add
+  // doors call (docs/ux/COLOUR-QUANTITIES.md §4.2): the one visible-then-refuse question went with it.
+  'worker/routes/cart.ts': 0,
+  'worker/lib/cartAdd.ts': 1,
   'worker/routes/orders.ts': 0,
   'worker/lib/quickBuy/session.ts': 1,
   'worker/lib/quickBuy/finalize.ts': 0,
@@ -221,7 +226,9 @@ const EXPECTED_CALLS: Record<string, { visible: number; sellable: number; states
   'worker/lib/tradeInTargets.ts': { visible: 0, sellable: 2, states: 0 },
   'worker/lib/tradeInToday.ts': { visible: 0, sellable: 1, states: 0 },
   'worker/routes/bundles.ts': { visible: 0, sellable: 2, states: 0 },
-  'worker/routes/cart.ts': { visible: 1, sellable: 3, states: 0 },
+  'worker/routes/cart.ts': { visible: 0, sellable: 2, states: 0 },
+  // `loadAddProduct`: SELLABLE, and «still shown? then 409 PRICE_NOT_AVAILABLE» — for the single and the batch add.
+  'worker/lib/cartAdd.ts': { visible: 1, sellable: 1, states: 0 },
   'worker/routes/catalog.ts': { visible: 2, sellable: 2, states: 0 },
   'worker/routes/communityFavorites.ts': { visible: 1, sellable: 1, states: 0 },
   'worker/routes/communityPosts.ts': { visible: 3, sellable: 0, states: 0 },

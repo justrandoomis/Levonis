@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { listing, priceNotAvailable, refuseIfOnlyCatalog } from '../lib/listing';
+import { listing, priceNotAvailable } from '../lib/listing';
 import { checkSelection, namesUnpricedChoice, selectionKey, skuPriced } from '../lib/commercialState';
 import { serverMessage } from '@levonis/contracts/costRefusals';
 import { cartShippingType, typeForTransport, type ShippingType } from '../lib/shippingType';
@@ -35,12 +35,13 @@ import { newId } from '../lib/crypto';
 import { dailyUserHash, emitBestEffort, eventsEnabled, waitUntilFrom } from '../lib/eventBus';
 import { AddToCartV1 } from '@levonis/contracts/events/v1/AddToCart';
 import { getSettings } from '../lib/settings';
-import { parseProductRow, publicColor, publicOption, publicPreorderRoutes, type ProductDoc } from '../lib/productModel';
+import { canonicalProductMediaUrl, parseProductRow, publicColor, publicOption, publicPreorderRoutes, type ProductDoc } from '../lib/productModel';
 import { customerAvailability, customerLinePrice, type CustomerLinePrice } from '../lib/customerPricing';
 import {
   applyRelations,
   capacityFrom,
   EMPTY_RELATIONS,
+  isActiveProductImageRow,
   loadRelationsViews,
   publicRelations,
   snapshotFrom,
@@ -51,6 +52,18 @@ import { validateCoupon } from '../lib/membershipOps';
 import { couponLinesOf, productCouponFacts } from '../lib/couponLines';
 import { rateLimit } from '../lib/ratelimit';
 import { lineOrderType, saleAvailability, unusableOrderType } from './products';
+import {
+  isComposition,
+  judgeLevonisLine,
+  judgeLevonisLineOrThrow,
+  lineStockTargets,
+  loadAddContext,
+  loadAddProduct,
+  type AddLine,
+  type AddShared,
+  type JudgedLine,
+} from '../lib/cartAdd';
+import { demandByCounter } from '../lib/aggregateDemand';
 import type { SaleAvailability } from './products';
 
 /**
@@ -391,7 +404,17 @@ export function resolveCartLine(
    * only place that holds the viewer's membership.
    */
   offer?: { view: OfferView | null; eligible: boolean; nowMs: number }
-): { doc: ProductDoc; resolved: ResolvedPrice; variantLabel: string; selectionErrors: string[]; offerId: string | null } {
+): {
+  doc: ProductDoc;
+  resolved: ResolvedPrice;
+  variantLabel: string;
+  selectionErrors: string[];
+  offerId: string | null;
+  /** docs/ux/COLOUR-QUANTITIES.md §4.6: the line's colour as a field, or null. */
+  colorTag: ColorTag | null;
+  /** `variantLabel` without the colour part. */
+  optionsLabel: string;
+} {
   // Options and colours come from the relational tables when the product has
   // them (migration 0022 gave every existing product its rows), so the cart
   // prices exactly what the storefront showed.
@@ -441,13 +464,31 @@ export function resolveCartLine(
       : [];
 
   const labels: string[] = [];
+  // The colour, when it is an option group's value (0194 `kind = 'color'`),
+  // is part of the option labels; it is left out of `optionsLabel` so a screen
+  // that draws the colour as its own tag does not print it twice.
+  const colourValue = sel.colorId ? null : colourGroupValue(view, valueIds);
+  const optionLabels: string[] = [];
   for (const id of valueIds) {
     const o = doc.options.find((x: { id: string }) => x.id === id);
-    labels.push(o ? o.name_en || o.name_ar || o.id : id);
+    const label = o ? o.name_en || o.name_ar || o.id : id;
+    labels.push(label);
+    if (id !== colourValue?.id) optionLabels.push(label);
   }
+  let colorTag: ColorTag | null = colourValue
+    ? {
+        id: colourValue.id,
+        name: colourValue.name_en || colourValue.name_ar || colourValue.id,
+        // The same allow-list the product page's swatch passes (productOverlay `swatchOf`).
+        hex: /^#[0-9A-F]{6}$/.test(String(colourValue.swatch?.published_hex ?? '')) ? String(colourValue.swatch?.published_hex) : '',
+        image: canonicalProductMediaUrl(colourValue.swatch?.url),
+      }
+    : null;
   if (sel.colorId) {
     const col = doc.colors.find((x: { id: string }) => x.id === sel.colorId);
-    labels.push(col ? col.name_en || col.name_ar || col.id : sel.colorId);
+    const name = col ? col.name_en || col.name_ar || col.id : sel.colorId;
+    labels.push(name);
+    colorTag = { id: sel.colorId, name, hex: cssHex(col?.hex), image: colourImageOf(view, sel.colorId) };
   }
   const withOffer =
     offer && offer.eligible && (doc.composition ?? '') === ''
@@ -463,7 +504,54 @@ export function resolveCartLine(
     // the checkout so "which offer produced this price" is answerable years
     // later (§12).
     offerId: withOffer.source === 'offer' ? withOffer.offer_id : null,
+    colorTag,
+    optionsLabel: optionLabels.join(' / '),
   };
+}
+
+/**
+ * THE COLOUR AS A FIELD (docs/ux/COLOUR-QUANTITIES.md §4.6). The cart and the
+ * checkout drew the colour as the last word of a 12px grey label; they now draw
+ * a swatch and a name. ADDITIVE: `variantLabel` keeps its exact value, because
+ * invoices, emails and `option_snapshot` read it, and an older client ignores
+ * this field.
+ */
+export interface ColorTag {
+  id: string;
+  /** English in every language (the product-form mandate §7). */
+  name: string;
+  /** '' when none is known. */
+  hex: string;
+  /** The colour's own picture, '' when none is bound. */
+  image: string;
+}
+
+/** A colour's hex as the page may paint it, or '' (an admin field is never trusted into CSS). */
+const cssHex = (v: unknown): string => (typeof v === 'string' && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v.trim()) ? v.trim() : '');
+
+/**
+ * The first active relational image bound to this colour — the same rows the
+ * product page's gallery reads, never the legacy colour image column.
+ */
+function colourImageOf(view: ProductRelationsView | undefined, colorId: string): string {
+  if (!view || !Array.isArray(view.images)) return '';
+  const bound = view.images
+    .filter((i) => isActiveProductImageRow(i) && i.color_id === colorId)
+    .sort((a, b) => (b.is_primary === 1 ? 1 : 0) - (a.is_primary === 1 ? 1 : 0) || a.sort_order - b.sort_order || a.id.localeCompare(b.id));
+  return bound[0]?.url ?? '';
+}
+
+/**
+ * The selected value of the option group whose kind is 'color'. Only a
+ * database with 0194 carries a group `kind` (`SELECT *` returns no such key
+ * before it), so before 0194 this is null and every screen keeps today's label
+ * (CLAUDE.md rule 2).
+ */
+function colourGroupValue(view: ProductRelationsView | undefined, valueIds: readonly string[]) {
+  if (!view) return null;
+  const groups = new Set(view.groups.filter((g) => g.kind === 'color').map((g) => g.id));
+  if (groups.size === 0) return null;
+  return view.values.find((v) => groups.has(v.group_id) && valueIds.includes(v.id)) ?? null;
 }
 
 /**
@@ -949,7 +1037,7 @@ async function loadCart(c: Context<AppContext>) {
     const offerView = lineOffers.get(offerKey(subjectOf(String(row.id)))) ?? null;
     const offerCheck = offerEligible(status, offerView, nowMs);
     const offerInput = { view: offerView, eligible: offerCheck.ok, nowMs };
-    const { doc, resolved, variantLabel, selectionErrors } = resolveCartLine(
+    const { doc, resolved, variantLabel, selectionErrors, colorTag, optionsLabel } = resolveCartLine(
       row,
       sel,
       tier,
@@ -1046,6 +1134,10 @@ async function loadCart(c: Context<AppContext>) {
       shipping_method_id: row.shipping_method_id, // legacy column, no longer priced
       selling_type: doc.selling_type,
       variantLabel,
+      // docs/ux/COLOUR-QUANTITIES.md §4.6 — the colour as its own field, and
+      // the label without it. Additive: `variantLabel` above is unchanged.
+      color_tag: colorTag,
+      options_label: optionsLabel,
       // §3.3/§3.4 display flag — NOT a price, NOT a promise of a gift to the
       // buyer: it marks the line the support-gift program evaluates for the
       // REFERRER after delivery and payment settlement.
@@ -1705,7 +1797,7 @@ function lineCeilingRefusal() {
   return badRequest(`At most ${LINE_QTY_MAX} per order`, 'QTY_UNAVAILABLE', { max_qty: LINE_QTY_MAX, preorder: false });
 }
 
-function refuseQty(availability: SaleAvailability) {
+export function refuseQty(availability: SaleAvailability) {
   const preorder = availability.mode === 'preorder';
   const remaining = preorder ? availability.preorder.capacity.available : availability.stock.available;
   return badRequest(
@@ -2107,6 +2199,59 @@ cartRoutes.post('/gift-items', async (c) => {
   return answer(false);
 });
 
+/**
+ * THE ORDINARY UPSERT — one statement for the single door and the batch door
+ * (docs/ux/COLOUR-QUANTITIES.md §4.2).
+ *
+ * shipping_method_id stays '' — legacy column kept for the UNIQUE key only,
+ * pricing is entirely resolver-driven now. Intentionally targetless for the
+ * same three-schema rollout as the bundle upsert above: old-only, v1+v2, then
+ * v2-only. Stage C enables the multi-group UI only after the separate 0083
+ * contract deployment completes.
+ *
+ * A SECOND ADD OF THE SAME LINE IS HELD TO THE SAME CEILING (`judged.ceiling`).
+ * The door judged `qty` alone against `max_qty`; the merge adds what the line
+ * already holds, and used to stop only at the storage limit — so two adds of
+ * 600 on a shelf of 1,000 left a line the checkout refuses. The merged line
+ * becomes the most this selection sells (the owner's rule: set the most, never
+ * say no), never less than this add.
+ */
+export function upsertStatement(
+  db: D1Database,
+  userId: string,
+  productId: string,
+  judged: JudgedLine,
+  line: AddLine,
+  shared: AddShared
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
+                               shipping_method_id, transport_method, fulfillment_type, warranty_plan_id, qty)
+       VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)
+       ON CONFLICT DO UPDATE SET qty = MIN(?, qty + excluded.qty),
+                     option_value_ids = excluded.option_value_ids,
+                     transport_method = excluded.transport_method,
+                     fulfillment_type = excluded.fulfillment_type,
+                     warranty_plan_id = CASE WHEN excluded.warranty_plan_id = ''
+                                             THEN cart_items.warranty_plan_id
+                                             ELSE excluded.warranty_plan_id END`
+    )
+    .bind(
+      newId('ci'),
+      userId,
+      productId,
+      judged.primaryOption,
+      judged.canonicalJson,
+      line.colorId,
+      shared.transportMethod,
+      shared.fulfillmentType,
+      shared.warrantyPlanId,
+      line.qty,
+      judged.ceiling
+    );
+}
+
 cartRoutes.post('/items', async (c) => {
   const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
@@ -2117,222 +2262,39 @@ cartRoutes.post('/items', async (c) => {
   // so an older client keeps working unchanged.
   const rawValueIds: unknown[] = Array.isArray(body.optionValueIds) ? body.optionValueIds : [];
   const optionValueIds = canonicalOptionValueIds(rawValueIds, legacyOptionId).slice(0, 12);
-  const optionId = optionValueIds[0] ?? '';
   const colorId = str(body.colorId, 'colorId', { max: 60, required: false });
   const transportMethod = parseTransportMethod(body.transportMethod);
   const fulfillmentType = parseFulfillmentType(body.fulfillmentType);
   const warrantyPlanId = str(body.warrantyPlanId, 'warrantyPlanId', { max: 60, required: false });
+  const shared: AddShared = { transportMethod, fulfillmentType, warrantyPlanId };
+  const line: AddLine = { optionValueIds, colorId, qty };
 
-  // SELLABLE (worker/lib/listing.ts): a held or unpriced product is not added. One a customer can still see
-  // (catalog-only, DECISIONS row 240) answers 409 PRICE_NOT_AVAILABLE; any other answers 404 as before.
-  const product = await c.env.DB.prepare(`SELECT * FROM products WHERE id = ? AND ${(await listing(c.env.DB)).sellable('products')}`)
-    .bind(productId)
-    .first<Record<string, unknown>>();
-  if (!product) {
-    await refuseIfOnlyCatalog(c.env.DB, productId);
-    throw notFound('Product not found or unavailable');
-  }
+  // THE RULES ARE worker/lib/cartAdd.ts, shared with the batch door below
+  // (docs/ux/COLOUR-QUANTITIES.md §4.2): the product read, the product-level
+  // refusals, then every line-level refusal in the order this door always
+  // spoke them.
+  const product = await loadAddProduct(c, productId);
 
   // A COMPOSITION ROW TAKES ITS OWN DOOR (§5). It has no options, no colours,
   // no warranty plan and no stock of its own, so none of the ordinary
   // resolution below applies to it — and every figure it needs comes from the
   // same resolution pass the card and the detail page ran.
-  if (String(product.composition ?? '') !== '') {
+  if (isComposition(product)) {
     return await addCompositionLine(c, product, qty, transportMethod, body);
   }
 
-  const [{ tier, active: tierActive, status: addStatus, ctx }, views, isPrinter, addOffers] = await Promise.all([
-    cartPricing(c),
-    loadRelationsViews(c.env.DB, [{ id: productId, inventory_mode: product.inventory_mode }]),
-    // The owner's catalog flag decides whether an extended warranty may ride
-    // on this line at all — "this system applies to printers only".
-    warrantyPlanId ? isPrinterProduct(c.env.DB, productId) : Promise.resolve(false),
-    // Same rule as the cart read: no 0060 means no window exists, so the
-    // ladder price IS this line's price. Anything other than a missing table
-    // still refuses the add rather than storing a line at the wrong price.
-    degradeIfSchemaMissing(
-      'special offers (migration 0060)',
-      () => loadOffers(c.env.DB, [subjectOf(productId)]),
-      new Map<string, OfferView>()
-    ),
-  ]);
-  refuseNonPrinterWarranty(isPrinter, warrantyPlanId);
-  const view = views.get(productId);
-  // ADD-TO-CART RE-CHECKS THE OFFER INDEPENDENTLY (§15.1 rule 6). A window
-  // that ended, was switched off or gates a tier this buyer does not hold
-  // refuses here rather than letting the line sit in a cart the checkout will
-  // reject with a different sentence.
-  const addNow = Date.now();
-  const addOfferView = addOffers.get(offerKey(subjectOf(productId))) ?? null;
-  const addOfferCheck = offerEligible(addStatus, addOfferView, addNow);
-  // Only a LIVE window can refuse: an ordinary product outlives its
-  // promotions, and an expired one must not make it permanently unbuyable.
-  if (addOfferView?.window && !addOfferCheck.ok && addOfferCheck.reason === 'MEMBERSHIP_REQUIRED') {
-    throw new HttpError(403, `"${String(product.name_ar || product.name)}" is available to members only`, 'MEMBERSHIP_REQUIRED', {
-      required_tiers: addOfferCheck.required_tiers,
-    });
-  }
-  const { doc, resolved, selectionErrors } = resolveCartLine(
-    product,
-    { optionId, optionValueIds, colorId, transportMethod, fulfillmentType, warrantyPlanId },
-    tier,
-    tierActive,
-    ctx,
-    view,
-    'prepaid',
-    isPrinter,
-    { view: addOfferView, eligible: addOfferCheck.ok, nowMs: addNow }
-  );
-  if (offerPriceRefusal(resolved.errors)) {
-    throw badRequest('This offer is not available right now', 'OFFER_INACTIVE');
-  }
-  // A MISSING ROUTE KEEPS ITS OWN CODE. Now that the product page always
-  // states the order type, the resolver narrows `saleTypes` to the stated one
-  // and raises TRANSPORT_REQUIRED here (packages/pricing/src/pricing.ts) —
-  // ninety lines before the door's own guard below can be reached. Flattening
-  // it to 'VALIDATION' handed the customer an untranslated code inside an
-  // English sentence, when the page already speaks this one in all three
-  // languages. The guard below still answers the legacy shape: a body with
-  // NEITHER field on a product that sells both ways, which the resolver cannot
-  // narrow and therefore never flags.
-  if (resolved.errors.length === 1 && resolved.errors[0] === 'TRANSPORT_REQUIRED') {
-    throw badRequest('Choose a shipping method for this pre-order', 'TRANSPORT_REQUIRED');
-  }
-  // Pricing V2 strict (spec C-13): a SKU × channel not priced yet is not for sale — the page speaks this code.
-  // An incomplete selection has no SKU row either: «choose an option» is the truer answer there, and since
-  // the clean start every ordinary product is strict, so the selection guard speaks first.
-  if (resolved.errors.includes(SKU_STRICT_ERROR)) {
-    refuseIncompleteSelection(saleAvailability(doc, { optionValueIds, colorId: colorId || null, qty: 1 }));
-    throw badRequest('That option is not available right now', SKU_STRICT_ERROR);
-  }
-  if (resolved.errors.length > 0) {
-    throw badRequest(`Invalid selection: ${resolved.errors.join(', ')}`, 'VALIDATION');
-  }
-  // §7: the colour/option combination must be one the admin actually offers.
-  if (selectionErrors.length > 0) {
-    throw badRequest(`Invalid selection: ${selectionErrors.join(', ')}`, 'VALIDATION');
-  }
-
-  // Stock comes from the authoritative level for THIS selection — an
-  // exhausted colour blocks the add even when the base row is full.
-  //
-  // AND IT IS COARSE FOR A MYSTERY-POOL MEMBER (§8.2 row 18). The refusals
-  // below quote `availability.stock.available`, so an add-to-cart of qty 99
-  // was an oracle on its own: "Only 7 left" for one candidate and "Only 9
-  // left" for the rest names the drawn colour without buying anything. The
-  // coarse branch returns `available: null`, so both refusals take their
-  // existing count-free path with no new branch.
-  const coarseStock =
-    (
-      await degradeIfSchemaMissing(
-        'mystery pools (migration 0061)',
-        () => activePoolProductIds(c.env.DB, [String(product.id)]),
-        new Set<string>()
-      )
-    ).size > 0;
-  const availability = saleAvailability(doc, {
-    optionValueIds,
-    colorId: colorId || null,
-    qty,
-    coarseStock,
-    transportDefaults: ctx.transportDefaults,
-    inventory: view
-      ? snapshotFrom(view, {
-          stock: doc.stock,
-          reserved: Number(product.stock_reserved ?? 0),
-          low_stock_threshold: (product.low_stock_threshold as number | null) ?? null,
-        })
-      : undefined,
-    links: view?.links,
-    // 0073/0075 — THE ORDER TYPE THE CUSTOMER STATED, NOT ONE INFERRED FROM
-    // THE ROUTE. The transport is only the fallback for a client that has not
-    // learned to send `fulfillmentType`; without this the add validated a
-    // stated pre-order against the model's SHELF, so a sold-out direct model
-    // refused a pre-order it had capacity for.
-    preferredType: fulfillmentType || (transportMethod ? 'pre_order' : null),
-    capacity: view ? capacityFrom(view, optionValueIds) : null,
-    transportMethod,
-  });
-  // A product with options or colours is sold as ONE of them. The relational
-  // path enforces that in validateSelection; a legacy JSON-column product
-  // reached this point with no option at all and was added at the base
-  // price — a line the shop never offers. saleAvailability already knows
-  // (it is what disables the storefront button), so the cart listens to it.
-  // Checked before stock so "choose an option" wins over "out of stock".
-  refuseIncompleteSelection(availability);
-  // THE ORDER TYPE IS HONOURED OR REFUSED, NEVER QUIETLY SWAPPED. Without
-  // this, "buy now" on a model whose last unit had gone fell through to the
-  // pre-order branch and the line landed in the cart as a pre-order — a
-  // different price, a different wait and a different counter than the one the
-  // customer pressed.
-  //
-  // AND IT IS THE TYPE THIS ROW WILL BE, not the raw field. The door used to
-  // hand `unusableOrderType` the body's `fulfillmentType` verbatim, which
-  // answers null for anything that is not exactly one of the two types — so a
-  // body carrying a TRANSPORT and no stated type (exactly what
-  // src/components/orders/ReorderButton.tsx builds) was validated against the
-  // descriptive fallback, admitted against the SHELF, and stored as a row that
-  // both `GET /api/cart` and `POST /api/orders` then type `pre_order`: admitted
-  // against one counter and described by another in the same response.
-  // `lineOrderType` is the read model's own rule and the checkout's own rule.
-  const addLineType = lineOrderType(availability, fulfillmentType, transportMethod);
-  const statedAdd = unusableOrderType(availability, addLineType);
-  if (statedAdd) throw badRequest(statedAdd.message, statedAdd.code);
-  // A PRE-ORDER WITHOUT A ROUTE IS A LINE NO PART OF THIS SHOP AGREES ABOUT.
-  //
-  // The pricing resolver only raises TRANSPORT_REQUIRED when the order type is
-  // narrowed to pre-order — either stated outright or because the product
-  // sells exactly one way (packages/pricing/src/pricing.ts). A DUAL-MODE
-  // product whose direct shelf is empty falls through both tests when the body
-  // carries neither field, and the row was then stored with an empty type and
-  // an empty route: the money resolved it to a direct sale, `GET /api/cart`
-  // and the checkout resolved the same row to a pre-order. One row, two
-  // answers, and the customer read «بيع مباشر» under a pre-order they had
-  // chosen.
-  //
-  // Keyed on `lineOrderType` — the read model's rule and the checkout's rule —
-  // so the door refuses exactly the lines the rest of the stack calls
-  // pre-orders. It cannot fire when no route is offered at all: `preorderUsable`
-  // is false for an empty transport list, so `mode` is 'unavailable' and the
-  // refusal below wins first with NO_TRANSPORT_OFFERED. The offered routes ride
-  // along in `details` so a caller can render a chooser instead of a dead end.
-  if (addLineType === 'pre_order' && !transportMethod) {
-    throw new HttpError(400, 'Choose a shipping method for this pre-order', 'TRANSPORT_REQUIRED', {
-      transport_methods: availability.preorder.transports.filter((t) => t.configured).map((t) => t.method),
-    });
-  }
-  if (availability.mode === 'unavailable') {
-    throw badRequest(
-      availability.reason === 'OUT_OF_STOCK'
-        ? 'That selection is out of stock.'
-        : availability.reason === 'PREORDER_CAPACITY_EXHAUSTED'
-          ? // "Out of stock" would be a lie about a pre-order: there is no
-            // shelf, the IMPORT QUOTA is full. The customer needs to know it is
-            // a different wait, not a different shop.
-            'The pre-order quota for this selection is full.'
-          : `This item cannot be added right now (${availability.reason ?? 'UNAVAILABLE'})`,
-      availability.reason ?? 'UNAVAILABLE'
-    );
-  }
-  if (!availability.qty_ok) throw refuseQty(availability);
+  const actx = await loadAddContext(c, product, { warrantyPlanId });
+  const judged = judgeLevonisLineOrThrow(actx, line, shared);
+  // The full selection is stored canonically sorted (judgeLevonisLineOrThrow):
+  // option_id is the lexically first canonical value, never the authored
+  // group order, because it participates in the unique key.
+  const { canonical, canonicalJson } = judged;
+  const primaryOption = canonical[0] ?? '';
 
   // ONE SHIPPING TYPE PER CART and ONE SELLER PER CART, checked before
   // anything is written — the same two rules, in the same function, for an
   // ordinary product and for a bundle.
   const replacing = await enforceCartScope(c, typeForTransport(transportMethod), body.replaceCart === true);
-
-  // shipping_method_id stays '' — legacy column kept for the UNIQUE key only,
-  // pricing is entirely resolver-driven now.
-  // The full selection is stored canonically sorted so two requests that name
-  // the same values in a different order are the same line. option_id is the
-  // lexically first canonical value as well: it participates in the unique
-  // key, so tying it to mutable admin group order would let reordering groups
-  // create a duplicate of the exact same option_value_ids selection. Pricing
-  // already used authored group order in resolveCartLine above and stays
-  // deliberately separate from this persisted identity.
-  const canonical = canonicalOptionValueIds(optionValueIds);
-  const canonicalJson = optionValueIdsJson(canonical);
-  const primaryOption = canonical[0] ?? '';
 
   // ONE PLAN PER LINE, AND THE LINE'S PLAN IS THE CUSTOMER'S TO CHANGE. The
   // merge key (user, product, option, colour) says nothing about the warranty,
@@ -2341,7 +2303,7 @@ cartRoutes.post('/items', async (c) => {
   // vanish from both units, or a plan would be applied to a unit the customer
   // never picked it for. An add that names a DIFFERENT plan than the line
   // holds (including a line with none) is refused, naming the fix; an add that
-  // names none keeps the line's plan (the CASE in the upsert below).
+  // names none keeps the line's plan (the CASE in the upsert).
   // A cart about to be emptied (`replacing`) holds no line to merge into.
   const existingLine = replacing.length
     ? null
@@ -2360,36 +2322,12 @@ cartRoutes.post('/items', async (c) => {
     );
   }
 
-  // Intentionally targetless for the same three-schema rollout as the bundle
-  // upsert above: old-only, v1+v2, then v2-only. Stage C enables the multi-
-  // group UI only after the separate 0083 contract deployment completes.
   try {
     await c.env.DB.batch([
       // The confirmed "empty the cart first", in the same transaction as the
       // line that replaces it (B15).
       ...replacing,
-      c.env.DB.prepare(
-        `INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
-                                 shipping_method_id, transport_method, fulfillment_type, warranty_plan_id, qty)
-         VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)
-         ON CONFLICT DO UPDATE SET qty = MIN(?, qty + excluded.qty),
-                       option_value_ids = excluded.option_value_ids,
-                       transport_method = excluded.transport_method,
-                       fulfillment_type = excluded.fulfillment_type,
-                       warranty_plan_id = CASE WHEN excluded.warranty_plan_id = ''
-                                               THEN cart_items.warranty_plan_id
-                                               ELSE excluded.warranty_plan_id END`
-      ).bind(
-        newId('ci'), user.id, productId, primaryOption, canonicalJson, colorId,
-        transportMethod, fulfillmentType, warrantyPlanId, qty,
-        // A SECOND ADD OF THE SAME LINE IS HELD TO THE SAME CEILING. The door
-        // judged `qty` alone against `max_qty`; the merge adds what the line
-        // already holds, and used to stop only at the storage limit — so two
-        // adds of 600 on a shelf of 1,000 left a line the checkout refuses.
-        // The merged line becomes the most this selection sells (the owner's
-        // rule: set the most, never say no), never less than this add.
-        Math.max(qty, Math.min(LINE_QTY_MAX, availability.stock.max_qty))
-      ),
+      upsertStatement(c.env.DB, user.id, productId, judged, line, shared),
     ]);
   } catch (e) {
     // A store line landed between this door's read and its write; the 0114
@@ -2406,28 +2344,257 @@ cartRoutes.post('/items', async (c) => {
   // nothing a dropped telemetry event costs. The price is the one the cart
   // just resolved, not a second lookup.
   if (eventsEnabled(c.env)) {
-    const line = items.find(
-      (it) =>
-        String(it.productId) === productId &&
-        sameOptionValueIds(Array.isArray(it.option_value_ids) ? it.option_value_ids : [], canonical) &&
-        String(it.color_id ?? '') === colorId
-    );
-    await emitBestEffort(
-      c.env.DB,
-      AddToCartV1,
-      {
-        user_hash: await dailyUserHash(user.id),
-        product_id: productId,
-        line_key: `${productId}:${canonicalJson}:${colorId}`,
-        qty,
-        seller_type: 'platform',
-        price_iqd_snapshot: Math.max(0, Math.round(Number(line?.unit_price_iqd ?? 0))),
-      },
-      { aggregateId: user.id, actorId: user.id, waitUntil: waitUntilFrom(c) }
-    );
+    await emitAddToCart(c, items, productId, canonical, canonicalJson, colorId, qty);
   }
 
   return c.json({ success: true, items, tier: t, tierActive: ta });
+});
+
+/** One `AddToCart` event for one added line (best effort; see the single door). */
+async function emitAddToCart(
+  c: Context<AppContext>,
+  items: Array<Record<string, unknown>>,
+  productId: string,
+  canonical: string[],
+  canonicalJson: string,
+  colorId: string,
+  qty: number
+) {
+  const user = c.get('user')!;
+  const line = items.find(
+    (it) =>
+      String(it.productId) === productId &&
+      sameOptionValueIds(Array.isArray(it.option_value_ids) ? (it.option_value_ids as string[]) : [], canonical) &&
+      String(it.color_id ?? '') === colorId
+  );
+  await emitBestEffort(
+    c.env.DB,
+    AddToCartV1,
+    {
+      user_hash: await dailyUserHash(user.id),
+      product_id: productId,
+      line_key: `${productId}:${canonicalJson}:${colorId}`,
+      qty,
+      seller_type: 'platform',
+      price_iqd_snapshot: Math.max(0, Math.round(Number(line?.unit_price_iqd ?? 0))),
+    },
+    { aggregateId: user.id, actorId: user.id, waitUntil: waitUntilFrom(c) }
+  );
+}
+
+// ------------------------------------------------------- several colours, one add
+//
+// docs/ux/COLOUR-QUANTITIES.md §4. «50 of this colour, 5 of that»: one product,
+// one shared selection (route, order type, warranty), up to forty lines that
+// differ in their colour (or any option), added ALL OR NOTHING. Every line is
+// judged by the single door's own rules (worker/lib/cartAdd.ts); the lines that
+// draw on one stock counter are judged on their sum; and every write — the
+// confirmed emptying of the cart included — lands in ONE D1 batch, which D1
+// runs as one transaction. A customer never gets the black added and the white
+// refused without being told: a refusal adds nothing.
+
+/** The most lines one batch carries: the largest colour list in the catalogue is 30. */
+export const BATCH_MAX_LINES = 40;
+
+interface BatchLineInput extends AddLine {
+  /** What the page believes the cart holds of this exact line; null = not sent. */
+  inCart: number | null;
+}
+
+/** Refusal details for one line, carrying only what the single door's `details` already carries. */
+function lineRefusal(index: number, line: AddLine, error: HttpError) {
+  return {
+    index,
+    color_id: line.colorId,
+    option_value_ids: line.optionValueIds,
+    code: error.code ?? 'VALIDATION',
+    message: error.message,
+    ...(error.details ?? {}),
+  };
+}
+
+function parseBatchLines(raw: unknown): BatchLineInput[] {
+  if (!Array.isArray(raw) || raw.length === 0) throw badRequest('lines must hold at least one line', 'VALIDATION');
+  if (raw.length > BATCH_MAX_LINES) {
+    throw badRequest(`At most ${BATCH_MAX_LINES} lines can be added at once`, 'BATCH_TOO_MANY_LINES', { max_lines: BATCH_MAX_LINES });
+  }
+  const lines = raw.map((entry, i): BatchLineInput => {
+    const l = (entry && typeof entry === 'object' ? entry : {}) as Record<string, unknown>;
+    const rawIds: unknown[] = Array.isArray(l.optionValueIds) ? l.optionValueIds : [];
+    return {
+      // No legacy `optionId`: the batch door has only new clients.
+      optionValueIds: canonicalOptionValueIds(rawIds).slice(0, 12),
+      colorId: str(l.colorId, `lines[${i}].colorId`, { max: 60, required: false }),
+      qty: int(l.qty, `lines[${i}].qty`, { min: 1, max: QTY_INPUT_MAX }),
+      inCart:
+        l.inCart === undefined || l.inCart === null
+          ? null
+          : int(l.inCart, `lines[${i}].inCart`, { min: 0, max: LINE_QTY_MAX }),
+    };
+  });
+  const sent = lines.filter((l) => l.inCart !== null).length;
+  if (sent !== 0 && sent !== lines.length) {
+    throw badRequest('inCart is sent on every line or on none', 'VALIDATION');
+  }
+  // TWO LINES WITH ONE IDENTITY WOULD MERGE INSIDE THE SAME TRANSACTION, and
+  // one line would hold both quantities with nobody having asked for that.
+  const seen = new Map<string, number>();
+  for (const [i, l] of lines.entries()) {
+    const key = `${optionValueIdsJson(l.optionValueIds)}|${l.colorId}`;
+    const first = seen.get(key);
+    if (first !== undefined) {
+      throw badRequest('The same selection appears twice in this add', 'BATCH_DUPLICATE_LINE', { line_indexes: [first, i] });
+    }
+    seen.set(key, i);
+  }
+  return lines;
+}
+
+cartRoutes.post('/items/batch', async (c) => {
+  const user = c.get('user')!;
+  const body = await c.req.json().catch(() => ({}));
+  // 1. Parse with the single door's parsers, then the rate limit: a batch does
+  //    up to forty times the validation work of one add.
+  const productId = str(body.productId, 'productId', { min: 1, max: 60 });
+  const transportMethod = parseTransportMethod(body.transportMethod);
+  const fulfillmentType = parseFulfillmentType(body.fulfillmentType);
+  const warrantyPlanId = str(body.warrantyPlanId, 'warrantyPlanId', { max: 60, required: false });
+  const lines = parseBatchLines(body.lines);
+  const shared: AddShared = { transportMethod, fulfillmentType, warrantyPlanId };
+  await rateLimit(c, 'cart_batch', 20, 60);
+
+  // 2. The product-level refusals, once, with the single door's codes.
+  const product = await loadAddProduct(c, productId);
+  if (isComposition(product)) {
+    throw badRequest('This product cannot be added in several lines at once — add it from its page.', 'BATCH_NOT_SUPPORTED');
+  }
+  const actx = await loadAddContext(c, product, { warrantyPlanId });
+
+  // 3. Every line through the single door's rules. ALL refusals are collected,
+  //    not only the first, so the page can mark every colour that needs fixing.
+  const verdicts = lines.map((l) => judgeLevonisLine(actx, l, shared));
+  const refused = verdicts.flatMap((v, i) => (v.ok ? [] : [lineRefusal(i, lines[i], v.error)]));
+  if (refused.length > 0) {
+    const first = verdicts.find((v) => !v.ok) as { ok: false; error: HttpError };
+    throw new HttpError(first.error.status, first.error.message, first.error.code, { lines: refused });
+  }
+  const judged = verdicts.map((v) => (v as { ok: true; judged: JudgedLine }).judged);
+
+  // 4. SHARED COUNTERS. Lines that draw on one stock counter are judged on
+  //    their sum, keyed exactly as the checkout keys them — three colours on
+  //    one shelf of 52 would otherwise each pass alone (50, 5 and 1) and reach
+  //    a cart the checkout refuses.
+  const demandLines = judged.map((j, i) => ({
+    product_id: productId,
+    qty: lines[i].qty,
+    stock_targets: lineStockTargets(actx, j, lines[i], shared).targets,
+  }));
+  for (const [, counter] of demandByCounter(demandLines)) {
+    if (counter.indexes.length < 2 || counter.available === null || counter.needed <= counter.available) continue;
+    throw badRequest(
+      actx.coarseStock ? 'There is not enough stock for these quantities together' : `Only ${counter.available} left for these colours together`,
+      'QTY_UNAVAILABLE',
+      {
+        // A mystery-pool member's refusal names no count (§8.2 row 18).
+        ...(actx.coarseStock ? {} : { available: counter.available }),
+        preorder: counter.preorder,
+        shared: true,
+        line_indexes: counter.indexes,
+      }
+    );
+  }
+
+  // 5. ONE scope check for the whole batch: every line shares the route.
+  const replacing = await enforceCartScope(c, typeForTransport(transportMethod), body.replaceCart === true);
+
+  // 6. What the cart already holds of these lines — one read, two bound
+  //    parameters, never an IN list.
+  const existing = replacing.length
+    ? []
+    : ((
+        await c.env.DB
+          .prepare(
+            `SELECT id, option_id, option_value_ids, color_id, qty, warranty_plan_id FROM cart_items
+              WHERE user_id = ? AND product_id = ? AND shipping_method_id = ''`
+          )
+          .bind(user.id, productId)
+          .all<{ id: string; option_id: string; option_value_ids: string; color_id: string; qty: number; warranty_plan_id: string | null }>()
+      ).results ?? []);
+  const existingFor = (j: JudgedLine, l: AddLine) =>
+    existing.find(
+      (row) =>
+        String(row.option_id ?? '') === j.primaryOption &&
+        String(row.option_value_ids ?? '[]') === j.canonicalJson &&
+        String(row.color_id ?? '') === l.colorId
+    ) ?? null;
+  const before = judged.map((j, i) => Number(existingFor(j, lines[i])?.qty ?? 0));
+
+  // A PRESS WHOSE ANSWER WAS LOST IS SAFE TO PRESS AGAIN. The page sends what
+  // it believes each line holds; a second identical press after a lost answer
+  // meets the doubled-up cart and is refused instead of adding 50 more
+  // (CART_LINES_CHANGED — the store checkout's CART_CHANGED is another door's code).
+  const changed = lines.flatMap((l, i) => (l.inCart !== null && l.inCart !== before[i] ? [{ index: i, in_cart: before[i] }] : []));
+  if (changed.length > 0) {
+    throw new HttpError(409, 'Your cart changed since this page read it, so nothing was added.', 'CART_LINES_CHANGED', { lines: changed });
+  }
+  // ONE PLAN PER LINE (the single door's rule, per line).
+  if (warrantyPlanId) {
+    const clashes = judged.flatMap((j, i) => {
+      const row = existingFor(j, lines[i]);
+      return row && warrantyPlanId !== String(row.warranty_plan_id ?? '')
+        ? [{ index: i, color_id: lines[i].colorId, option_value_ids: lines[i].optionValueIds, code: CART_WARRANTY_CONFLICT }]
+        : [];
+    });
+    if (clashes.length > 0) {
+      throw new HttpError(
+        409,
+        'This printer is already in your cart with a different extended-warranty choice — change it from the cart.',
+        CART_WARRANTY_CONFLICT,
+        { lines: clashes }
+      );
+    }
+  }
+
+  // 7. Every write in ONE batch: the confirmed emptying and every line, or none.
+  try {
+    await c.env.DB.batch([...replacing, ...judged.map((j, i) => upsertStatement(c.env.DB, user.id, productId, j, lines[i], shared))]);
+  } catch (e) {
+    if (isCartSellerAbort(e)) throw await sellerConflictRefusal(c, PLATFORM_SCOPE, 'LEVONIS');
+    throw e;
+  }
+
+  // 8. The cart as it now is, and what each line became — a merge held to the
+  //    ceiling is reported, never silent.
+  const { items, tier: t, tierActive: ta } = await loadCart(c);
+  const added = judged.map((j, i) => {
+    const line = (items as Array<Record<string, unknown>>).find(
+      (it) =>
+        String(it.productId) === productId &&
+        String(it.kind ?? '') !== 'gift' &&
+        sameOptionValueIds(Array.isArray(it.option_value_ids) ? (it.option_value_ids as string[]) : [], j.canonical) &&
+        String(it.color_id ?? '') === lines[i].colorId
+    );
+    const after = Number(line?.qty ?? 0);
+    return {
+      index: i,
+      line_id: line ? String(line.id) : null,
+      option_value_ids: j.canonical,
+      color_id: lines[i].colorId,
+      requested: lines[i].qty,
+      before: before[i],
+      after,
+      capped: after < before[i] + lines[i].qty,
+    };
+  });
+
+  // 9. `AddToCart` per line, best effort, under the single door's gate.
+  if (eventsEnabled(c.env)) {
+    for (const [i, j] of judged.entries()) {
+      await emitAddToCart(c, items, productId, j.canonical, j.canonicalJson, lines[i].colorId, lines[i].qty);
+    }
+  }
+
+  return c.json({ success: true, items, tier: t, tierActive: ta, added });
 });
 
 /**
