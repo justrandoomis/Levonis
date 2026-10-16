@@ -33,7 +33,8 @@ test('the panels run availability → transport → option → colour', () => {
   const availability = page.indexOf('data-fulfilment-chooser', blocks);
   const notify = page.indexOf('<StockAlertPanel', blocks);
   const transport = page.indexOf('{showTransports ? (', blocks);
-  const option = page.indexOf('{hasMultipleOptionGroups ? (', blocks);
+  // The group chooser: several relational groups, or one group carrying the Bambu import's data (spec §G.3).
+  const option = page.indexOf('{groupChooser ? (', blocks);
   const colour = page.indexOf('{orderedColors.length > 0 ? (', blocks);
   const warranty = page.indexOf('data-extended-warranty', blocks);
   for (const [name, i] of Object.entries({ availability, notify, transport, option, colour, warranty })) {

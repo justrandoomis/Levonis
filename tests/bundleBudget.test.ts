@@ -443,7 +443,7 @@ function staticClosure(start: string): Set<string> {
   return seen;
 }
 
-test('opening a product excludes below-fold reviews, closed purchase dialogs, refusal translations and the price-request panel', () => {
+test('opening a product excludes below-fold reviews, closed purchase dialogs, refusal translations, the price-request panel and the knowledge tabs', () => {
   const files = readdirSync(ASSETS).filter((file) => file.endsWith('.js'));
   const product = files.find((file) => file.startsWith('Product-'));
   assert.ok(product, 'the product page has its own route chunk');
@@ -451,7 +451,8 @@ test('opening a product excludes below-fold reviews, closed purchase dialogs, re
   const bytes = [...opening].reduce((sum, file) => sum + gz(join(ASSETS, file)), 0);
   console.log(`bundle: product opening ${kb(bytes)} gzip (complete static closure)`);
   // «طلب السعر» (DECISIONS row 240) is mounted only for a product or selection with no price: a priced page never pays for it.
-  for (const name of ['ReviewSection', 'CheaperElsewhereSheet', 'GiniInstalmentsSheet', 'refusalStrings', 'PriceRequestPanel']) {
+  // The Bambu import spec §G.6: the knowledge tabs (specifications, documents …) load near the viewport, never with the page.
+  for (const name of ['ReviewSection', 'CheaperElsewhereSheet', 'GiniInstalmentsSheet', 'refusalStrings', 'PriceRequestPanel', 'ProductKnowledgeTabs']) {
     const file = files.find((candidate) => candidate.startsWith(`${name}-`));
     assert.ok(file, `${name} remains available in its own deferred chunk`);
     assert.equal(opening.has(file!), false, `${name} became a static product import and would compete with the lead image`);

@@ -58,6 +58,7 @@ import { takePrimedJson } from '../lib/bootFetch';
 import { mediaAspect, productGallerySizes } from '../../packages/contracts/src/imageSizes';
 
 import SafeImage from '../components/ui/SafeImage';
+import VariantImg from '../components/ui/VariantImg';
 import Note from '../components/ui/Note';
 import { QuantityInput } from '../components/ui/QuantityInput';
 import { quantityLimit } from '../../packages/pricing/src/quantity';
@@ -68,7 +69,10 @@ import { ProductDetailSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, NotFoundState } from '../components/ui/AsyncStates';
 import { monthsLabel } from '../components/orders/format';
 import { authPathWithSupportRef, captureSupportRefFromSearch } from '../lib/supportRef';
-import { productGalleryForSelection, productVariantIdForSelection } from '../lib/productImage';
+import { productVariantIdForSelection } from '../lib/productImage';
+import { dedupeByUrl, galleryForSelection, mediaInStoredOrder } from '../lib/productGallery';
+import { NOT_OFFERED, defaultSelection, groupName, importedChooser, valueOffered } from '../lib/productChooser';
+import Section from '../components/product/Section';
 import { useTheme } from '../lib/theme';
 import {
   formatPhysicalMeasurement,
@@ -107,6 +111,14 @@ import { afterCriticalPaint, allowsSpeculativeLoads } from '../lib/afterCritical
 const STEP_IMAGE_SIZES = '(min-width: 1024px) 180px, (min-width: 640px) 25vw, 33vw';
 /** The pictures of the description: a 2–3 column grid in the left column. */
 const DESCRIPTION_IMAGE_SIZES = '(min-width: 1024px) 300px, (min-width: 640px) 33vw, 50vw';
+
+/**
+ * THE PRODUCT'S KNOWLEDGE (the Bambu import spec §G.1, §G.2): specifications with
+ * their sources and states, packaging, the box, compatibility and documents. Its
+ * own chunk, and its own request (`/api/products/:slug/knowledge`), both started
+ * only when the tabs near the viewport — never on first paint.
+ */
+const ProductKnowledgeTabs = React.lazy(() => import('../components/product/ProductKnowledgeTabs'));
 
 /** Its own chunk: only a printer page with maintenance parts ever draws it. */
 const MaintenanceShelf = React.lazy(() => import('../components/product/MaintenanceShelf'));
@@ -153,6 +165,51 @@ function ProductReviews({ productId }: { productId: string }) {
   }, []);
   const placeholder = <div aria-hidden="true" className="mt-8 h-32" />;
   return <div ref={target}>{ready ? <ChunkBoundary compact><React.Suspense fallback={placeholder}><ReviewSection productId={productId} /></React.Suspense></ChunkBoundary> : placeholder}</div>;
+}
+
+/**
+ * The knowledge tabs start when they come within 400 px of the viewport (spec §G.2):
+ * the chunk and the request together, never with the page.
+ */
+function ProductKnowledge(props: React.ComponentProps<typeof ProductKnowledgeTabs>) {
+  const target = useRef<HTMLDivElement>(null);
+  const [ready, setReady] = useState(false);
+  /** Drawn: the tabs had something to show. Until then the slot takes no room (no gap in the sections). */
+  const [filled, setFilled] = useState(false);
+  const { onCovers } = props;
+  const covers = useCallback(
+    (c: { specs: boolean; box: boolean; any: boolean }) => {
+      setFilled(c.any);
+      onCovers?.(c);
+    },
+    [onCovers]
+  );
+  useEffect(() => {
+    if (!target.current || typeof IntersectionObserver === 'undefined') {
+      setReady(true);
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setReady(true);
+        observer.disconnect();
+      }
+    }, { root: document.getElementById('main-scroll-container'), rootMargin: '400px', threshold: 0 });
+    observer.observe(target.current);
+    return () => observer.disconnect();
+  }, []);
+  // `mb-0` until filled: the sections' own spacing (space-y, zero specificity) then reads as before.
+  return (
+    <div ref={target} data-product-knowledge className={filled ? undefined : 'mb-0'}>
+      {ready ? (
+        <ChunkBoundary compact>
+          <React.Suspense fallback={null}>
+            <ProductKnowledgeTabs {...props} onCovers={covers} />
+          </React.Suspense>
+        </ChunkBoundary>
+      ) : null}
+    </div>
+  );
 }
 
 // ------------------------------------------------------------------ strings
@@ -508,8 +565,12 @@ interface RelationsPayload {
   inventory_mode: 'BASE' | 'OPTION' | 'COLOR' | 'VARIANT_COMBINATION' | string;
   option_groups: Array<{
     id: string; name_en: string; sort: number;
+    /** 0194 (the Bambu import): the group's Arabic and Sorani labels, its kind and the source's default value. */
+    name_ar?: string; name_ckb?: string; kind?: string; default_value_id?: string;
     values: Array<{
       id: string; name_en: string; image: string; sort: number; available: number | null;
+      /** 0194: the official colour swatch (our own /files picture) or a hex the manufacturer published. */
+      swatch?: { url: string; width: number | null; height: number | null; published_hex: string };
     } & ProductDimensionOverridesV2>;
   }>;
   colors: Array<{
@@ -522,6 +583,8 @@ interface RelationsPayload {
   images: Array<{
     id: string; url: string; alt_en: string; sort_order: number; is_primary: boolean;
     option_value_id: string | null; color_id: string | null; variant_id: string | null;
+    /** 0194: a representative row's source variant — the gallery drops it when that variant clashes (§G.3). */
+    via_variant_id?: string;
   }>;
 }
 
@@ -786,43 +849,20 @@ function transportLabel(s: Strings, method: string): string {
   return method;
 }
 
-/** Media in stored order, primary first, de-duplicated by URL. */
-function galleryOf(product: ProductDetail): MediaItem[] {
+/**
+ * Every media row in stored order, primary first — one entry per row, a picture
+ * bound to several values once per binding (src/lib/productGallery.ts
+ * de-duplicates AFTER ranking, the Bambu import spec §G.3). A product with no
+ * media rows falls back to its image list, as before.
+ */
+function storedMedia(product: ProductDetail): MediaItem[] {
   const media = Array.isArray(product.media) ? product.media.filter((m) => m && m.url) : [];
-  const source: MediaItem[] = media.length
-    ? [...media].sort((a, b) => {
-        if (!!b.primary !== !!a.primary) return b.primary ? 1 : -1;
-        return (a.order ?? 0) - (b.order ?? 0);
-      })
-    : (Array.isArray(product.images) ? product.images : []).filter(Boolean).map((url, i) => ({ url, order: i }));
-  const seen = new Set<string>();
-  return source.filter((m) => (seen.has(m.url) ? false : (seen.add(m.url), true)));
+  return mediaInStoredOrder(
+    media.length ? media : (Array.isArray(product.images) ? product.images : []).filter(Boolean).map((url, i) => ({ url, order: i }))
+  );
 }
 
 // ---------------------------------------------------------------- component
-
-function Section({
-  title, icon, children, defaultOpen = false,
-}: { title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="lv-surface overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className="w-full p-4 min-h-[44px] flex justify-between items-center text-text-primary font-bold gap-3 hover:bg-white/5 transition-colors"
-      >
-        <span className="flex items-center gap-2 text-start">
-          {icon}
-          <span>{title}</span>
-        </span>
-        <ChevronDown aria-hidden="true" className={`w-5 h-5 text-text-secondary shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-      {open ? <div className="px-4 pb-4">{children}</div> : null}
-    </div>
-  );
-}
 
 /**
  * The address bar as an EXTERNAL STORE.
@@ -1016,6 +1056,8 @@ export default function Product() {
   // leaves exactly one possibility (no randomness) or the user picks it.
   /** One selected value per active relational group, kept in group order. */
   const [optionValueIds, setOptionValueIds] = useState<string[]>([]);
+  /** What the knowledge answer covers (spec §G.2): its tabs then stand in for the page's older specs and box sections. */
+  const [knowledgeCovers, setKnowledgeCovers] = useState<{ specs: boolean; box: boolean; any?: boolean }>({ specs: false, box: false });
   /** Legacy and pricing compatibility: the first group remains `optionId`. */
   const optionId = optionValueIds[0] ?? '';
   const [colorId, setColorId] = useState('');
@@ -1241,15 +1283,32 @@ export default function Product() {
         const opts = data.relations
           ? (data.product.options ?? []).filter((option) => publicRelationOptionIds.has(option.id))
           : (data.product.options ?? []);
+        /*
+          THE IMPORT'S DEFAULT SELECTION (the Bambu import spec §G.3). With no
+          `initial_selection` — always the case for an unpriced product — a product
+          whose groups carry the source's defaults opens on them, while they form a
+          real variant (else the first group's default alone), and every
+          single-value group is chosen. A product without the import's data gets
+          nothing new (`defaultSelection` answers []).
+        */
+        const importedDefaults = data.relations
+          ? defaultSelection(
+              (data.relations.option_groups ?? []).filter((g) => g.values.length > 0),
+              data.relations.variants ?? []
+            )
+          : [];
         const openingOptionValueIds = initial
           ? (initial.option_value_ids?.length
               ? initial.option_value_ids
               : initial.option_id
                 ? [initial.option_id]
                 : [])
-          : (opts.length === 1 ? [opts[0].id] : []);
+          : importedDefaults.length
+            ? importedDefaults
+            : (opts.length === 1 ? [opts[0].id] : []);
         const openingOptionId = openingOptionValueIds[0] ?? '';
         setOptionValueIds(openingOptionValueIds);
+        setKnowledgeCovers({ specs: false, box: false });
         const cols = (data.product.colors ?? []).filter(
           (c) => !c.option_id || (openingOptionId && c.option_id === openingOptionId)
         );
@@ -2090,6 +2149,14 @@ export default function Product() {
     [relations]
   );
   const hasMultipleOptionGroups = relationOptionGroups.length > 1;
+  /**
+   * THE IMPORT'S CHOOSER (spec §G.3): a product whose groups carry a kind, a
+   * default or a swatch is drawn group by group even with one group — the
+   * colour swatches, the localized group names and the impossible-combination
+   * rule live there. Every other product takes exactly the path it took before.
+   */
+  const knowledgeChooser = importedChooser(relationOptionGroups);
+  const groupChooser = hasMultipleOptionGroups || knowledgeChooser;
   const storefrontOptions = useMemo(() => {
     const all = product?.options ?? [];
     if (!relations) return all;
@@ -2106,7 +2173,7 @@ export default function Product() {
     // A relational multi-group product gets one visible chooser per group
     // below. Folding those values into the legacy "model" abstraction would
     // hide the secondary groups and lose part of the selection at checkout.
-    if (hasMultipleOptionGroups) return null;
+    if (groupChooser) return null;
     const declared = storefrontOptions.some(
       (o) =>
         o.availability_type === 'pre_order' ||
@@ -2122,7 +2189,7 @@ export default function Product() {
       else byKey.set(key, { key, label: o.variant_label || pickName(o.name_en, o.name, o.name_ar) || key, options: [o] });
     }
     return [...byKey.values()];
-  }, [hasMultipleOptionGroups, storefrontOptions]);
+  }, [groupChooser, storefrontOptions]);
 
   const selectedOption = useMemo(
     () => (optionId ? (product?.options ?? []).find((o) => o.id === optionId) ?? null : null),
@@ -2185,6 +2252,26 @@ export default function Product() {
     optionValueIds,
     colorId,
   });
+  /**
+   * THE SELECTION THE KNOWLEDGE TABS FOLLOW (spec §G.2): the one on screen, else the
+   * default selection (§G.3) — so a per-version fact (A1 Combo's package) shows for the
+   * version the page opens on. Value and variant ids are named for «خاص بـ …».
+   */
+  const knowledgeIds = optionValueIds.length ? optionValueIds : defaultSelection(relationOptionGroups, relations?.variants ?? []);
+  const knowledgeSelection = {
+    optionValueIds: knowledgeIds,
+    variantId: productVariantIdForSelection(relations?.variants ?? [], { optionValueIds: knowledgeIds, colorId }),
+  };
+  const scopeNames: Record<string, string> = {};
+  for (const g of relationOptionGroups) for (const v of g.values) scopeNames[v.id] = v.name_en || v.id;
+  for (const v of relations?.variants ?? []) {
+    scopeNames[v.id] = v.combo_key
+      .split('|')
+      .filter((part) => part.startsWith('o:'))
+      .map((part) => scopeNames[part.slice(2)] ?? '')
+      .filter(Boolean)
+      .join(' + ');
+  }
   const physicalDimensions = resolveProductSelectionDimensions(product, relations, {
     optionValueIds,
     colorId,
@@ -2217,17 +2304,21 @@ export default function Product() {
     },
   ];
   const gallery = (() => {
-    const base = galleryOf(product);
-    const ordered = productGalleryForSelection(base, mediaBindings, {
-      optionId,
-      optionValueIds,
-      colorId,
-      variantId: selectedVariantId,
-    });
+    // THE GALLERY FOR THE SELECTION (spec §G.3, src/lib/productGallery.ts): drop
+    // the pictures the selection contradicts, rank the full remaining list, then
+    // de-duplicate by URL. With no binding (every product before the import) it is
+    // the stored order exactly as before.
+    const rows = storedMedia(product);
+    const ordered = galleryForSelection(
+      rows,
+      mediaBindings,
+      { groups: relationOptionGroups, variants: relations?.variants ?? [] },
+      { optionId, optionValueIds, colorId, variantId: selectedVariantId }
+    );
     // THE MAIN IMAGE FOR THE THEME ON SCREEN (migration 0138): on the light
     // theme the primary's slot shows the light-theme main image, wherever the
     // selection has moved it; every other picture is the same in both themes.
-    const primaryUrl = base[0]?.url;
+    const primaryUrl = dedupeByUrl(rows)[0]?.url;
     const light = theme === 'light' ? (product.light_image ?? '').trim() : '';
     // The light picture is another file: the stored size of the primary does not describe it.
     return light && primaryUrl ? ordered.map((m) => (m.url === primaryUrl ? { ...m, url: light, width: null, height: null } : m)) : ordered;
@@ -3238,14 +3329,20 @@ export default function Product() {
         </fieldset>
       ) : null}
 
-      {hasMultipleOptionGroups ? (
+      {groupChooser ? (
         <div className="space-y-3" data-option-groups>
           {relationOptionGroups.map((group) => {
             const groupSelected = group.values.find((value) => optionValueIds.includes(value.id))?.id ?? '';
+            // The import's rules (spec §G.3): a colour group as swatches; a value that forms no variant with
+            // the rest of the selection disabled with «غير متاح مع هذا الاختيار» — never «نفد».
+            const swatches = knowledgeChooser && group.kind === 'color';
+            const offered = (id: string) =>
+              !knowledgeChooser || valueOffered(id, group.id, optionValueIds, relationOptionGroups, relations?.variants ?? []);
+            const anyBlocked = knowledgeChooser && group.values.some((value) => !offered(value.id));
             return (
-              <fieldset key={group.id} className="lv-section" data-option-group={group.id}>
+              <fieldset key={group.id} className="lv-section" data-option-group={group.id} data-group-kind={group.kind || undefined}>
                 <legend className="px-1 text-text-primary font-bold text-[14px]">
-                  {group.name_en}
+                  {knowledgeChooser ? groupName(group, lang === 'en' || lang === 'ckb' ? lang : 'ar') : group.name_en}
                   <Chosen
                     value={(() => {
                       if (!groupSelected) return null;
@@ -3257,19 +3354,90 @@ export default function Product() {
                     <span className="ms-2 text-amber-300 font-medium text-[12px]">{s.chooseOption}</span>
                   ) : null}
                 </legend>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className={`mt-2 flex flex-wrap ${swatches ? 'gap-1' : 'gap-2'}`}>
                   {group.values.map((value) => {
                     const selected = groupSelected === value.id;
                     const option = options.find((item) => item.id === value.id);
                     const label = option ? pickName(option.name_en, option.name, option.name_ar) : value.name_en || value.id;
-                    const chip = !optionSellsDirect(option)
+                    const isOffered = offered(value.id);
+                    const notOffered = tr(NOT_OFFERED.ar, NOT_OFFERED.en, NOT_OFFERED.ckb);
+                    /** One handler for the chip and the swatch: the group's value changes, the others are kept. */
+                    const choose = () => {
+                      setOptionValueIds((current) =>
+                        relationOptionGroups.flatMap((candidateGroup) => {
+                          if (candidateGroup.id === group.id) return selected ? [] : [value.id];
+                          const kept = candidateGroup.values.find((item) => current.includes(item.id));
+                          return kept ? [kept.id] : [];
+                        })
+                      );
+                      /*
+                        Any changed dimension asks the server afresh which
+                        fulfilment modes this complete combination offers —
+                        and that is ALL it does now.
+
+                        IT USED TO CLEAR THE BUYER'S TWO ANSWERS TOO, and
+                        the owner met the result: «عند الضغط على النسخة
+                        يذهب خيار طريق الشحن … وعند تغيير الخيار يرجع
+                        يختفي». Both presses are now remembered and
+                        filtered instead — `requestedOrderType` and
+                        `effectiveTransport` each honour the press only
+                        while this combination still offers it.
+
+                        The clearing existed for a real reason that is
+                        fixed at its source. The derived type's fallback
+                        used to read `availability.mode`, which is the
+                        SERVER ECHOING BACK the `preferredType` this page
+                        handed it — so an answer fed the next request and
+                        re-latched itself, and dropping the press was the
+                        only way to break the loop. The fallback reads
+                        `modes[]` now, which the server computes before it
+                        looks at `preferredType` at all, so there is no
+                        loop left to break.
+                      */
+                      setLiveAvailability(null);
+                    };
+                    if (swatches && (value.swatch?.url || value.swatch?.published_hex)) {
+                      // A COLOUR SAMPLE, NOT PRODUCT IMAGERY: 28 px in a circle (object-fit cover) inside a
+                      // 44 px target; the accessible name is always the value's own name.
+                      return (
+                        <button
+                          key={value.id}
+                          type="button"
+                          aria-pressed={selected}
+                          aria-label={isOffered ? label : `${label} — ${notOffered}`}
+                          title={isOffered ? label : `${label} — ${notOffered}`}
+                          disabled={!isOffered}
+                          data-swatch={value.id}
+                          data-offered={isOffered ? undefined : 'false'}
+                          onClick={choose}
+                          className={`relative grid h-11 w-11 place-items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed ${
+                            selected ? 'bg-surface-selected' : 'hover:bg-white/5'
+                          }`}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={`block h-7 w-7 overflow-hidden rounded-full ${selected ? 'ring-2 ring-text-primary' : 'ring-1 ring-border-subtle'} ${isOffered ? '' : 'opacity-35'}`}
+                            style={value.swatch?.url ? undefined : { backgroundColor: value.swatch?.published_hex }}
+                          >
+                            {value.swatch?.url ? (
+                              <VariantImg src={value.swatch.url} sizes="28px" naturalWidth={value.swatch.width} alt="" width={28} height={28} className="h-full w-full object-cover" />
+                            ) : null}
+                          </span>
+                          {isOffered ? null : (
+                            <span aria-hidden="true" className="pointer-events-none absolute h-px w-7 rotate-45 bg-text-muted" />
+                          )}
+                        </button>
+                      );
+                    }
+                    // A value not offered with this choice says only that (never a stock word, never «بلا سعر»).
+                    const chip = !isOffered || !optionSellsDirect(option)
                       ? null
                       : invMode === 'OPTION'
                         ? levelChip(availByValue.get(value.id))
                         : invMode === 'VARIANT_COMBINATION'
                           ? levelChip(variantTotalForOption(value.id))
                           : null;
-                    const unpricedChoice = optionNoPrice(
+                    const unpricedChoice = isOffered && optionNoPrice(
                       relationOptionGroups.flatMap((g) =>
                         g.id === group.id ? [value.id] : g.values.filter((v) => optionValueIds.includes(v.id)).map((v) => v.id)
                       ),
@@ -3280,41 +3448,10 @@ export default function Product() {
                         key={value.id}
                         type="button"
                         aria-pressed={selected}
-                        onClick={() => {
-                          setOptionValueIds((current) =>
-                            relationOptionGroups.flatMap((candidateGroup) => {
-                              if (candidateGroup.id === group.id) return selected ? [] : [value.id];
-                              const kept = candidateGroup.values.find((item) => current.includes(item.id));
-                              return kept ? [kept.id] : [];
-                            })
-                          );
-                          /*
-                            Any changed dimension asks the server afresh which
-                            fulfilment modes this complete combination offers —
-                            and that is ALL it does now.
-
-                            IT USED TO CLEAR THE BUYER'S TWO ANSWERS TOO, and
-                            the owner met the result: «عند الضغط على النسخة
-                            يذهب خيار طريق الشحن … وعند تغيير الخيار يرجع
-                            يختفي». Both presses are now remembered and
-                            filtered instead — `requestedOrderType` and
-                            `effectiveTransport` each honour the press only
-                            while this combination still offers it.
-
-                            The clearing existed for a real reason that is
-                            fixed at its source. The derived type's fallback
-                            used to read `availability.mode`, which is the
-                            SERVER ECHOING BACK the `preferredType` this page
-                            handed it — so an answer fed the next request and
-                            re-latched itself, and dropping the press was the
-                            only way to break the loop. The fallback reads
-                            `modes[]` now, which the server computes before it
-                            looks at `preferredType` at all, so there is no
-                            loop left to break.
-                          */
-                          setLiveAvailability(null);
-                        }}
-                        className="lv-choice flex min-h-[48px] items-center gap-2 px-3 py-1.5 text-sm font-bold"
+                        disabled={!isOffered}
+                        data-offered={isOffered ? undefined : 'false'}
+                        onClick={choose}
+                        className="lv-choice flex min-h-[48px] items-center gap-2 px-3 py-1.5 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {optionImage(value.id) ? (
                           <SafeImage
@@ -3332,12 +3469,20 @@ export default function Product() {
                           {/* No stock word beside «بلا سعر»: nobody claims stock for a choice with no price (row 240). */}
                           {chip && !unpricedChoice ? <span className={`block text-[10px] font-medium leading-tight ${chip.cls}`}>{chip.text}</span> : null}
                           {unpricedChoice ? noPriceTag : null}
+                          {isOffered ? null : (
+                            <span className="block text-[10px] font-medium leading-tight text-text-muted" data-not-offered>{notOffered}</span>
+                          )}
                         </span>
                         <span className="lv-choice-mark ms-auto"><Check aria-hidden="true" className="h-3 w-3" /></span>
                       </button>
                     );
                   })}
                 </div>
+                {swatches && anyBlocked ? (
+                  <p className="mt-1.5 px-1 text-[11px] text-text-muted" data-not-offered-note>
+                    {tr(NOT_OFFERED.ar, NOT_OFFERED.en, NOT_OFFERED.ckb)}
+                  </p>
+                ) : null}
               </fieldset>
             );
           })}
@@ -4226,7 +4371,17 @@ export default function Product() {
                 )}
               </Section>
 
-              {boxItems.length > 0 ? (
+              {source === 'catalog' && product.slug ? (
+                <ProductKnowledge
+                  slug={product.slug}
+                  lang={lang === 'en' || lang === 'ckb' ? lang : 'ar'}
+                  selection={knowledgeSelection}
+                  scopeNames={scopeNames}
+                  onCovers={setKnowledgeCovers}
+                />
+              ) : null}
+
+              {boxItems.length > 0 && !knowledgeCovers.box ? (
                 <Section title={s.inTheBox} icon={<Box aria-hidden="true" className="w-5 h-5 text-text-secondary" />}>
                   <ul className="space-y-1.5">
                     {boxItems.map((item, i) => (
@@ -4387,7 +4542,7 @@ export default function Product() {
                 </Section>
               ) : null}
 
-              {specGroups.length > 0 || legacySpecs.length > 0 ? (
+              {(specGroups.length > 0 || legacySpecs.length > 0) && !knowledgeCovers.specs ? (
                 <Section title={s.specs} icon={<Settings2 aria-hidden="true" className="w-5 h-5 text-text-secondary" />}>
                   {specGroups.length > 0 ? (
                     <div className="space-y-4">
