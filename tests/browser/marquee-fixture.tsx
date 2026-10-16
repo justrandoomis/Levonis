@@ -12,7 +12,12 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { LanguageProvider } from '../../src/LanguageContext';
 import Marquee from '../../src/components/home/Marquee';
+import { beginBusy } from '../../src/lib/busy';
 import '../../src/index.css';
+
+// The runner holds a `route` wait the way NavigationRouter does during a
+// navigation (scripts/e2e-marquee-drift.mjs, case G).
+(window as unknown as { __beginBusy: typeof beginBusy }).__beginBusy = beginBusy;
 
 /**
  * The component reads `dir` from the language context only to know when to
@@ -61,6 +66,9 @@ function Fixture() {
       <div data-belt="ltr" dir="ltr" style={{ marginTop: 12 }}>
         <Marquee speed={34} renderSet={brandSet} />
       </div>
+
+      {/* Room to scroll every belt out of sight (case G: off screen it does not run). */}
+      <div aria-hidden style={{ height: '250vh' }} />
     </div>
   );
 }

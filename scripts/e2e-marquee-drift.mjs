@@ -303,6 +303,48 @@ async function run(engine, name) {
   );
   cases++;
 
+  // ------------------------------------------------------------------ G
+  // IT HOLDS STILL WHILE A PAGE IS ON ITS WAY, AND OFF SCREEN IT DOES NOT RUN
+  // (speed audit 2026-10-16). A navigation renders in a transition React
+  // slices between frames; a loop that takes its slice of every frame slows
+  // the next page down. And a belt nobody can see is work for nobody.
+  await page.mouse.move(4, 4);
+  await page.evaluate(() => { window.__releaseRoute = window.__beginBusy('route'); });
+  await delay(150);
+  const waiting = await travel(page, 'ads', 700);
+  measurements.push({ engine: name, belt: 'ads', case: 'route-wait', ...waiting });
+  assert.ok(
+    waiting.moved < 3,
+    `${name}: a page on its way must hold the belt still (moved ${waiting.moved.toFixed(2)}px)`
+  );
+  await page.evaluate(() => window.__releaseRoute());
+  await delay(300);
+  const afterWait = await travel(page, 'ads', 900);
+  measurements.push({ engine: name, belt: 'ads', case: 'route-done', ...afterWait });
+  assert.ok(
+    afterWait.moved > 8,
+    `${name}: the drift must resume once the page has arrived (moved ${afterWait.moved.toFixed(2)}px)`
+  );
+  cases += 2;
+
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await delay(400);
+  const hidden = await travel(page, 'ads', 700);
+  measurements.push({ engine: name, belt: 'ads', case: 'off-screen', ...hidden });
+  assert.ok(
+    hidden.moved < 1,
+    `${name}: a belt scrolled out of sight must not run (moved ${hidden.moved.toFixed(2)}px)`
+  );
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await delay(400);
+  const back = await travel(page, 'ads', 900);
+  measurements.push({ engine: name, belt: 'ads', case: 'on-screen-again', ...back });
+  assert.ok(
+    back.moved > 8,
+    `${name}: and must drift again when it is back in sight (moved ${back.moved.toFixed(2)}px)`
+  );
+  cases += 2;
+
   // ------------------------------------------------------------------ F
   // REDUCED MOTION PARKS IT AND LEAVES IT SWIPEABLE — it is not faked back on.
   const reduced = await context.newPage();
