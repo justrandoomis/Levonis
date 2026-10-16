@@ -34,6 +34,8 @@ import {
   newProductIdOf,
   parseReviewedBundle,
   resolveTaxonomy,
+  reviewedBundleDigest,
+  reviewedFileSha256,
   reviewedTargets,
   ReviewedBundleInvalid,
   REVIEWED_FILES,
@@ -85,7 +87,8 @@ test('a malformed file is refused with the file and the JSON path, never half-re
     [{ taxonomyMap: JSON.stringify({ version: 1, create: [], routes: { '1>2': { primary: '@nowhere' } } }) }, 'taxonomy-map.json', /primary/],
     [{ existingMatches: JSON.stringify({ version: 1, entries: [{ source_product_id: '1', decision: 'merge' }] }) }, 'existing-matches.json', /source_handle/],
     [{ existingMatches: JSON.stringify({ version: 1, entries: [{ source_product_id: '1', source_handle: 'a', levonis_product_id: 'p', decision: 'merge_publish', reason: 'same_model', reviewed_by: 'r', reviewed_at: 'd' }] }) }, 'existing-matches.json', /approval_ref/],
-    [{ curatedIndex: JSON.stringify({ version: 1, entries: { a: 'not-a-sha' } }) }, 'curated/index.json', /entries/],
+    [{ mediaOverrides: JSON.stringify({ version: 1, overrides: [{ resource_file_id: 'f', value_ids: ['v'] }] }) }, 'media-overrides.json', /resource_file_id/],
+    [{ mediaOverrides: JSON.stringify({ version: 1, overrides: [{ resourceFileId: 'f' }] }) }, 'media-overrides.json', /overrides\[0\]$/],
   ];
   for (const [over, file, path] of cases) {
     assert.throws(
@@ -95,6 +98,26 @@ test('a malformed file is refused with the file and the JSON path, never half-re
     );
   }
   assert.throws(() => parseReviewedBundle({ ...emptyReviewedTexts(), searchSynonyms: undefined as never }), ReviewedBundleInvalid);
+});
+
+test('the runner\'s spellings: the combined digest, the curated index shapes and the override entries read alike on both sides', () => {
+  // scripts/bambu-import/discover.ts `bundleDigest`: SHA-256 over "<file> <sha256>\n", the files sorted by name.
+  const b = parseReviewedBundle(emptyReviewedTexts());
+  const byFile = reviewedFileSha256(b.sha256);
+  assert.deepEqual(Object.keys(byFile).sort(), Object.values(REVIEWED_FILES).slice().sort());
+  const lines = Object.keys(byFile).sort().map((f) => `${f} ${byFile[f]}\n`).join('');
+  assert.equal(b.bundleSha256, createHash('sha256').update(lines).digest('hex'));
+  assert.equal(reviewedBundleDigest(byFile), b.bundleSha256);
+  // curated/index.json: {files}, {entries} or a plain map; a value that is not a digest names no file.
+  const sha = 'a'.repeat(64);
+  for (const text of [{ files: { h: sha } }, { version: 1, entries: { h: { sha256: sha } } }, { h: sha, x: 'not-a-sha' }]) {
+    const c = parseReviewedBundle({ ...emptyReviewedTexts(), curatedIndex: JSON.stringify(text) }).curated;
+    assert.equal(c.get('h'), sha);
+    assert.equal(c.has('x'), false);
+  }
+  // media-overrides.json: the package's MediaOverride spelling, a handle optional.
+  const o = parseReviewedBundle({ ...emptyReviewedTexts(), mediaOverrides: JSON.stringify({ version: 1, overrides: [{ resourceFileId: 'f1', valueIds: ['ov_1'] }] }) }).overrides;
+  assert.deepEqual(o, [{ handle: '', resource_file_id: 'f1', value_ids: ['ov_1'], variant_ids: [], reviewed_by: '', reason: '' }]);
 });
 
 test('existing-matches.json may hold ids, a public slug, a decision and a reason code — never a note (§A.8)', () => {
@@ -238,7 +261,7 @@ test('identity rows, override bindings and relation targets come from the review
   assert.equal(refusal(checkReviewedScope(w.bundle, { ...p, images: [p.images[0], img] })), 'REVIEWED_SCOPE_REFUSED:override_not_reviewed');
   const withOverride = parseReviewedBundle({
     ...w.texts,
-    mediaOverrides: JSON.stringify({ version: 1, overrides: [{ handle: p.handle, resource_file_id: img.source_media_id, value_ids: [img.option_value_id], reviewed_by: 'r', reason: 'bundle_content' }] }),
+    mediaOverrides: JSON.stringify({ version: 1, overrides: [{ handle: p.handle, resourceFileId: img.source_media_id, valueIds: [img.option_value_id], reviewed_by: 'r', reason: 'bundle_content' }] }),
   });
   assert.equal(refusal(checkReviewedScope(withOverride, { ...p, images: [p.images[0], img] })), 'ok');
   // Relations (§B.6): a resolved target the compat file does not name; a pending handle it does not name.

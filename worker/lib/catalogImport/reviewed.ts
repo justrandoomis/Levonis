@@ -156,7 +156,13 @@ export interface IdentityEntry {
   family?: string;
 }
 
-/** A reviewed binding for an image the source ties to nothing (§C.4). Ids are the deterministic Levonis ids (§B.8). */
+/**
+ * A reviewed binding for an image the source ties to nothing (§C.4). Ids are the deterministic Levonis ids (§B.8).
+ * The file spells an entry the way the runner reads it (scripts/bambu-import/discover.ts, the package's
+ * `MediaOverride`): `{resourceFileId, valueIds?, variantIds?}`, optionally with `handle`, `reviewed_by` and
+ * `reason`. An entry without a handle applies wherever its resource file appears (its value and variant ids
+ * name one product anyway).
+ */
 export interface MediaOverrideEntry {
   handle: string;
   resource_file_id: string;
@@ -183,7 +189,11 @@ export interface ReviewedBundle {
   synonyms: SynonymRow[];
   /** SHA-256 of each file's exact text. */
   sha256: Record<ReviewedFileKey, string>;
-  /** sha256 over `<file path>:<sha256>\n` in REVIEWED_FILES order: the run's reviewed_bundle_sha256. */
+  /**
+   * The combined digest the run row stores (`catalog_import_runs.reviewed_bundle_sha256`), by the runner's
+   * formula (scripts/bambu-import/discover.ts `bundleDigest`): SHA-256 over the lines `<file> <sha256>\n` of
+   * the reviewed files, sorted by file name.
+   */
   bundleSha256: string;
 }
 
@@ -469,6 +479,8 @@ function parseIdentity(text: string): Map<string, IdentityEntry> {
   return out;
 }
 
+const OVERRIDE_KEYS = ['resourceFileId', 'valueIds', 'variantIds', 'handle', 'reviewed_by', 'reason'] as const;
+
 function parseOverrides(text: string): MediaOverrideEntry[] {
   const r = new Reader(REVIEWED_FILES.mediaOverrides);
   const root = r.obj(parseJson(r.file, text), '$');
@@ -476,27 +488,36 @@ function parseOverrides(text: string): MediaOverrideEntry[] {
   return r.arr(root.overrides ?? [], '$.overrides').map((raw, i) => {
     const p = `$.overrides[${i}]`;
     const o = r.obj(raw, p);
-    const ids = (k: string) => (o[k] === undefined ? [] : r.arr(o[k], `${p}.${k}`).map((x, j) => r.str(x, `${p}.${k}[${j}]`, { max: 40 })));
+    // Only the runner's spelling: a key it would not read must not bind anything here either.
+    r.only(o, p, OVERRIDE_KEYS);
+    const ids = (k: 'valueIds' | 'variantIds') => (o[k] === undefined ? [] : r.arr(o[k], `${p}.${k}`).map((x, j) => r.str(x, `${p}.${k}[${j}]`, { max: 40 })));
     const e: MediaOverrideEntry = {
-      handle: r.str(o.handle, `${p}.handle`, { max: 300 }),
-      resource_file_id: r.str(String(o.resource_file_id ?? ''), `${p}.resource_file_id`, { max: 200 }),
-      value_ids: ids('value_ids'),
-      variant_ids: ids('variant_ids'),
-      reviewed_by: r.str(o.reviewed_by, `${p}.reviewed_by`, { max: 120 }),
-      reason: r.str(o.reason, `${p}.reason`, { max: 80 }),
+      handle: o.handle === undefined ? '' : r.str(o.handle, `${p}.handle`, { max: 300 }),
+      resource_file_id: r.str(o.resourceFileId, `${p}.resourceFileId`, { max: 200 }),
+      value_ids: ids('valueIds'),
+      variant_ids: ids('variantIds'),
+      reviewed_by: o.reviewed_by === undefined ? '' : r.str(o.reviewed_by, `${p}.reviewed_by`, { max: 120 }),
+      reason: o.reason === undefined ? '' : r.str(o.reason, `${p}.reason`, { max: 80 }),
     };
     if (!e.value_ids.length && !e.variant_ids.length) r.fail(p, 'binds nothing');
     return e;
   });
 }
 
+/**
+ * curated/index.json: handle → SHA-256 of the reviewed curated file. Read exactly as the runner reads it
+ * (scripts/bambu-import/discover.ts `curatedIndexOf`): `{files: {…}}`, `{entries: {…}}` or a plain map, each
+ * value a digest or `{sha256}`; anything that is not a 64-hex digest names no file, on both sides.
+ */
 function parseCurated(text: string): Map<string, string> {
   const r = new Reader(REVIEWED_FILES.curatedIndex);
-  const root = r.obj(parseJson(r.file, text), '$');
-  r.version(root);
+  const root = parseJson(r.file, text);
   const out = new Map<string, string>();
-  for (const [handle, sha] of Object.entries(r.obj(root.entries ?? {}, '$.entries'))) {
-    out.set(handle, r.str(sha, `$.entries["${handle}"]`, { pattern: /^[0-9a-f]{64}$/ }));
+  if (!isObj(root)) return out;
+  const inner = isObj(root.files) ? root.files : isObj(root.entries) ? root.entries : root;
+  for (const [handle, v] of Object.entries(inner)) {
+    const digest = typeof v === 'string' ? v : isObj(v) && typeof v.sha256 === 'string' ? v.sha256 : '';
+    if (/^[0-9a-f]{64}$/.test(digest)) out.set(handle, digest);
   }
   return out;
 }
@@ -512,6 +533,23 @@ function parseSynonyms(text: string): SynonymRow[] {
   });
 }
 
+/** Each bundled file's SHA-256 under its file name relative to data/bambu-import/ — the keys `/hello` answers. */
+export function reviewedFileSha256(byKey: Record<ReviewedFileKey, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const k of Object.keys(REVIEWED_FILES) as ReviewedFileKey[]) out[REVIEWED_FILES[k]] = byKey[k];
+  return out;
+}
+
+/** The runner's combined digest: SHA-256 over `<file> <sha256>\n`, the files sorted by name. */
+export function reviewedBundleDigest(byFile: Record<string, string>): string {
+  return sha256Hex(
+    Object.keys(byFile)
+      .sort()
+      .map((file) => `${file} ${byFile[file]}\n`)
+      .join('')
+  );
+}
+
 /** Parses and validates the eight bundled files. Throws ReviewedBundleInvalid on the first problem. */
 export function parseReviewedBundle(texts: ReviewedTexts): ReviewedBundle {
   const sha256 = {} as Record<ReviewedFileKey, string>;
@@ -519,7 +557,7 @@ export function parseReviewedBundle(texts: ReviewedTexts): ReviewedBundle {
     if (typeof texts[k] !== 'string') throw new ReviewedBundleInvalid(REVIEWED_FILES[k], '$', 'missing from the bundle');
     sha256[k] = sha256Hex(texts[k]);
   }
-  const bundleSha256 = sha256Hex((Object.keys(REVIEWED_FILES) as ReviewedFileKey[]).map((k) => `${REVIEWED_FILES[k]}:${sha256[k]}\n`).join(''));
+  const bundleSha256 = reviewedBundleDigest(reviewedFileSha256(sha256));
   return {
     manifest: parseManifest(texts.manifest),
     taxonomy: parseTaxonomy(texts.taxonomyMap),
@@ -544,7 +582,7 @@ export function emptyReviewedTexts(): ReviewedTexts {
     compatTargets: j({ version: 1, labels: {} }),
     identityMap: j({ version: 1, entries: {} }),
     mediaOverrides: j({ version: 1, overrides: [] }),
-    curatedIndex: j({ version: 1, entries: {} }),
+    curatedIndex: j({ version: 1, files: {} }),
     searchSynonyms: j({ version: 1, rows: [] }),
   };
 }
@@ -661,7 +699,7 @@ const targetsOf = (compat: CompatTargets) => {
 /** The reviewed overrides of one product, in the shape the package's media binder reads. */
 export function mediaOverridesFor(bundle: ReviewedBundle, handle: string): MediaOverride[] {
   return bundle.overrides
-    .filter((o) => o.handle === handle)
+    .filter((o) => o.handle === '' || o.handle === handle)
     .map((o) => ({ resourceFileId: o.resource_file_id, valueIds: o.value_ids, variantIds: o.variant_ids }));
 }
 
@@ -704,7 +742,7 @@ export function checkReviewedScope(bundle: ReviewedBundle, payload: ImportPayloa
     if (got !== want) return refuse('REVIEWED_SCOPE_REFUSED', `identity_${k}_not_reviewed`);
   }
   // 6. An override binding only as the overrides file states it (§C.4).
-  const overrides = bundle.overrides.filter((o) => o.handle === payload.handle);
+  const overrides = bundle.overrides.filter((o) => o.handle === '' || o.handle === payload.handle);
   for (const img of payload.images) {
     if (img.binding_rule !== 'reviewed_override') continue;
     const ov = overrides.find((o) => o.resource_file_id === img.source_media_id);

@@ -9,6 +9,15 @@
   "name": "levonis",
   "main": "worker/index.ts",
   /**
+   * THE BAMBU IMPORT'S REVIEWED FILES, BUNDLED AS TEXT (import spec §A.3).
+   * data/bambu-import/*.json (and curated/index.json) are imported by
+   * worker/lib/catalogImport/bundle.ts; as Text modules each import is the
+   * file's exact bytes, so the SHA-256 /hello answers is the SHA-256 of the
+   * committed file the runner hashes. A changed file is therefore a reviewed
+   * commit deployed by workflow 7. Inheritable: every environment bundles them.
+   */
+  "rules": [{ "type": "Text", "globs": ["**/data/bambu-import/*.json"], "fallthrough": true }],
+  /**
    * NEVER DELETE A VAR THIS FILE DID NOT MENTION.
    *
    * `wrangler deploy` replaces a Worker's plain-text vars WHOLESALE by default,
