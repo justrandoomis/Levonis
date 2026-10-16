@@ -23,13 +23,13 @@ import type { AddressInfo } from 'node:net';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { inflateSync } from 'node:zlib';
+import { gzipSync, inflateSync } from 'node:zlib';
 import { ROOT } from './fixtures/d1';
 import { freshDb } from './fixtures/app';
 import { main as candidatesMain, matchCandidates, materialTokens, modelTokens, slugOverlap, tablesOf, manifestEntries } from '../scripts/bambu-import/match-candidates';
 import { loadReviewedBundle } from '../scripts/bambu-import/discover';
 // @ts-expect-error - plain ESM script (the local dry run), no types
-import { fixtureBundle, judge, localOnlyCount, parseArgs, refuseCredentials, runChild, runRowSql, storeAnswer, storeHitFailures, standInPng, FIXTURE_HANDLES, IMPORT_UA } from '../scripts/e2e-bambu-import.mjs';
+import { expectedHandles, fixtureBundle, judge, localOnlyCount, parseArgs, readPage, refuseCredentials, repoBundle, runChild, runRowSql, storeAnswer, storeHitFailures, standInPng, FIXTURE_HANDLES, IMPORT_UA } from '../scripts/e2e-bambu-import.mjs';
 import { USER_AGENT } from '../scripts/bambu-import/fetch';
 
 const SNAPSHOT = {
@@ -110,8 +110,16 @@ test('match candidates: sandbox only — refused in Actions, refused inside a ch
 });
 
 test('the dry run: arguments, no Cloudflare credential, the fixture bundle, the run row, the store stand-in, the pass conditions', () => {
-  assert.deepEqual(parseArgs(['--build', '--images', 'real', '--seal', 'A'.repeat(43), '--out', '/tmp/x']), { build: true, images: 'real', seal: 'A'.repeat(43), out: '/tmp/x' });
-  assert.deepEqual(parseArgs([]), { build: false, images: 'double', seal: '', out: '' });
+  assert.deepEqual(parseArgs(['--build', '--images', 'real', '--seal', 'A'.repeat(43), '--out', '/tmp/x']), { build: true, images: 'real', seal: 'A'.repeat(43), out: '/tmp/x', bundle: 'fixture', maxItems: 0, pages: {} });
+  assert.deepEqual(parseArgs([]), { build: false, images: 'double', seal: '', out: '', bundle: 'fixture', maxItems: 0, pages: {} });
+  // The real reviewed bundle runs only a prefix of the queue, against the pages it is given (never the store).
+  assert.deepEqual(parseArgs(['--bundle', 'repo', '--max-items', '1', '--page', 'filament-buffer=/x/filament-buffer.html.gz']), {
+    build: false, images: 'double', seal: '', out: '', bundle: 'repo', maxItems: 1, pages: { 'filament-buffer': '/x/filament-buffer.html.gz' },
+  });
+  assert.throws(() => parseArgs(['--bundle', 'repo']), /needs --max-items/);
+  assert.throws(() => parseArgs(['--bundle', 'live']), /fixture or repo/);
+  assert.throws(() => parseArgs(['--max-items', 'one']), /whole number/);
+  assert.throws(() => parseArgs(['--page', 'Filament Buffer']), /<handle>=<file>/);
   assert.throws(() => parseArgs(['--images', 'cdn']));
   assert.throws(() => parseArgs(['--seal', 'A'.repeat(43)]), /--seal needs --out/);
   assert.throws(() => parseArgs(['--wrangler']));
@@ -132,6 +140,23 @@ test('the dry run: arguments, no Cloudflare credential, the fixture bundle, the 
     assert.equal(Object.keys(bundle.curatedIndex).length, rows.filter((r) => r.curated === true).length, 'every curated row has its reviewed file');
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+
+  // --bundle repo: data/bambu-import/ byte for byte, the manifest in queue order, the canary first.
+  const repo = repoBundle() as { rows: Array<{ handle: string; queue_position: number }>; text: Record<string, string> };
+  assert.deepEqual(Object.keys(repo.text).sort(), ['compat-targets.json', 'curated/index.json', 'existing-matches.json', 'identity-map.json', 'manifest.json', 'media-overrides.json', 'search-synonyms.json', 'taxonomy-map.json']);
+  for (const [file, body] of Object.entries(repo.text)) assert.equal(body, readFileSync(join(ROOT, 'data', 'bambu-import', file), 'utf8'), file);
+  assert.deepEqual(repo.rows.map((r) => r.queue_position), repo.rows.map((_, i) => i + 1));
+  assert.deepEqual(expectedHandles(repo.rows, 1), ['filament-buffer']);
+  assert.equal(expectedHandles(rows, 0).length, rows.length);
+  const pageDir = mkdtempSync(join(tmpdir(), 'levonis-dryrun-page-'));
+  try {
+    writeFileSync(join(pageDir, 'p.html.gz'), gzipSync('<html>gz</html>'));
+    writeFileSync(join(pageDir, 'p.html'), '<html>plain</html>');
+    assert.equal(readPage(join(pageDir, 'p.html.gz')), '<html>gz</html>');
+    assert.equal(readPage(join(pageDir, 'p.html')), '<html>plain</html>');
+  } finally {
+    rmSync(pageDir, { recursive: true, force: true });
   }
 
   const db = freshDb();

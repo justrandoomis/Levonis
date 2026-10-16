@@ -17,6 +17,15 @@
  *     Worker bundles data/bambu-import/ at build time, so the run happens in a
  *     TEMPORARY COPY of worker/ beside that bundle: the repository's own
  *     data/bambu-import/ is never touched.
+ *   - `--bundle repo` runs the REAL reviewed bundle instead: data/bambu-import/
+ *     as committed, copied byte for byte into the temporary tree (all 1,115
+ *     manifest rows go through `open`), with `--max-items N` (the first N rows
+ *     of the queue: `--max-items 1` is the canary filament-buffer) and the
+ *     store stand-in serving the pages given by `--page <handle>=<file>` (an
+ *     .html or a crawled .html.gz; the store itself is never fetched). The run
+ *     then stops at max_items (more=true): the processed items must be
+ *     COMPLETE and every other row still DISCOVERED; the full re-run is not
+ *     made (it would start the next row).
  *   - A run row with the SHA-256 of a fresh token is inserted into the local
  *     database (what cf.mjs `open` does live); each job gets a 0600 token file.
  *   - Images: `--images double` (the sandbox, which cannot reach the CDN)
@@ -58,7 +67,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { cpSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { deflateSync } from 'node:zlib';
+import { deflateSync, gunzipSync } from 'node:zlib';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
@@ -72,16 +81,28 @@ const UNPRICED = { ar: 'السعر غير متوفر حالياً', en: 'Price n
 // ------------------------------------------------------------------ arguments (pure)
 
 export function parseArgs(argv) {
-  const out = { build: false, images: 'double', seal: '', out: '' };
+  const out = { build: false, images: 'double', seal: '', out: '', bundle: 'fixture', maxItems: 0, pages: {} };
   for (let at = 0; at < argv.length; at++) {
     const a = argv[at];
     if (a === '--build') out.build = true;
     else if (a === '--images') out.images = argv[++at] ?? '';
     else if (a === '--seal') out.seal = argv[++at] ?? '';
     else if (a === '--out') out.out = argv[++at] ?? '';
-    else throw new Error(`unknown argument ${JSON.stringify(a)}`);
+    else if (a === '--bundle') out.bundle = argv[++at] ?? '';
+    else if (a === '--max-items') {
+      const n = argv[++at] ?? '';
+      if (!/^[0-9]{1,4}$/.test(n)) throw new Error('--max-items is a whole number');
+      out.maxItems = Number(n);
+    } else if (a === '--page') {
+      const m = /^([a-z0-9][a-z0-9-]*)=(.+)$/.exec(argv[++at] ?? '');
+      if (!m) throw new Error('--page is <handle>=<file>');
+      out.pages[m[1]] = m[2];
+    } else throw new Error(`unknown argument ${JSON.stringify(a)}`);
   }
   if (!['double', 'real'].includes(out.images)) throw new Error('--images is double or real');
+  if (!['fixture', 'repo'].includes(out.bundle)) throw new Error('--bundle is fixture or repo');
+  // The real bundle names 1,115 rows and the stand-in serves only the given pages: the run must stop at max_items.
+  if (out.bundle === 'repo' && out.maxItems < 1) throw new Error('--bundle repo needs --max-items 1 or more');
   if (out.seal && !/^[A-Za-z0-9_-]{43}$/.test(out.seal)) throw new Error('--seal is a one-time public key');
   if (out.seal && !out.out) throw new Error('--seal needs --out');
   return out;
@@ -137,6 +158,33 @@ export function fixtureBundle({ p0Dir = join(ROOT, 'docs', 'bambu-import', 'p0')
   }
   text['curated/index.json'] = `${JSON.stringify({ files: curatedIndex }, null, 2)}\n`;
   return { rows, text };
+}
+
+/**
+ * The REAL reviewed bundle: every file under data/bambu-import/ exactly as committed (path relative to it →
+ * contents), and the manifest rows in queue order. Nothing is rewritten, so the Worker and the runner hash the
+ * committed bytes.
+ */
+export function repoBundle({ dataDir = join(ROOT, 'data', 'bambu-import') } = {}) {
+  const text = {};
+  const walk = (dir, rel = '') => {
+    for (const name of readdirSync(dir, { withFileTypes: true })) {
+      if (name.isDirectory()) walk(join(dir, name.name), `${rel}${name.name}/`);
+      else if (name.name.endsWith('.json')) text[`${rel}${name.name}`] = readFileSync(join(dir, name.name), 'utf8');
+    }
+  };
+  walk(dataDir);
+  const rows = [...(JSON.parse(text['manifest.json'] ?? '{}').rows ?? [])].sort((a, b) => a.queue_position - b.queue_position);
+  return { rows, text };
+}
+
+/** The handles a run must have processed: the first `maxItems` rows of the queue (all of them for 0). */
+export const expectedHandles = (rows, maxItems) => (maxItems > 0 ? rows.slice(0, maxItems) : rows).map((r) => r.handle);
+
+/** A page the stand-in serves: an .html file, or a crawled .html.gz. */
+export function readPage(path) {
+  const buf = readFileSync(path);
+  return (path.endsWith('.gz') ? gunzipSync(buf) : buf).toString('utf8');
 }
 
 /** The run row cf.mjs `open` would create, with the hash of the given token (§B.3). */
@@ -305,8 +353,10 @@ async function run() {
   if (args.build) execFileSync('npm', ['run', 'build'], { cwd: ROOT, stdio: 'inherit' });
   if (!existsSync(join(ROOT, 'dist/index.html'))) throw new Error('dist/ is missing: run `npm run build` first, or pass --build');
 
-  // 1. A temporary Worker tree beside the fixture bundle (the repository is never written).
-  const bundle = fixtureBundle();
+  // 1. A temporary Worker tree beside the bundle — the fixture one, or the committed one (the repository is never written).
+  const bundle = args.bundle === 'repo' ? repoBundle() : fixtureBundle();
+  const expected = expectedHandles(bundle.rows, args.maxItems);
+  const partial = expected.length < bundle.rows.length;
   const tree = join(WORK, 'tree');
   mkdirSync(tree);
   cpSync(join(ROOT, 'worker'), join(tree, 'worker'), { recursive: true });
@@ -341,7 +391,9 @@ async function run() {
   db.close();
 
   // 3. The store and CDN stand-in, then the Worker.
-  const pages = Object.fromEntries(FIXTURE_HANDLES.map((h) => [h, readFileSync(join(FIXTURES, `${h}.page.html`), 'utf8')]));
+  const pages = Object.keys(args.pages).length
+    ? Object.fromEntries(Object.entries(args.pages).map(([h, file]) => [h, readPage(file)]))
+    : Object.fromEntries(FIXTURE_HANDLES.map((h) => [h, readFileSync(join(FIXTURES, `${h}.page.html`), 'utf8')]));
   const storeHits = [];
   const store = createServer((req, res) => {
     const path = new URL(req.url ?? '/', STORE).pathname;
@@ -385,7 +437,7 @@ async function run() {
           HOME: process.env.HOME,
           IN_MODE: mode,
           IN_RUN_ID: mode === 'open' ? '' : runId,
-          IN_MAX_ITEMS: '0',
+          IN_MAX_ITEMS: String(args.maxItems),
           IN_RESUME: 'false',
           IN_CHAIN: 'false',
           IN_CHAIN_COUNT: '0',
@@ -427,15 +479,26 @@ async function run() {
       return t.file;
     };
     const ran = await importer('run', setToken());
-    check('mode run: the queue ran to its end', ran.status === 0 && /more=false/.test(ran.outputs) && /blocked=false/.test(ran.outputs), ran.outputs);
-    const before = rowCount();
-    const again = await importer('run', setToken());
-    const rerunWrites = rowCount() - before;
-    check('a full re-run: nothing left to do', again.status === 0 && /more=false/.test(again.outputs));
+    if (partial) {
+      check(`mode run: ${expected.length} item(s), then the job stops at max_items (more=true, blocked=false)`, ran.status === 0 && /more=true/.test(ran.outputs) && /blocked=false/.test(ran.outputs), ran.outputs);
+    } else {
+      check('mode run: the queue ran to its end', ran.status === 0 && /more=false/.test(ran.outputs) && /blocked=false/.test(ran.outputs), ran.outputs);
+    }
+    let rerunWrites = 0;
+    if (partial) {
+      results.not_run = ['the full re-run: the run stopped at max_items, and a re-run would start the next row'];
+    } else {
+      const before = rowCount();
+      const again = await importer('run', setToken());
+      rerunWrites = rowCount() - before;
+      check('a full re-run: nothing left to do', again.status === 0 && /more=false/.test(again.outputs));
+    }
 
     // 5. The database (read-only) and the store's view of the importer.
     const r = new DatabaseSync(dbFile, { readOnly: true });
-    const items = r.prepare('SELECT handle, processing_state FROM catalog_import_items WHERE run_id = ?').all(runId);
+    const allItems = r.prepare('SELECT handle, processing_state FROM catalog_import_items WHERE run_id = ?').all(runId);
+    const items = allItems.filter((i) => expected.includes(i.handle));
+    const others = allItems.filter((i) => !expected.includes(i.handle));
     const refs = r.prepare('SELECT product_id, stock_decision FROM product_source_refs WHERE import_run_id = ?').all(runId);
     const products = refs.length
       ? r.prepare(`SELECT id, price_iqd, product_cost_iqd, prime_price_iqd, pro_price_iqd, original_price_iqd, stock, net_weight_g, package_weight_g, package_width_mm, package_depth_mm, package_height_mm, slug FROM products WHERE id IN (SELECT value FROM json_each(?))`).all(JSON.stringify(refs.map((x) => x.product_id)))
@@ -443,7 +506,11 @@ async function run() {
     const guardEvents = Number(r.prepare("SELECT COUNT(*) AS n FROM catalog_import_events WHERE run_id = ? AND code = 'IMPORT_FINANCIAL_WRITE_REFUSED'").get(runId).n);
     r.close();
     const failures = judge({ items, products, refs, guardEvents, rerunWrites });
-    check(`every fixture item COMPLETE (${items.length}/${FIXTURE_HANDLES.length}), no money, stock not configured, no guard hit, re-run writes 0`, failures.length === 0 && items.length === FIXTURE_HANDLES.length, failures);
+    check(`every processed item COMPLETE (${items.length}/${expected.length}), no money, stock not configured, no guard hit${partial ? '' : ', re-run writes 0'}`, failures.length === 0 && items.length === expected.length, failures);
+    if (partial) {
+      const moved = others.filter((i) => i.processing_state !== 'DISCOVERED');
+      check(`the rest of the queue untouched: ${others.length} rows DISCOVERED`, others.length === bundle.rows.length - expected.length && moved.length === 0, moved.slice(0, 5));
+    }
     const hitFailures = storeHitFailures(storeHits);
     check('store pages at least 11 s apart, with the import User-Agent', hitFailures.length === 0, hitFailures.slice(0, 10));
     check('the importer sent nothing off 127.0.0.1 (every job held to it, its refusals counted)', jobs.every((j) => j.refused !== null), jobs);
