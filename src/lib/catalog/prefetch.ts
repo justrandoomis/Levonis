@@ -12,6 +12,8 @@
  * swallowed — the page will simply fetch (and report) on its own.
  */
 import { cachedCategory, cachedTree, loadCategory, loadTree } from './data';
+import { listingFirstPagePath, parseListing } from './listingQuery';
+import { primeGet } from '../bootFetch';
 
 const started = new Set<string>();
 
@@ -32,10 +34,16 @@ export function prefetchCategory(slug: string): void {
   if (!cachedCategory(slug)) once(`data:category:${slug}`, () => loadCategory(slug, { mascot: 'silent' }));
 }
 
-/** `/categories/<cat>/<sub>` — the listing chunk and the tree it resolves against. */
-export function prefetchListing(): void {
+/**
+ * `/categories/<cat>/<sub>` — the listing chunk, the tree it resolves against,
+ * and the list itself, by the section's slug and with the door's own filters
+ * (a smart shelf's «عرض الكل» lands on `…/all?avail=1`): the page takes that
+ * request when its listing mounts (src/components/listing/useListing.ts).
+ */
+export function prefetchListing(slug = '', search = ''): void {
   once(`chunk:listing`, () => import('../../pages/CategoryListing'));
   if (!cachedTree()) once('data:tree', () => loadTree({ mascot: 'silent' }));
+  if (slug) primeGet(listingFirstPagePath(parseListing(search), slug));
 }
 
 /** `/categories` — the explorer chunk and the tree. */
@@ -49,13 +57,23 @@ export function prefetchExplorer(): void {
  * page: `/categories`, `/categories/<cat>` or `/categories/<cat>/<sub>`.
  */
 export function prefetchProps(path: string): { onPointerDown: () => void; onFocus: () => void } {
-  const run = () => {
-    const [clean] = path.split('?');
+  // `press`: a finger or a pointer is on the door. A listing's prices are
+  // started only then — focus (tabbing past) warms code and the map alone.
+  const run = (press: boolean) => {
+    const [clean, query = ''] = path.split('?');
     const parts = clean.split('/').filter(Boolean);
     if (parts[0] !== 'categories') return;
     if (parts.length === 1) prefetchExplorer();
     else if (parts.length === 2) prefetchCategory(decodeURIComponent(parts[1]));
-    else prefetchListing();
+    else {
+      let slug = '';
+      try {
+        slug = press ? decodeURIComponent(parts[2] === 'all' ? parts[1] : parts[2]) : '';
+      } catch {
+        /* a malformed link: the page asks for itself */
+      }
+      prefetchListing(slug, query);
+    }
   };
-  return { onPointerDown: run, onFocus: run };
+  return { onPointerDown: () => run(true), onFocus: () => run(false) };
 }

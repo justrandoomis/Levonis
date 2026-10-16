@@ -155,7 +155,9 @@ export default function CategoryPage() {
           hero={<CategoryHero ref={setHeroEl} payload={payload} photo={photo} compact />}
           sections={rows.length ? <CategoryRowBanners rows={rows} heading={sectionsHeading} label={sectionsHeading} /> : undefined}
           scope={{
-            category: node.id,
+            // By slug, as the Worker names it on this answer's headers
+            // (X-Catalog-Listing): the list may already be on its way.
+            category: node.slug,
             title: name,
             description: nodeDescription(node, lang),
             kind,
