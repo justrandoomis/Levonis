@@ -67,9 +67,16 @@ export interface ResolvedQuantity {
  * Clamp a number (a step, a server answer) into [min, max].
  * `max` below `min` (nothing sellable) resolves to `min`; the caller's
  * add-to-cart button is what is disabled in that case, not this figure.
+ *
+ * THE FLOOR IS 1, except where the caller asks for EXACTLY 0: a row of the
+ * several-colours list (docs/ux/COLOUR-QUANTITIES.md §3.10) means «none of this
+ * colour» by 0. Every other caller passes nothing or 1 and is unchanged, and
+ * the Worker never passes 0, so a cart line keeps its floor of 1.
  */
+export const quantityFloor = (min: number | undefined): number => (min === 0 ? 0 : Math.max(1, Math.trunc(min ?? 1) || 1));
+
 export function clampQuantity(n: number, max: number, min = 1): ResolvedQuantity {
-  const floor = Math.max(1, Math.trunc(min) || 1);
+  const floor = quantityFloor(min);
   const ceiling = Math.max(floor, Math.trunc(Number.isFinite(max) ? max : floor));
   const whole = Number.isFinite(n) ? Math.trunc(n) : floor;
   if (whole > ceiling) return { value: ceiling, capped: true, raised: false };

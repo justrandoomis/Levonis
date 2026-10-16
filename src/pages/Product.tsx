@@ -106,6 +106,22 @@ import { quickBuyChrome } from '../components/quickBuy/chromeStrings';
 import type { QuickBuySheetMode } from '../components/quickBuy/quickBuyActions';
 import type { QuickBuyPrinterAcceptance, QuickBuyPrinterPolicy } from '../lib/quickBuy';
 import { afterCriticalPaint, allowsSpeculativeLoads } from '../lib/afterCriticalPaint';
+import {
+  addLabel,
+  addedLabel,
+  colourLang,
+  colourStrings,
+  isolate,
+  leaveMulti,
+  lineQtyIn,
+  noticeText,
+  prefillRows,
+  qtyAfterColourChange,
+} from '../lib/colourQuantities';
+import { groupedNumber } from '../lib/localeNumber';
+import { ColourTag } from '../components/product/ColourTag';
+import { Segmented } from '../components/ui/Segmented';
+import type { ColourRow } from '../components/product/ColourQuantityPanel';
 
 /** The pictures of a step: a 3–4 column grid in the left column. */
 const STEP_IMAGE_SIZES = '(min-width: 1024px) 180px, (min-width: 640px) 25vw, 33vw';
@@ -134,6 +150,13 @@ const ProductTradeInEntry = React.lazy(() => import('../components/tradeIn/Produ
  * a selection, with no V2 price — a priced page never downloads it.
  */
 const PriceRequestPanel = React.lazy(() => import('../components/product/PriceRequestPanel'));
+/**
+ * «عدة ألوان» (docs/ux/COLOUR-QUANTITIES.md §3.11): the per-colour list, the
+ * batch add and its confirmation sheet are a chunk of their own, warmed when a
+ * finger or the focus reaches the switch. Most product visits never open it.
+ */
+const loadColourQuantityPanel = () => import('../components/product/ColourQuantityPanel');
+const ColourQuantityPanel = React.lazy(loadColourQuantityPanel);
 /**
  * QUICK BUY (docs/GIFTS_QUICK_BUY.md §3.5, owner spec §4). The page statically
  * carries only the purchase bar's two morphing capsules
@@ -429,17 +452,17 @@ const STRINGS = {
     serverChecks: 'نرخ و بەردەستی لەسەر ڕاژەکار دووبارە پشکنین دەکرێن لە سەبەتە و لە کاتی داواکاری.',
     OUT_OF_STOCK: 'ئێستا لە کۆگا نییە.',
     /*
-     * NO SORANI IS INVENTED HERE. These four sentences arrived with 0075 and
-     * the Kurdish for them is the owner's to write by hand — the same rule the
-     * rest of this block follows («nothing here was translated»). Until they
-     * do, a Kurdish reader gets the ARABIC sentence, which is the documented
-     * fallback elsewhere in this app (components/adminBenefits/shared.ts),
-     * rather than a machine translation of a refusal.
+     * THESE FOUR ARRIVED WITH 0075 AND STOOD IN ARABIC under an older rule
+     * («the Kurdish is the owner's to write by hand»). DECISIONS row 183
+     * superseded it — a ckb slot never carries a copy of the Arabic — and the
+     * several-colours rows and the bar now surface these sentences, so they
+     * are Sorani, in the app's own words («پشکی پێشداواکاری», «نەماوە»)
+     * (docs/ux/COLOUR-QUANTITIES.md §8.5).
      */
-    PREORDER_CAPACITY_EXHAUSTED: 'اكتملت حصة الطلب المسبق لهذا الاختيار.',
-    routeQuotaFull: 'اكتملت حصة هذه الطريقة',
-    preorderLeft: 'بقي {n} من حصة الطلب المسبق',
-    directSoldOutPreorderOpen: 'نفد مخزون البيع المباشر — الطلب المسبق ما زال متاحًا.',
+    PREORDER_CAPACITY_EXHAUSTED: 'پشکی پێشداواکاری بۆ ئەم هەڵبژاردەیە تەواو بووە.',
+    routeQuotaFull: 'پشکی ئەم ڕێگایە تەواو بووە',
+    preorderLeft: '{n} ماوە لە پشکی پێشداواکاری',
+    directSoldOutPreorderOpen: 'کۆگای فرۆشتنی ڕاستەوخۆ نەماوە — پێشداواکاری هێشتا کراوەیە.',
     PREORDER_NOT_ENABLED: 'پێشداواکاری بۆ ئەم بەرهەمە چالاک نەکراوە.',
     NO_TRANSPORT_OFFERED: 'پێشداواکاری چالاکە بەڵام هیچ شێوازی گواستنەوە پێشکەش نەکراوە.',
     TRANSPORT_COMMISSION_UNCONFIGURED: 'ئەم ڕێگای ناردنە لە ئێستادا بەردەست نییە.',
@@ -862,6 +885,39 @@ function storedMedia(product: ProductDetail): MediaItem[] {
   );
 }
 
+/**
+ * THE COLOUR ON SCREEN, BY NAME (docs/ux/COLOUR-QUANTITIES.md §3.1): a product
+ * colour, else the selected value of the 0194 option group whose kind is
+ * `color`. English in every language (`pickName`). Null when none is chosen.
+ */
+function chosenColourOf(
+  product: ProductDetail | null,
+  relations: RelationsPayload | null,
+  colorId: string,
+  optionValueIds: readonly string[]
+): { id: string; name: string; hex: string; groupId: string | null } | null {
+  if (!product) return null;
+  if (colorId) {
+    const col = (product.colors ?? []).find((c) => c.id === colorId);
+    return { id: colorId, name: col ? pickName(col.name_en, col.name, col.name_ar) || colorId : colorId, hex: col?.hex ?? '', groupId: null };
+  }
+  if ((product.colors ?? []).length > 0) return null;
+  const group = (relations?.option_groups ?? []).find((g) => g.kind === 'color');
+  const value = group?.values.find((v) => optionValueIds.includes(v.id));
+  if (!group || !value) return null;
+  const option = (product.options ?? []).find((o) => o.id === value.id);
+  return {
+    id: value.id,
+    name: option ? pickName(option.name_en, option.name, option.name_ar) || value.name_en || value.id : value.name_en || value.id,
+    hex: value.swatch?.published_hex ?? '',
+    groupId: group.id,
+  };
+}
+
+type ColourHint =
+  | { kind: 'reset'; previous: { colour: string; qty: number }; to: string }
+  | { kind: 'discovery'; colours: string[] };
+
 // ---------------------------------------------------------------- component
 
 /**
@@ -1081,7 +1137,32 @@ export default function Product() {
       if (to !== q) mascot.quantity(to, q);
       return to;
     });
+    // D4: the reset hint stays until the customer next changes the quantity.
+    setColourHint((h) => (h?.kind === 'reset' ? null : h));
   }, []);
+  /**
+   * A QUANTITY BELONGS TO ONE COLOUR (docs/ux/COLOUR-QUANTITIES.md). The one
+   * hint on screen (D4's reset, D6's «one colour at a time»), the colours
+   * tapped in the last 30 s, the several-colours mode and its rows, and what
+   * the last add actually added — all for THIS product view only.
+   */
+  const [colourHint, setColourHint] = useState<ColourHint | null>(null);
+  const colourTaps = useRef<Array<{ id: string; at: number }>>([]);
+  const [discoveryDone, setDiscoveryDone] = useState(false);
+  const [bigQtyDone, setBigQtyDone] = useState(false);
+  const [colourMode, setColourMode] = useState<'one' | 'many'>('one');
+  const [multiRows, setMultiRows] = useState<Record<string, number>>({});
+  const [multiFocus, setMultiFocus] = useState<string | null>(null);
+  /** The single colour (or colour-group value) the page held when it entered «عدة ألوان». */
+  const singleColourBeforeMulti = useRef('');
+  const [multiBarSlot, setMultiBarSlot] = useState<HTMLDivElement | null>(null);
+  const [multiPanelSlot, setMultiPanelSlot] = useState<HTMLDivElement | null>(null);
+  const [lastAdded, setLastAdded] = useState<{ name: string; qty: number; capped: { after: number } | null } | null>(null);
+  const [addedFlash, setAddedFlash] = useState(false);
+  const [noticeHeld, setNoticeHeld] = useState(false);
+  const [stepperFlash, setStepperFlash] = useState(false);
+  /** The polite «عدة ألوان: حدّد الكمية لكل لون» when the mode changes — never on first paint. */
+  const [colourModeAnnounce, setColourModeAnnounce] = useState('');
   /**
    * THE ORDER TYPE THE CUSTOMER ACTUALLY CHOSE — and '' until they do.
    *
@@ -1264,6 +1345,15 @@ export default function Product() {
         setQuoteLoading(false);
         setGalleryIndex(0);
         setQty(1);
+        setColourHint(null);
+        colourTaps.current = [];
+        setDiscoveryDone(false);
+        setBigQtyDone(false);
+        setColourMode('one');
+        setMultiRows({});
+        setMultiFocus(null);
+        setLastAdded(null);
+        setAddedFlash(false);
         setWarrantyPlanId('');
         setWarrantyOpen(false);
         setActionError('');
@@ -1566,11 +1656,32 @@ export default function Product() {
    * and, worse, kept the CTA reading «تمت الإضافة». Three seconds is long
    * enough to read and short enough that the control returns to its real job.
    */
+  /*
+   * AFTER A COLOUR ADD THE CONFIRMATION NAMES WHAT WAS ADDED («أُضيف إلى السلة:
+   * 50 × Black») and stays 6 s — never while the customer's pointer or focus is
+   * on it (docs/ux/COLOUR-QUANTITIES.md D5). A product without colours keeps
+   * the 3 s it always had.
+   */
   useEffect(() => {
-    if (!notice) return;
-    const t = setTimeout(() => setNotice(''), 3000);
+    if (!notice || noticeHeld) return;
+    const t = setTimeout(() => {
+      setNotice('');
+      setLastAdded(null);
+    }, lastAdded ? 6000 : 3000);
     return () => clearTimeout(t);
-  }, [notice]);
+  }, [notice, noticeHeld, lastAdded]);
+  /** The button reads «أُضيف 50 × Black» for 3 s, from the ADDED values. */
+  useEffect(() => {
+    if (!addedFlash) return;
+    const t = setTimeout(() => setAddedFlash(false), 3000);
+    return () => clearTimeout(t);
+  }, [addedFlash]);
+  /** The bar's stepper shows the new 1 at once after a colour change (no highlight under reduced motion). */
+  useEffect(() => {
+    if (!stepperFlash) return;
+    const t = setTimeout(() => setStepperFlash(false), 160);
+    return () => clearTimeout(t);
+  }, [stepperFlash]);
 
   // Keep a valid selection, drop an invalid one (mandate §7.2: the user's
   // choice survives as long as it is valid).
@@ -1775,14 +1886,24 @@ export default function Product() {
    * about the customer's basket — the same rule the nav badge follows.
    */
   const [cartLines, setCartLines] = useState<CartItem[]>([]);
+  /**
+   * Whether `cartLines` were actually READ: a failed load and an empty cart
+   * both leave `[]`, and the several-colours add sends what the page believes
+   * each line holds (`inCart`) only when it knows (docs/ux/COLOUR-QUANTITIES.md §3.7).
+   */
+  const [cartLinesLoaded, setCartLinesLoaded] = useState(false);
   useEffect(() => {
     setCartLines([]);
+    setCartLinesLoaded(false);
     if (!isAuthenticated || !product?.id) return;
     let cancelled = false;
     void api
       .get<{ items: CartItem[] }>('/api/cart')
       .then((data) => {
-        if (!cancelled) setCartLines(Array.isArray(data.items) ? data.items : []);
+        if (!cancelled) {
+          setCartLines(Array.isArray(data.items) ? data.items : []);
+          setCartLinesLoaded(true);
+        }
       })
       .catch(() => {
         /* no note rather than a made-up one */
@@ -1804,15 +1925,7 @@ export default function Product() {
    */
   const inCartQty = useMemo(() => {
     if (!product?.id || cartLines.length === 0) return 0;
-    const key = (ids: string[] | undefined, legacy: string) =>
-      (ids && ids.length ? [...ids].sort().join(',') : legacy) || '';
-    const mine = key(optionValueIds, optionId);
-    return cartLines.reduce((n, line) => {
-      if (line.productId !== product.id) return n;
-      if (key(line.option_value_ids, line.option_id) !== mine) return n;
-      if ((line.color_id || '') !== (colorId || '')) return n;
-      return n + (Number(line.qty) || 0);
-    }, 0);
+    return lineQtyIn(cartLines, product.id, optionValueIds, optionId, colorId);
   }, [cartLines, product?.id, optionValueIds, optionId, colorId]);
 
   const handleShare = () => {
@@ -1913,15 +2026,37 @@ export default function Product() {
         if (requestedOrderType) body.fulfillmentType = requestedOrderType;
         if (warrantyPlanId) body.warrantyPlanId = warrantyPlanId;
         if (replaceCart) body.replaceCart = true;
+        // What THIS line held before the press: the confirmation compares it
+        // with what the server reports after, so a merge the door held to the
+        // most available is said, never silent (docs/ux/COLOUR-QUANTITIES.md §3.8).
+        const before = inCartQty;
         const data = await api.post<{ items: CartItem[] }>('/api/cart/items', body);
         // Success is claimed ONLY after the server returns the saved cart.
         const count = countCartItems(data.items);
         // The response is the saved cart, so the note below the price updates
         // from the same answer that proved the add worked — no second request,
         // and no window in which the badge and the note disagree.
-        setCartLines(Array.isArray(data.items) ? data.items : []);
+        const items = Array.isArray(data.items) ? data.items : [];
+        setCartLines(items);
         setShippingConflict(null);
-        setNotice(`${s.added} (${count})`);
+        const chosen = chosenColourOf(product, relations, colorId, optionValueIds);
+        if (chosen) {
+          // D5: the banner names what was added, the button reads «أُضيف 50 ×
+          // Black» for 3 s, and the quantity returns to 1 at once — no next
+          // colour can inherit this number.
+          const after = lineQtyIn(items, product.id, optionValueIds, optionId, colorId);
+          const capped = after > 0 && after < before + qty ? { after } : null;
+          setLastAdded({ name: chosen.name, qty, capped });
+          setAddedFlash(true);
+          setNotice(noticeText(colourLang(lang), { name: chosen.name, qty }, capped));
+          setQty(1);
+          setColourHint(null);
+          colourTaps.current = [];
+          setBigQtyDone(true);
+        } else {
+          setLastAdded(null);
+          setNotice(`${s.added} (${count})`);
+        }
         // The nav badge is the one piece of confirmation visible from anywhere
         // on the page, including from the bottom of a long product.
         setCartCount(count);
@@ -2004,7 +2139,7 @@ export default function Product() {
         setAddingToCart(false);
       }
     },
-    [product, qty, optionId, optionValueIds, colorId, requestedOrderType, effectiveTransport, warrantyPlanId, isAuthenticated, navigate, s, lang, refreshQuote]
+    [product, relations, inCartQty, qty, optionId, optionValueIds, colorId, requestedOrderType, effectiveTransport, warrantyPlanId, isAuthenticated, navigate, s, lang, refreshQuote]
   );
 
   const handleAddToCart = useCallback(() => postAddToCart(false), [postAddToCart]);
@@ -2103,6 +2238,12 @@ export default function Product() {
         },
         { owner: user?.id, lang, money: moneyBoth, navigate, retry: () => runQuickBuyRef.current() }
       );
+      if (outcome.kind === 'added' && chosenColourOf(product, relations, colorId, optionValueIds)) {
+        // D5: no next colour inherits a quantity from either door.
+        setQty(1);
+        setColourHint(null);
+        colourTaps.current = [];
+      }
       if (outcome.kind === 'activate' || outcome.kind === 'reconsent' || outcome.kind === 'address') {
         openQuickBuySheet(outcome.kind);
       } else if (outcome.kind === 'printer') {
@@ -2120,7 +2261,7 @@ export default function Product() {
       quickBuyInFlight.current = false;
       setQuickBuyBusy(false);
     }
-  }, [product, isAuthenticated, user?.id, navigate, qty, optionId, optionValueIds, colorId, warrantyPlanId, lang, moneyBoth, openQuickBuySheet, refreshQuote]);
+  }, [product, relations, isAuthenticated, user?.id, navigate, qty, optionId, optionValueIds, colorId, warrantyPlanId, lang, moneyBoth, openQuickBuySheet, refreshQuote]);
   runQuickBuyRef.current = (acceptance) => void runQuickBuy(acceptance);
 
   // Escape used to be a hand-rolled window listener here. `Overlay` owns
@@ -2935,7 +3076,7 @@ export default function Product() {
             </div>
           ) : null}
           {isPro && viewerTier?.pro_benefits_context === false ? <ProAddressNotice className="mt-2.5" /> : null}
-          {qty > 1 ? (
+          {qty > 1 && colourMode !== 'many' ? (
             <div className="text-text-secondary text-[13px] mt-2">
               {s.lineTotal}: <span className="text-text-primary font-bold tabular-nums">{money(lineTotal!)}</span>
             </div>
@@ -2972,7 +3113,7 @@ export default function Product() {
         sees it; the sentence changes to acknowledge that they already hold a
         membership rather than inviting them to start one.
       */}
-      {proInvite !== null ? (
+      {proInvite !== null && colourMode !== 'many' ? (
         <button
           type="button"
           data-testid="product-pro-invite"
@@ -3070,6 +3211,294 @@ export default function Product() {
   const colorNoPrice = (id: string): boolean =>
     unpricedKeys.size > 0 && (unpricedKeys.has(selectionKeyOf(optionValueIds, id)) || levelIsNull(priceLevels?.color, id));
   const noPriceTag = <span data-no-price className="block text-[10px] font-bold leading-tight text-text-muted">{s.noPriceTag}</span>;
+
+  // ------------------------------------------------- colour quantities
+  // docs/ux/COLOUR-QUANTITIES.md. A quantity always belongs to ONE colour, the
+  // button says what it adds, and several colours go in one press.
+  const cs = colourStrings(lang);
+  const cl = colourLang(lang);
+  /** The colour dimension (§3.1): the product's colours, else the 0194 option group whose kind is `color`. */
+  const colourGroup = (product.colors ?? []).length === 0 ? relationOptionGroups.find((g) => g.kind === 'color') ?? null : null;
+  const hasColourDimension = (product.colors ?? []).length > 0 || !!colourGroup;
+  const chosenColour = chosenColourOf(product, relations, colorId, optionValueIds);
+  /** The selection every colour shares: the options, without the colour group's own value. */
+  const sharedIds = colourGroup ? optionValueIds.filter((id) => !colourGroup.values.some((v) => v.id === id)) : optionValueIds;
+  const singleColourId = colourGroup ? (colourGroup.values.find((v) => optionValueIds.includes(v.id))?.id ?? '') : colorId;
+  const comboKeyFor = (ids: readonly string[], colour: string | null) =>
+    [...ids].sort().map((id) => `o:${id}`).concat(colour ? [`c:${colour}`] : []).join('|');
+  /** A colour's own shelf where the inventory mode makes it the counter; null = untracked or shared. */
+  const colourShelf = (id: string): number | null => {
+    if (colourGroup) {
+      if (invMode === 'OPTION') return availByValue.get(id) ?? null;
+      if (invMode === 'VARIANT_COMBINATION') return variantAvailable.get(comboKeyFor([...sharedIds, id], null)) ?? null;
+      return null;
+    }
+    if (invMode === 'COLOR') return availByColor.get(id) ?? null;
+    if (invMode === 'VARIANT_COMBINATION' && optionValueIds.length) return variantAvailable.get(comboKeyFor(optionValueIds, id)) ?? null;
+    return null;
+  };
+  /** The server's level price for one colour row, where the level grid can say (never for several groups). */
+  const colourLevel = (id: string): PriceLevel | null => {
+    const L = priceLevels;
+    if (!L) return null;
+    if (colourGroup) return sharedIds.length === 0 ? (L.option[id] ?? null) : null;
+    if (optionValueIds.length > 1) return null;
+    if (optionId) return L.complete ? (L.combo[`${optionId}|${id}`] ?? null) : null;
+    return L.color[id] ?? null;
+  };
+  /** The rows of «عدة ألوان», in the chips' own order (in stock first on a direct sale). */
+  const colourRows: ColourRow[] = (() => {
+    const direct = requestedOrderType === 'direct_sale';
+    const rows: ColourRow[] = colourGroup
+      ? colourGroup.values
+          .filter((v) => !knowledgeChooser || valueOffered(v.id, colourGroup.id, sharedIds, relationOptionGroups, relations?.variants ?? []))
+          .map((v) => {
+            const option = options.find((o) => o.id === v.id);
+            const shelf = colourShelf(v.id);
+            const unpriced = optionNoPrice([...sharedIds, v.id], v.id);
+            const level = colourLevel(v.id);
+            return {
+              id: v.id,
+              name: option ? pickName(option.name_en, option.name, option.name_ar) || v.name_en || v.id : v.name_en || v.id,
+              hex: v.swatch?.published_hex ?? '',
+              image: optionImage(v.id) || v.swatch?.url || '',
+              noPrice: unpriced,
+              soldOut: direct && shelf !== null && shelf <= 0,
+              offered: !unpriced && !(direct && shelf !== null && shelf <= 0),
+              chip: unpriced ? null : levelChip(shelf),
+              ownMax: direct ? shelf : null,
+              levelUnit: level?.unit_subtotal_iqd ?? null,
+              levelRegular: level?.regular_iqd ?? null,
+              levelApplied: level?.applied_iqd ?? null,
+            };
+          })
+      : orderedColors.map((col) => {
+          const shelf = colourShelf(col.id);
+          const unpriced = colorNoPrice(col.id);
+          const level = colourLevel(col.id);
+          return {
+            id: col.id,
+            name: pickName(col.name_en, col.name, col.name_ar) || col.id,
+            hex: col.hex ?? '',
+            image: colorImage(col.id),
+            noPrice: unpriced,
+            soldOut: direct && shelf !== null && shelf <= 0,
+            offered: !unpriced && !(direct && shelf !== null && shelf <= 0),
+            chip: unpriced ? null : levelChip(shelf),
+            ownMax: direct ? shelf : null,
+            levelUnit: level?.unit_subtotal_iqd ?? null,
+            levelRegular: level?.regular_iqd ?? null,
+            levelApplied: level?.applied_iqd ?? null,
+          };
+        });
+    // The rows that can take a quantity first, by the same stable rule as the chips.
+    return [...rows].sort((a, b) => Number(b.offered) - Number(a.offered));
+  })();
+  /** §3.1: a catalogue product, priced, with at least two colours that can take a quantity. */
+  const multiOffered = source === 'catalog' && !catalogOnly && colourRows.filter((r) => r.offered).length >= 2;
+  const colourMulti = multiOffered && colourMode === 'many';
+  const multiCount = Object.values(multiRows).filter((q) => q > 0).length;
+
+  /** Sets the single mode's colour: a product colour, or the colour group's value (kept in group order). */
+  const setSingleColour = (id: string) => {
+    if (colourGroup) {
+      setOptionValueIds((current) =>
+        relationOptionGroups.flatMap((g) =>
+          g.id === colourGroup.id ? (id ? [id] : []) : g.values.filter((v) => current.includes(v.id)).map((v) => v.id)
+        )
+      );
+      setLiveAvailability(null);
+    } else {
+      setColorId(id);
+    }
+  };
+  const warmColourPanel = () => {
+    void loadColourQuantityPanel().catch(() => undefined);
+  };
+  /**
+   * INTO «عدة ألوان» (§3.2). `seed` rows come from a hint («Black: 50»); the
+   * single colour carries the number typed FOR IT only when `carrySingle`.
+   */
+  const enterMulti = (seed: Record<string, number>, focus: string | null, carrySingle: boolean) => {
+    warmColourPanel();
+    singleColourBeforeMulti.current = singleColourId;
+    setMultiRows(prefillRows({ ...multiRows, ...seed }, carrySingle && singleColourId ? { colour: singleColourId, qty } : null));
+    setMultiFocus(focus);
+    setColourMode('many');
+    setColourHint(null);
+    setColourModeAnnounce(cs.announceModeOn);
+    setSingleColour('');
+  };
+  /** Back to one colour: exactly one row with a quantity becomes the selection; otherwise the rows wait. */
+  const leaveMultiMode = () => {
+    const back = leaveMulti(multiRows, singleColourBeforeMulti.current);
+    setMultiRows(back.remembered);
+    setColourMode('one');
+    setMultiFocus(null);
+    setColourModeAnnounce(cs.announceModeOff);
+    setSingleColour(back.colour);
+    setQty(Math.max(1, back.qty));
+  };
+
+  /**
+   * D4 — IN THE TAP HANDLER, NEVER IN AN EFFECT. From one colour to another
+   * with a quantity above 1, the quantity returns to 1 and the hint offers both
+   * meanings back. D6 — three different colours in 30 s with no add between
+   * says, once per view, that colours are chosen one at a time.
+   */
+  const afterColourTap = (from: string, to: string) => {
+    const r = qtyAfterColourChange({ from, to, qty });
+    if (r.hint) {
+      setQty(r.qty);
+      setColourHint(r.hint);
+      setStepperFlash(true);
+    } else if (colourHint?.kind === 'reset') {
+      setColourHint(null);
+    }
+    if (!to) return;
+    const now = Date.now();
+    const taps = [...colourTaps.current.filter((t) => now - t.at <= 30_000), { id: to, at: now }];
+    colourTaps.current = taps;
+    const distinct = [...new Set(taps.map((t) => t.id))];
+    if (!r.hint && !discoveryDone && multiOffered && distinct.length >= 3) {
+      setColourHint({ kind: 'discovery', colours: distinct });
+      setDiscoveryDone(true);
+    }
+  };
+  const onColourChipTap = (id: string, selected: boolean) => {
+    const next = selected ? '' : id;
+    afterColourTap(colorId, next);
+    setColorId(next);
+  };
+  const rowName = (id: string) => colourRows.find((r) => r.id === id)?.name ?? id;
+  /** «أبقِ 50 لـ White»: the number back, for the new colour, held to that colour's shelf. */
+  const keepPreviousQty = () => {
+    if (colourHint?.kind !== 'reset') return;
+    const shelf = colourShelf(colourHint.to);
+    const ceiling = requestedOrderType === 'direct_sale' && shelf !== null ? shelf : Number.POSITIVE_INFINITY;
+    setQty(Math.max(1, Math.min(colourHint.previous.qty, ceiling)));
+    setColourHint(null);
+  };
+  const colourHintBlock =
+    colourHint && !colourMulti ? (
+      <div role="status" data-colour-hint={colourHint.kind} className="mt-3 rounded-md lv-well p-3 text-[13px] leading-relaxed text-text-primary">
+        <p>{colourHint.kind === 'reset' ? cs.resetHint : cs.discoveryHint}</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {multiOffered ? (
+            <button
+              type="button"
+              data-colour-hint-action="per-colour"
+              onPointerDown={warmColourPanel}
+              onClick={() =>
+                colourHint.kind === 'reset'
+                  ? enterMulti({ [colourHint.previous.colour]: colourHint.previous.qty }, colourHint.to, false)
+                  : enterMulti({}, colourHint.colours[0] ?? null, false)
+              }
+              className="lv-button lv-button-secondary lv-button-sm min-h-[44px]"
+            >
+              {cs.perColourAction}
+            </button>
+          ) : null}
+          {colourHint.kind === 'reset' ? (
+            <button type="button" data-colour-hint-action="keep" onClick={keepPreviousQty} className="lv-button lv-button-secondary lv-button-sm min-h-[44px]">
+              {cs.keepQty(groupedNumber(colourHint.previous.qty), isolate(rowName(colourHint.to)))}
+            </button>
+          ) : null}
+          <button type="button" data-colour-hint-action="ok" onClick={() => setColourHint(null)} className="lv-button lv-button-ghost lv-button-sm min-h-[44px]">
+            {cs.dismissOk}
+          </button>
+        </div>
+      </div>
+    ) : null;
+  /** The «عدة ألوان | لون واحد» switch, on its own row under the legend (§3.2). */
+  const colourModeSwitch = multiOffered ? (
+    <div className="mt-2" onPointerDown={warmColourPanel} onFocus={warmColourPanel} data-colour-mode-switch>
+      <Segmented
+        size="sm"
+        group="colour-mode"
+        label={cs.colourModeLabel}
+        value={colourMode}
+        dataAttr="data-colour-mode"
+        onChange={(id) => {
+          if (id === 'many' && colourMode !== 'many') enterMulti({}, null, true);
+          else if (id === 'one' && colourMode !== 'one') leaveMultiMode();
+        }}
+        items={[
+          { id: 'one', label: cs.colourModeOne },
+          { id: 'many', label: cs.colourModeMany, badge: multiCount > 0 ? <span className="tabular-nums">({groupedNumber(multiCount)})</span> : undefined },
+        ]}
+      />
+      <p className="sr-only" aria-live="polite">{colourModeAnnounce}</p>
+    </div>
+  ) : null;
+  /** The colour's own picture (a product photo bound to it), '' when it has none. */
+  const chosenColourOwnImage = chosenColour ? (chosenColour.groupId ? optionImage(chosenColour.id) : colorImage(chosenColour.id)) : '';
+  const chosenColourImage = chosenColourOwnImage || (chosenColour?.groupId ? colourRows.find((r) => r.id === chosenColour.id)?.image ?? '' : '');
+  /**
+   * W6 — THE PHOTO DOES NOT CHANGE FOR A COLOUR WITH NO PICTURE OF ITS OWN, so
+   * the lead image says which colour is chosen (§3.12). Never in «عدة ألوان».
+   */
+  const galleryColourChip =
+    !colourMulti && chosenColour && colourRows.length >= 2 && !chosenColourOwnImage ? (
+      <span
+        data-gallery-colour-chip
+        className="pointer-events-none absolute bottom-2 start-2 inline-flex max-w-[70%] items-center gap-1.5 rounded-full bg-surface-raised/90 px-2.5 py-1 text-[12px] text-text-primary"
+      >
+        <ColourTag size="sm" name={cs.galleryChosenColour(isolate(chosenColour.name))} hex={chosenColour.hex} nameClassName="text-[12px] font-semibold text-text-primary" />
+        <span className="sr-only"> — {cs.galleryNoColourPhoto}</span>
+      </span>
+    ) : null;
+  const sharedSelectionComplete = colourGroup
+    ? relationOptionGroups.every((g) => g.id === colourGroup.id || g.values.some((v) => optionValueIds.includes(v.id)))
+    : relationOptionGroups.length > 0
+      ? relationOptionGroups.every((g) => g.values.some((v) => optionValueIds.includes(v.id)))
+      : options.length === 0 || optionValueIds.length > 0;
+  /** In «عدة ألوان» the colour is the rows' to choose: «اختر لونًا» is no blocker there. */
+  const shownBlockingCodes = colourMulti
+    ? blockingCodes.filter((code) => code !== 'COLOR_REQUIRED' && !(colourGroup && code === 'OPTION_GROUP_REQUIRED' && sharedSelectionComplete))
+    : blockingCodes;
+  const colourPanel = colourMulti ? (
+    <>
+      <p className="mt-2 text-[12.5px] text-text-secondary leading-relaxed">{cs.perColourIntro}</p>
+      <ChunkBoundary compact>
+        <React.Suspense fallback={<div className="mt-3 min-h-24" aria-hidden="true" />}>
+          <ColourQuantityPanel
+            lang={lang}
+            productId={product.id}
+            productSlug={product.slug}
+            rows={colourRows}
+            quantities={multiRows}
+            onQuantities={setMultiRows}
+            dimension={colourGroup ? { kind: 'group', groupId: colourGroup.id } : { kind: 'color' }}
+            sharedOptionValueIds={sharedIds}
+            fulfillmentType={requestedOrderType}
+            transportMethod={requestedOrderType === 'pre_order' ? effectiveTransport : ''}
+            warrantyPlanId={warrantyPlanId}
+            sharedReady={source === 'catalog' && !catalogOnly && sharedSelectionComplete && routeReady && mode !== 'unavailable'}
+            cartLines={cartLines}
+            cartLinesLoaded={cartLinesLoaded}
+            isAuthenticated={isAuthenticated}
+            onSignIn={() => navigate(authPathWithSupportRef(`/product/${product.slug}`))}
+            onCartItems={(items) => {
+              setCartLines(items);
+              setCartLinesLoaded(true);
+              setCartCount(countCartItems(items));
+            }}
+            focusRow={multiFocus}
+            onFocused={() => setMultiFocus(null)}
+            barSlot={multiBarSlot}
+            panelSlot={multiPanelSlot}
+            money={money}
+            quickBuyOn={quickBuyFor === product.id}
+            reasonFor={(code) => {
+              const said = reasonText(s, code);
+              return said === code ? '' : said;
+            }}
+          />
+        </React.Suspense>
+      </ChunkBoundary>
+    </>
+  ) : null;
 
   const activeModel = models?.find((m) => m.key === modelKey) ?? null;
 
@@ -3340,6 +3769,17 @@ export default function Product() {
             const offered = (id: string) =>
               !knowledgeChooser || valueOffered(id, group.id, optionValueIds, relationOptionGroups, relations?.variants ?? []);
             const anyBlocked = knowledgeChooser && group.values.some((value) => !offered(value.id));
+            /** This group IS the colour dimension (0194 kind = color, no product colours): the switch and the list live here. */
+            const colourDim = colourGroup?.id === group.id;
+            if (colourDim && colourMulti) {
+              return (
+                <fieldset key={group.id} className="lv-section" data-option-group={group.id} data-group-kind={group.kind || undefined} data-colour-fieldset>
+                  <legend className="px-1 text-text-primary font-bold text-[14px]">{cs.perColourLegend}</legend>
+                  {colourModeSwitch}
+                  {colourPanel}
+                </fieldset>
+              );
+            }
             return (
               <fieldset key={group.id} className="lv-section" data-option-group={group.id} data-group-kind={group.kind || undefined}>
                 <legend className="px-1 text-text-primary font-bold text-[14px]">
@@ -3355,6 +3795,7 @@ export default function Product() {
                     <span className="ms-2 text-amber-300 font-medium text-[12px]">{s.chooseOption}</span>
                   ) : null}
                 </legend>
+                {colourDim ? colourModeSwitch : null}
                 <div className={`mt-2 flex flex-wrap ${swatches ? 'gap-1' : 'gap-2'}`}>
                   {group.values.map((value) => {
                     const selected = groupSelected === value.id;
@@ -3367,6 +3808,9 @@ export default function Product() {
                      * on an imported product, those that still form a variant with it (`chooseValue`).
                      */
                     const choose = () => {
+                      // D4 for a colour that is an option group's value (docs/ux/COLOUR-QUANTITIES.md):
+                      // the quantity typed for one colour does not follow the tap to another.
+                      if (group.kind === 'color') afterColourTap(groupSelected, selected ? '' : value.id);
                       setOptionValueIds((current) =>
                         knowledgeChooser
                           ? chooseValue(value.id, group.id, current, relationOptionGroups, relations?.variants ?? [])
@@ -3490,6 +3934,7 @@ export default function Product() {
                     {tr(NOT_OFFERED.ar, NOT_OFFERED.en, NOT_OFFERED.ckb)}
                   </p>
                 ) : null}
+                {colourDim ? colourHintBlock : null}
               </fieldset>
             );
           })}
@@ -3681,19 +4126,24 @@ export default function Product() {
       ) : null}
 
       {orderedColors.length > 0 ? (
-        <fieldset className="lv-section">
+        <fieldset className="lv-section" data-colour-fieldset>
           <legend className="px-1 text-text-primary font-bold text-[14px]">
-            {s.colors}
-            <Chosen
-              value={(() => {
-                const picked = orderedColors.find((col) => col.id === colorId);
-                return picked ? pickName(picked.name_en, picked.name, picked.name_ar) : null;
-              })()}
-            />
-            {availability?.selection.color_required && !colorId ? (
+            {colourMulti ? cs.perColourLegend : s.colors}
+            {colourMulti ? null : (
+              <Chosen
+                value={(() => {
+                  const picked = orderedColors.find((col) => col.id === colorId);
+                  return picked ? pickName(picked.name_en, picked.name, picked.name_ar) : null;
+                })()}
+              />
+            )}
+            {!colourMulti && availability?.selection.color_required && !colorId ? (
               <span className="ms-2 text-amber-300 font-medium text-[12px]">{s.chooseColor}</span>
             ) : null}
           </legend>
+          {colourModeSwitch}
+          {colourMulti ? colourPanel : (
+          <>
           <div className="mt-2 flex flex-wrap gap-2">
             {orderedColors.map((col) => {
               const selected = colorId === col.id;
@@ -3722,7 +4172,11 @@ export default function Product() {
                     // carries one — and since the owner's order puts «طريقة
                     // التوفر» and «وسيلة النقل» first, clearing them here sent the
                     // buyer back two steps for picking a colour.
-                    setColorId(selected ? '' : col.id);
+                    //
+                    // AND THE QUANTITY TYPED FOR ONE COLOUR DOES NOT FOLLOW THE TAP
+                    // TO ANOTHER (D4, docs/ux/COLOUR-QUANTITIES.md): the reset runs
+                    // here, in the tap, never in an effect.
+                    onColourChipTap(col.id, selected);
                   }}
                   className="lv-choice flex items-center gap-2 px-3 py-1.5 text-sm font-bold"
                 >
@@ -3753,6 +4207,9 @@ export default function Product() {
               );
             })}
           </div>
+          {colourHintBlock}
+          </>
+          )}
         </fieldset>
       ) : null}
 
@@ -3926,9 +4383,33 @@ export default function Product() {
     />
   );
 
+  /**
+   * D6, SECOND TRIGGER: a quantity of 10 or more on a product with two or more
+   * colours that can be bought — the quiet «لعدة ألوان: حدّد كمية لكل لون» in
+   * the note's slot, only when nothing is in the cart for this selection, and
+   * once per view (docs/ux/COLOUR-QUANTITIES.md).
+   */
+  const bigQtyTip =
+    !colourMulti && multiOffered && !bigQtyDone && qty >= 10 && inCartQty === 0 && !colourHint ? (
+      <div data-big-qty-tip className="mb-2 text-[12px]">
+        <button
+          type="button"
+          onPointerDown={warmColourPanel}
+          onClick={() => {
+            setBigQtyDone(true);
+            enterMulti({}, singleColourId || null, true);
+          }}
+          className="min-h-[44px] font-medium text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded"
+        >
+          {cs.bigQtyTip}
+        </button>
+      </div>
+    ) : null;
+  const noteSlot = inCartNote ?? bigQtyTip;
+
   const qtyControl = (
     <div>
-      {inCartNote}
+      {noteSlot}
     <div className="flex items-center justify-between gap-3">
       <span className="text-text-secondary text-sm font-bold">{s.qty}</span>
       {qtyInput('md', 'start')}
@@ -3949,7 +4430,13 @@ export default function Product() {
    * decision is actually made, and it is reachable from anywhere on the page
    * without scrolling back up.
    */
-  const barStepper = maxQty > 1 ? <div className="shrink-0">{qtyInput('sm', 'above')}</div> : null;
+  // The new 1 shows at once after a colour change (a 160 ms highlight; none under reduced motion).
+  const barStepper =
+    maxQty > 1 ? (
+      <div className={`shrink-0 rounded-md transition-shadow motion-reduce:transition-none ${stepperFlash ? 'ring-2 ring-focus motion-reduce:ring-0' : ''}`} data-stepper-flash={stepperFlash || undefined}>
+        {qtyInput('sm', 'above')}
+      </div>
+    ) : null;
 
   const statusMessages = (
     <div className="space-y-2" aria-live="polite">
@@ -3972,8 +4459,8 @@ export default function Product() {
           {s.directSoldOutPreorderOpen}
         </p>
       ) : null}
-      {mode !== 'unavailable' && blockingCodes.length > 0
-        ? blockingCodes.map((code) => (
+      {mode !== 'unavailable' && shownBlockingCodes.length > 0
+        ? shownBlockingCodes.map((code) => (
             <p key={code} className="lv-alert lv-alert-warning text-amber-100 text-[13px]">
               {reasonText(s, code)}
             </p>
@@ -3986,7 +4473,7 @@ export default function Product() {
           stack, immediately over the CTA. The legend chip on the transport
           panel points at the control that answers it; a third copy between
           them was just noise. */}
-      {availability && !availability.qty_ok && mode !== 'unavailable' ? (
+      {availability && !availability.qty_ok && mode !== 'unavailable' && !colourMulti ? (
         <p className="lv-alert lv-alert-warning text-amber-100 text-[13px]">
           {s.qtyCapped.replace('{n}', String(availability.stock.max_qty))}
         </p>
@@ -4002,7 +4489,15 @@ export default function Product() {
         </p>
       ) : null}
       {notice ? (
-        <div className="lv-alert lv-alert-success flex items-center justify-between gap-3 text-[13px] text-emerald-200">
+        <div
+          role="status"
+          data-add-notice
+          onMouseEnter={() => setNoticeHeld(true)}
+          onMouseLeave={() => setNoticeHeld(false)}
+          onFocus={() => setNoticeHeld(true)}
+          onBlur={() => setNoticeHeld(false)}
+          className="lv-alert lv-alert-success flex items-center justify-between gap-3 text-[13px] text-emerald-200"
+        >
           <span className="flex items-center gap-2">
             <Check aria-hidden="true" className="w-4 h-4" />
             {notice}
@@ -4018,16 +4513,37 @@ export default function Product() {
   // The line landed in the cart, and the button says so for a moment before
   // returning to its resting label — the feedback belongs on the control that
   // was pressed, not only in a panel somewhere above the fold.
-  const justAdded = !!notice;
+  //
+  // AND IT SAYS WHAT IT ADDS (D3, docs/ux/COLOUR-QUANTITIES.md): with a colour
+  // chosen it reads «أضف 50 × Black», never the bare «أضف إلى السلة»; a colour
+  // still to choose reads «اختر لونًا أولًا». Only a product with no colour
+  // dimension keeps «أضف إلى السلة». After a colour add it reads «أُضيف 50 ×
+  // Black» for 3 s, built from what WAS added, not from the current state.
+  const justAdded = lastAdded ? addedFlash : !!notice;
   const buyButtonLabel = !isAuthenticated
     ? s.signInToBuy
     : addingToCart
       ? s.adding
       : justAdded
-        ? s.added
+        ? lastAdded
+          ? addedLabel(cl, lastAdded, { short: true })
+          : s.added
         : mode === 'unavailable'
           ? s.unavailable
-          : s.addToCart;
+          : !hasColourDimension
+            ? s.addToCart
+            : chosenColour
+              ? addLabel(cl, [{ name: chosenColour.name, qty }], { short: true })
+              : cs.chooseColourFirst;
+  /** The full name for assistive tech when the visible label shortened a long colour name. */
+  const buyButtonAria =
+    isAuthenticated && !addingToCart && mode !== 'unavailable' && hasColourDimension
+      ? justAdded && lastAdded
+        ? addedLabel(cl, lastAdded)
+        : !justAdded && chosenColour
+          ? addLabel(cl, [{ name: chosenColour.name, qty }])
+          : undefined
+      : undefined;
 
   /**
    * THE BUY ROW. For a signed-in customer on a catalogue product it is one
@@ -4053,6 +4569,7 @@ export default function Product() {
         cart={{
           icon: cartIcon,
           label: buyButtonLabel,
+          ariaLabel: buyButtonAria,
           disabled: addingToCart || (isAuthenticated && !canBuy),
           busy: addingToCart,
           onPress: handleAddToCart,
@@ -4067,6 +4584,7 @@ export default function Product() {
       <button
         type="button"
         data-testid="product-cta"
+        aria-label={buyButtonAria}
         onClick={handleAddToCart}
         disabled={addingToCart || (isAuthenticated && !canBuy)}
         className="lv-button lv-button-primary w-full min-h-[50px] text-[15px] active:scale-[0.985] [touch-action:manipulation]"
@@ -4243,6 +4761,7 @@ export default function Product() {
                   fallbackIconClassName="w-10 h-10"
                   fallbackClassName="text-text-muted"
                 />
+                {galleryColourChip}
                 {activeMedia?.url ? (
                   /* The house round button: a 44px target around a 36px
                      raised disc. IconButton positions itself relative, so
@@ -4780,8 +5299,15 @@ export default function Product() {
             {selectionBlocks}
             {noPrice ? null : (
             <div className="lv-surface space-y-3 p-4">
-              {qtyControl}
-              {buyButton}
+              {colourMulti ? (
+                // «عدة ألوان»: the summary and the add are the lazy panel's, drawn into this slot.
+                <div ref={setMultiPanelSlot} data-colour-multi-panel className="space-y-3" />
+              ) : (
+                <>
+                  {qtyControl}
+                  {buyButton}
+                </>
+              )}
               <p className="text-[11px] text-text-muted leading-relaxed">{s.serverChecks}</p>
             </div>
             )}
@@ -4805,9 +5331,19 @@ export default function Product() {
           fold, so a customer who added from here previously got no visible
           answer at all.
         */}
+        {colourMulti ? (
+          // «عدة ألوان» (§3.3): the total and the add are the lazy panel's, drawn into this slot.
+          <div ref={setMultiBarSlot} data-colour-multi-bar className="mx-auto w-full max-w-[640px]" />
+        ) : (
+        <>
         {notice ? (
           <div
             role="status"
+            data-add-notice
+            onMouseEnter={() => setNoticeHeld(true)}
+            onMouseLeave={() => setNoticeHeld(false)}
+            onFocus={() => setNoticeHeld(true)}
+            onBlur={() => setNoticeHeld(false)}
             className="lv-alert lv-alert-success mx-auto mb-2 flex w-full max-w-[640px] items-center justify-between gap-3 text-[13px] text-emerald-200"
           >
             <span className="flex items-center gap-2 min-w-0">
@@ -4829,7 +5365,7 @@ export default function Product() {
           saying almost the same thing, one above the other, is the crowding
           this bar is kept clear of.
         */}
-        {!notice ? <div className="mx-auto w-full max-w-[640px]">{inCartNote}</div> : null}
+        {!notice ? <div className="mx-auto w-full max-w-[640px]">{noteSlot}</div> : null}
         <div className="mx-auto grid w-full max-w-[640px] grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:flex sm:gap-2.5">
           {/*
             A FIXED FOOTPRINT. This cell used to be auto-sized, so its width
@@ -4838,7 +5374,15 @@ export default function Product() {
             shrank on every quote. Reserving the space keeps the bar still.
           */}
           <div className="min-w-0 sm:basis-[7.5rem] sm:shrink-0">
-            <div className="text-[11px] text-text-muted">{s.price}</div>
+            {/* «السعر · ● Black» (§3.12): the line that names the colour while ⚡ has the wide capsule. */}
+            {chosenColour ? (
+              <div className="flex min-w-0 items-center gap-1 text-[11px] text-text-muted" data-price-colour>
+                <span className="shrink-0">{cs.priceWithColour}</span>
+                <ColourTag size="sm" name={chosenColour.name} hex={chosenColour.hex} image={chosenColourImage} nameClassName="text-[11px] font-semibold text-text-muted" />
+              </div>
+            ) : (
+              <div className="text-[11px] text-text-muted">{s.price}</div>
+            )}
             <div
               aria-busy={priceIsPending || undefined}
               className={`text-text-primary font-black text-[15px] tabular-nums truncate transition-opacity duration-200 ${
@@ -4851,6 +5395,8 @@ export default function Product() {
           {barStepper}
           <div className="col-span-2 min-w-0 sm:flex-1">{buyButton}</div>
         </div>
+        </>
+        )}
         </>
         )}
       </div>

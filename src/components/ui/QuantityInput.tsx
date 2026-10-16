@@ -34,6 +34,7 @@ import { useLanguage } from '../../LanguageContext';
 import { groupedNumber } from '../../lib/localeNumber';
 import {
   clampQuantity,
+  quantityFloor,
   resolveQuantityDraft,
   sanitizeQuantityDraft,
   type QuantityLimitKind,
@@ -69,6 +70,21 @@ export interface QuantityInputProps {
   autoClamp?: boolean;
   /** Accessible name of the number; defaults to «الكمية». */
   label?: string;
+  /** Accessible names of − and + (a colour row names its colour: «زيادة Black»). */
+  increaseLabel?: string;
+  decreaseLabel?: string;
+  /**
+   * `false` takes − and + out of the tab order (they still answer touch and
+   * click, and the number keeps ↑/↓): a list of thirty colour rows is then
+   * thirty keyboard stops, not ninety (docs/ux/COLOUR-QUANTITIES.md §3.10).
+   */
+  stepButtonsInTabOrder?: boolean;
+  /** Extra ids the number is described by (a row's availability line, its refusal). */
+  describedBy?: string;
+  /** The number is in error (a refused row): `aria-invalid`. */
+  invalid?: boolean;
+  /** The number's id, so a caller can move focus to it. */
+  inputId?: string;
   className?: string;
   /** Test hook on the wrapper. */
   'data-testid'?: string;
@@ -89,6 +105,12 @@ export function QuantityInput({
   hintPlacement = 'below',
   autoClamp = false,
   label,
+  increaseLabel,
+  decreaseLabel,
+  stepButtonsInTabOrder = true,
+  describedBy,
+  invalid = false,
+  inputId,
   className = '',
   'data-testid': testId,
 }: QuantityInputProps) {
@@ -106,7 +128,8 @@ export function QuantityInput({
   // created with the value of the first press.
   const valueRef = useRef(value);
   valueRef.current = value;
-  const ceiling = Math.max(min, Math.trunc(max) || min);
+  const floor = quantityFloor(min);
+  const ceiling = Math.max(floor, Math.trunc(max) || floor);
 
   const hintText = useCallback(
     (n: number): string => {
@@ -115,11 +138,10 @@ export function QuantityInput({
         return loc(`الحد الأقصى للطلب الواحد: ${shown}`, `Maximum per order: ${shown}`, `زۆرترین ${shown} بۆ هەر داواکارییەک`);
       }
       if (limitKind === 'preorder_quota') {
-        // OWNER: Sorani to be written by hand.
-        return loc(`المتبقي من حصة الطلب المسبق: ${shown}`, `Pre-order quota left: ${shown}`);
+        // Sorani per DECISIONS row 183 (docs/ux/COLOUR-QUANTITIES.md §8.5): the colour rows surface this.
+        return loc(`المتبقي من حصة الطلب المسبق: ${shown}`, `Pre-order quota left: ${shown}`, `ماوەی پشکی پێشداواکاری: ${shown}`);
       }
-      // OWNER: Sorani to be written by hand.
-      return loc(`الحد الأقصى المتوفر: ${shown}`, `Maximum available: ${shown}`);
+      return loc(`الحد الأقصى المتوفر: ${shown}`, `Maximum available: ${shown}`, `زۆرترینی بەردەست: ${shown}`);
     },
     [limitKind, loc]
   );
@@ -140,10 +162,10 @@ export function QuantityInput({
   // a smaller shelf was picked) re-applies the rule — only where the caller
   // holds the value locally.
   useEffect(() => {
-    if (!autoClamp || disabled || value <= ceiling || ceiling < min) return;
+    if (!autoClamp || disabled || value <= ceiling || ceiling < floor) return;
     onChange(ceiling, 'clamp');
     showHint(ceiling);
-  }, [autoClamp, disabled, value, ceiling, min, onChange, showHint]);
+  }, [autoClamp, disabled, value, ceiling, floor, onChange, showHint]);
 
   const step = useCallback(
     (delta: number) => {
@@ -198,7 +220,7 @@ export function QuantityInput({
     step(delta);
   };
 
-  const atMin = value <= min;
+  const atMin = value <= floor;
   const atMax = value >= ceiling;
   const name = label ?? loc('الكمية', 'Quantity', 'بڕ');
   const numberWidth = size === 'sm' ? 'w-14 text-[15px]' : 'w-[4.5rem] text-[16px]';
@@ -220,7 +242,8 @@ export function QuantityInput({
       >
         <button
           type="button"
-          aria-label={loc('إنقاص الكمية', 'Decrease quantity', 'کەمکردنەوەی بڕ')}
+          aria-label={decreaseLabel ?? loc('إنقاص الكمية', 'Decrease quantity', 'کەمکردنەوەی بڕ')}
+          tabIndex={stepButtonsInTabOrder ? undefined : -1}
           data-mascot="qty-dec"
           disabled={disabled || atMin}
           onClick={clickStep(-1)}
@@ -244,11 +267,13 @@ export function QuantityInput({
           spellCheck={false}
           dir="ltr"
           role="spinbutton"
+          id={inputId}
           aria-label={name}
           aria-valuenow={value}
-          aria-valuemin={min}
+          aria-valuemin={floor}
           aria-valuemax={ceiling}
-          aria-describedby={hint ? hintId : undefined}
+          aria-describedby={[hint ? hintId : '', describedBy ?? ''].filter(Boolean).join(' ') || undefined}
+          aria-invalid={invalid || undefined}
           data-mascot="quantity"
           disabled={disabled}
           value={editing ? draft : groupedNumber(value)}
@@ -290,7 +315,8 @@ export function QuantityInput({
         />
         <button
           type="button"
-          aria-label={loc('زيادة الكمية', 'Increase quantity', 'زیادکردنی بڕ')}
+          aria-label={increaseLabel ?? loc('زيادة الكمية', 'Increase quantity', 'زیادکردنی بڕ')}
+          tabIndex={stepButtonsInTabOrder ? undefined : -1}
           data-mascot="qty-inc"
           disabled={disabled || atMax}
           onClick={clickStep(1)}

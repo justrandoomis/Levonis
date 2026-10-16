@@ -96,7 +96,12 @@ export interface QuickBuyBarProps {
   requestQuick: () => Promise<boolean>;
   /** The finger or the focus is on ⚡: fetch the lazy chunks and the readiness now. */
   onWarm: () => void;
-  cart: { icon: React.ReactNode; label: React.ReactNode; disabled: boolean; busy: boolean; onPress: () => void };
+  /**
+   * `ariaLabel`: the full name when the visible label is shortened — «أضف 50 ×
+   * Jade White (10100)» while the capsule shows «أضف 50 × Jade White»
+   * (docs/ux/COLOUR-QUANTITIES.md §9).
+   */
+  cart: { icon: React.ReactNode; label: React.ReactNode; ariaLabel?: string; disabled: boolean; busy: boolean; onPress: () => void };
   buy: { disabled: boolean; busy: boolean; onPress: () => void };
 }
 
@@ -482,7 +487,7 @@ export function QuickBuyBar(props: QuickBuyBarProps) {
         type="button"
         data-testid="product-cta"
         data-quick-buy-capsule="cart"
-        aria-label={quick ? words.backToCart : undefined}
+        aria-label={quick ? words.backToCart : cart.ariaLabel}
         disabled={!quick && cart.disabled}
         aria-busy={(!quick && cart.busy) || undefined}
         onClick={onCartClick}

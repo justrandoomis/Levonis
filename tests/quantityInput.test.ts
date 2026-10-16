@@ -174,3 +174,31 @@ test('no door hard-codes the per-line ceiling any more', () => {
     assert.doesNotMatch(src, /MIN\(99,|max: 99\b(?!,? ?def: 5)/, `${rel} still carries its own 99`);
   }
 });
+
+// ─────────────────────────────────── a colour row means «none» by 0 (§3.10)
+
+test('min 0 is honoured EXACTLY: a colour row can hold 0; the default floor is still 1', () => {
+  assert.equal(clampQuantity(-1, 10, 0).value, 0);
+  assert.equal(clampQuantity(0, 10, 0).value, 0);
+  assert.equal(clampQuantity(3, 0, 0).value, 0, 'a ceiling of 0 lowers a row to 0');
+  assert.equal(resolveQuantityDraft('0', { max: 10, min: 0, previous: 3 }).value, 0, 'a typed 0 means 0');
+  assert.equal(resolveQuantityDraft('', { max: 10, min: 0, previous: 3 }).value, 3, 'an empty draft goes back');
+  // Every existing caller is unchanged.
+  assert.equal(clampQuantity(5, 0).value, 1);
+  assert.equal(clampQuantity(0, 10).value, 1);
+  assert.equal(clampQuantity(0, 10, 1).value, 1);
+  assert.equal(resolveQuantityDraft('0', { max: 10, previous: 3 }).value, 1);
+});
+
+test('a colour row names its colour on − and +, and can take them out of the tab order', () => {
+  const src = read('src/components/ui/QuantityInput.tsx');
+  assert.match(src, /aria-label=\{decreaseLabel \?\? loc\('إنقاص الكمية'/);
+  assert.match(src, /aria-label=\{increaseLabel \?\? loc\('زيادة الكمية'/);
+  assert.equal((src.match(/tabIndex=\{stepButtonsInTabOrder \? undefined : -1\}/g) ?? []).length, 2, 'both step buttons');
+  assert.match(src, /aria-invalid=\{invalid \|\| undefined\}/);
+  assert.match(src, /aria-valuemin=\{floor\}/);
+  // The two hints a colour row surfaces speak Sorani (DECISIONS row 183).
+  assert.match(src, /`ماوەی پشکی پێشداواکاری: \$\{shown\}`/);
+  assert.match(src, /`زۆرترینی بەردەست: \$\{shown\}`/);
+  assert.doesNotMatch(src, /OWNER: Sorani to be written by hand/);
+});
