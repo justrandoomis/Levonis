@@ -106,8 +106,14 @@ export interface WorldOptions {
   robots?: string;
   /** A store answer per handle (default: the fixture page). */
   storePage?: (handle: string, attempt: number) => Response | null;
-  /** Planted strings the fake Worker echoes back in every free-text field it has (the log test). */
-  planted?: string[];
+  /**
+   * ONE planted private value the fake Worker answers in EVERY field it has (the log test): free text, and
+   * every field the runner shape-checks — status.current.handle, current_product, blocker, failed_stage, a
+   * missing-info reason and a finance key, the lease's slug and stage_data, run/finish and withdraw state,
+   * error messages. Planted on its own (never joined with others), so a value of a field's own shape — a
+   * lower-case slug, an UPPER_SNAKE SKU, a snake_case key — is really tried against that field.
+   */
+  planted?: string;
   /** The reviewed SHA-256s /hello answers (default: the runner's own). */
   reviewed?: (own: Record<string, string>) => Record<string, string>;
   /** Initial states (sid → partial item). */
@@ -208,7 +214,7 @@ export class World {
   }
 
   private planted(): string {
-    return (this.opts.planted ?? []).join(' ');
+    return this.opts.planted ?? '';
   }
 
   // ---------------------------------------------------------------- fetch
@@ -286,7 +292,8 @@ export class World {
       stage_data: this.opts.planted ? { note: this.planted() } : {},
       blocker_code: i.blocker_code,
       levonis_product_id: i.levonis_product_id,
-      slug: i.slug,
+      // A slug the item does not have yet (not COMPLETE, not even written): the planted one.
+      slug: i.slug || this.planted(),
       payload_sha256: i.payload_sha,
     };
   }
@@ -308,7 +315,8 @@ export class World {
       for (const i of this.items.values()) counts[i.state] = (counts[i.state] ?? 0) + 1;
       const current = this.inFlight();
       const next = [...this.items.values()].filter((i) => i.state === 'DISCOVERED').sort((a, b) => a.queue_position - b.queue_position)[0] ?? null;
-      const ref = (i: FakeItem | null) => (i ? { source_product_id: i.sid, handle: i.handle, queue_position: i.queue_position, state: i.state, last_completed_stage: i.last_completed } : null);
+      const ref = (i: FakeItem | null) =>
+        i ? { source_product_id: i.sid, handle: planted || i.handle, queue_position: i.queue_position, state: i.state, last_completed_stage: i.last_completed } : null;
       return json(200, {
         run: { id: RUN_ID, state: this.runState },
         counts,
@@ -317,7 +325,15 @@ export class World {
         last_verified_url: '',
         complete_count: counts.COMPLETE ?? 0,
         discovered_total: this.items.size,
-        ...(planted ? { current_product: planted, blocker: planted, failed_stage: planted, missing_info_by_reason: { [planted]: 1 } } : {}),
+        ...(planted
+          ? {
+              current_product: planted,
+              blocker: planted,
+              failed_stage: planted,
+              missing_info_by_reason: { [planted]: 1, not_applicable: 2 },
+              finance_protection: { guard_hits: 0, [planted]: 1, snapshots: { before: 1, [planted]: 2 } },
+            }
+          : {}),
       });
     }
     if (path === '/manifest') return json(200, { accepted: Array.isArray(body?.rows) ? body!.rows.length : 0 });
@@ -326,7 +342,7 @@ export class World {
     if (path === '/run/finish') {
       const partial = [...this.items.values()].some((i) => i.state === 'BLOCKED' || i.state === 'WITHDRAWN_AT_SOURCE');
       this.runState = 'closed';
-      return json(200, { state: partial ? 'partial' : 'closed' });
+      return json(200, { state: planted || (partial ? 'partial' : 'closed') });
     }
     const m = /^\/items\/(\d+)\/([a-z-]+)$/.exec(path);
     if (!m) return json(404, { code: 'NO_ROUTE', message: 'no route' });
@@ -348,7 +364,7 @@ export class World {
       if (i.state !== 'BLOCKED' || i.blocker_code !== 'SOURCE_WITHDRAWN' || typeof body?.approval_ref !== 'string') return json(409, { code: 'IMPORT_ILLEGAL_TRANSITION', message: 'withdraw' });
       i.state = 'WITHDRAWN_AT_SOURCE';
       this.events.push({ seq: ++this.seq, sid: i.sid, state: 'WITHDRAWN_AT_SOURCE', outcome: 'withdrawn', code: 'SOURCE_WITHDRAWN', release: false, retry_at: '' });
-      return json(200, { state: i.state });
+      return json(200, { state: planted || i.state });
     }
     if (!leaseOk()) return json(409, { code: 'IMPORT_LEASE_LOST', message: 'lease' });
     renew();

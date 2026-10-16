@@ -2,32 +2,41 @@
  * NOTHING PRIVATE LEAVES THE IMPORT IN CLEAR (Bambu import spec §A.8).
  *
  * The repository is public, so are its Actions logs and artifacts. A recorded
- * run (open, then the queue: one product COMPLETE, one refused by the Worker)
- * goes through the real runner against a fake Worker that PLANTS private
- * values in every free-text field it answers — a hidden product's name and
- * slug, a draft product's SKU, an inactive catalog's name — while the pages
- * carry real `source_url`s and a manifest row carries a planted
- * `canonical_url`. None of them, and not the job token, may appear in the
- * log, the job summary, the step outputs or any file that is not sealed.
- * Every artifact must be sealed, and the private material it holds opens only
- * with the one-time key.
+ * run (open, then the queue: one product COMPLETE, one refused by the Worker;
+ * then close; and a withdrawal) goes through the real runner against a fake
+ * Worker that PLANTS a private value in EVERY field it answers — a hidden
+ * product's name and slug, a draft product's SKU, an inactive catalog's key —
+ * while the pages carry real `source_url`s and a manifest row carries a
+ * planted `canonical_url`. Each value is planted ON ITS OWN, in the very shape
+ * of the fields that are filtered by shape (a lower-case slug where a handle
+ * goes, an UPPER_SNAKE SKU where a code or a stage goes, a snake_case key
+ * where a reason goes), so a shape filter alone cannot pass this test. None
+ * of them, and not the job token, may appear in the log, the job summary, the
+ * step outputs or any file that is not sealed. Every artifact must be sealed,
+ * and the private material it holds opens only with the one-time key. The
+ * real process entry (`main()`, with GITHUB_OUTPUT, GITHUB_STEP_SUMMARY and
+ * the file sealer) is run once per value too, through a local server.
  *
  * Run: node --import tsx --test tests/catalogImportLogs.test.ts
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createPrivateKey } from 'node:crypto';
-import { TOKEN, World } from './fixtures/bambuImportWorld';
+import { ROOT } from './fixtures/d1';
+import { SITE, TOKEN, World } from './fixtures/bambuImportWorld';
 import { ImportLog, scrub } from '../scripts/bambu-import/log';
 import { renderSummary } from '../scripts/bambu-import/summary';
 import { fileSealer } from '../scripts/bambu-import/run';
 // @ts-expect-error - plain ESM helper run by workflow 60 and in the sandbox, no types
 import { unsealBuffer, generateSealKeys } from '../scripts/bambu-import/seal.mjs';
 
-const PLANTED = ['PLANTED-HIDDEN-NAME', 'planted-hidden-slug', 'PLANTED-DRAFT-SKU', 'PLANTED-INACTIVE-CATALOG'];
+/** Each planted on its own: free text, and the shapes of a handle, a code or stage, a reason or finance key. */
+const PLANTED = ['PLANTED-HIDDEN-NAME', 'planted-hidden-slug', 'PLANTED_DRAFT_SKU', 'planted_inactive_catalog', 'PLANTED HIDDEN NAME'];
 const CANONICAL = 'https://us.store.bambulab.com/products/PLANTED-CANONICAL-URL';
 /** Owner-only provenance that must never be printed (the fixture pages' image hosts, the store itself). */
 const PROVENANCE = ['store.bblcdn.com', 'us.store.bambulab.com', 'PLANTED-CANONICAL-URL', 'cdn.shopify.com'];
@@ -43,57 +52,184 @@ function filesUnder(dir: string): string[] {
   return out;
 }
 
-test('a recorded run with planted private values: none reaches the log, the summary, the outputs or an unsealed file', async () => {
-  const w = new World({ planted: PLANTED });
-  try {
-    w.bundle.rows[0].canonical_url = CANONICAL;
-    // The second product is refused by the Worker with a message that names private things.
-    w.inject(/\/items\/580876092009701376\/stage$/, 9, () => json(400, { code: 'IMPORT_REVIEWED_SCOPE_REFUSED', message: `merge into ${PLANTED.join(' ')} at ${CANONICAL}` }));
-    assert.equal(await w.importer({ mode: 'open', runId: '' }).main(), 0);
-    assert.equal(await w.importer().main(), 0);
-    assert.equal(w.item('filament-buffer').state, 'COMPLETE');
-    assert.equal(w.item('ams-2-pro').blocker_code, 'REVIEWED_SCOPE_REFUSED');
+/** Asserts that no planted value, provenance or the token is in `text`. */
+function clean(where: string, text: string, planted: string): void {
+  for (const secret of [TOKEN, planted, ...PROVENANCE]) assert.ok(!text.includes(secret), `${secret} appears in the ${where}`);
+  assert.doesNotMatch(text, /[0-9a-f]{64}/, `no 64-hex value (a token or a hash) in the ${where}`);
+}
 
-    // The private values really travelled through the runner (otherwise this test proves nothing).
-    const manifestCall = w.calls.find((c) => c.path === '/manifest')!;
-    assert.ok(JSON.stringify(manifestCall.body).includes(CANONICAL), 'the planted canonical_url reached the Worker');
-    const stage = w.calls.find((c) => c.path.endsWith('/stage'))!;
-    assert.ok(JSON.stringify(stage.body).includes('store.bblcdn.com'), 'source URLs travel in the payload');
-
-    const log = w.logLines.join('\n');
-    const summary = readFileSync(w.summaryFile, 'utf8');
-    const outputs = JSON.stringify(w.outputs);
-    for (const [where, text] of [['log', log], ['summary', summary], ['outputs', outputs]] as const) {
-      for (const secret of [TOKEN, ...PLANTED, ...PROVENANCE]) assert.ok(!text.includes(secret), `${secret} appears in the ${where}`);
-      assert.doesNotMatch(text, /[0-9a-f]{64}/, `no 64-hex value (a token or a hash) in the ${where}`);
-    }
-    // The log says what happened, in codes and counts.
-    assert.match(log, /#2 ams-2-pro BLOCKED: BLOCKED REVIEWED_SCOPE_REFUSED; the queue stops here/);
-    assert.match(log, /COMPLETE: https:\/\/levonis-iq\.com\/product\/bambu-filament-buffer/);
-    assert.match(summary, /partial/);
-
-    // Every file the job left is sealed; the private material is inside, and opens only with the one-time key.
-    const files = filesUnder(join(w.dir, 'out'));
-    assert.ok(files.length >= 3);
-    const key = createPrivateKey(w.keys.privateKeyPem);
-    let privateInside = false;
-    for (const file of files) {
-      assert.match(file, /\.sealed$/);
-      const bytes = readFileSync(file);
-      assert.equal(bytes.subarray(0, 6).toString(), 'LVSEAL');
-      const raw = new TextDecoder('latin1').decode(bytes);
-      for (const secret of [TOKEN, ...PLANTED, ...PROVENANCE]) assert.ok(!raw.includes(secret), `${secret} in the sealed bytes of ${file}`);
-      const clear = new TextDecoder().decode(unsealBuffer(key, bytes) as Uint8Array);
-      if (clear.includes('store.bblcdn.com') || clear.includes('PLANTED-HIDDEN-NAME')) privateInside = true;
-      assert.ok(!clear.includes(TOKEN), 'the token is not even in a sealed artifact');
-    }
-    assert.ok(privateInside, 'the sealed reports keep the owner-only material for the agent');
-    const other = generateSealKeys() as { privateKeyPem: string };
-    assert.throws(() => unsealBuffer(createPrivateKey(other.privateKeyPem), readFileSync(files[0])), /sealed to key/);
-  } finally {
-    w.dispose();
+/** Every file under `dir` is sealed, carries nothing in clear, and opens only with the one-time key. */
+function allSealed(dir: string, privateKeyPem: string, planted: string): boolean {
+  const files = filesUnder(dir);
+  const key = createPrivateKey(privateKeyPem);
+  let privateInside = false;
+  for (const file of files) {
+    assert.match(file, /\.sealed$/);
+    const bytes = readFileSync(file);
+    assert.equal(bytes.subarray(0, 6).toString(), 'LVSEAL');
+    const raw = new TextDecoder('latin1').decode(bytes);
+    for (const secret of [TOKEN, planted, ...PROVENANCE]) assert.ok(!raw.includes(secret), `${secret} in the sealed bytes of ${file}`);
+    const clear = new TextDecoder().decode(unsealBuffer(key, bytes) as Uint8Array);
+    if (clear.includes('store.bblcdn.com') || clear.includes(planted)) privateInside = true;
+    assert.ok(!clear.includes(TOKEN), 'the token is not even in a sealed artifact');
   }
-});
+  return privateInside;
+}
+
+for (const planted of PLANTED) {
+  test(`a recorded run with ${JSON.stringify(planted)} planted in every Worker field: it reaches no log, summary, output or unsealed file`, async () => {
+    const w = new World({ planted });
+    try {
+      w.bundle.rows[0].canonical_url = CANONICAL;
+      // The second product is refused by the Worker with a message that names private things.
+      w.inject(/\/items\/580876092009701376\/stage$/, 9, () => json(400, { code: 'IMPORT_REVIEWED_SCOPE_REFUSED', message: `merge into ${planted} at ${CANONICAL}` }));
+      const summaries: string[] = [];
+      const job = async (over: Parameters<World['importer']>[0]) => {
+        const code = await w.importer(over).main();
+        summaries.push(readFileSync(w.summaryFile, 'utf8'));
+        return code;
+      };
+      assert.equal(await job({ mode: 'open', runId: '' }), 0);
+      assert.equal(await job({}), 0);
+      assert.equal(w.item('filament-buffer').state, 'COMPLETE');
+      assert.equal(w.item('ams-2-pro').blocker_code, 'REVIEWED_SCOPE_REFUSED');
+      // close: the sitemaps, the sweep, the snapshot after, and a /run/finish whose state is the planted value.
+      await job({ mode: 'close' });
+      assert.ok(w.calls.some((c) => c.path === '/run/finish'), 'close reached /run/finish');
+
+      // The private values really travelled through the runner (otherwise this test proves nothing).
+      const manifestCall = w.calls.find((c) => c.path === '/manifest')!;
+      assert.ok(JSON.stringify(manifestCall.body).includes(CANONICAL), 'the planted canonical_url reached the Worker');
+      const stage = w.calls.find((c) => c.path.endsWith('/stage'))!;
+      assert.ok(JSON.stringify(stage.body).includes('store.bblcdn.com'), 'source URLs travel in the payload');
+
+      const log = w.logLines.join('\n');
+      for (const [where, text] of [['log', log], ['outputs', JSON.stringify(w.outputs)], ...summaries.map((t, i) => [`summary of job ${i + 1}`, t])] as const) clean(where, text, planted);
+      // The log says what happened, in codes and counts; the summary names the reviewed handle, not the Worker's text.
+      assert.match(log, /#2 ams-2-pro BLOCKED: BLOCKED REVIEWED_SCOPE_REFUSED; the queue stops here/);
+      assert.match(log, /COMPLETE: https:\/\/levonis-iq\.com\/product\/bambu-filament-buffer/);
+      assert.match(log, /run finished: state \[\?\]/, 'a finish state outside the fixed list prints the marker');
+      assert.match(summaries[1], /\| current_product \| (?:filament-buffer|ams-2-pro) \|/);
+      assert.match(summaries[1], /\| missing_info_by_reason \| not_applicable 2 \|/);
+      assert.match(summaries[1], /\| finance_protection \| guard_hits 0, snapshots\.before 1 \|/);
+      assert.match(summaries.at(-1)!, /partial/);
+
+      // Every file the job left is sealed; the private material is inside, and opens only with the one-time key.
+      assert.ok(filesUnder(join(w.dir, 'out')).length >= 3);
+      assert.ok(allSealed(join(w.dir, 'out'), w.keys.privateKeyPem, planted), 'the sealed reports keep the owner-only material for the agent');
+      const other = generateSealKeys() as { privateKeyPem: string };
+      assert.throws(() => unsealBuffer(createPrivateKey(other.privateKeyPem), readFileSync(filesUnder(join(w.dir, 'out'))[0])), /sealed to key/);
+    } finally {
+      w.dispose();
+    }
+    // A withdrawal: the Worker answers the planted value as the state.
+    const g = new World({
+      planted,
+      handles: ['filament-buffer'],
+      items: { '6945416380552': { state: 'BLOCKED', last_completed: '', blocker_code: 'SOURCE_WITHDRAWN' } },
+      storePage: () => new Response('gone', { status: 410 }),
+      sitemapExclude: ['filament-buffer'],
+    });
+    try {
+      await g.importer({ mode: 'withdraw', item: '6945416380552' }).main();
+      assert.equal(callsToWithdraw(g), 1, 'the withdrawal reached the Worker');
+      assert.match(g.logLines.join('\n'), /withdrawn at the source: state \[\?\]/);
+      clean('withdraw log', g.logLines.join('\n'), planted);
+      clean('withdraw summary', readFileSync(g.summaryFile, 'utf8'), planted);
+    } finally {
+      g.dispose();
+    }
+  });
+}
+
+const callsToWithdraw = (w: World) => w.calls.filter((c) => /\/withdraw$/.test(c.path)).length;
+
+/** The fake world behind a local HTTP server: the importer's real process talks to it as to the live site. */
+async function serve(w: World): Promise<{ origin: string; close: () => Promise<void> }> {
+  const server = createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (c: Buffer) => chunks.push(c));
+    req.on('end', () => {
+      const headers = Object.fromEntries(Object.entries(req.headers).map(([k, v]) => [k, Array.isArray(v) ? v.join(', ') : String(v ?? '')]));
+      const body = chunks.length ? Buffer.concat(chunks).toString('utf8') : undefined;
+      w.fetch(`${SITE}${req.url}`, { method: req.method, headers, body })
+        .then(async (answer) => {
+          res.writeHead(answer.status, Object.fromEntries(answer.headers.entries()));
+          res.end(Buffer.from(await answer.arrayBuffer()));
+        })
+        .catch(() => res.writeHead(500).end());
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+  const port = (server.address() as { port: number }).port;
+  return { origin: `http://127.0.0.1:${port}`, close: () => new Promise((resolve) => server.close(() => resolve())) };
+}
+
+for (const planted of PLANTED) {
+  test(`the real main() in mode open with ${JSON.stringify(planted)} planted: GITHUB_OUTPUT, GITHUB_STEP_SUMMARY, stdout and every file it leaves are clean`, async () => {
+    const w = new World({ planted });
+    const job = mkdtempSync(join(tmpdir(), 'levonis-runner-main-'));
+    const site = await serve(w);
+    try {
+      const tokenFile = join(job, 'import-token');
+      writeFileSync(tokenFile, `${TOKEN}\n`, { mode: 0o600 });
+      mkdirSync(join(job, 'out'), { mode: 0o700 });
+      const output = join(job, 'github_output');
+      const summary = join(job, 'step_summary');
+      writeFileSync(output, '');
+      writeFileSync(summary, '');
+      const child = spawn(process.execPath, ['--import', 'tsx', join(ROOT, 'scripts/bambu-import/run.ts')], {
+        cwd: ROOT,
+        env: {
+          PATH: process.env.PATH ?? '',
+          HOME: job,
+          IN_MODE: 'open',
+          IN_RUN_ID: '',
+          IN_MAX_ITEMS: '0',
+          IN_RESUME: 'false',
+          IN_CHAIN: 'false',
+          IN_CHAIN_COUNT: '0',
+          IN_ITEM: '',
+          IN_SEAL_PUBKEY: w.keys.publicKey,
+          DEADLINE_EPOCH: String(Math.floor(Date.now() / 1000) + 330 * 60),
+          IMPORT_TOKEN_FILE: tokenFile,
+          IMPORT_RUN_FILE: join(job, 'import-run'),
+          IMPORT_SITE_ORIGIN: site.origin,
+          IMPORT_DATA_DIR: join(w.dir, 'data'),
+          IMPORT_OUT_DIR: join(job, 'out'),
+          GITHUB_OUTPUT: output,
+          GITHUB_STEP_SUMMARY: summary,
+          GITHUB_RUN_ID: '123',
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let stdout = '';
+      let stderr = '';
+      child.stdout.on('data', (c: Buffer) => (stdout += c.toString()));
+      child.stderr.on('data', (c: Buffer) => (stderr += c.toString()));
+      const code = await new Promise<number | null>((resolve) => child.on('close', resolve));
+      assert.equal(code, 0, `${stdout}\n${stderr}`);
+      assert.match(readFileSync(output, 'utf8'), /^more=false\nblocked=false\nrun_id=cir_[0-9a-f]{24}\n$/);
+      assert.ok(readFileSync(summary, 'utf8').length > 0, 'the summary was written');
+      assert.ok(w.calls.some((c) => c.path === '/run/protect-snapshot'), 'the open mode ran against the planted Worker');
+      clean('stdout', stdout, planted);
+      clean('stderr', stderr, planted);
+      // Every file the job left in its temporary directory: the token file is gone, the rest is clean or sealed.
+      const left = filesUnder(job);
+      assert.ok(!left.includes(tokenFile), 'the importer deleted the token file');
+      for (const file of left) {
+        if (file.startsWith(join(job, 'out'))) continue;
+        clean(file, readFileSync(file, 'utf8'), planted);
+      }
+      assert.deepEqual(readdirSync(join(job, 'out')), ['open-report.json.sealed']);
+      assert.ok(allSealed(join(job, 'out'), w.keys.privateKeyPem, planted));
+    } finally {
+      await site.close();
+      w.dispose();
+      rmSync(job, { recursive: true, force: true });
+    }
+  });
+}
 
 test('the logger prints only values of their own shape; exceptions are scrubbed', () => {
   const lines: string[] = [];
@@ -124,20 +260,44 @@ test('the logger prints only values of their own shape; exceptions are scrubbed'
 
 test('the summary: §H.3 counts only, "partial" names the BLOCKED items, never «تم» or "100 %"', () => {
   const base = { mode: 'run', runId: 'cir_0123456789abcdef01234567', siteOrigin: 'https://levonis-iq.com', withdrawn: [] as string[], more: false };
+  // Each Worker field holds a private value of that field's OWN shape: a shape filter alone would print it.
   const status = {
     run: { id: 'cir_0123456789abcdef01234567', state: 'running' },
     counts: { COMPLETE: 3, BLOCKED: 1 },
-    current: null,
+    current: { source_product_id: '580876092009701376', handle: 'bambu-lab-a1-mini-owner-hidden', queue_position: 4, state: 'BLOCKED', last_completed_stage: 'VALIDATING' },
     next: null,
     last_verified_url: 'https://us.store.bambulab.com/products/a1',
-    progress: { complete_count: 3, discovered_total: 4, created_count: 'PLANTED-HIDDEN-NAME', blocker: 'PLANTED-DRAFT-SKU', current_product: 'planted hidden slug', missing_info_by_reason: { not_found_in_checked_sources: 12, 'PLANTED-INACTIVE-CATALOG': 3 } },
+    progress: {
+      complete_count: 3,
+      discovered_total: 4,
+      created_count: 'PLANTED-HIDDEN-NAME',
+      blocker: 'PLANTED_DRAFT_SKU',
+      failed_stage: 'PLANTED_DRAFT_SKU',
+      current_product: 'planted-hidden-slug',
+      missing_info_by_reason: { not_found_in_checked_sources: 12, planted_inactive_catalog: 3 },
+      finance_protection: { guard_hits: 0, planted_inactive_catalog: 1, snapshots: { before: 3, planted_inactive_catalog: 4 } },
+    },
   };
-  const partial = renderSummary({ ...base, status, items: [{ position: 4, handle: 'ams-2-pro', outcome: 'blocked', code: 'ACCESS_CHALLENGE' }], blocked: [{ handle: 'ams-2-pro', code: 'ACCESS_CHALLENGE' }] });
+  const handleOf = (sid: string) => (sid === '580876092009701376' ? 'ams-2-pro' : null);
+  const partial = renderSummary({
+    ...base,
+    status,
+    handleOf,
+    items: [{ position: 4, handle: 'ams-2-pro', outcome: 'blocked', code: 'ACCESS_CHALLENGE' }, { position: 5, handle: 'a1', outcome: 'blocked', code: 'PLANTED_DRAFT_SKU' }],
+    blocked: [{ handle: 'ams-2-pro', code: 'ACCESS_CHALLENGE' }, { handle: 'a1', code: 'PLANTED_DRAFT_SKU' }],
+  });
   assert.match(partial, /The run is \*\*partial\*\*/);
   assert.match(partial, /- BLOCKED `ams-2-pro` ACCESS_CHALLENGE/);
   assert.match(partial, /3 of 4 items complete\./);
+  assert.match(partial, /\| current_product \| ams-2-pro \|/, 'the reviewed handle of the id, never the Worker\'s text');
+  assert.match(partial, /\| blocker \| - \|/);
+  assert.match(partial, /\| failed_stage \| - \|/);
   assert.match(partial, /\| missing_info_by_reason \| not_found_in_checked_sources 12 \|/);
-  for (const secret of [...PLANTED, 'planted hidden slug', 'us.store.bambulab.com']) assert.ok(!partial.includes(secret), secret);
+  assert.match(partial, /\| finance_protection \| guard_hits 0, snapshots\.before 3 \|/);
+  for (const secret of [...PLANTED, 'bambu-lab-a1-mini-owner-hidden', 'us.store.bambulab.com']) assert.ok(!partial.includes(secret), secret);
+  // An id outside the reviewed manifest names no product at all.
+  assert.match(renderSummary({ ...base, status, handleOf: () => null, items: [], blocked: [] }), /\| current_product \| - \|/);
+  assert.match(renderSummary({ ...base, status: { ...status, progress: { ...status.progress, blocker: 'ACCESS_CHALLENGE', failed_stage: 'VALIDATING' } }, handleOf, items: [], blocked: [] }), /\| failed_stage \| VALIDATING \|[\s\S]*\| blocker \| ACCESS_CHALLENGE \|/);
   const done = renderSummary({ ...base, status: { ...status, counts: { COMPLETE: 4 }, progress: { complete_count: 4, discovered_total: 4 } }, items: [], blocked: [], closedState: 'closed' });
   assert.doesNotMatch(done, /partial|100 ?%|تم/);
   assert.match(done, /4 of 4 items complete\./);

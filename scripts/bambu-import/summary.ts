@@ -2,10 +2,15 @@
  * THE JOB SUMMARY (Bambu import spec §H.3, §I.3; written after every product).
  *
  * Counts only. The §H.3 progress fields come from `/run/status` (D1
- * aggregates); every value is printed only when it has its field's shape: a
- * count is a whole number, a code is a code, the current product is a store
- * handle, a public product URL is `<site>/product/<slug>` of a COMPLETE item.
- * Anything else prints as "-". No name, no id, no source URL, no conflict text.
+ * aggregates). A SHAPE IS NOT ENOUGH: a hidden product's slug has the shape of
+ * a handle, a draft SKU the shape of a code, an inactive catalog's key the
+ * shape of a reason. So nothing the Worker writes is printed as text: a count
+ * is a whole number; the current product is the REVIEWED manifest's handle of
+ * the item `/run/status` names by source id (never the Worker's own text); a
+ * code is one of the fixed §B.5 codes; a stage is one of the seven stages; a
+ * reason or finance key is one of its fixed list; a public product URL is
+ * `<site>/product/<slug>` of a COMPLETE item. Anything else prints as "-".
+ * No name, no id, no source URL, no conflict text.
  *
  * WORDING (§I.3): the summary says "partial" and names the exact BLOCKED and
  * WITHDRAWN items when any exists. It never says «تم» or "100 %": completion is
@@ -14,7 +19,7 @@
  */
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { ImportLog } from './log';
-import type { StatusAnswer } from './opsClient';
+import { BLOCKER_CODES, TRANSIENT_CODES, type StatusAnswer } from './opsClient';
 
 export const PROGRESS_FIELDS = [
   'discovered_total',
@@ -62,8 +67,23 @@ const HEADLINES = {
   closed: { en: 'Bambu Lab import: closed', ar: 'استيراد Bambu Lab: مُغلق', ckb: 'هاوردەکردنی Bambu Lab: داخراوە' },
 } as const;
 
-const CODE = /^[A-Z][A-Z0-9_]{1,63}$/;
-const STAGE = /^[A-Z_]{3,32}$/;
+/** The codes a summary names: §B.5's blockers and transients, and the few the runner and the Worker add. */
+export const SUMMARY_CODES: ReadonlySet<string> = new Set([...BLOCKER_CODES, ...TRANSIENT_CODES, 'BLOCKED', 'UNCLASSIFIED', 'DEADLINE_EXIT']);
+/** The seven working stages (run.ts STAGES): `failed_stage` is one of them. */
+export const SUMMARY_STAGES: ReadonlySet<string> = new Set(['EXTRACTING', 'ENRICHING', 'VALIDATING', 'INGESTING_MEDIA', 'WRITING', 'PUBLISHING', 'VERIFYING_LIVE']);
+/** `missing_info_by_reason` keys: the payload's `missing_reason` values (§C.6), and the Worker's name for none. */
+export const MISSING_REASONS: ReadonlySet<string> = new Set(['not_found_in_checked_sources', 'not_published_by_manufacturer', 'not_applicable', 'unspecified']);
+/** `finance_protection` keys (§H.3 "Finance protection"), one nested level read as `<key>.<phase>`. */
+export const FINANCE_KEYS: ReadonlySet<string> = new Set([
+  'guard_hits',
+  'write_equal',
+  'write_unequal',
+  'stock_not_configured',
+  'snapshots.before',
+  'snapshots.after',
+  'snapshots.write',
+]);
+const code = (v: unknown): string => (typeof v === 'string' && SUMMARY_CODES.has(v) ? v : '');
 const count = (v: unknown): string => (typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v.toLocaleString('en-US') : '-');
 
 export interface SummaryItem {
@@ -79,6 +99,8 @@ export interface SummaryInput {
   runId: string;
   siteOrigin: string;
   status: StatusAnswer | null;
+  /** The reviewed manifest's handle of a source product id (null when the id is not in it). */
+  handleOf?: (sourceProductId: string) => string | null;
   /** This job's items, in order. */
   items: readonly SummaryItem[];
   /** BLOCKED and WITHDRAWN items of the whole run (handles and codes), when known. */
@@ -106,20 +128,18 @@ export function renderSummary(inp: SummaryInput): string {
   for (const field of PROGRESS_FIELDS) {
     const v = progress[field];
     let shown = '-';
-    if (field === 'current_product') shown = typeof v === 'string' ? ImportLog.handle(v) : inp.status?.current ? ImportLog.handle(inp.status.current.handle) : '-';
-    else if (field === 'public_product_url') shown = log.liveUrl(v) ?? log.liveUrl(inp.status?.last_verified_url) ?? '-';
-    else if (field === 'failed_stage') shown = typeof v === 'string' && STAGE.test(v) ? v : '-';
-    else if (field === 'blocker') shown = typeof v === 'string' && CODE.test(v) ? v : '-';
+    if (field === 'current_product') {
+      // The Worker's own text (its `current_product`, `current.handle`) is never printed: only the reviewed handle of the id.
+      const sid = inp.status?.current?.source_product_id ?? '';
+      const reviewed = sid && inp.handleOf ? inp.handleOf(sid) : null;
+      shown = reviewed ? ImportLog.handle(reviewed) : '-';
+    } else if (field === 'public_product_url') shown = log.liveUrl(v) ?? log.liveUrl(inp.status?.last_verified_url) ?? '-';
+    else if (field === 'failed_stage') shown = typeof v === 'string' && SUMMARY_STAGES.has(v) ? v : '-';
+    else if (field === 'blocker') shown = code(v) || '-';
     else if (field === 'resumption_instruction') shown = partial || blockedCount ? RESUME_INSTRUCTION.en : '-';
-    else if (field === 'missing_info_by_reason' || field === 'finance_protection') {
-      shown =
-        v && typeof v === 'object' && !Array.isArray(v)
-          ? Object.entries(v as Record<string, unknown>)
-              .filter(([k, n]) => /^[a-z_]{1,48}$/.test(k) && (typeof n === 'number' || typeof n === 'boolean'))
-              .map(([k, n]) => `${k} ${typeof n === 'boolean' ? (n ? 'yes' : 'no') : count(n)}`)
-              .join(', ') || '-'
-          : '-';
-    } else if (field === 'complete_count') shown = count(complete);
+    else if (field === 'missing_info_by_reason') shown = listed(v, MISSING_REASONS);
+    else if (field === 'finance_protection') shown = listed(v, FINANCE_KEYS);
+    else if (field === 'complete_count') shown = count(complete);
     else if (field === 'blocked_count') shown = count(blockedCount);
     else if (field === 'withdrawn_count') shown = count(withdrawnCount);
     else if (field === 'discovered_total') shown = total ? count(total) : '-';
@@ -129,17 +149,33 @@ export function renderSummary(inp: SummaryInput): string {
   if (inp.items.length) {
     lines.push('', '### This job', '', '| # | handle | outcome | code | public page |', '|---|---|---|---|---|');
     for (const it of inp.items) {
-      lines.push(`| ${count(it.position)} | ${ImportLog.handle(it.handle)} | ${it.outcome} | ${it.code && CODE.test(it.code) ? it.code : ''} | ${it.outcome === 'complete' ? log.liveUrl(it.url) ?? '' : ''} |`);
+      lines.push(`| ${count(it.position)} | ${ImportLog.handle(it.handle)} | ${it.outcome} | ${code(it.code)} | ${it.outcome === 'complete' ? log.liveUrl(it.url) ?? '' : ''} |`);
     }
   }
   if (inp.blocked.length || inp.withdrawn.length) {
     lines.push('', '### BLOCKED and withdrawn items');
-    for (const b of inp.blocked) lines.push(`- BLOCKED \`${ImportLog.handle(b.handle)}\` ${CODE.test(b.code) ? b.code : ''}`);
+    for (const b of inp.blocked) lines.push(`- BLOCKED \`${ImportLog.handle(b.handle)}\` ${code(b.code)}`);
     for (const w of inp.withdrawn) lines.push(`- WITHDRAWN_AT_SOURCE \`${ImportLog.handle(w)}\``);
     lines.push('', `${RESUME_INSTRUCTION.ar}`, `${RESUME_INSTRUCTION.en}`, `${RESUME_INSTRUCTION.ckb}`);
   }
   lines.push('', `More to do: ${inp.more ? 'yes' : 'no'}.`);
   return `${lines.join('\n')}\n`;
+}
+
+/** `{key: count | boolean}` (one nested level as `key.sub`), only the keys of the fixed list, as "key n, …". */
+function listed(v: unknown, keys: ReadonlySet<string>): string {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return '-';
+  const flat: Array<[string, unknown]> = [];
+  for (const [k, n] of Object.entries(v as Record<string, unknown>)) {
+    if (n && typeof n === 'object' && !Array.isArray(n)) for (const [sub, m] of Object.entries(n as Record<string, unknown>)) flat.push([`${k}.${sub}`, m]);
+    else flat.push([k, n]);
+  }
+  return (
+    flat
+      .filter(([k, n]) => keys.has(k) && (typeof n === 'number' || typeof n === 'boolean'))
+      .map(([k, n]) => `${k} ${typeof n === 'boolean' ? (n ? 'yes' : 'no') : count(n)}`)
+      .join(', ') || '-'
+  );
 }
 
 /** The summary file is rewritten after every product: the newest counts replace the previous ones. */

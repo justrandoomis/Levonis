@@ -322,7 +322,18 @@ export class Importer {
   private writeSummary(more: boolean, closedState?: string): void {
     const blocked = this.items.filter((i) => i.outcome === 'blocked').map((i) => ({ handle: i.handle, code: i.code ?? '' }));
     this.deps.summary.write(
-      renderSummary({ mode: this.cfg.mode, runId: this.runId, siteOrigin: this.cfg.siteOrigin, status: this.status, items: this.items, blocked, withdrawn: [], more, closedState })
+      renderSummary({
+        mode: this.cfg.mode,
+        runId: this.runId,
+        siteOrigin: this.cfg.siteOrigin,
+        status: this.status,
+        handleOf: (sid) => this.deps.bundle.bySid.get(sid)?.handle ?? null,
+        items: this.items,
+        blocked,
+        withdrawn: [],
+        more,
+        closedState,
+      })
     );
   }
 

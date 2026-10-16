@@ -120,7 +120,8 @@ const PARAM_SHAPES: Readonly<Record<string, RegExp>> = {
   check: WORD,
   call: /^[a-z][a-z/_:-]{0,40}$/,
   phase: /^(before|after)$/,
-  state: /^[a-zA-Z_]{1,32}$/,
+  // A run state or an item state, from the fixed lists (§B.3): a Worker answer of any other text prints [?].
+  state: /^(?:open|running|blocked|closed|partial|DISCOVERED|EXTRACTING|ENRICHING|VALIDATING|INGESTING_MEDIA|WRITING|PUBLISHING|VERIFYING_LIVE|RETRYING|BLOCKED|COMPLETE|WITHDRAWN_AT_SOURCE)$/,
   what: WORD,
   name: /^[a-z0-9][a-z0-9._-]{0,80}\.sealed$/,
   run: RUN_ID,
