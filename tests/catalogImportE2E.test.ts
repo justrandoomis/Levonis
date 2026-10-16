@@ -23,6 +23,12 @@
  * again; a block after the write hides the created product and the resume puts
  * it back; DEADLINE_EXIT parks without counting toward stage_attempts; with no
  * open run every ops path answers the uniform 404.
+ *
+ * Merges through the real door, verified by the runner's own verifyPublic: an
+ * existing, unpriced product whose name is not the store title (merge), and an
+ * owner-hidden one (merge_publish) — every hard check, compare by the name the
+ * site shows, and COMPLETE. The close sweep over the real v1 list: more than
+ * one page of the brand, paged by `meta.pagination.next_cursor`.
  */
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -38,7 +44,7 @@ import { projectionFingerprint, projectionFromPayload, projectionFromSite, type 
 import type { ImportPayload } from '../packages/catalog/src/bambuImport/payload';
 import { specKey } from '../packages/catalog/src/bambuImport/registry/specKeys';
 import { reviewedBundleDigest, type ReviewedTexts } from '../worker/lib/catalogImport/reviewed';
-import { edgeEvidence, modelCodesOf, Site, verifyPublic, type VerifyContext, type VerifyOutcome } from '../scripts/bambu-import/verify';
+import { edgeEvidence, modelCodesOf, publicBrandSweep, Site, SWEEP_PAGE, verifyPublic, type VerifyContext, type VerifyOutcome } from '../scripts/bambu-import/verify';
 import { HostFetcher } from '../scripts/bambu-import/fetch';
 import { Deadline as RunnerDeadline } from '../scripts/bambu-import/deadline';
 import { writtenGallery } from '../scripts/bambu-import/gallery';
@@ -46,6 +52,11 @@ import { NOT_APPLICABLE } from '../scripts/bambu-import/browser';
 import { catalogOnlyLive } from '../scripts/bambu-import/run';
 import { writtenDocumentsOf, type DocumentCheck as RunnerDocumentCheck, type MediaAnswerRow, type WrittenImage } from '../scripts/bambu-import/opsClient';
 import { createHash } from 'node:crypto';
+import { asD1 } from './fixtures/app';
+import { publishSeededV2 } from './fixtures/autoPublish';
+import { seedCatalog, seedProduct } from './fixtures/completeness';
+import { planProductSave, saveProductAtomic } from '../worker/lib/productPersistence';
+import { validateProductDoc } from '../worker/lib/productModel';
 
 after(() => {
   restoreFetch();
@@ -103,8 +114,8 @@ function fixtures(): Fixture[] {
   });
 }
 
-function textsFor(rows: Array<Record<string, unknown>>): ReviewedTexts {
-  return bundleTexts({ manifestRows: rows, matches: [] }, { searchSynonyms: JSON.stringify(p0Json('search-synonyms.json')) });
+function textsFor(rows: Array<Record<string, unknown>>, matches: Array<Record<string, unknown>> = []): ReviewedTexts {
+  return bundleTexts({ manifestRows: rows, matches }, { searchSynonyms: JSON.stringify(p0Json('search-synonyms.json')) });
 }
 
 /** The /manifest request row, as scripts/bambu-import/discover.ts `manifestRequestRow` builds it. */
@@ -521,13 +532,27 @@ test('a collapse that hands the primary on: the hotend\'s general lead picture i
  * the tree, search, the quote and the request door, every /files object, compare — and its `edgeEvidence` is what
  * /complete judges. The browser has no place in-process: its part is recorded as the runner records a passing one.
  */
-async function runItemVerifiedByRunner(w: OpsWorld, client: Client, f: Fixture, texts: ReviewedTexts, titles: string[]): Promise<{ outcome: VerifyOutcome; done: { state: string; d1_checks: Record<string, unknown> } }> {
+async function runItemVerifiedByRunner(
+  w: OpsWorld,
+  client: Client,
+  f: Fixture,
+  texts: ReviewedTexts,
+  titles: string[]
+): Promise<{ outcome: VerifyOutcome; done: { state: string; d1_checks: Record<string, unknown> }; it: Awaited<ReturnType<typeof writeThroughDoor>> }> {
   const it = await writeThroughDoor(client, f);
   const outcome = await verifyByRunner(w, client, f, texts, titles, it, { documentChecks: it.checks as unknown as RunnerDocumentCheck[] });
   const browser = { ok: true, checks: { image_decodes: true, image_contain: true, selection_images: true }, counts: { values_checked: 1 }, selections: [], not_applicable: { ...NOT_APPLICABLE } };
   const liveUrl = `https://levonis-iq.com/product/${it.written.slug}`;
   const done = await client.complete(f.sid, it.t, liveUrl, edgeEvidence(outcome, browser, liveUrl, f.payload, 1));
-  return { outcome, done };
+  return { outcome, done, it };
+}
+
+/** The runner's site reader (verify.ts Site over fetch.ts HostFetcher), spaced on a clock that does not sleep, through this app. */
+function runnerSite(w: OpsWorld): Site {
+  let now = Date.now();
+  const fakeClock = { now: () => now, sleep: async (ms: number) => void (now += ms) };
+  const fetcher = new HostFetcher({ fetch: (url, init) => w.fetch(url, init), clock: fakeClock, deadline: new RunnerDeadline(now + 6 * 3600_000, fakeClock), siteOrigin: 'https://levonis-iq.com' });
+  return new Site('https://levonis-iq.com', fetcher, () => 0);
 }
 
 /** One item as run.ts sequences it up to VERIFY: lease, the stages, stage, media, write (with the checks), publish-finish. */
@@ -558,11 +583,7 @@ async function verifyByRunner(
   it: Awaited<ReturnType<typeof writeThroughDoor>>,
   documents: Pick<VerifyContext, 'documentChecks' | 'writtenDocuments'>
 ): Promise<VerifyOutcome> {
-  // The runner's site reader, spaced on a clock that does not sleep, through this app.
-  let now = Date.now();
-  const fakeClock = { now: () => now, sleep: async (ms: number) => void (now += ms) };
-  const fetcher = new HostFetcher({ fetch: (url, init) => w.fetch(url, init), clock: fakeClock, deadline: new RunnerDeadline(now + 6 * 3600_000, fakeClock), siteOrigin: 'https://levonis-iq.com' });
-  const site = new Site('https://levonis-iq.com', fetcher, () => 0);
+  const site = runnerSite(w);
   const runnerMedia = it.media as unknown as Map<string, MediaAnswerRow>;
   const gallery = writtenGallery(f.payload, runnerMedia, { rows: it.rows, source: 'write' });
   return verifyPublic(site, {
@@ -576,7 +597,8 @@ async function verifyByRunner(
     also: (f.row.also as string[]) ?? [],
     taxonomy: JSON.parse(texts.taxonomyMap) as Record<string, unknown>,
     modelCodes: modelCodesOf(f.payload.product.title_en, titles),
-    merge: null,
+    // run.ts mergeEvidence: this job's /write answer.
+    merge: f.payload.write_mode === 'merge' ? { before_fp_equal: it.written.before_fp_equal, source: 'write' } : null,
     readback: async () => {
       const rb = await client.readback(f.sid);
       return { ok: rb.ok, mismatches: rb.mismatches };
@@ -682,17 +704,147 @@ test('the runner\'s own VERIFY over the real routes (§I.1): H2D, PLA Basic and 
 
 test('preflight reads the real public context: catalog-only is live by the document\'s own content.products_priced, with no data envelope', async () => {
   const w = opsWorld();
-  let now = Date.now();
-  const fakeClock = { now: () => now, sleep: async (ms: number) => void (now += ms) };
-  const fetcher = new HostFetcher({ fetch: (url, init) => w.fetch(url, init), clock: fakeClock, deadline: new RunnerDeadline(now + 3600_000, fakeClock), siteOrigin: 'https://levonis-iq.com' });
-  const site = new Site('https://levonis-iq.com', fetcher, () => 0);
-  const a = await site.read('GET', '/api/public/v1/context');
+  const a = await runnerSite(w).read('GET', '/api/public/v1/context');
   assert.equal(a.status, 200);
   assert.equal(catalogOnlyLive(a.json), true, 'the live document carries content.products_priced');
   // The shape the runner used to expect, and a document without the count, are not proof.
   assert.equal(catalogOnlyLive({ data: { content: { products_priced: 3 } } }), false);
   assert.equal(catalogOnlyLive({ content: { products: 3 } }), false);
   assert.equal(catalogOnlyLive(null), false);
+});
+
+// ---------------------------------------------------------------- merges, verified by the runner over the real routes
+
+/** The existing A1 the reviewed match names, as the owner made it: its own name, never the store title. */
+const EXISTING_A1 = {
+  id: 'p_a1_existing',
+  slug: 'bambu-lab-a1',
+  // The live printers' pattern (bambu-lab-p1s: «Bambu Lab P1S / P1S AMS Combo / P1S AMS 2 Combo 3D Printer»):
+  // it does not contain the store title «Bambu Lab A1 3D Printer».
+  name_en: 'Bambu Lab A1 / A1 Combo 3D Printer',
+  name_ar: 'طابعة Bambu Lab A1 / A1 Combo ثلاثية الأبعاد',
+  name_ckb: 'چاپکەری سێ ڕەهەندی Bambu Lab A1 / A1 Combo',
+} as const;
+
+/**
+ * An existing product the import merges into (§E.2), as the owner made it through the product save: a Model group
+ * of two values, a variant each, no image — and NEVER V2-published: catalog-only, shown with no price (DECISIONS
+ * row 240), like every live merge target. `hidden`: the owner hid it (the 14 `merge_publish` targets, row 242).
+ */
+async function existingA1(raw: OpsWorld['raw'], status: 'active' | 'hidden'): Promise<void> {
+  raw.exec("INSERT OR IGNORE INTO brands (id, slug, name_ar, name_en, name_ckb) VALUES ('brd_bambu', 'bambu-lab', 'بامبو لاب', 'Bambu Lab', 'بامبو لاب')");
+  const db = asD1(raw);
+  const doc = validateProductDoc({ id: EXISTING_A1.id, slug: EXISTING_A1.slug, name_en: EXISTING_A1.name_en, name_ar: EXISTING_A1.name_ar, name_ckb: EXISTING_A1.name_ckb, price_iqd: 0, status: 'active', category_id: 'cat_printers', brand_id: 'brd_bambu', description_en: 'Our own description.' });
+  const plan = await planProductSave(db, {
+    mode: 'create',
+    doc,
+    prev: null,
+    relations: {
+      inventory_mode: 'VARIANT_COMBINATION',
+      groups: [{ id: 'g_model', name_en: 'Model', sort: 0, values: [{ id: 'v_std', name_en: 'A1', sort: 0 }, { id: 'v_combo', name_en: 'A1 Combo', sort: 1 }] }],
+      colors: [],
+      variants: [
+        { id: 'x_std', option_value_ids: ['v_std'], stock: 0 },
+        { id: 'x_combo', option_value_ids: ['v_combo'], stock: 0 },
+      ],
+      images: [],
+    },
+    catalogIds: ['cat_printers'],
+    actor: { adminId: 'usr_owner', money: true },
+  } as Parameters<typeof planProductSave>[1]);
+  await saveProductAtomic(db, plan);
+  if (status === 'hidden') raw.prepare('UPDATE products SET status = ? WHERE id = ?').run('hidden', EXISTING_A1.id);
+}
+
+/** The A1 as a reviewed MERGE into the existing product: its manifest row, payload and existing-matches entry. */
+function a1Merge(decision: 'merge' | 'merge_publish'): Fixture & { match: Record<string, unknown> } {
+  const x = sample('a1');
+  const built = buildFor({ queue: 0 }, 'a1', { writeMode: 'merge', mergeProductId: EXISTING_A1.id });
+  const match = {
+    source_product_id: x.sourceProductId,
+    source_handle: x.handle,
+    levonis_product_id: EXISTING_A1.id,
+    levonis_slug: EXISTING_A1.slug,
+    decision,
+    value_map: { '579550514255634444': { option_value_ids: ['v_std'] }, '579550514255634440': { option_value_ids: ['v_combo'] } },
+    unmapped_variants: ['776210262809161737'],
+    reason: 'same_model',
+    reviewed_by: 'test',
+    reviewed_at: '2026-10-16',
+    ...(decision === 'merge_publish' ? { approval_ref: 'DECISIONS row 242' } : {}),
+  };
+  return { handle: 'a1', sid: x.sourceProductId, row: built.row, payload: built.payload, match };
+}
+
+async function mergeVerifiedByRunner(decision: 'merge' | 'merge_publish', status: 'active' | 'hidden'): Promise<void> {
+  const w = opsWorld();
+  await existingA1(w.raw, status);
+  const f = a1Merge(decision);
+  const title = f.payload.product.title_en;
+  assert.equal(f.payload.write_mode, 'merge');
+  assert.ok(!EXISTING_A1.name_en.includes(title), 'the existing name does not contain the store title (else this proves nothing)');
+  const texts = textsFor([f.row], [f.match]);
+  setBundle(texts);
+  openRun(w.raw);
+  installCdnDouble(w);
+  try {
+    const client = await clientFor(w);
+    await client.hello();
+    await client.manifest([manifestRequestRow(f.row, new Date().toISOString())]);
+    await client.prepareTaxonomy();
+    const { outcome, done, it } = await runItemVerifiedByRunner(w, client, f, texts, [title]);
+    assert.equal(it.written.created, false, 'merged into the existing product');
+    assert.equal(it.written.product_id, EXISTING_A1.id);
+    assert.equal(it.written.before_fp_equal, true);
+    const product = w.raw.prepare('SELECT name, status FROM products WHERE id = ?').get(EXISTING_A1.id) as { name: string; status: string };
+    assert.deepEqual({ ...product }, { name: EXISTING_A1.name_en, status: 'active' }, `${decision}: the owner's name is kept, the product is shown`);
+    for (const [name, c] of Object.entries(outcome.checks)) assert.ok(c.ok || !c.hard, `${decision}: ${name} ${JSON.stringify({ status: c.status, counts: c.counts, detail: c.detail })}`);
+    assert.equal(outcome.ok, true);
+    assert.equal(outcome.checks.merge.ok, true);
+    // §I.1.11 for a type with ≥ 3 compare keys: the card AND the candidates — found by the name the site shows.
+    assert.ok((outcome.checks.compare.counts?.compare_keys ?? 0) >= 3, JSON.stringify(outcome.checks.compare));
+    assert.deepEqual({ compare: outcome.checks.compare.detail?.compare, candidates: outcome.checks.compare.detail?.candidates }, { compare: 'card', candidates: 'present' });
+    // The real route matches the product's own names: the store title alone never finds this product.
+    const byTitle = (await (await w.call(`/api/compare/candidates?q=${encodeURIComponent(title)}`, { token: null, protocol: null })).json()) as { products: Array<{ id: string }> };
+    assert.ok(!byTitle.products.some((p) => p.id === EXISTING_A1.id), 'asked by the store title, the candidates route does not offer the merged product');
+    const byName = (await (await w.call(`/api/compare/candidates?q=${encodeURIComponent(EXISTING_A1.name_en)}`, { token: null, protocol: null })).json()) as { products: Array<{ id: string }> };
+    assert.ok(byName.products.some((p) => p.id === EXISTING_A1.id), 'asked by its own name, it does');
+    assert.equal(done.state, 'COMPLETE', `${decision}: ${JSON.stringify(done.d1_checks)}`);
+  } finally {
+    restoreFetch();
+  }
+}
+
+test('a MERGE through the real door, verified by the runner: an existing, unpriced product whose name is not the store title — every hard check passes (compare by the name the site shows) and /complete answers COMPLETE', async () => {
+  await mergeVerifiedByRunner('merge', 'active');
+});
+
+test('a merge_publish through the real door, verified by the runner: the owner-hidden existing product, named otherwise, is published by the merge, verified and COMPLETE', async () => {
+  await mergeVerifiedByRunner('merge_publish', 'hidden');
+});
+
+// ---------------------------------------------------------------- the close sweep over the real v1 list
+
+test('the close sweep reads the real v1 list: paged by meta.pagination.next_cursor, every visible Bambu Lab product counted over 2 pages, labelled the brand\'s', async () => {
+  const w = opsWorld();
+  w.raw.exec("INSERT INTO brands (id, slug, name_ar, name_en, name_ckb, active) VALUES ('brd_bambu', 'bambu-lab', 'بامبو لاب', 'Bambu Lab', 'بامبو لاب', 1)");
+  w.raw.exec("INSERT INTO brands (id, slug, name_ar, name_en, name_ckb, active) VALUES ('brd_other', 'other-brand', 'أخرى', 'Other', 'ئەوی تر', 1)");
+  seedCatalog(w.raw);
+  for (let i = 0; i < 63; i++) seedProduct(w.raw, { id: `p_sweep_${i}`, slug: `bambu-sweep-${i}`, name: `Bambu Sweep ${i}` });
+  seedProduct(w.raw, { id: 'p_sweep_other', slug: 'other-sweep', name: 'Other Sweep' });
+  w.raw.exec("UPDATE products SET brand_id = CASE WHEN id = 'p_sweep_other' THEN 'brd_other' ELSE 'brd_bambu' END, brand = CASE WHEN id = 'p_sweep_other' THEN 'Other' ELSE 'Bambu Lab' END");
+  await publishSeededV2(w.raw);
+  const visible = Number((w.raw.prepare("SELECT COUNT(*) AS n FROM products WHERE brand_id = 'brd_bambu' AND status = 'active'").get() as { n: number }).n);
+  assert.ok(visible > SWEEP_PAGE, `more than one page of the brand (${visible})`);
+  // The real envelope: the page under `data`, its cursor under `meta.pagination` — none at the top level.
+  const page1 = (await (await w.call(`/api/public/v1/products?brand=bambu-lab&limit=${SWEEP_PAGE}`, { token: null, protocol: null })).json()) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  assert.equal(page1.pagination, undefined);
+  assert.equal(typeof page1.meta?.pagination?.next_cursor, 'string');
+  const sweep = await publicBrandSweep(runnerSite(w));
+  assert.deepEqual(sweep, { scope: 'brand:bambu-lab', visible, unpriced: 0, pages: Math.ceil(visible / SWEEP_PAGE), whole: true, status: 200 });
+  // Bounded: a sweep stopped by its page cap says it did not read the whole list.
+  const capped = await publicBrandSweep(runnerSite(w), 1);
+  assert.deepEqual({ visible: capped.visible, pages: capped.pages, whole: capped.whole }, { visible: SWEEP_PAGE, pages: 1, whole: false });
 });
 
 test('with no open run every ops path is the uniform 404', async () => {

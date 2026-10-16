@@ -69,7 +69,7 @@ import { OpsClient, OpsError, writtenDocumentsOf, writtenImagesOf, type Document
 import { writtenGallery, type Gallery } from './gallery';
 import { NO_ROBOTS, parseRobots, robotsAllows, SITEMAP_PATHS, type Robots } from './robots';
 import { renderSummary, SummaryWriter, type SummaryItem } from './summary';
-import { AFTER_CACHE_WAIT, cacheWaitOf, edgeEvidence, modelCodesOf, Site, verifyPublic, type VerifyContext, type VerifyOutcome } from './verify';
+import { AFTER_CACHE_WAIT, cacheWaitOf, edgeEvidence, modelCodesOf, publicBrandSweep, Site, verifyPublic, type VerifyContext, type VerifyOutcome } from './verify';
 import type { BrowserInput, BrowserResult } from './browser';
 // @ts-expect-error - plain ESM helper run by workflow 60, no types
 import { sealBuffer } from './seal.mjs';
@@ -553,7 +553,8 @@ export class Importer {
   async preflight(): Promise<number> {
     const a = await this.site.read('GET', '/api/public/v1/context');
     const priced = a.status === 200 && catalogOnlyLive(a.json);
-    this.log.info('preflight', { priced });
+    // The status too: a refusal on the way (a challenge, a 5xx) is not the same finding as a document without the count.
+    this.log.info('preflight', { status: a.status, priced });
     return priced ? 0 : 1;
   }
 
@@ -1400,9 +1401,10 @@ export class Importer {
     for (const path of SITEMAP_PATHS) urls.push(...parseSitemap(await this.store.sitemap(path)));
     const diff = sitemapDiff(productHandles(urls), this.deps.bundle.rows);
     this.log.info('sitemap', { listed: diff.listed, new: diff.added.length, removed: diff.removed.length });
-    // §I.3.3: the public sweep of the brand's visible products (v1), at ≤ 4 requests per second.
-    const sweep = await this.publicSweep();
-    this.log.info('sweep', { what: 'public', passed: sweep.visible, total: c.COMPLETE ?? 0 });
+    // §I.3.3: the public sweep of the brand's visible products (v1), at ≤ 4 requests per second. Its numbers are the
+    // BRAND's (every visible Bambu Lab product, this run's and the ones it never wrote), labelled so (verify.ts).
+    const sweep = await publicBrandSweep(this.site);
+    this.log.info('sweep', { visible: sweep.visible, pages: sweep.pages, unpriced: sweep.unpriced, whole: sweep.whole, complete: c.COMPLETE ?? 0 });
     const after = await this.ops.protectSnapshot('after');
     this.log.info('protect', { phase: 'after', subjects: after.subjects });
     const fin = await this.finishSettled();
@@ -1469,24 +1471,6 @@ export class Importer {
         await this.pause(wait);
       }
     }
-  }
-
-  private async publicSweep(): Promise<{ visible: number; pages: number; unpriced: number }> {
-    let cursor = '';
-    let visible = 0;
-    let unpriced = 0;
-    let pages = 0;
-    do {
-      const a = await this.site.read('GET', `/api/public/v1/products?brand=bambu-lab&limit=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
-      pages++;
-      if (a.status !== 200 || !a.json) break;
-      const data = Array.isArray(a.json.data) ? (a.json.data as Array<Record<string, unknown>>) : [];
-      visible += data.length;
-      unpriced += data.filter((p) => typeof p.price === 'object' && p.price && (p.price as Record<string, unknown>).status === 'unpriced').length;
-      const pg = a.json.pagination as Record<string, unknown> | undefined;
-      cursor = typeof pg?.next_cursor === 'string' ? pg.next_cursor : '';
-    } while (cursor && pages < 200);
-    return { visible, pages, unpriced };
   }
 
   // ---------------------------------------------------------------- withdraw (§1 row 20, §A.3)

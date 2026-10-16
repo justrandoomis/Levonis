@@ -7,7 +7,12 @@
  * the runner's verification reads them, never its own payload. Like the
  * Worker, `/media` stores each picture under a content-addressed key and
  * `/write` collapses byte-identical gallery images (§C.4 step 1), answers the
- * rows it wrote, and the site shows those rows.
+ * rows it wrote, and the site shows those rows. The site answers in the live
+ * routes' own shapes (the v1 envelope with its cursor under `meta.pagination`,
+ * the listing and the search honouring their text, the compare candidates
+ * matched against the product's OWN name — a merge keeps the existing one —
+ * and the Cache-Control each route sends), and the door answers the Worker's
+ * own codes, so a test cannot pass on an answer the live site never gives.
  *
  * Every store request and every ops event takes a number from one global
  * sequence, so a test can prove the order of things (EXTRACT never before the
@@ -22,6 +27,7 @@ import { canonicalJson } from '../../packages/catalog/src/bambuImport/fingerprin
 import { ROOT } from './d1';
 import type { Clock } from '../../scripts/bambu-import/deadline';
 import { routeKnowledge } from './bambuKnowledgeRoute';
+import { modelsInText } from '../../packages/catalog/src/bambuImport/registry/models';
 import { collapseContentDuplicates, type StoredGalleryRow } from '../../scripts/bambu-import/gallery';
 import { loadReviewedBundle, type ReviewedBundle } from '../../scripts/bambu-import/discover';
 import { ImportLog } from '../../scripts/bambu-import/log';
@@ -54,6 +60,41 @@ type Rec = Record<string, unknown>;
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } });
+
+/**
+ * The Cache-Control the live routes answer with (measured on levonis-iq.com, 2026-10-16): the cache rule of VERIFY
+ * (§I.1.9) reads the s-maxage of a failing answer.
+ */
+export const CACHE = {
+  context: 'public, max-age=60, s-maxage=600',
+  v1: 'public, max-age=60, s-maxage=120',
+  site: 'public, max-age=60, s-maxage=120, stale-while-revalidate=600',
+  knowledge: 'public, max-age=60, s-maxage=300, stale-while-revalidate=600',
+  tree: 'public, max-age=60, s-maxage=300',
+  files: 'public, max-age=31536000, immutable',
+  private: 'private, no-store',
+} as const;
+
+/** The v1 list's opaque cursor (worker/lib/publicApi/paging.ts): base64url of `{o: offset}`. */
+export const encodeV1Cursor = (offset: number) => Buffer.from(JSON.stringify({ o: offset })).toString('base64url');
+const decodeV1Cursor = (raw: string): number => {
+  if (!raw) return 0;
+  const o = Number((JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as { o?: unknown }).o);
+  return Number.isInteger(o) && o >= 0 ? o : 0;
+};
+
+/** likePattern's body (worker/lib/sqlLike.ts): the trimmed text cut to 48 UTF-8 bytes, whole code points. */
+export function likeBody(raw: string): string {
+  let body = '';
+  let used = 0;
+  for (const ch of raw.trim()) {
+    const cost = Buffer.byteLength(ch);
+    if (used + cost > 48) break;
+    body += ch;
+    used += cost;
+  }
+  return body;
+}
 
 export const WORKING = ['EXTRACTING', 'ENRICHING', 'VALIDATING', 'INGESTING_MEDIA', 'WRITING', 'PUBLISHING', 'VERIFYING_LIVE'];
 const NEXT: Record<string, string> = { '': 'EXTRACTING', EXTRACTING: 'ENRICHING', ENRICHING: 'VALIDATING', VALIDATING: 'INGESTING_MEDIA', INGESTING_MEDIA: 'WRITING', WRITING: 'PUBLISHING', PUBLISHING: 'VERIFYING_LIVE', VERIFYING_LIVE: 'COMPLETE' };
@@ -166,6 +207,11 @@ export interface WorldOptions {
   noDocumentsRecord?: boolean;
   /** Manifest rows the reviewed bundle holds (handle → hold code): end-of-queue holds. */
   holds?: Record<string, 'OWNER_HIDDEN' | 'ORDER_TYPE_WORD'>;
+  /**
+   * The name an EXISTING product keeps when the import merges into it (handle → its name, §E.2): the site shows it,
+   * and the compare candidates route matches it, never the store's title. Default: the payload's title.
+   */
+  existingNames?: Record<string, string>;
 }
 
 export class World {
@@ -429,7 +475,8 @@ export class World {
     const m = /^\/items\/(\d+)\/([a-z-]+)$/.exec(path);
     if (!m) return json(404, { code: 'NO_ROUTE', message: 'no route' });
     const i = this.items.get(m[1]);
-    if (!i) return json(404, { code: 'ITEM_NOT_IN_RUN', message: `item ${planted}` });
+    // The Worker's itemBySource (worker/lib/catalogImport/items.ts): an id the run does not hold.
+    if (!i) return json(404, { code: 'IMPORT_ITEM_NOT_FOUND', message: `item ${planted}` });
     const action = m[2];
     const leaseOk = () => body?.lease_token === i.lease_token && i.lease_until > this.clock.now();
     const renew = () => {
@@ -520,7 +567,8 @@ export class World {
     }
     if (action === 'write') {
       if (i.state !== 'WRITING') return json(409, { code: 'IMPORT_ILLEGAL_TRANSITION', message: 'write' });
-      if (body?.payload_sha256 !== i.payload_sha) return json(409, { code: 'PAYLOAD_SHA_MISMATCH', message: 'sha' });
+      // The route's own refusal (worker/routes/catalogImportOps.ts /write): not the payload staged for this item.
+      if (body?.payload_sha256 !== i.payload_sha) return json(409, { code: 'IMPORT_NOT_STAGED', message: 'sha' });
       i.levonis_product_id = i.payload!.product_id;
       i.slug = `bambu-${i.handle}`;
       i.state = 'PUBLISHING';
@@ -577,6 +625,14 @@ export class World {
       const evidence = (body?.edge_evidence ?? {}) as Rec;
       const checks = (evidence.checks ?? {}) as Rec;
       if (!checks.browser || (i.match_kind === 'merged' && i.fp_equal !== true)) return json(200, { state: 'VERIFYING_LIVE', seq: null, d1_checks: {} });
+      // verifyD1.ts price_request: every selection the runner checked goes through the request door's validator against
+      // the product's OWN values. A merged product's values are the existing product's, never the payload's: a payload
+      // value id there is PRICE_REQUEST_SELECTION_INVALID, and nothing completes.
+      const payloadValues = new Set((i.payload?.groups ?? []).flatMap((g) => g.values.map((v) => v.id)));
+      const selections = Array.isArray(evidence.selections_checked) ? (evidence.selections_checked as unknown[]) : [];
+      if (i.match_kind === 'merged' && selections.some((sel) => Array.isArray(sel) && sel.some((id) => payloadValues.has(String(id))))) {
+        return json(200, { state: 'VERIFYING_LIVE', seq: null, d1_checks: { ok: false, agreement: { failed: ['d1.price_request'] } } });
+      }
       i.state = 'COMPLETE';
       i.last_completed = 'VERIFYING_LIVE';
       const seq = ++this.seq;
@@ -603,6 +659,25 @@ export class World {
     return null;
   }
 
+  /** The written products a visitor sees, in queue order. */
+  private visible(): FakeItem[] {
+    return [...this.items.values()].filter((i) => i.payload && !i.hidden && !i.cachedHidden).sort((a, b) => a.queue_position - b.queue_position);
+  }
+
+  /** The name the site shows: a merge keeps the existing product's own (§E.2), a create carries the store title. */
+  shownName(i: FakeItem): string {
+    return (i.match_kind === 'merged' ? this.opts.existingNames?.[i.handle] : undefined) ?? i.payload?.product.title_en ?? i.title;
+  }
+
+  /**
+   * What the site's search finds a product by (worker/lib/search: its name, its search aliases — the import writes the
+   * store title as one — the model tokens of the title and the searchable external ids), lower-cased.
+   */
+  private searchText(i: FakeItem): string {
+    const p = i.payload!;
+    return [this.shownName(i), p.product.title_en, ...modelsInText(p.product.title_en).map((m) => m.token), ...p.external_ids.filter((e) => e.searchable).map((e) => e.value)].join(' \n ').toLowerCase();
+  }
+
   private files(i: FakeItem, id: string): string {
     const m = i.media.get(id);
     return m ? `/files/${m.r2_key}` : '';
@@ -611,35 +686,86 @@ export class World {
   private site(method: string, u: URL): Response {
     const p = u.pathname;
     // The live document's own shape (worker/lib/publicApi/meta.ts): no `data` envelope.
-    if (p === '/api/public/v1/context') return json(200, { name: 'Levonis', content: { products: 10, products_priced: 4 } });
+    if (p === '/api/public/v1/context') return json(200, { name: 'Levonis', content: { products: 10, products_priced: 4 } }, { 'cache-control': CACHE.context });
     if (p === '/api/catalog/tree') {
       const node = (id: string, slug: string, parent: string, name_en: string, name_ar: string, children: Rec[] = []) => ({ id, slug, parent_id: parent, name_en, name_ar, name_ckb: '', product_count: 1, children });
-      return json(200, {
-        success: true,
-        roots: [
-          node('cat_maint', 'maintenance', '', 'Maintenance', 'الصيانة', [
-            node('cat_maint_spare', 'spare-parts', 'cat_maint', 'Spare parts', 'قطع الغيار', [node('cat_x1p1', 'x1-p1-series-parts', 'cat_maint_spare', 'X1 & P1 series parts', 'قطع غيار سلسلة X1 وP1')]),
-          ]),
-          node('cat_pacc', 'printer-accessories', '', 'Printer accessories', 'ملحقات الطابعات', [
-            node('cat_pacc_fdm', 'fdm-accessories', 'cat_pacc', 'FDM accessories', 'ملحقات FDM', [node('cat_ams', 'ams-filament-feeding', 'cat_pacc_fdm', 'AMS & filament feeding', 'أنظمة تغذية المواد (AMS)')]),
-          ]),
-        ],
-      });
+      return json(
+        200,
+        {
+          success: true,
+          roots: [
+            node('cat_maint', 'maintenance', '', 'Maintenance', 'الصيانة', [
+              node('cat_maint_spare', 'spare-parts', 'cat_maint', 'Spare parts', 'قطع الغيار', [node('cat_x1p1', 'x1-p1-series-parts', 'cat_maint_spare', 'X1 & P1 series parts', 'قطع غيار سلسلة X1 وP1')]),
+            ]),
+            node('cat_pacc', 'printer-accessories', '', 'Printer accessories', 'ملحقات الطابعات', [
+              node('cat_pacc_fdm', 'fdm-accessories', 'cat_pacc', 'FDM accessories', 'ملحقات FDM', [node('cat_ams', 'ams-filament-feeding', 'cat_pacc_fdm', 'AMS & filament feeding', 'أنظمة تغذية المواد (AMS)')]),
+            ]),
+          ],
+          totals: {},
+        },
+        { 'cache-control': CACHE.tree }
+      );
     }
     if (p === '/api/products' && method === 'GET') {
-      const items = [...this.items.values()].filter((i) => i.payload && this.sectionsOf(i.handle).includes(u.searchParams.get('category') ?? ''));
-      // listCatalogProducts without a listing key: no `total`, no `truncated` (the runner pages while a page is full).
-      return json(200, { success: true, suggestion: null, products: items.map((i) => ({ slug: i.slug, id: i.levonis_product_id })) });
+      // listCatalogProducts without a listing key (worker/routes/products.ts): `search`, `limit` (1–50, default 20)
+      // and `offset` honoured; no `total`, no `truncated` (the runner pages while a page is full).
+      const category = u.searchParams.get('category') ?? '';
+      const search = (u.searchParams.get('search') ?? '').trim().toLowerCase();
+      const limit = Math.min(50, Math.max(1, Number(u.searchParams.get('limit') ?? 20) || 20));
+      const offset = Math.max(0, Number(u.searchParams.get('offset') ?? 0) || 0);
+      const items = this.visible().filter((i) => this.sectionsOf(i.handle).includes(category) && (!search || this.searchText(i).includes(search)));
+      return json(
+        200,
+        { success: true, category: category ? { slug: category } : null, suggestion: null, products: items.slice(offset, offset + limit).map((i) => ({ slug: i.slug, id: i.levonis_product_id })) },
+        { 'cache-control': CACHE.site }
+      );
     }
     if (p === '/api/public/v1/search') {
-      const all = [...this.items.values()].filter((i) => i.payload);
-      return json(200, { data: { products: all.map((i) => ({ slug: i.slug })) } });
+      // The v1 envelope (worker/routes/publicApi.ts serve) around the site's search: `q` honoured.
+      const q = (u.searchParams.get('q') ?? '').trim().toLowerCase();
+      const products = this.visible().filter((i) => q && this.searchText(i).includes(q)).map((i) => ({ slug: i.slug }));
+      return json(
+        200,
+        { data: { query: q, suggestion: null, products, sections: [], brands: [], more_products_api_url: null }, meta: { version: 'v1', pagination: null }, links: { self: u.toString(), next: null, web: null } },
+        { 'cache-control': CACHE.v1 }
+      );
     }
-    if (p.startsWith('/files/') && method === 'HEAD') return new Response(null, { status: 200, headers: { 'content-type': 'image/webp' } });
+    if (p.startsWith('/files/') && method === 'HEAD') return new Response(null, { status: 200, headers: { 'content-type': 'image/webp', 'cache-control': CACHE.files } });
     if (p === '/api/price-requests' && method === 'POST') return json(401, { success: false, error: 'Authentication required', code: 'UNAUTHORIZED' });
-    if (p === '/api/compare') return json(200, { products: [{ id: u.searchParams.get('ids') }] });
-    if (p === '/api/compare/candidates') return json(200, { candidates: [...this.items.values()].filter((i) => i.payload).map((i) => ({ id: i.levonis_product_id })) });
-    if (p === '/api/public/v1/products') return json(200, { data: [...this.items.values()].filter((i) => i.payload).map((i) => ({ slug: i.slug, price: { status: 'unpriced' } })), pagination: { next_cursor: null } });
+    if (p === '/api/compare') {
+      const id = u.searchParams.get('ids') ?? '';
+      const i = this.visible().find((x) => x.levonis_product_id === id);
+      return json(200, { success: true, products: [{ id, slug: i?.slug ?? '' }] }, { 'cache-control': CACHE.private });
+    }
+    if (p === '/api/compare/candidates') {
+      // browseCompareCandidates (worker/routes/compare.ts): `q` matched against the product's OWN name (LIKE, the
+      // first 48 bytes), at most 12; the answer names no anchor without `for`.
+      const q = likeBody(u.searchParams.get('q') ?? '').toLowerCase();
+      const products = this.visible()
+        .filter((i) => !q || this.shownName(i).toLowerCase().includes(q))
+        .slice(0, 12)
+        .map((i) => ({ id: i.levonis_product_id, slug: i.slug, name: { ar: this.shownName(i), en: this.shownName(i), ckb: this.shownName(i) } }));
+      return json(200, { success: true, for: null, products }, { 'cache-control': CACHE.private });
+    }
+    if (p === '/api/public/v1/products') {
+      // The v1 list (worker/lib/publicApi/resources/products.ts listProducts): `brand`, `limit` (clamped to 50,
+      // default 24) and the opaque `cursor`; the page under `data`, the cursor under `meta.pagination`.
+      const brand = u.searchParams.get('brand') ?? '';
+      const limit = Math.min(50, Math.max(1, Number(u.searchParams.get('limit') ?? 24) || 24));
+      const offset = decodeV1Cursor(u.searchParams.get('cursor') ?? '');
+      const all = this.visible().filter(() => !brand || brand.split(',').includes('bambu-lab'));
+      const page = all.slice(offset, offset + limit);
+      const next = offset + limit < all.length ? encodeV1Cursor(offset + limit) : null;
+      return json(
+        200,
+        {
+          data: page.map((i) => ({ slug: i.slug, price: { currency: 'IQD', status: 'unpriced', amount: null, regular: null, from: false, member_price: null } })),
+          meta: { version: 'v1', pagination: { limit, next_cursor: next, total: all.length } },
+          links: { self: u.toString(), next: next ? `${SITE}${p}?brand=${brand}&cursor=${next}&limit=${limit}` : null, web: `${SITE}/products` },
+        },
+        { 'cache-control': CACHE.v1 }
+      );
+    }
     const v1 = /^\/api\/public\/v1\/products\/([^/]+)$/.exec(p);
     const siteP = /^\/api\/products\/([^/]+)(\/knowledge|\/quote)?$/.exec(p);
     const i = v1 ? this.bySlug(decodeURIComponent(v1[1])) : siteP ? this.bySlug(decodeURIComponent(siteP[1])) : null;
@@ -648,33 +774,44 @@ export class World {
     // The rows the write wrote (byte-identical images collapsed), as the page shows them.
     const stored = (i.written ?? pay.images).filter((x) => this.files(i, x.source_media_id));
     if (v1) {
-      return json(200, {
-        data: {
-          slug: i.slug,
-          name: { ar: pay.product.title_en, en: pay.product.title_en, ckb: pay.product.title_en },
-          sections: this.sectionsOf(i.handle).map((slug) => ({ slug })),
-          images: [...new Set(stored.map((x) => this.files(i, x.source_media_id)))].map((url) => ({ url: `${SITE}${url}` })),
-          price: { currency: 'IQD', status: 'unpriced', amount: null, regular: null, from: false },
-          purchase: null,
+      const shown = this.shownName(i);
+      return json(
+        200,
+        {
+          data: {
+            slug: i.slug,
+            name: { ar: shown, en: shown, ckb: shown },
+            sections: this.sectionsOf(i.handle).map((slug) => ({ slug })),
+            images: [...new Set(stored.map((x) => this.files(i, x.source_media_id)))].map((url) => ({ url: `${SITE}${url}` })),
+            price: { currency: 'IQD', status: 'unpriced', amount: null, regular: null, from: false },
+            purchase: null,
+          },
+          meta: { version: 'v1', pagination: null },
+          links: { self: u.toString(), next: null, web: `${SITE}/product/${i.slug}` },
         },
-      });
+        { 'cache-control': CACHE.v1 }
+      );
     }
     if (siteP?.[2] === '/quote') return json(409, { success: false, error: 'not available', code: 'PRICE_NOT_AVAILABLE', details: { price_status: 'unpriced' } });
-    if (siteP?.[2] === '/knowledge') return json(200, routeKnowledge(pay, i.media, { inactiveDocuments: new Set(i.documentsInactive ?? []) }));
-    return json(200, {
-      price_status: 'unpriced',
-      relations: {
-        option_groups: pay.groups.map((g) => ({
-          id: g.id,
-          name_en: g.name_en,
-          sort: g.sort,
-          default_value_id: g.default_value_id,
-          values: g.values.map((v) => ({ id: v.id, sort: v.sort })),
-        })),
-        variants: pay.variants.map((v) => ({ id: v.id, combo_key: v.combo_key })),
-        images: stored.map((x) => ({ id: x.id, url: this.files(i, x.source_media_id), is_primary: x.is_primary, option_value_id: x.option_value_id, variant_id: x.variant_id })),
+    if (siteP?.[2] === '/knowledge') return json(200, routeKnowledge(pay, i.media, { inactiveDocuments: new Set(i.documentsInactive ?? []) }), { 'cache-control': CACHE.knowledge });
+    return json(
+      200,
+      {
+        price_status: 'unpriced',
+        relations: {
+          option_groups: pay.groups.map((g) => ({
+            id: g.id,
+            name_en: g.name_en,
+            sort: g.sort,
+            default_value_id: g.default_value_id,
+            values: g.values.map((v) => ({ id: v.id, sort: v.sort })),
+          })),
+          variants: pay.variants.map((v) => ({ id: v.id, combo_key: v.combo_key })),
+          images: stored.map((x) => ({ id: x.id, url: this.files(i, x.source_media_id), is_primary: x.is_primary, option_value_id: x.option_value_id, variant_id: x.variant_id })),
+        },
       },
-    });
+      { 'cache-control': CACHE.site }
+    );
   }
 
   // ---------------------------------------------------------------- the runner, wired

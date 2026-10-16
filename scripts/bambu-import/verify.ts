@@ -32,7 +32,10 @@
  *   7  browser        browser.ts (Playwright, the site only);
  *   8  merge          before_fp_equal from /write;
  *   11 compare        GET /api/compare?ids=<id> → 200 with the card; the
- *                     candidates when the type has ≥ 3 compare keys with values.
+ *                     candidates when the type has ≥ 3 compare keys with values
+ *                     (GET /api/compare/candidates?q=<the name the site shows>:
+ *                     the route matches the product's own names, and a merge
+ *                     keeps the existing product's name, not the store title).
  *                     The keys are counted by the route's own rule
  *                     (worker/lib/knowledge/compareKeys.ts `comparedFields`: the
  *                     facts a single-id column stands on — public, product
@@ -592,9 +595,10 @@ export async function verifyPublic(site: Site, ctx: VerifyContext): Promise<Veri
     const m = /s-maxage=(\d+)/.exec(a.headers.get('cache-control') ?? '');
     if (m) cacheMs = Math.max(cacheMs, Math.min(CACHE_WAIT_MAX, (Number(m[1]) + 60) * 1000));
   };
-  const record = (name: string, r: CheckResult, a?: SiteAnswer) => {
+  /** A check's result; a failing one notes the s-maxage of the answers it read (the cache rule's wait). */
+  const record = (name: string, r: CheckResult, a?: SiteAnswer | readonly SiteAnswer[]) => {
     checks[name] = r;
-    if (!r.ok && a) noteCache(a);
+    if (!r.ok && a) for (const one of Array.isArray(a) ? a : [a as SiteAnswer]) noteCache(one);
   };
 
   // 1. public v1
@@ -727,15 +731,23 @@ export async function verifyPublic(site: Site, ctx: VerifyContext): Promise<Veri
   const leafNode = ctx.leaf ? resolveSection(ctx.leaf, ctx.taxonomy, tree) : null;
   const leafMatches: boolean | null = merge ? null : !!leafNode && leafNode.slug === leafSlug;
   // The live listing answers `total` / `truncated` only with a listing key; a full page means there may be more.
+  // Every page read by a listing that did not find the product feeds the cache rule (its s-maxage, §I.1.9).
+  const listingMisses: SiteAnswer[] = [];
   const listed = async (category: string) => {
+    const read: SiteAnswer[] = [];
+    const miss = (status: number, pages: number) => {
+      listingMisses.push(...read);
+      return { ok: false, status, pages };
+    };
     for (let offset = 0, page = 0; page < 8; page++, offset += 50) {
       const a = await site.read('GET', `/api/products?category=${encodeURIComponent(category)}&search=${encodeURIComponent(title)}&limit=50&offset=${offset}`);
+      read.push(a);
       const items = list(a.json?.products);
-      if (a.status !== 200) return { ok: false, status: a.status, pages: page + 1 };
+      if (a.status !== 200) return miss(a.status, page + 1);
       if (items.some((p) => str(p.slug) === ctx.slug)) return { ok: true, status: a.status, pages: page + 1 };
-      if (items.length < 50 && a.json?.truncated !== true) return { ok: false, status: a.status, pages: page + 1 };
+      if (items.length < 50 && a.json?.truncated !== true) return miss(a.status, page + 1);
     }
-    return { ok: false, status: 200, pages: 8 };
+    return miss(200, 8);
   };
   const leafListed = leafSlug ? await listed(leafSlug) : { ok: false, status: 0, pages: 0 };
   const rootListed = rootSlug && rootSlug !== leafSlug ? await listed(rootSlug) : leafListed;
@@ -757,13 +769,17 @@ export async function verifyPublic(site: Site, ctx: VerifyContext): Promise<Veri
     status: leafListed.status,
     counts: { leaf_pages: leafListed.pages, secondary: secondary.length, tree_count: treeCount },
     detail: { leaf: leafListed.ok, root: rootListed.ok, secondary: secondaryOk, leaf_is_mapped: leafMatches },
-  });
+  }, listingMisses);
 
   // 4. search
+  // A search that missed feeds the cache rule (its s-maxage), like every other failing answer.
+  const searchMisses: SiteAnswer[] = [];
   const found = async (q: string) => {
     const a = await site.read('GET', `/api/public/v1/search?q=${encodeURIComponent(q.slice(0, 100))}&limit=24`);
     const products = isRec(a.json?.data) ? list((a.json!.data as Rec).products) : [];
-    return a.status === 200 && products.some((p) => str(p.slug) === ctx.slug);
+    const hit = a.status === 200 && products.some((p) => str(p.slug) === ctx.slug);
+    if (!hit) searchMisses.push(a);
+    return hit;
   };
   const titleFound = await found(title);
   let hardMisses = 0;
@@ -781,7 +797,7 @@ export async function verifyPublic(site: Site, ctx: VerifyContext): Promise<Veri
     hard: true,
     counts: { model_codes: ctx.modelCodes.length, model_hard_misses: hardMisses, model_soft_misses: softMisses, external_ids: ids.length, external_id_misses: idMisses },
     detail: { title: titleFound },
-  });
+  }, searchMisses);
 
   // 5. not sellable, and the request door. A merge keeps the existing product's money (§E.2, §I.1.8 "the V2 status
   // is unchanged"): its quote is whatever it was, and the protected-fields check proves nothing moved.
@@ -819,8 +835,12 @@ export async function verifyPublic(site: Site, ctx: VerifyContext): Promise<Veri
     cmp.status === 200 && JSON.stringify(cmp.json ?? {}).includes(ctx.productId) ? 'card' : noSpecs && !typed ? 'not_applicable' : 'failed';
   let candidates: 'present' | 'absent_expected' | 'missing' = 'absent_expected';
   if (typed) {
-    const c = await site.read('GET', `/api/compare/candidates?q=${encodeURIComponent(title.slice(0, 120))}`);
-    candidates = c.status === 200 && JSON.stringify(c.json ?? {}).includes(ctx.productId) ? 'present' : 'missing';
+    // The candidates route matches `q` against the product's OWN names (worker/routes/compare.ts
+    // browseCompareCandidates: LIKE on name, name_ar, name_ku, the first 48 bytes). A merge keeps the existing
+    // product's name (§E.2), which need not contain the store's title: ask with the name the site shows (v1).
+    const shown = str(name.en) || title;
+    const c = await site.read('GET', `/api/compare/candidates?q=${encodeURIComponent(shown.slice(0, 120))}`);
+    candidates = c.status === 200 && list(c.json?.products).some((p) => str(p.id) === ctx.productId) ? 'present' : 'missing';
   }
   record('compare', {
     ok: compare !== 'failed' && candidates !== 'missing',
@@ -839,6 +859,58 @@ export async function verifyPublic(site: Site, ctx: VerifyContext): Promise<Veri
   // The section the product IS in (the leaf of its public sections), by the tree's Arabic name.
   const leafName = tree.find((n) => n.slug === leafSlug)?.name_ar ?? '';
   return { ok, checks, leafName, sections: { leaf: leafSlug, root: rootSlug, secondary }, cacheMs: cacheMs || CACHE_WAIT_MAX, knowledge: merge ? null : exp.knowledge };
+}
+
+/** The close sweep (§I.3.3): what the public v1 list shows of the brand. */
+export interface PublicSweep {
+  /** What was counted: every visible product of the brand, the ones this run never wrote included. */
+  scope: 'brand:bambu-lab';
+  visible: number;
+  unpriced: number;
+  pages: number;
+  /** Every page was read (no refusal on the way, the page cap not reached). */
+  whole: boolean;
+  /** The HTTP status of the last page read. */
+  status: number;
+}
+
+/** The v1 list's own page size cap (worker/lib/publicApi/paging.ts MAX_LIMIT). */
+export const SWEEP_PAGE = 50;
+
+/**
+ * §I.3.3: every product of the brand a signed-out visitor sees, through the public v1 list, paged by its own
+ * cursor. The list answers the envelope of every v1 list (worker/routes/publicApi.ts `serve`): `{data, meta:
+ * {version, pagination: {limit, next_cursor, total}}, links: {self, next, web}}` — the cursor is under `meta`.
+ *
+ * The brand filter counts EVERY visible Bambu Lab product, this run's and the ones it never wrote (products the
+ * owner made before the import): the ops door names no run's products in bulk, and a `/lease` of each item would
+ * take the unfinished ones. So the numbers are reported as the brand's (`scope`), never as "this run's".
+ */
+export async function publicBrandSweep(site: Site, maxPages = 200): Promise<PublicSweep> {
+  let cursor = '';
+  let visible = 0;
+  let unpriced = 0;
+  let pages = 0;
+  let status = 0;
+  let whole = false;
+  for (;;) {
+    const a = await site.read('GET', `/api/public/v1/products?brand=bambu-lab&limit=${SWEEP_PAGE}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+    pages++;
+    status = a.status;
+    if (a.status !== 200 || !a.json || !Array.isArray(a.json.data)) break;
+    const data = list(a.json.data);
+    visible += data.length;
+    unpriced += data.filter((p) => isRec(p.price) && p.price.status === 'unpriced').length;
+    const meta = isRec(a.json.meta) ? a.json.meta : {};
+    const pg = isRec(meta.pagination) ? meta.pagination : {};
+    cursor = typeof pg.next_cursor === 'string' ? pg.next_cursor : '';
+    if (!cursor) {
+      whole = true;
+      break;
+    }
+    if (pages >= maxPages) break;
+  }
+  return { scope: 'brand:bambu-lab', visible, unpriced, pages, whole, status };
 }
 
 /** §I.1.11: with this many compare keys with values, the compare card and the candidates are hard checks. */
@@ -905,8 +977,15 @@ export function edgeEvidence(outcome: VerifyOutcome, browser: Record<string, unk
     round,
     checks: { ...outcome.checks, ...(browser ? { browser } : {}) },
     sections: outcome.sections,
-    // The selections the page held when the browser checked it (the opening one first); without a browser, the opening one.
-    selections_checked: (browser?.selections as string[][] | undefined)?.length ? (browser!.selections as string[][]) : [defaultSelection(payload)],
+    // The selections the page held when the browser checked it (the opening one first); without a browser, the opening
+    // one. A MERGE's page is the existing product's (§E.2): its values are not the payload's, and the browser checks no
+    // selection on it, so none is sent — the Worker checks the product's own default selection (verifyD1.ts
+    // price_request), and a payload id would read there as PRICE_REQUEST_SELECTION_INVALID.
+    selections_checked: (browser?.selections as string[][] | undefined)?.length
+      ? (browser!.selections as string[][])
+      : payload.write_mode === 'merge'
+        ? []
+        : [defaultSelection(payload)],
     counts: {
       groups: payload.groups.length,
       values: payload.groups.reduce((n, g) => n + g.values.length, 0),

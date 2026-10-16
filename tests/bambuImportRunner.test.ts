@@ -36,7 +36,7 @@ import { parseRobots, robotsAllows } from '../scripts/bambu-import/robots';
 import { ImportStop, StoreFetcher } from '../scripts/bambu-import/fetch';
 import { ExtractGate, localOnlyFetch, stageAfter } from '../scripts/bambu-import/run';
 import { reviewedDifferences } from '../scripts/bambu-import/discover';
-import { expectedFacts } from '../scripts/bambu-import/verify';
+import { defaultSelection, expectedFacts } from '../scripts/bambu-import/verify';
 import type { MediaAnswerRow } from '../scripts/bambu-import/opsClient';
 // @ts-expect-error - plain ESM helper, no types
 import { unsealBuffer } from '../scripts/bambu-import/seal.mjs';
@@ -103,7 +103,11 @@ test('the happy path: two products, one at a time, each verified on the public s
 
 test('ops client: the §B.5 classification and the IMPORT_ codes of §C.11', () => {
   assert.equal(classify(404, ''), 'gone');
-  assert.equal(classify(404, 'ITEM_NOT_IN_RUN'), 'permanent');
+  // The Worker's own codes (worker/lib/catalogImport/items.ts itemBySource, worker/routes/catalogImportOps.ts /write):
+  // a 404 WITH a code is an answer about the item, never the uniform "token gone".
+  assert.equal(classify(404, 'IMPORT_ITEM_NOT_FOUND'), 'permanent');
+  assert.equal(classify(409, 'IMPORT_NOT_STAGED'), 'permanent');
+  assert.equal(normaliseCode('IMPORT_NOT_STAGED'), 'IMPORT_NOT_STAGED');
   assert.equal(classify(429, 'RATE_LIMITED'), 'transient');
   assert.equal(classify(500, ''), 'transient');
   assert.equal(classify(503, 'X'), 'transient');
@@ -473,8 +477,38 @@ test('mode close: refused while the queue holds work; then the sitemaps, the swe
     assert.ok(w.logLines.some((l) => /the old token now answers 404: yes/.test(l)));
     assert.ok(w.logLines.some((l) => /run finished: state closed/.test(l)));
     assert.ok(w.sealed.some((s) => s.name === 'close-report.json'));
+    // The sweep reads the v1 list as the Worker pages it (meta.pagination) and says whose products it counted.
+    assert.ok(
+      w.logLines.includes("[import] public sweep of the brand bambu-lab (every visible product, not only this run's): 2 visible over 1 pages, 2 unpriced, read whole yes; the run completed 2"),
+      w.logLines.join('\n')
+    );
   } finally {
     w.dispose();
+  }
+});
+
+test('mode preflight: the public context document as the Worker serves it; the log names the HTTP status beside what the document carries', async () => {
+  const w = new World();
+  try {
+    assert.equal(await w.importer({ mode: 'preflight' }).main(), 0, w.logLines.join('\n'));
+    assert.ok(w.logLines.includes('[import] preflight: public context HTTP 200; carries products_priced yes'), w.logLines.join('\n'));
+    assert.equal(w.calls.length, 0, 'preflight never opens the import door');
+  } finally {
+    w.dispose();
+  }
+  // A refusal on the way (a challenge page) and a document without the count both refuse — and the log tells them apart.
+  const answers: Array<[() => Response, string]> = [
+    [() => new Response('<html>Just a moment...</html>', { status: 403, headers: { 'content-type': 'text/html' } }), '[import] preflight: public context HTTP 403; carries products_priced no'],
+    [() => json(200, { data: { content: { products_priced: 4 } } }), '[import] preflight: public context HTTP 200; carries products_priced no'],
+  ];
+  for (const [answer, line] of answers) {
+    const r = new World({ siteOverride: (_method, path) => (path === '/api/public/v1/context' ? answer() : null) });
+    try {
+      assert.equal(await r.importer({ mode: 'preflight' }).main(), 1);
+      assert.ok(r.logLines.includes(line), r.logLines.join('\n'));
+    } finally {
+      r.dispose();
+    }
   }
 });
 
@@ -802,6 +836,27 @@ test('a created product BLOCKED at VERIFY (hidden, §A.10) and resumed: /publish
     const firstRead = w.siteRequests.find((r) => r.seq > job2[0].seq)!;
     assert.ok(finish && firstRead && finish.seq < firstRead.seq, 'the purge came before the first public read of the resumed job');
     assert.ok(!w.logLines.slice(lines).some((l) => /a stale answer; purge again and wait/.test(l)), 'round 1 already read the product as it is');
+  } finally {
+    w.dispose();
+  }
+});
+
+test('a merge in the runner\'s own loop: the existing product\'s page holds none of the payload\'s values, so /complete carries no payload selection (the Worker checks the product\'s own); COMPLETE', async () => {
+  const sid = '580876092009701376';
+  const w = new World({
+    handles: ['ams-2-pro'],
+    matches: [{ source_product_id: sid, decision: 'merge', levonis_product_id: 'p_existing_ams_0001' }],
+    existingNames: { 'ams-2-pro': 'AMS 2 Pro — the automatic material system (our own name)' },
+  });
+  try {
+    assert.equal(w.sid('ams-2-pro'), sid);
+    assert.equal(await w.importer().main(), 0, w.logLines.join('\n'));
+    const item = w.item('ams-2-pro');
+    assert.equal(item.match_kind, 'merged');
+    assert.ok(defaultSelection(item.payload!).length > 0, 'the payload has an opening selection of its own (else this proves nothing)');
+    assert.equal(item.state, 'COMPLETE', w.logLines.join('\n'));
+    const sent = callsTo(w, /\/complete$/).map((c) => (c.body!.edge_evidence as { selections_checked: unknown }).selections_checked);
+    assert.deepEqual(sent, [[]], 'no selection of the payload\'s values is sent for a merged product');
   } finally {
     w.dispose();
   }

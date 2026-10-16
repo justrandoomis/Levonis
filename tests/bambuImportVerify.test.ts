@@ -29,7 +29,11 @@
  *   - compare (§I.1.11): 400 COMPARE_NO_SPECS for this product is the
  *     expected absence when the type has fewer than 3 compare keys with
  *     values (recorded `not_applicable`), a failure with 3 or more, and any
- *     other refusal fails either way.
+ *     other refusal fails either way; the candidates are asked by the name the
+ *     site shows (a merge keeps the existing product's, which need not contain
+ *     the store title — the route matches the product's own names);
+ *   - the cache rule hears a stale listing and a stale search too (their
+ *     s-maxage, as the live routes send it).
  *
  * Run: node --import tsx --test tests/bambuImportVerify.test.ts
  */
@@ -46,7 +50,8 @@ import type { HostFetcher } from '../scripts/bambu-import/fetch';
 import { writtenImagesOf, type DocumentCheck, type MediaAnswerRow, type WrittenImage } from '../scripts/bambu-import/opsClient';
 import { collapseContentDuplicates, galleryFromWritten, recomputedGallery, writtenGallery, type GalleryImage, type StoredGalleryRow } from '../scripts/bambu-import/gallery';
 import { pageDefaultSelection } from '../scripts/bambu-import/selection';
-import { RUN_ID, World } from './fixtures/bambuImportWorld';
+import { CACHE, likeBody, RUN_ID, World } from './fixtures/bambuImportWorld';
+import { modelsInText } from '../packages/catalog/src/bambuImport/registry/models';
 import { routeKnowledge, type StoredKnowledgeKnobs } from './fixtures/bambuKnowledgeRoute';
 
 const SITE = 'https://levonis-iq.com';
@@ -100,7 +105,18 @@ interface Live {
   stored?: StoredKnowledgeKnobs;
   /** A route that answers otherwise than the real one (one fault at a time). */
   knowledgeEdit?: (k: Rec) => Rec;
+  /** The listing does not show the product yet (a stale cached page): every listing read misses it. */
+  unlisted?: boolean;
+  /** The search does not find the product yet (a stale cached answer). */
+  unsearched?: boolean;
 }
+
+/** The name the site shows: a merge keeps the existing product's own (§E.2), a create carries the store title. */
+const shownName = (l: Live) => l.existing?.name ?? l.payload.product.title_en;
+
+/** What the site's search finds the product by: its name, its aliases (the store title), model tokens, searchable ids. */
+const searchText = (l: Live) =>
+  [shownName(l), l.payload.product.title_en, ...modelsInText(l.payload.product.title_en).map((m) => m.token), ...l.payload.external_ids.filter((e) => e.searchable).map((e) => e.value)].join(' \n ').toLowerCase();
 
 const files = (l: Live, id: string) => {
   const m = l.media.get(id);
@@ -137,9 +153,11 @@ function v1(l: Live): Rec {
   const own = l.existing ? l.existing.images.map((i) => String(i.url)) : [];
   const urls = [...new Set([...own, ...p.images.map((i) => files(l, i.source_media_id)).filter(Boolean)])];
   return {
+    meta: { version: 'v1', pagination: null },
+    links: { self: `${SITE}/api/public/v1/products/${l.slug}`, next: null, web: `${SITE}/product/${l.slug}` },
     data: {
       slug: l.slug,
-      name: { ar: l.existing?.name ?? p.product.title_en, en: l.existing?.name ?? p.product.title_en, ckb: '' },
+      name: { ar: shownName(l), en: shownName(l), ckb: '' },
       sections: l.sections.map((slug) => ({ slug })),
       images: urls.map((u) => ({ url: `${SITE}${u}` })),
       price: l.existing?.priced ? { currency: 'IQD', status: 'priced', amount: 1_250_000 } : { currency: 'IQD', status: 'unpriced', amount: null },
@@ -164,26 +182,39 @@ function fetcher(l: Live, reads: string[] = []) {
       const p = url.pathname;
       reads.push(`${init.method ?? 'GET'} ${p}${url.search}`);
       const slug = encodeURIComponent(l.slug);
-      if ((init.method ?? 'GET') === 'HEAD' && p.startsWith('/files/')) return { status: 200, headers: new Headers({ 'content-type': 'image/webp' }), body: '', bytes: null };
-      if (p === `/api/public/v1/products/${slug}`) return answer(200, v1(l));
-      if (p === `/api/products/${slug}`) return answer(200, siteAnswer(l));
-      if (p === `/api/products/${slug}/knowledge`) return answer(200, knowledge(l));
+      if ((init.method ?? 'GET') === 'HEAD' && p.startsWith('/files/')) return { status: 200, headers: new Headers({ 'content-type': 'image/webp', 'cache-control': CACHE.files }), body: '', bytes: null };
+      if (p === `/api/public/v1/products/${slug}`) return answer(200, v1(l), { 'cache-control': CACHE.v1 });
+      if (p === `/api/products/${slug}`) return answer(200, siteAnswer(l), { 'cache-control': CACHE.site });
+      if (p === `/api/products/${slug}/knowledge`) return answer(200, knowledge(l), { 'cache-control': CACHE.knowledge });
       if (p === `/api/products/${slug}/quote`) return l.existing?.priced ? answer(200, { success: true, total: 1_250_000 }) : answer(409, { success: false, code: 'PRICE_NOT_AVAILABLE' });
       if (p === '/api/price-requests') return answer(401, { success: false, error: 'Authentication required' });
-      if (p === '/api/catalog/tree') return answer(200, tree(l));
+      if (p === '/api/catalog/tree') return answer(200, tree(l), { 'cache-control': CACHE.tree });
       if (p === '/api/products') {
-        // listCatalogProducts without a listing key: { success, category, suggestion, products } — no total, no truncated.
+        // listCatalogProducts without a listing key: { success, category, suggestion, products } — no total, no truncated;
+        // `search`, `limit` and `offset` honoured. The `ahead` products match the product's own title too.
         const cat = url.searchParams.get('category') ?? '';
+        const search = (url.searchParams.get('search') ?? '').trim().toLowerCase();
         const offset = Number(url.searchParams.get('offset') ?? 0);
-        const all = l.sections.includes(cat) ? [...Array.from({ length: l.ahead ?? 0 }, (_, i) => ({ id: `p_other_${i}`, slug: `other-${i}` })), { id: l.productId, slug: l.slug }] : [];
-        return answer(200, { success: true, category: { slug: cat }, suggestion: null, products: all.slice(offset, offset + 50) });
+        const limit = Math.min(50, Number(url.searchParams.get('limit') ?? 20));
+        const self = !l.unlisted && (!search || searchText(l).includes(search)) ? [{ id: l.productId, slug: l.slug }] : [];
+        const all = l.sections.includes(cat) ? [...Array.from({ length: l.ahead ?? 0 }, (_, i) => ({ id: `p_other_${i}`, slug: `other-${i}` })), ...self] : [];
+        return answer(200, { success: true, category: { slug: cat }, suggestion: null, products: all.slice(offset, offset + limit) }, { 'cache-control': CACHE.site });
       }
-      if (p === '/api/public/v1/search') return answer(200, { data: { products: [{ slug: l.slug }] } });
+      if (p === '/api/public/v1/search') {
+        const q = (url.searchParams.get('q') ?? '').trim().toLowerCase();
+        const products = !l.unsearched && q && searchText(l).includes(q) ? [{ slug: l.slug }] : [];
+        return answer(200, { data: { query: q, suggestion: null, products, sections: [], brands: [] }, meta: { version: 'v1', pagination: null }, links: { self: u, next: null, web: null } }, { 'cache-control': CACHE.v1 });
+      }
       if (p === '/api/compare') {
         const c = l.compare?.();
-        return c ? answer(c.status, c.body) : answer(200, { success: true, products: [{ id: l.productId }] });
+        return c ? answer(c.status, c.body, { 'cache-control': CACHE.private }) : answer(200, { success: true, products: [{ id: l.productId, slug: l.slug }] }, { 'cache-control': CACHE.private });
       }
-      if (p === '/api/compare/candidates') return answer(200, { success: true, products: [{ id: l.productId }] });
+      if (p === '/api/compare/candidates') {
+        // browseCompareCandidates: `q` against the product's OWN name (LIKE, the first 48 bytes); no anchor without `for`.
+        const q = likeBody(url.searchParams.get('q') ?? '').toLowerCase();
+        const products = !q || shownName(l).toLowerCase().includes(q) ? [{ id: l.productId, slug: l.slug, name: { ar: shownName(l), en: shownName(l), ckb: '' } }] : [];
+        return answer(200, { success: true, for: null, products }, { 'cache-control': CACHE.private });
+      }
       return answer(404, { success: false, error: 'Not found' });
     },
   };
@@ -291,6 +322,45 @@ test('a MERGE into an existing priced product (§E.2): its own name, money, opti
   const first = payload.images[0].source_media_id;
   const o2 = await verify({ ...l, media: missing }, { media: new Map([...missing].map(([k, v]) => [k, k === first ? { ...v, r2_key: 'products/import/gallery/not-there.webp' } : v])) });
   assert.ok(failed(o2).includes('structure') && failed(o2).includes('v1'));
+});
+
+test('compare for a MERGE: the candidates are asked by the name the site shows — the existing product\'s, which need not contain the store title', async () => {
+  const payload = payloadOf('h2d', 'p_existing_h2d_0002');
+  const existing = {
+    // The live route matches `q` against the product's OWN names; a merge keeps this one (§E.2), and it does not
+    // contain the store's «Bambu Lab H2D».
+    name: 'H2D 3D Printer — Bambu Lab (H2D Combo / Laser Full Combo)',
+    priced: false,
+    groups: [{ id: 'og_existing', name_en: 'Bundle', sort: 0, default_value_id: 'ov_existing_a', values: [{ id: 'ov_existing_a', sort: 0 }] }],
+    variants: [{ id: 'pv_existing_a', combo_key: 'o:ov_existing_a' }],
+    images: [{ id: 'pi_existing_main', url: '/files/products/existing-main.webp', is_primary: true, option_value_id: null, variant_id: null }],
+  };
+  assert.ok(!existing.name.includes(payload.product.title_en), 'the existing name does not contain the store title (else this proves nothing)');
+  const l = live('h2d', { payload, media: mediaOf(payload), slug: 'bambu-lab-h2d', productId: 'p_existing_h2d_0002', sections: ['printers', 'fdm-printers'], existing });
+  const reads: string[] = [];
+  const o = await verify(l, {}, reads);
+  assert.ok(o.checks.compare.counts!.compare_keys >= 3, 'a type with 3 or more compare keys: the candidates are a hard part of the check');
+  assert.deepEqual(failed(o), [], JSON.stringify(o.checks.compare));
+  assert.equal(o.checks.compare.detail?.candidates, 'present');
+  const asked = reads.find((r) => r.includes('/api/compare/candidates'));
+  assert.equal(asked, `GET /api/compare/candidates?q=${encodeURIComponent(existing.name)}`, 'asked by the shown name, never the store title');
+  // The store title finds nothing on that route: the very answer the check must not be built on.
+  assert.equal(likeBody(payload.product.title_en), 'Bambu Lab H2D');
+  assert.ok(!existing.name.toLowerCase().includes(likeBody(payload.product.title_en).toLowerCase()));
+});
+
+test('the cache rule hears a stale listing and a stale search too: their s-maxage sets the wait, not the 6-minute default', async () => {
+  const l = live('bambu-hotend-a1-a2');
+  const listing = await verify({ ...l, unlisted: true });
+  assert.deepEqual(failed(listing), ['listings']);
+  assert.equal(listing.cacheMs, (120 + 60) * 1000, 'the listing answers s-maxage=120 (live): wait 120 s + 60 s');
+  const search = await verify({ ...l, unsearched: true });
+  assert.deepEqual(failed(search), ['search']);
+  assert.equal(search.cacheMs, (120 + 60) * 1000, 'the v1 search answers s-maxage=120 (live)');
+  // A failing knowledge answer (s-maxage=300) still sets the longest wait.
+  const both = await verify({ ...l, unlisted: true, knowledgeEdit: (k) => ({ ...k, documents: [] }) });
+  assert.ok(failed(both).includes('listings') && failed(both).includes('knowledge'), JSON.stringify(failed(both)));
+  assert.equal(both.cacheMs, (300 + 60) * 1000);
 });
 
 test('the mapped leaf: filed elsewhere fails even when the mapped leaf is missing from the tree; an empty leaf fails; a merge keeps its own', async () => {
