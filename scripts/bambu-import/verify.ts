@@ -114,7 +114,8 @@ export interface VerifyContext {
   taxonomy: Rec;
   /** Model tokens of the title with whether the token is unique to this product in the manifest. */
   modelCodes: ReadonlyArray<{ code: string; unique: boolean }>;
-  merge: { before_fp_equal: boolean | null } | null;
+  /** For a merge: the protected-fields equality and where the runner has it from (run.ts mergeEvidence). */
+  merge: { before_fp_equal: boolean | null; source?: string } | null;
   readback: () => Promise<{ ok: boolean; mismatches: number }>;
 }
 
@@ -476,7 +477,7 @@ export async function verifyPublic(site: Site, ctx: VerifyContext): Promise<Veri
   record('media', { ok: headFailed === 0 && rb.ok && rb.mismatches === 0, hard: true, counts: { heads, failed: headFailed, readback_mismatches: rb.mismatches } });
 
   // 8. existing products
-  if (ctx.merge) record('merge', { ok: ctx.merge.before_fp_equal === true, hard: true, detail: { before_fp_equal: ctx.merge.before_fp_equal } });
+  if (ctx.merge) record('merge', { ok: ctx.merge.before_fp_equal === true, hard: true, detail: { before_fp_equal: ctx.merge.before_fp_equal, source: ctx.merge.source ?? 'write' } });
 
   // 11. compare
   const cmp = await site.read('GET', `/api/compare?ids=${encodeURIComponent(ctx.productId)}`);

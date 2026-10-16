@@ -154,7 +154,9 @@ async function serve(w: World): Promise<{ origin: string; close: () => Promise<v
       const body = chunks.length ? Buffer.concat(chunks).toString('utf8') : undefined;
       w.fetch(`${SITE}${req.url}`, { method: req.method, headers, body })
         .then(async (answer) => {
-          res.writeHead(answer.status, Object.fromEntries(answer.headers.entries()));
+          const out: Record<string, string> = {};
+          answer.headers.forEach((value, key) => (out[key] = value));
+          res.writeHead(answer.status, out);
           res.end(Buffer.from(await answer.arrayBuffer()));
         })
         .catch(() => res.writeHead(500).end());

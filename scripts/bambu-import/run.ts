@@ -19,7 +19,18 @@
  * against the absolute deadline; a wait that does not fit releases the lease
  * (event RETRYING with retry_at) and the job exits `more=true blocked=false`,
  * so the chain job continues. The durable state is D1; this process keeps
- * nothing it cannot rebuild (a resumed item re-reads its page).
+ * nothing it cannot rebuild (a resumed item re-reads its page, and VERIFY
+ * checks that the rebuilt payload is, digest for digest, the one written).
+ *
+ * THE LEASE IS KEPT WHILE THE RUNNER WAITS. The Worker's lease lasts 15
+ * minutes and every item call renews it; every sleep of this job (a backoff,
+ * a Retry-After honoured in a call, the store's spacing, the cache wait, the
+ * wait for a RETRYING item's retry time) goes through `pause`, which renews
+ * the lease with `/lease` so that no 10 minutes pass without a renewal. A
+ * transition outside a stage's own retries (start, resume, retry, park,
+ * blocked) that fails transiently asks `/lease` what committed and is retried
+ * within the deadline rules; if it never settles, the item is left to the
+ * next job (`more=true`), never reported BLOCKED.
  *
  * Modes (workflow 60 §K.3): preflight (public checks), open (hello, the
  * manifest, the taxonomy, the protected snapshot `before`), run, close (§A.9,
@@ -28,6 +39,7 @@
  * Outputs (GITHUB_OUTPUT): more, blocked, run_id.
  */
 import { createHash } from 'node:crypto';
+import { canonicalJson } from '@levonis/catalog/bambuImport/fingerprint';
 import { appendFileSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -65,6 +77,15 @@ export const SITE_ORIGIN = 'https://levonis-iq.com';
 const LOCAL_ORIGIN = /^http:\/\/127\.0\.0\.1:\d{2,5}$/;
 const MEDIA_SPACING_MS = 1000;
 const HELLO_EVERY = 50;
+/** The Worker's lease is 15 minutes; the runner renews it before 10 have passed since the last item call. */
+export const LEASE_KEEP_MS = 10 * 60_000;
+/** A transition outside a stage's retries: this many tries (30 s × 2^k apart) before the item is left to the next job. */
+const TRANSITION_ATTEMPTS = 4;
+
+/** The Worker's `catalog_import_items.payload_sha256` of a payload (worker/lib/catalogImport/reviewed.ts payloadSha256). */
+export function payloadDigest(payload: unknown): string {
+  return createHash('sha256').update(canonicalJson(payload)).digest('hex');
+}
 
 export const STAGES = ['EXTRACTING', 'ENRICHING', 'VALIDATING', 'INGESTING_MEDIA', 'WRITING', 'PUBLISHING', 'VERIFYING_LIVE'] as const;
 export type Stage = (typeof STAGES)[number];
@@ -247,8 +268,16 @@ interface ItemWork {
   verify?: VerifyOutcome;
   browser?: BrowserResult | null;
   shots: Buffer[];
-  leaseShaAtStart: string;
+  /** The staged (and, after WRITING, written) payload's digest, as /lease reports it. */
+  writtenSha: string;
+  /** stage_data.before_fp_equal, when the Worker records the merge's protected-fields result there. */
+  stageFpEqual: boolean | null;
+  /** /publish-finish ran for this item in this job (it purges, and republishes a product hidden on a block). */
+  publishedThisJob: boolean;
 }
+
+const stageFpEqualOf = (stageData: Record<string, unknown>): boolean | null =>
+  typeof stageData.before_fp_equal === 'boolean' ? stageData.before_fp_equal : null;
 
 type ItemOutcome =
   | { kind: 'complete'; url: string }
@@ -283,6 +312,11 @@ export class Importer {
   private status: StatusAnswer | null = null;
   private runId: string;
   private resumeUsed = false;
+  /** The item whose lease this job holds, and when an item call last renewed it (null between items). */
+  private held: { w: ItemWork; renewedAt: number } | null = null;
+  private renewing = false;
+  /** The clock every fetcher sleeps on: its sleeps keep the held lease alive (`pause`). */
+  readonly leaseClock: Clock;
 
   constructor(
     readonly cfg: RunConfig,
@@ -290,17 +324,21 @@ export class Importer {
   ) {
     this.deadline = new Deadline(cfg.deadlineMs, deps.clock);
     this.runId = cfg.runId || deps.openedRunId || '';
+    this.leaseClock = { now: () => deps.clock.now(), sleep: (ms) => this.pause(ms) };
     this.ops = new OpsClient({
       siteOrigin: cfg.siteOrigin,
       token: deps.token,
       fetch: deps.fetch,
-      clock: deps.clock,
+      clock: this.leaseClock,
       deadline: this.deadline,
       githubRunId: cfg.githubRunId,
       codeCommit: cfg.codeCommit,
+      onRenewed: (sid) => {
+        if (this.held && this.held.w.sid === sid) this.held.renewedAt = deps.clock.now();
+      },
     });
-    this.store = new StoreFetcher({ fetch: deps.fetch, clock: deps.clock, deadline: this.deadline, origin: cfg.storeOrigin, onRequest: deps.onStoreRequest });
-    this.hosts = new HostFetcher({ fetch: deps.fetch, clock: deps.clock, deadline: this.deadline, siteOrigin: cfg.siteOrigin });
+    this.store = new StoreFetcher({ fetch: deps.fetch, clock: this.leaseClock, deadline: this.deadline, origin: cfg.storeOrigin, onRequest: deps.onStoreRequest });
+    this.hosts = new HostFetcher({ fetch: deps.fetch, clock: this.leaseClock, deadline: this.deadline, siteOrigin: cfg.siteOrigin });
     this.site = new Site(cfg.siteOrigin, this.hosts, () => (this.siteBudgetEnd === null ? 0 : Math.max(0, this.siteBudgetEnd - deps.clock.now())));
     deps.log.addSecret(deps.token);
   }
@@ -311,6 +349,45 @@ export class Importer {
 
   private now(): string {
     return new Date(this.deps.clock.now()).toISOString();
+  }
+
+  /**
+   * Every sleep of this job. While an item is held, its lease is renewed with `/lease` before 10 minutes pass
+   * since the last item call (the Worker's lease is 15), so no wait — a 30-minute backoff, a Retry-After, the
+   * wait for a retry time — lets the lease lapse under the next call.
+   */
+  private async pause(ms: number): Promise<void> {
+    let left = Math.max(0, ms);
+    while (left > 0) {
+      const h = this.held;
+      if (!h || this.renewing) {
+        await this.deps.clock.sleep(left);
+        return;
+      }
+      const room = h.renewedAt + LEASE_KEEP_MS - this.deps.clock.now();
+      if (room <= 0) {
+        await this.renew(h);
+        continue;
+      }
+      const step = Math.min(left, room);
+      await this.deps.clock.sleep(step);
+      left -= step;
+    }
+  }
+
+  /** `/lease` with the held token: renews it (or, after a lapse, takes the item again with a fresh token). */
+  private async renew(h: { w: ItemWork; renewedAt: number }): Promise<void> {
+    this.renewing = true;
+    try {
+      const a = await this.ops.lease(h.w.sid, h.w.leaseToken);
+      if (a.lease_token) h.w.leaseToken = a.lease_token;
+    } catch (err) {
+      if (err instanceof OpsError && err.kind === 'gone') throw new JobStop('OPS_GONE', true);
+      // Anything else: the next item call learns what it must (a lapsed lease is re-leased by relearn).
+    } finally {
+      this.renewing = false;
+      h.renewedAt = this.deps.clock.now();
+    }
   }
 
   private seal(name: string, value: unknown): void {
@@ -498,7 +575,18 @@ export class Importer {
 
   private async processItem(row: ManifestRow): Promise<ItemOutcome> {
     const sid = row.source_product_id;
-    const lease = await this.ops.lease(sid);
+    let lease;
+    try {
+      lease = await this.ops.lease(sid);
+    } catch (err) {
+      // No settled answer (its in-call retries spent): the item is left to the next job, never reported BLOCKED.
+      if (err instanceof OpsError && (err.kind === 'transient' || err.kind === 'stale')) {
+        this.log.item(row.queue_position, row.handle, 'LEASE', 'ops_unsettled', { call: 'lease', attempts: 1 });
+        return { kind: 'deadline' };
+      }
+      if (err instanceof OpsError && err.kind === 'gone') throw new JobStop('OPS_GONE', true);
+      throw err;
+    }
     const w: ItemWork = {
       sid,
       row,
@@ -511,39 +599,53 @@ export class Importer {
       productId: lease.levonis_product_id,
       slug: lease.slug,
       shots: [],
-      leaseShaAtStart: lease.payload_sha256,
+      writtenSha: lease.payload_sha256,
+      stageFpEqual: stageFpEqualOf(lease.stage_data),
+      publishedThisJob: false,
     };
     const pos = row.queue_position;
     const log = (stage: LogStage, t: Parameters<ImportLog['item']>[3], p: Parameters<ImportLog['item']>[4] = {}) => this.log.item(pos, row.handle, stage, t, p);
     if (w.state === 'COMPLETE' || w.state === 'WITHDRAWN_AT_SOURCE') return { kind: 'skip' };
+    this.held = { w, renewedAt: this.deps.clock.now() };
+    try {
+      return await this.workItem(w, lease.blocker_code, lease.retry_at, log);
+    } finally {
+      this.held = null;
+    }
+  }
+
+  private async workItem(w: ItemWork, blockerCode: string, retryAt: string, log: (stage: LogStage, t: Parameters<ImportLog['item']>[3], p?: Parameters<ImportLog['item']>[4]) => void): Promise<ItemOutcome> {
+    const sid = w.sid;
     try {
       this.gate.noteStart(sid);
       if (w.state === 'BLOCKED') {
         if (!this.cfg.resume || this.resumeUsed) {
-          log('BLOCKED', 'blocked', { code: lease.blocker_code || 'BLOCKED' });
+          log('BLOCKED', 'blocked', { code: blockerCode || 'BLOCKED' });
           this.gate.release();
-          return { kind: 'blocked', code: lease.blocker_code || 'BLOCKED' };
+          return { kind: 'blocked', code: blockerCode || 'BLOCKED' };
         }
         this.resumeUsed = true;
         const target = stageAfter(w.lastCompleted);
         if (!target) throw blockedStop('RETRIES_EXHAUSTED', 'nothing to resume');
-        await this.event(w, target, 'resume');
+        await this.transition(w, target, 'resume');
         log(target, 'resumed', { from: 'BLOCKED', stage: target });
       } else if (w.state === 'RETRYING') {
         const target = stageAfter(w.lastCompleted);
         if (!target) throw blockedStop('RETRIES_EXHAUSTED', 'nothing to resume');
-        const wait = Math.max(0, (Date.parse(lease.retry_at) || 0) - this.deps.clock.now());
+        const wait = Math.max(0, (Date.parse(retryAt) || 0) - this.deps.clock.now());
         if (!this.deadline.fitsStage(wait, WORST_OF[target])) {
           log('RETRYING', 'deadline_exit', { need: Math.round((wait + WORST[WORST_OF[target]]) / 1000), left: Math.round(this.deadline.left() / 1000) });
           this.gate.release();
           return { kind: 'deadline' };
         }
-        if (wait > 0) await this.deps.clock.sleep(wait);
-        await this.event(w, target, 'resume');
+        // The lease was taken before the wait: `pause` keeps it alive until the retry time.
+        if (wait > 0) await this.pause(wait);
+        await this.transition(w, target, 'resume');
         log(target, 'resumed', { from: 'RETRYING', stage: target });
       } else if (w.state === 'DISCOVERED' || w.state === '') {
-        const a = await this.event(w, 'EXTRACTING', 'start');
-        this.gate.assertMayExtract(sid, a.seq);
+        const a = await this.transition(w, 'EXTRACTING', 'start');
+        // A start whose answer was lost but committed carries no sequence number: the Worker's in-flight index is the proof.
+        this.gate.assertMayExtract(sid, a?.seq ?? null);
       } else if (!(STAGES as readonly string[]).includes(w.state)) {
         throw new JobStop('ITEM_STATE_UNKNOWN', true);
       }
@@ -568,9 +670,11 @@ export class Importer {
     if (!code) throw err;
     if (code === 'ACCESS_CHALLENGE') log('BLOCKED', 'challenge');
     try {
-      if (w.state !== 'BLOCKED') await this.event(w, 'BLOCKED', 'blocked', { code });
+      if (w.state !== 'BLOCKED') await this.transition(w, 'BLOCKED', 'blocked', { code });
     } catch (e) {
       if (e instanceof OpsError && e.kind === 'gone') throw new JobStop('OPS_GONE', true);
+      // The BLOCKED event never settled: the item is not BLOCKED in D1, and the next job meets the same cause.
+      if (e instanceof ImportStop && e.kind === 'deadline') return { kind: 'deadline' };
       throw e;
     }
     log('BLOCKED', 'blocked', { code });
@@ -595,6 +699,49 @@ export class Importer {
     w.stageAttempts = lease.stage_attempts;
     if (lease.levonis_product_id) w.productId = lease.levonis_product_id;
     if (lease.slug) w.slug = lease.slug;
+    if (lease.payload_sha256) w.writtenSha = lease.payload_sha256;
+    const fp = stageFpEqualOf(lease.stage_data);
+    if (fp !== null) w.stageFpEqual = fp;
+  }
+
+  /**
+   * A transition outside a stage's own retries (start, resume, RETRYING, park, BLOCKED). `/event` is never
+   * retried inside its call, so a 5xx, a timeout or a stale answer here asks `/lease` what committed: a
+   * transition that committed is done (its answer is null), one that did not is sent again after the §B.5
+   * backoff, within the deadline rules. If it never settles, the item is left to the next job: an ImportStop
+   * of kind `deadline` (`more=true`), never BLOCKED for a passing failure. Two stale answers stop the job.
+   */
+  private async transition(
+    w: ItemWork,
+    state: string,
+    outcome: 'start' | 'retry' | 'blocked' | 'resume',
+    extra: { code?: string; retry_at?: string; release?: boolean } = {}
+  ): Promise<Awaited<ReturnType<Importer['event']>> | null> {
+    let stale = 0;
+    for (let attempt = 0; ; attempt++) {
+      let failure: OpsError;
+      try {
+        return await this.event(w, state, outcome, extra);
+      } catch (err) {
+        if (!(err instanceof OpsError) || (err.kind !== 'transient' && err.kind !== 'stale')) throw err;
+        failure = err;
+      }
+      if (failure.kind === 'stale' && ++stale > 2) throw new JobStop('LEASE_UNSTABLE', true);
+      try {
+        await this.relearn(w);
+        if (w.state === state) return null; // it committed; only the answer was lost
+      } catch (err) {
+        if (err instanceof OpsError && err.kind === 'gone') throw err;
+        if (!(err instanceof OpsError)) throw err;
+        // /lease did not answer either: try again after the wait.
+      }
+      const wait = Math.max(failure.retryAfterMs ?? 0, backoff(attempt));
+      if (attempt + 1 >= TRANSITION_ATTEMPTS || !this.deadline.fits(wait, WORST.PUBLISH_FINISH)) {
+        this.log.item(w.row.queue_position, w.row.handle, 'LEASE', 'ops_unsettled', { call: 'event', attempts: attempt + 1 });
+        throw new ImportStop('OPS_UNSETTLED', 'deadline', 'a transition never settled', { needMs: wait });
+      }
+      await this.pause(wait);
+    }
   }
 
   private async runStages(w: ItemWork): Promise<ItemOutcome> {
@@ -613,7 +760,7 @@ export class Importer {
       if (w.state === 'RETRYING') {
         const target = stageAfter(w.lastCompleted);
         if (!target) throw blockedStop('RETRIES_EXHAUSTED', 'nothing to resume');
-        await this.event(w, target, 'resume');
+        await this.transition(w, target, 'resume');
         continue;
       }
       const stage = w.state as Stage;
@@ -659,25 +806,32 @@ export class Importer {
         const retryAfter = err instanceof ImportStop ? err.detail.retryAfterMs ?? null : (err as OpsError).retryAfterMs;
         if (w.stageAttempts + 1 >= MAX_STAGE_ATTEMPTS) throw blockedStop('RETRIES_EXHAUSTED', 'eight attempts of one stage');
         const wait = Math.max(retryAfter ?? 0, backoff(w.stageAttempts));
-        if (!this.deadline.fitsStage(wait, WORST_OF[stage])) {
+        // The curated file can only arrive with a new commit, never inside this job (its bundle is loaded once):
+        // the item waits in D1 for a later job instead of an hour here.
+        if (code === 'CURATION_PENDING' || !this.deadline.fitsStage(wait, WORST_OF[stage])) {
           await this.park(w, stage, wait, code);
           return { kind: 'deadline' };
         }
-        await this.event(w, 'RETRYING', 'retry', { code, retry_at: this.deadline.retryAt(wait) });
+        await this.transition(w, 'RETRYING', 'retry', { code, retry_at: this.deadline.retryAt(wait) });
         this.log.item(w.row.queue_position, w.row.handle, 'RETRYING', 'retrying', { code, seconds: Math.round(wait / 1000), attempt: w.stageAttempts });
-        await this.deps.clock.sleep(wait);
-        await this.event(w, stage, 'resume');
+        await this.pause(wait);
+        await this.transition(w, stage, 'resume');
       }
     }
   }
 
   /** Rule 3: release the lease (event RETRYING, lease expires now) and let the job exit `more=true`. */
   private async park(w: ItemWork, stage: Stage, waitMs: number, code: string): Promise<void> {
-    this.log.item(w.row.queue_position, w.row.handle, stage, 'deadline_exit', {
-      need: Math.round((waitMs + WORST[WORST_OF[stage]]) / 1000),
-      left: Math.round(this.deadline.left() / 1000),
-    });
-    await this.event(w, 'RETRYING', 'retry', { code, retry_at: this.deadline.retryAt(waitMs), release: true });
+    if (code === 'CURATION_PENDING') this.log.item(w.row.queue_position, w.row.handle, stage, 'parked', { code, seconds: Math.round(waitMs / 1000) });
+    else {
+      this.log.item(w.row.queue_position, w.row.handle, stage, 'deadline_exit', {
+        need: Math.round((waitMs + WORST[WORST_OF[stage]]) / 1000),
+        left: Math.round(this.deadline.left() / 1000),
+      });
+    }
+    await this.transition(w, 'RETRYING', 'retry', { code, retry_at: this.deadline.retryAt(waitMs), release: true });
+    // The lease is released: nothing renews it any more.
+    if (this.held?.w === w) this.held = null;
     this.gate.release();
   }
 
@@ -886,7 +1040,7 @@ export class Importer {
       const batch = pending.splice(0, 4);
       const wait = lastCall === null ? 0 : Math.max(0, lastCall + MEDIA_SPACING_MS - this.deps.clock.now());
       if (!this.deadline.fitsStage(wait, 'MEDIA_CALL')) throw new ImportStop('DEADLINE_EXIT', 'deadline', 'a media call does not fit', { needMs: wait });
-      if (wait > 0) await this.deps.clock.sleep(wait);
+      if (wait > 0) await this.pause(wait);
       const t0 = this.deps.clock.now();
       lastCall = t0;
       const rows = await this.ops.media(w.sid, w.leaseToken, batch);
@@ -938,6 +1092,7 @@ export class Importer {
   private async publish(w: ItemWork): Promise<void> {
     const t0 = this.deps.clock.now();
     const a = await this.ops.publishFinish(w.sid, w.leaseToken);
+    w.publishedThisJob = true;
     w.state = a.state || 'VERIFYING_LIVE';
     w.lastCompleted = 'PUBLISHING';
     this.log.item(w.row.queue_position, w.row.handle, 'PUBLISHING', 'published', { ms: this.deps.clock.now() - t0 });
@@ -957,7 +1112,25 @@ export class Importer {
     if (!w.slug || !w.productId) await this.relearn(w);
     if (!w.slug || !w.productId) throw blockedStop('VERIFY_FAILED_PERSISTENT', 'the write answer named no product');
     await this.ensureEnriched(w);
+    // A resumed item (no /write in this job) rebuilt its payload from the page read NOW. It is verified only when
+    // it is, digest for digest, the payload the Worker staged and wrote; otherwise the expectations would be
+    // another build's. A passing difference (an optional wiki or tracker read that failed) is retried; a lasting
+    // one (the store changed the product after the write) stops the item for the owner.
+    if (!w.write && w.writtenSha && payloadDigest(w.payload!) !== w.writtenSha) {
+      this.log.item(w.row.queue_position, w.row.handle, 'VERIFYING_LIVE', 'rebuilt_differs', { attempt: w.stageAttempts + 1 });
+      this.forgetBuild(w);
+      if (w.stageAttempts < 2) throw transientStop('VERIFY_STALE', 'the page read again is not the payload written');
+      throw blockedStop('VERIFY_FAILED_PERSISTENT', 'the source changed after the write');
+    }
     if (w.media.size === 0) await this.ingest(w);
+    // Resumed into VERIFY in this job (after a block that hid the product, a park, a lost job): /publish-finish
+    // first. It is idempotent in VERIFYING_LIVE; it puts back a product hidden on the block (§A.10) and purges
+    // every page that cached it hidden, so round 1 reads the product as it is.
+    if (!w.publishedThisJob) {
+      await this.ops.publishFinish(w.sid, w.leaseToken);
+      w.publishedThisJob = true;
+    }
+    const isMerge = w.payload!.write_mode === 'merge' || (!!w.write && !w.write.created);
     const ctx = {
       payload: w.payload!,
       productId: w.productId,
@@ -967,7 +1140,7 @@ export class Importer {
       also: w.row.also ?? [],
       taxonomy: this.deps.bundle.taxonomy,
       modelCodes: modelCodesOf(w.payload!.product.title_en, this.deps.bundle.rows.map((r) => r.title ?? '')),
-      merge: w.write && !w.write.created ? { before_fp_equal: w.write.before_fp_equal } : w.payload!.write_mode === 'merge' ? { before_fp_equal: w.write?.before_fp_equal ?? null } : null,
+      merge: isMerge ? this.mergeEvidence(w) : null,
       readback: () => this.ops.readback(w.sid),
     };
     const audit = (w.row.audit_classes ?? []).length > 0;
@@ -1013,9 +1186,31 @@ export class Importer {
       if (!this.deadline.fits(wait, AFTER_CACHE_WAIT)) throw new ImportStop('DEADLINE_EXIT', 'deadline', 'the cache wait does not fit', { needMs: wait });
       this.log.item(w.row.queue_position, w.row.handle, 'VERIFYING_LIVE', 'cache_wait', { seconds: Math.round(wait / 1000) });
       await this.ops.publishFinish(w.sid, w.leaseToken);
-      await this.deps.clock.sleep(wait);
+      await this.pause(wait);
     }
     throw blockedStop('VERIFY_FAILED_PERSISTENT', 'a check failed again after a purge and a wait');
+  }
+
+  /**
+   * The merge's protected-fields proof (§I.1.8): this job's /write answer; else what the Worker recorded in
+   * stage_data; else the committed write itself — the item is past WRITING in D1, and its batch could not have
+   * committed had a guard trigger seen a protected column move (§A.5, §E.3). A resumed runner never fails a
+   * hard check on a value it cannot have.
+   */
+  private mergeEvidence(w: ItemWork): { before_fp_equal: boolean | null; source: 'write' | 'stage_data' | 'committed_write' } {
+    if (w.write) return { before_fp_equal: w.write.before_fp_equal, source: 'write' };
+    if (w.stageFpEqual !== null) return { before_fp_equal: w.stageFpEqual, source: 'stage_data' };
+    return { before_fp_equal: true, source: 'committed_write' };
+  }
+
+  /** Drops a rebuilt work so the next attempt reads the page again. */
+  private forgetBuild(w: ItemWork): void {
+    w.extraction = undefined;
+    w.build = undefined;
+    w.payload = undefined;
+    w.enrichReport = undefined;
+    w.documentChecks = [];
+    w.stagedSha = undefined;
   }
 
   /** The per-item report and its screenshots, sealed (they may name sources and media URLs). */
@@ -1055,13 +1250,17 @@ export class Importer {
       this.writeSummary(true);
       return 1;
     }
-    // §I.3.1: the three sitemaps again, at the store's pace, and the diff with the manifest.
+    // §I.3.1: the three sitemaps again, at the store's pace, and the diff with the manifest. A sitemap the store's
+    // robots.txt now disallows is a policy stop (§J.1), never an empty answer: the close is refused before the
+    // protected snapshot and the irreversible /run/finish, rather than report every product "no longer listed".
     const robots = await this.ensureRobots();
-    const urls: string[] = [];
-    for (const path of SITEMAP_PATHS) {
-      if (!robotsAllows(robots, path)) continue;
-      urls.push(...parseSitemap(await this.store.sitemap(path)));
+    if (SITEMAP_PATHS.some((path) => !robotsAllows(robots, path))) {
+      this.log.error('note', { code: 'SITEMAP_DISALLOWED' });
+      this.writeSummary(true);
+      return 1;
     }
+    const urls: string[] = [];
+    for (const path of SITEMAP_PATHS) urls.push(...parseSitemap(await this.store.sitemap(path)));
     const diff = sitemapDiff(productHandles(urls), this.deps.bundle.rows);
     this.log.info('sitemap', { listed: diff.listed, new: diff.added.length, removed: diff.removed.length });
     // §I.3.3: the public sweep of the brand's visible products (v1), at ≤ 4 requests per second.
@@ -1120,7 +1319,13 @@ export class Importer {
         second = { at: this.now(), outcome: 'withdrawn', status: err.detail.status ?? 0 };
       }
     }
-    const listed = robotsAllows(robots, '/sitemap_products_1.xml') ? productHandles(parseSitemap(await this.store.sitemap('/sitemap_products_1.xml'))) : [];
+    // The sitemap's absence is evidence only after a real read of it: a robots.txt Disallow is a policy stop
+    // (§J.1), never an empty sitemap — the withdrawal is refused and nothing is sent.
+    if (!robotsAllows(robots, '/sitemap_products_1.xml')) {
+      this.log.error('note', { code: 'SITEMAP_DISALLOWED' });
+      return 1;
+    }
+    const listed = productHandles(parseSitemap(await this.store.sitemap('/sitemap_products_1.xml')));
     const absent = !listed.includes(row.handle);
     if (second.outcome !== 'withdrawn' || !absent) {
       this.log.error('note', { code: 'SOURCE_STILL_PRESENT' });

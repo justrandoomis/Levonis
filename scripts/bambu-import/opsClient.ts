@@ -46,7 +46,8 @@
  * Idempotent calls are retried in-call (3 attempts, deadline-checked); a
  * non-idempotent one (`/write`, `/event`, `/complete` …) never is: an
  * ambiguous failure is reported as such and the runner asks `/lease` what
- * committed (§A.7).
+ * committed (§A.7). A 429 (the handler never ran) is retried in-call for a
+ * non-idempotent call too, except `/write`: rule 2 is checked again first.
  */
 import type { ImportPayload } from '@levonis/catalog/bambuImport/payload';
 import { Deadline, retryAfterMs, type Clock } from './deadline';
@@ -263,7 +264,12 @@ export interface OpsClientOptions {
   codeCommit?: string;
   /** Every call, as sent (tests): method, path, the body's keys. */
   onCall?: (method: string, path: string, body: Rec | null) => void;
+  /** An item call that renewed the item's lease answered 2xx (every item call with the lease renews it, §A.7). */
+  onRenewed?: (sid: string) => void;
 }
+
+/** The item calls that take or renew the lease (the Worker's holdLease / leaseItem). */
+const LEASE_CALL = /^\/items\/(\d{1,20})\/(?:lease|event|stage|media|write|publish-finish|complete)$/;
 
 export class OpsClient {
   private readonly base: string;
@@ -275,7 +281,12 @@ export class OpsClient {
     this.token = opts.token;
   }
 
-  private async send(call: string, method: 'GET' | 'POST', path: string, body: Rec | null, idempotent: boolean): Promise<Rec> {
+  /**
+   * `retry429`: a non-idempotent call that answered 429 never reached the Worker's handler, so it may be sent
+   * again in the call — except `/write`, whose retry must pass rule 2 (§A.7) again: its 429 goes to the stage's
+   * own retry, which checks the 13 minutes before it sends anything.
+   */
+  private async send(call: string, method: 'GET' | 'POST', path: string, body: Rec | null, idempotent: boolean, retry429 = true): Promise<Rec> {
     const text = body === null ? undefined : JSON.stringify(body);
     if (text !== undefined && Buffer.byteLength(text) > MAX_BODY_BYTES) throw new OpsError(call, 'permanent', 'PLAN_TOO_LARGE', 413);
     for (let attempt = 0; ; attempt++) {
@@ -317,13 +328,17 @@ export class OpsClient {
       } finally {
         clearTimeout(timer);
       }
-      if (!failed && status >= 200 && status < 300) return answer;
+      if (!failed && status >= 200 && status < 300) {
+        const renewed = LEASE_CALL.exec(path);
+        if (renewed) this.opts.onRenewed?.(renewed[1]);
+        return answer;
+      }
       if (!failed) {
         const code = str(answer.code);
         const kind = classify(status, code);
         failed = new OpsError(call, kind, kind === 'gone' ? 'OPS_GONE' : normaliseCode(code) || `HTTP_${status}`, status, retryAfter, kind === 'transient' && status >= 500 && !idempotent);
       }
-      const canRetry = failed.kind === 'transient' && (idempotent || (!failed.ambiguous && failed.status === 429)) && attempt + 1 < IN_CALL_ATTEMPTS;
+      const canRetry = failed.kind === 'transient' && (idempotent || (retry429 && !failed.ambiguous && failed.status === 429)) && attempt + 1 < IN_CALL_ATTEMPTS;
       if (!canRetry) throw failed;
       const wait = failed.retryAfterMs ?? 2000 * 2 ** attempt;
       if (!this.opts.deadline.fits(wait, 60_000)) throw failed;
@@ -426,6 +441,7 @@ export class OpsClient {
       'POST',
       this.sidPath(sid, 'write'),
       { lease_token: leaseToken, payload_sha256: payloadSha256, payload: payload as unknown as Rec, document_checks: documentChecks as unknown as Rec[] },
+      false,
       false
     );
     const counts = isRec(a.counts) ? Object.fromEntries(Object.entries(a.counts).filter(([, v]) => typeof v === 'number') as Array<[string, number]>) : {};

@@ -542,3 +542,255 @@ test('verification: what the runner records and sends as edge evidence, read fro
   }
 });
 
+
+// ------------------------------------------------------------------ review fixes: the loop (leases, transitions, resumes)
+
+const writeCalls = (w: World) => callsTo(w, /\/write$/);
+
+test('the lease outlives every wait: a chained job that waits 27 minutes for its retry time keeps the item and completes it', async () => {
+  const w = new World({ handles: ['filament-buffer'] });
+  try {
+    // Job 1: a 30-minute Retry-After near its deadline parks the item (rule 3) and exits more=true.
+    w.inject(/\/stage$/, 1, () => json(429, { code: 'RATE_LIMITED', message: 'later' }, { 'retry-after': '1800' }));
+    await w.importer({ deadlineMs: w.clock.now() + 25 * MIN }).main();
+    assert.deepEqual(w.outputs, { more: 'true', blocked: 'false', run_id: RUN_ID });
+    // Job 2, dispatched by the chain three minutes later: it leases the item, waits until retry_at, resumes it.
+    w.clock.t += 3 * MIN;
+    const code = await w.importer({ chainCount: 1 }).main();
+    assert.equal(code, 0, w.logLines.join('\n'));
+    assert.equal(w.item('filament-buffer').state, 'COMPLETE');
+    assert.deepEqual(w.outputs, { more: 'false', blocked: 'false', run_id: RUN_ID });
+    assert.ok(!w.logLines.some((l) => /IMPORT_LEASE_LOST/.test(l)));
+    // No 15 minutes ever passed between two item calls of the lease holder.
+    const itemCalls = w.calls.filter((c) => c.path.startsWith('/items/') && c.at > w.calls.find((x) => x.path === '/run/status' && x.at > 0)!.at);
+    for (let i = 1; i < itemCalls.length; i++) assert.ok(itemCalls[i].at - itemCalls[i - 1].at < 15 * MIN, `${itemCalls[i - 1].path} → ${itemCalls[i].path}`);
+  } finally {
+    w.dispose();
+  }
+});
+
+test('the lease outlives an in-job 960 s backoff (the sixth attempt of a stage): renewed while the runner waits', async () => {
+  const w = new World({ handles: ['filament-buffer'], items: { '6945416380552': { state: 'RETRYING', last_completed: 'ENRICHING', retry_at: '2026-10-16T07:00:00.000Z', stage_attempts: 5 } } });
+  try {
+    w.inject(/\/stage$/, 3, () => json(503, { code: 'OVERLOADED', message: 'busy' }));
+    const code = await w.importer().main();
+    assert.equal(code, 0, w.logLines.join('\n'));
+    assert.ok(w.logLines.some((l) => /retrying OVERLOADED: wait 960 s \(stage attempt 6\)/.test(l)));
+    assert.equal(w.item('filament-buffer').state, 'COMPLETE');
+    assert.ok(callsTo(w, /\/lease$/).length >= 2, 'the lease was renewed during the wait');
+  } finally {
+    w.dispose();
+  }
+});
+
+test('CURATION_PENDING parks the item for a later job (its bundle cannot change inside this one); no hour is slept in the job', async () => {
+  const w = new World({ handles: ['filament-buffer'] });
+  try {
+    w.bundle.bySid.get('6945416380552')!.curated = true;
+    const start = w.clock.now();
+    const code = await w.importer().main();
+    assert.equal(code, 0, w.logLines.join('\n'));
+    assert.deepEqual(w.outputs, { more: 'true', blocked: 'false', run_id: RUN_ID });
+    const last = w.events.at(-1)!;
+    assert.equal(last.state, 'RETRYING');
+    assert.equal(last.code, 'CURATION_PENDING');
+    assert.equal(last.release, true);
+    assert.equal(Date.parse(last.retry_at) - w.clock.now(), 60 * MIN, 'retry in an hour');
+    assert.ok(w.clock.now() - start < 10 * MIN, 'the job did not sleep the hour');
+    assert.ok(w.logLines.some((l) => /parked CURATION_PENDING: retry in 3600 s, in a later job/.test(l)));
+  } finally {
+    w.dispose();
+  }
+});
+
+test('/write that answers 429 is never sent again inside the call: the stage retry checks the 13 minutes first', async () => {
+  const w = new World({ handles: ['filament-buffer'], items: { '6945416380552': { state: 'RETRYING', last_completed: 'INGESTING_MEDIA', retry_at: '2026-10-16T07:00:00.000Z' } } });
+  try {
+    w.inject(/\/write$/, 1, () => json(429, { code: 'RATE_LIMITED', message: 'later' }, { 'retry-after': '840' }));
+    const deadline = w.clock.now() + 23.8 * MIN;
+    await w.importer({ deadlineMs: deadline }).main();
+    assert.ok(writeCalls(w).length >= 1);
+    for (const c of writeCalls(w)) assert.ok(deadline - c.at >= 13 * MIN, `a /write was sent with ${Math.round((deadline - c.at) / 1000)} s left`);
+    assert.deepEqual(w.outputs, { more: 'true', blocked: 'false', run_id: RUN_ID });
+    assert.equal(w.item('filament-buffer').state, 'RETRYING');
+    assert.equal(w.item('filament-buffer').last_completed, 'INGESTING_MEDIA', 'nothing was written: the next job writes and verifies in one go');
+  } finally {
+    w.dispose();
+  }
+});
+
+test('a transition that fails in passing (the start, a resume) asks /lease what committed and is sent again; never blocked=true', async () => {
+  // A 502 before the Worker saw the start event: re-sent after the backoff.
+  const a = new World({ handles: ['filament-buffer'] });
+  try {
+    a.inject(/\/event$/, 1, () => json(502, { code: 'BAD_GATEWAY', message: 'x' }));
+    assert.equal(await a.importer().main(), 0, a.logLines.join('\n'));
+    assert.equal(a.item('filament-buffer').state, 'COMPLETE');
+    assert.deepEqual(a.outputs, { more: 'false', blocked: 'false', run_id: RUN_ID });
+  } finally {
+    a.dispose();
+  }
+  // The start committed but its answer was lost: /lease shows EXTRACTING, nothing is sent twice.
+  const b = new World({ handles: ['filament-buffer'] });
+  try {
+    b.loseAnswer(/\/event$/, 1);
+    assert.equal(await b.importer().main(), 0, b.logLines.join('\n'));
+    assert.equal(b.item('filament-buffer').state, 'COMPLETE');
+    assert.equal(b.events.filter((e) => e.state === 'EXTRACTING').length, 1);
+  } finally {
+    b.dispose();
+  }
+  // A resume from RETRYING that meets a 503 once.
+  const c = new World({ handles: ['filament-buffer'], items: { '6945416380552': { state: 'RETRYING', last_completed: 'INGESTING_MEDIA', retry_at: '2026-10-16T07:00:00.000Z' } } });
+  try {
+    c.inject(/\/event$/, 1, () => json(503, { code: 'D1_BUSY', message: 'x' }));
+    assert.equal(await c.importer().main(), 0, c.logLines.join('\n'));
+    assert.equal(c.item('filament-buffer').state, 'COMPLETE');
+  } finally {
+    c.dispose();
+  }
+  // A Worker that never answers the event: the item is left to the next job (more=true), never BLOCKED.
+  const d = new World({ handles: ['filament-buffer'] });
+  try {
+    d.inject(/\/event$/, 99, () => json(502, { code: 'BAD_GATEWAY', message: 'x' }));
+    assert.equal(await d.importer().main(), 0, d.logLines.join('\n'));
+    assert.deepEqual(d.outputs, { more: 'true', blocked: 'false', run_id: RUN_ID });
+    assert.equal(d.item('filament-buffer').state, 'DISCOVERED');
+    assert.ok(d.logLines.some((l) => /ops event: no settled answer after 4 tries; the item is left to the next job/.test(l)));
+  } finally {
+    d.dispose();
+  }
+});
+
+test('a /lease whose first answer was lost: the retry takes the item over (the Worker\'s rule) and the job goes on', async () => {
+  const w = new World({ handles: ['filament-buffer'] });
+  try {
+    w.loseAnswer(/\/lease$/, 1);
+    assert.equal(await w.importer().main(), 0, w.logLines.join('\n'));
+    assert.equal(w.item('filament-buffer').state, 'COMPLETE');
+    assert.deepEqual(w.outputs, { more: 'false', blocked: 'false', run_id: RUN_ID });
+  } finally {
+    w.dispose();
+  }
+});
+
+test('a created product BLOCKED at VERIFY (hidden, §A.10) and resumed: /publish-finish puts it back and purges BEFORE the first read', async () => {
+  const w = new World({ handles: ['filament-buffer'] });
+  try {
+    w.inject(/\/items\/6945416380552\/complete$/, 1, () => json(409, { code: 'VERIFY_FAILED_PERSISTENT', message: 'a count differs' }));
+    await w.importer().main();
+    assert.equal(w.item('filament-buffer').state, 'BLOCKED');
+    assert.equal(w.item('filament-buffer').hidden, true, 'the Worker hid the product it created');
+    const before = w.calls.length;
+    const lines = w.logLines.length;
+    await w.importer({ resume: true }).main();
+    assert.equal(w.item('filament-buffer').state, 'COMPLETE', w.logLines.slice(lines).join('\n'));
+    const job2 = w.calls.slice(before);
+    const finish = job2.find((c) => c.path.endsWith('/publish-finish'))!;
+    const firstRead = w.siteRequests.find((r) => r.seq > job2[0].seq)!;
+    assert.ok(finish && firstRead && finish.seq < firstRead.seq, 'the purge came before the first public read of the resumed job');
+    assert.ok(!w.logLines.slice(lines).some((l) => /a stale answer; purge again and wait/.test(l)), 'round 1 already read the product as it is');
+  } finally {
+    w.dispose();
+  }
+});
+
+test('a merge resumed after its /write (a lost answer, or a later job) completes: the committed write is the protected-fields proof', async () => {
+  const matches = [{ source_product_id: '6945416380552', decision: 'merge', levonis_product_id: 'p_existing_buffer_0001' }];
+  // In this job: the /write committed, its answer was lost.
+  const a = new World({ handles: ['filament-buffer'], matches });
+  try {
+    a.loseAnswer(/\/items\/6945416380552\/write$/);
+    assert.equal(await a.importer().main(), 0, a.logLines.join('\n'));
+    assert.equal(writeCalls(a).length, 1, 'the committed write is not sent again');
+    assert.equal(a.item('filament-buffer').state, 'COMPLETE', a.logLines.join('\n'));
+    const merge = (callsTo(a, /\/complete$/)[0].body!.edge_evidence as Record<string, any>).checks.merge;
+    assert.deepEqual({ ok: merge.ok, detail: merge.detail }, { ok: true, detail: { before_fp_equal: true, source: 'committed_write' } });
+  } finally {
+    a.dispose();
+  }
+  // Across jobs: job 1 parks at VERIFY, job 2 resumes there without any /write answer.
+  const b = new World({ handles: ['filament-buffer'], matches });
+  try {
+    b.inject(/\/items\/6945416380552\/complete$/, 1, () => json(503, { code: 'OVERLOADED', message: 'busy' }, { 'retry-after': '1500' }));
+    await b.importer({ deadlineMs: b.clock.now() + 22 * MIN }).main();
+    assert.equal(b.item('filament-buffer').state, 'RETRYING');
+    assert.equal(b.item('filament-buffer').last_completed, 'PUBLISHING');
+    b.clock.t = Date.parse(b.item('filament-buffer').retry_at) + 1000;
+    assert.equal(await b.importer({ chainCount: 1 }).main(), 0, b.logLines.join('\n'));
+    assert.equal(b.item('filament-buffer').state, 'COMPLETE');
+    assert.equal(writeCalls(b).length, 1);
+  } finally {
+    b.dispose();
+  }
+  // And with this job's own answer, a merge reports where its proof came from.
+  const c = new World({ handles: ['filament-buffer'], matches });
+  try {
+    await c.importer().main();
+    const merge = (callsTo(c, /\/complete$/)[0].body!.edge_evidence as Record<string, any>).checks.merge;
+    assert.deepEqual(merge.detail, { before_fp_equal: true, source: 'write' });
+  } finally {
+    c.dispose();
+  }
+});
+
+test('a resume after /write verifies only the payload that was written: a changed page is retried, then stops; never checked against', async () => {
+  const park = (w: World) => w.inject(/\/items\/6945416380552\/complete$/, 1, () => json(503, { code: 'OVERLOADED', message: 'busy' }, { 'retry-after': '1500' }));
+  const edited = (w: World, html: string) => new Response(html.replaceAll('Filament Buffer', 'Filament Buffer Kit'), { status: 200, headers: { 'content-type': 'text/html' } });
+  // The store edited the product after the write: two rebuilds differ, the item stops, /complete is never sent.
+  let edit = false;
+  const a: World = new World({ handles: ['filament-buffer'], storePage: (h): Response | null => (edit ? edited(a, a.pages[h]) : null) });
+  try {
+    park(a);
+    await a.importer({ deadlineMs: a.clock.now() + 22 * MIN }).main();
+    assert.equal(a.item('filament-buffer').last_completed, 'PUBLISHING');
+    edit = true;
+    a.clock.t = Date.parse(a.item('filament-buffer').retry_at) + 1000;
+    const lines = a.logLines.length;
+    await a.importer({ chainCount: 1 }).main();
+    const job2 = a.logLines.slice(lines).join('\n');
+    assert.equal(a.item('filament-buffer').state, 'BLOCKED', job2);
+    assert.equal(a.item('filament-buffer').blocker_code, 'VERIFY_FAILED_PERSISTENT');
+    assert.match(job2, /the page read again is not the payload written/);
+    assert.doesNotMatch(job2, /verified: \d+ of \d+ checks passed/, 'nothing was verified against another build');
+    assert.equal(callsTo(a, /\/complete$/).length, 1, 'only job 1\'s parked /complete');
+  } finally {
+    a.dispose();
+  }
+  // A passing difference (the first rebuild reads an edited page, the next the written one): retried, then verified.
+  const b: World = new World({ handles: ['filament-buffer'], storePage: (h, attempt): Response | null => (attempt === 2 ? edited(b, b.pages[h]) : null) });
+  try {
+    park(b);
+    await b.importer({ deadlineMs: b.clock.now() + 22 * MIN }).main();
+    b.clock.t = Date.parse(b.item('filament-buffer').retry_at) + 1000;
+    assert.equal(await b.importer({ chainCount: 1 }).main(), 0, b.logLines.join('\n'));
+    assert.equal(b.item('filament-buffer').state, 'COMPLETE');
+    assert.ok(b.events.some((e: { state: string; code: string }) => e.state === 'RETRYING' && e.code === 'VERIFY_STALE'));
+  } finally {
+    b.dispose();
+  }
+});
+
+test('robots.txt that disallows a sitemap: withdraw and close refuse (a policy stop), never read it as an empty sitemap', async () => {
+  const blocked = { '6945416380552': { state: 'BLOCKED', last_completed: '', blocker_code: 'SOURCE_WITHDRAWN' } };
+  const robots = 'User-agent: *\nDisallow: /sitemap_products_1.xml\n';
+  const w = new World({ handles: ['filament-buffer'], items: blocked, robots, storePage: () => new Response('gone', { status: 404 }) });
+  try {
+    assert.equal(await w.importer({ mode: 'withdraw', item: '6945416380552' }).main(), 1);
+    assert.equal(callsTo(w, /\/withdraw$/).length, 0, 'nothing sent');
+    assert.equal(w.item('filament-buffer').state, 'BLOCKED');
+    assert.ok(w.logLines.some((l) => /::error::SITEMAP_DISALLOWED/.test(l)));
+  } finally {
+    w.dispose();
+  }
+  const c = new World({ robots: 'User-agent: *\nDisallow: /sitemap_collections_1.xml\n' });
+  try {
+    await c.importer().main();
+    assert.equal(await c.importer({ mode: 'close' }).main(), 1);
+    assert.equal(callsTo(c, /\/run\/finish$/).length, 0, 'the irreversible finish is never sent');
+    assert.equal(callsTo(c, /\/run\/protect-snapshot$/).length, 0);
+    assert.ok(!c.storeRequests.some((r) => r.path.endsWith('.xml')), 'no sitemap was read');
+  } finally {
+    c.dispose();
+  }
+});

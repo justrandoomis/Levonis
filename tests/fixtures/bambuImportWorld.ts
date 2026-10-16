@@ -15,6 +15,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { assertImportPayload, type ImportPayload } from '../../packages/catalog/src/bambuImport/payload';
+import { canonicalJson } from '../../packages/catalog/src/bambuImport/fingerprint';
 import { ROOT } from './d1';
 import type { Clock } from '../../scripts/bambu-import/deadline';
 import { isPublicSpec } from '../../scripts/bambu-import/verify';
@@ -82,6 +83,12 @@ export interface FakeItem {
   payload_sha: string;
   media: Map<string, { r2_key: string }>;
   title: string;
+  /** What /write did: a new product or a merge into a reviewed existing one. */
+  match_kind: '' | 'created' | 'merged';
+  /** §A.10: a product this run created, hidden by a BLOCKED event after WRITTEN. */
+  hidden: boolean;
+  /** The edge still serves the hidden answers until /publish-finish purges them. */
+  cachedHidden: boolean;
 }
 
 export interface Injection {
@@ -126,6 +133,8 @@ export interface WorldOptions {
   sitemapExclude?: string[];
   /** Hosts other than the store and the site (document checks, trackers, the wiki): path → answer. */
   hostAnswer?: (host: string, method: string, path: string, headers: Record<string, string>) => Response | null;
+  /** Reviewed existing-matches entries (a merge into an existing Levonis product, §E.1). */
+  matches?: Array<{ source_product_id: string; decision: string; levonis_product_id: string; reason?: string }>;
 }
 
 export class World {
@@ -135,6 +144,8 @@ export class World {
   readonly calls: Array<{ seq: number; method: string; path: string; body: Rec | null; headers: Record<string, string>; at: number }> = [];
   readonly storeRequests: Array<{ seq: number; path: string; at: number; ua: string; cookie: string; acceptEncoding: string }> = [];
   readonly hostRequests: Array<{ host: string; method: string; path: string }> = [];
+  /** Public-site reads (the runner's verification), numbered in the global sequence. */
+  readonly siteRequests: Array<{ seq: number; method: string; path: string }> = [];
   readonly items = new Map<string, FakeItem>();
   readonly injections: Injection[] = [];
   readonly dir: string;
@@ -156,6 +167,7 @@ export class World {
     const manifest = JSON.parse(text['manifest.json']);
     manifest.rows = kept;
     text['manifest.json'] = `${JSON.stringify(manifest, null, 2)}\n`;
+    if (opts.matches) text['existing-matches.json'] = `${JSON.stringify({ version: 1, entries: opts.matches.map((m) => ({ reason: 'same_model', ...m })) }, null, 2)}\n`;
     for (const [file, body] of Object.entries(text)) {
       mkdirSync(dirname(join(this.dir, 'data', file)), { recursive: true });
       writeFileSync(join(this.dir, 'data', file), body);
@@ -183,6 +195,9 @@ export class World {
         payload_sha: '',
         media: new Map(),
         title: r.title,
+        match_kind: '',
+        hidden: false,
+        cachedHidden: false,
         ...(opts.items?.[r.source_product_id] ?? {}),
       });
     }
@@ -242,7 +257,10 @@ export class World {
       }
       return answer;
     }
-    if (u.origin === SITE) return this.opts.siteOverride?.(method, u.pathname) ?? this.site(method, u);
+    if (u.origin === SITE) {
+      this.siteRequests.push({ seq: ++this.seq, method, path: u.pathname });
+      return this.opts.siteOverride?.(method, u.pathname) ?? this.site(method, u);
+    }
     this.hostRequests.push({ host: u.host, method, path: u.pathname });
     const custom = this.opts.hostAnswer?.(u.host, method, u.pathname + u.search, headers);
     if (custom) return custom;
@@ -354,8 +372,10 @@ export class World {
       i.lease_until = this.clock.now() + 15 * MIN;
     };
     if (action === 'lease') {
-      if (i.lease_token && i.lease_until > this.clock.now() && body?.lease_token !== i.lease_token) return json(409, { code: 'IMPORT_LEASE_LOST', message: 'held' });
-      if (!i.lease_token || body?.lease_token !== i.lease_token) i.lease_token = `lt_${sha(`${i.sid}${this.seq}`).slice(0, 16)}`;
+      // The Worker's leaseItem (worker/lib/catalogImport/items.ts): the presented token is renewed while its lease
+      // is live; any other caller — a new job after a lost one, a /lease retried after its answer was lost —
+      // takes the item over with a fresh token, which makes the old one stale.
+      if (!(body?.lease_token && body.lease_token === i.lease_token && i.lease_until > this.clock.now())) i.lease_token = `lt_${sha(`${i.sid}${this.seq}`).slice(0, 16)}`;
       renew();
       return json(200, this.lease(i));
     }
@@ -385,7 +405,17 @@ export class World {
         i.retry_at = String(body?.retry_at ?? '');
         if (body?.release === true) i.lease_until = this.clock.now();
       }
-      if (to === 'BLOCKED') i.blocker_code = String(body?.code ?? '');
+      if (to === 'BLOCKED') {
+        i.blocker_code = String(body?.code ?? '');
+        // §A.10: a product this run created is hidden in the same call when it blocks after WRITTEN.
+        if (i.match_kind === 'created' && ['WRITING', 'PUBLISHING', 'VERIFYING_LIVE'].includes(i.last_completed)) i.hidden = true;
+      }
+      // A resume straight into VERIFYING_LIVE puts the hidden product back in D1; the edge keeps the hidden
+      // answers until a purge (/publish-finish).
+      if (to === 'VERIFYING_LIVE' && i.hidden) {
+        i.hidden = false;
+        i.cachedHidden = true;
+      }
       if ((i.state === 'BLOCKED' || i.state === 'RETRYING') && to !== 'BLOCKED' && to !== 'RETRYING') i.blocker_code = '';
       i.state = to;
       const seq = ++this.seq;
@@ -400,7 +430,8 @@ export class World {
         return json(400, { code: 'IMPORT_PAYLOAD_KEY_REFUSED', message: 'refused' });
       }
       i.payload = body!.payload as ImportPayload;
-      i.payload_sha = sha(JSON.stringify(body!.payload));
+      // The Worker's own digest (worker/lib/catalogImport/reviewed.ts payloadSha256): sha256 of the canonical JSON.
+      i.payload_sha = sha(canonicalJson(body!.payload));
       return json(200, {
         payload_sha256: i.payload_sha,
         invocation_estimate: 300,
@@ -425,10 +456,26 @@ export class World {
       i.slug = `bambu-${i.handle}`;
       i.state = 'PUBLISHING';
       i.last_completed = 'WRITING';
+      const merged = i.payload!.write_mode === 'merge';
+      i.match_kind = merged ? 'merged' : 'created';
       this.events.push({ seq: ++this.seq, sid: i.sid, state: 'WRITTEN', outcome: 'ok', code: '', release: false, retry_at: '' });
-      return json(200, { product_id: i.levonis_product_id, slug: i.slug, created: true, counts: { groups: i.payload!.groups.length }, before_fp_equal: null, after_money_default: true, ...(planted ? { note: planted } : {}) });
+      return json(200, {
+        product_id: i.levonis_product_id,
+        slug: i.slug,
+        created: !merged,
+        merged,
+        match_kind: i.match_kind,
+        counts: { groups: i.payload!.groups.length },
+        before_fp_equal: merged ? true : null,
+        after_money_default: merged ? null : true,
+        ...(planted ? { note: planted } : {}),
+      });
     }
     if (action === 'publish-finish') {
+      if (!['PUBLISHING', 'VERIFYING_LIVE'].includes(i.state)) return json(409, { code: 'IMPORT_ILLEGAL_TRANSITION', message: 'publish-finish' });
+      // Republish a product hidden on a block, and purge: the edge answers what D1 holds again.
+      i.hidden = false;
+      i.cachedHidden = false;
       if (i.state === 'PUBLISHING') {
         i.state = 'VERIFYING_LIVE';
         i.last_completed = 'PUBLISHING';
@@ -454,7 +501,7 @@ export class World {
   }
 
   private bySlug(slug: string): FakeItem | null {
-    for (const i of this.items.values()) if (i.slug === slug && i.payload) return i;
+    for (const i of this.items.values()) if (i.slug === slug && i.payload && !i.hidden && !i.cachedHidden) return i;
     return null;
   }
 
