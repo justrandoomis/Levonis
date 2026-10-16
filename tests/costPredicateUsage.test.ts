@@ -216,7 +216,9 @@ test('S8: requireOwner is verification-aware and has no cost-route callers', () 
   // Owner ACTS that read no cost: the catalogue switch «إخفاء المنتجات الناقصة عن الزبائن»
   // (DECISIONS row 205) — counts and product names only; the per-product flags stay behind
   // canViewCost's projection, never this door.
-  for (const f of ['worker/routes/adminCompleteness.ts']) allowed.add(f);
+  // The Bambu import's dashboard (import spec §H.1, DECISIONS row 241): read-only counts, states, codes and public
+  // URLs of the import run — no cost, price or stock fact (tests/catalogImportE2E.test.ts scans its answers).
+  for (const f of ['worker/routes/adminCompleteness.ts', 'worker/routes/adminCatalogImport.ts']) allowed.add(f);
   assert.deepEqual(callers.filter((f) => !allowed.has(f)), [], 'requireOwner guards no cost route');
   for (const r of COST_ROUTERS) assert.doesNotMatch(code(r.file), /\brequireOwner\b/, `${r.file} uses the cost door, not requireOwner`);
 });
