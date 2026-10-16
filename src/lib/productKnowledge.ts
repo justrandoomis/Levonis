@@ -21,6 +21,11 @@
  * scoped row's general case and is not repeated. A row scoped to an unselected
  * value is hidden from the table and listed under «إصدارات أخرى». With no
  * explicit selection the page's default selection (§G.3) applies.
+ *
+ * THE US 110 V TABLE IS NEVER THE PRODUCT'S OWN VALUE (§C.6, owner decision
+ * L-20): a `us_110v` row, whatever its scope, sits only under the collapsed
+ * «إصدارات أخرى» with its US note — in the specifications and in the packaging
+ * tab alike — and a 220 V row of a key comes before its region-free row.
  */
 import { REGION_LABELS, VALUE_STATE_LABELS, type Tri } from '../../packages/catalog/src/bambuImport/registry/labels';
 import { DOCUMENT_TITLES, type DocumentKind } from '../../packages/catalog/src/bambuImport/registry/documents';
@@ -137,7 +142,9 @@ export function scopeApplies(scope: KnowledgeScope, sel: KnowledgeSelection): bo
 /**
  * The rows the table draws for a selection: the rows scoped to it first, then
  * the product's own rows not already stated for this selection (same key and
- * region). `hidden` are the rows scoped to other values — «إصدارات أخرى».
+ * region), a 220 V row ahead of its key's region-free row. `hidden` —
+ * «إصدارات أخرى» — are the rows scoped to other values and every US 110 V row
+ * (L-20: never in the table, whatever its scope).
  */
 export function rowsForSelection(rows: readonly KnowledgeRow[], sel: KnowledgeSelection): { shown: KnowledgeRow[]; hidden: KnowledgeRow[] } {
   const scoped: KnowledgeRow[] = [];
@@ -145,12 +152,30 @@ export function rowsForSelection(rows: readonly KnowledgeRow[], sel: KnowledgeSe
   const hidden: KnowledgeRow[] = [];
   for (const r of rows) {
     if (r.display === false) continue;
-    if (r.scope.kind === 'product' || !r.scope.id) general.push(r);
+    if (r.region === 'us_110v') hidden.push(r);
+    else if (r.scope.kind === 'product' || !r.scope.id) general.push(r);
     else if (scopeApplies(r.scope, sel)) scoped.push(r);
     else hidden.push(r);
   }
   const stated = new Set(scoped.map((r) => `${r.key}|${r.region}`));
-  return { shown: [...scoped, ...general.filter((r) => !stated.has(`${r.key}|${r.region}`))], hidden };
+  const listed = [...scoped, ...general.filter((r) => !stated.has(`${r.key}|${r.region}`))];
+  // 220 V first (L-20): a key's intl_220v rows move up to just before its first region-free row.
+  const shown: KnowledgeRow[] = [];
+  const placed = new Set<KnowledgeRow>();
+  for (const r of listed) {
+    if (placed.has(r)) continue;
+    if (r.region === '') {
+      for (const x of listed) {
+        if (x.key === r.key && x.region === 'intl_220v' && !placed.has(x)) {
+          shown.push(x);
+          placed.add(x);
+        }
+      }
+    }
+    shown.push(r);
+    placed.add(r);
+  }
+  return { shown, hidden };
 }
 
 // ------------------------------------------------------------------ the tabs
@@ -168,7 +193,8 @@ export const isMaterialRow = (group: string, key: string): boolean => MATERIAL_G
 export interface KnowledgeTabs {
   specs: Array<{ group: string; label: Tri; rows: KnowledgeRow[] }>;
   materials: Array<{ group: string; label: Tri; rows: KnowledgeRow[] }>;
-  packaging: { lines: PackagingLine[]; box: KnowledgeAnswer['in_the_box'] };
+  /** `other`: the logistics rows of other versions and the US 110 V table — «إصدارات أخرى», collapsed. */
+  packaging: { lines: PackagingLine[]; other: KnowledgeRow[]; box: KnowledgeAnswer['in_the_box'] };
   compatibility: Array<{ bucket: keyof KnowledgeAnswer['compatibility']; label: Tri; items: KnowledgeAnswer['compatibility']['compatible'] }>;
   documents: KnowledgeAnswer['documents'];
   /** The tabs with something to show, in the page's order. */
@@ -192,7 +218,9 @@ export function knowledgeTabs(k: KnowledgeAnswer, sel: KnowledgeSelection): Know
     if (own.length) specs.push({ group: g.group, label: g.label, rows: own });
     if (mat.length) materials.push({ group: g.group, label: g.label, rows: mat });
   }
-  const lines = packagingLines(k.logistics ?? { product: [], package: [], shipment: [], carton: [] }, recommended, sel);
+  const logistics = k.logistics ?? { product: [], package: [], shipment: [], carton: [] };
+  const lines = packagingLines(logistics, recommended, sel);
+  const other = packagingOther(logistics, recommended, sel);
   const box = (k.in_the_box ?? []).filter((i) => scopeApplies(i.scope, sel));
   const buckets: Array<[keyof KnowledgeAnswer['compatibility'], Tri]> = [
     ['compatible', KNOWLEDGE_WORDS.compatible],
@@ -207,10 +235,10 @@ export function knowledgeTabs(k: KnowledgeAnswer, sel: KnowledgeSelection): Know
   const order: KnowledgeTabId[] = [];
   if (specs.length) order.push('specs');
   if (materials.length) order.push('materials');
-  if (lines.length || box.length) order.push('packaging');
+  if (lines.length || other.length || box.length) order.push('packaging');
   if (compatibility.length) order.push('compatibility');
   if (documents.length) order.push('documents');
-  return { specs, materials, packaging: { lines, box }, compatibility, documents, order };
+  return { specs, materials, packaging: { lines, other, box }, compatibility, documents, order };
 }
 
 /** One line of the packaging tab: a weight, a set of three dimensions, the recommended space, a carton fact. */
@@ -226,7 +254,9 @@ export interface PackagingLine {
  * The packaging tab's lines in a fixed order — net weight, product
  * dimensions, recommended space, package weight, package dimensions, shipment
  * gross weight — then any other logistics row (carton facts) under its own
- * label. Rows scoped to another value are left out; no CBM ever arrives (L-4).
+ * label. Rows scoped to another value and the US 110 V table are not the
+ * product's lines: they are `packagingOther` («إصدارات أخرى»). No CBM ever
+ * arrives (L-4).
  */
 export function packagingLines(
   L: KnowledgeAnswer['logistics'],
@@ -268,6 +298,11 @@ export function packagingLines(
     if (!used.has(r)) out.push({ label: r.label, rows: [r] });
   }
   return out;
+}
+
+/** The packaging tab's «إصدارات أخرى»: the logistics rows of other versions and every US 110 V row (L-20), in tab order. */
+export function packagingOther(L: KnowledgeAnswer['logistics'], recommended: readonly KnowledgeRow[], sel: KnowledgeSelection): KnowledgeRow[] {
+  return [L.product ?? [], recommended, L.package ?? [], L.shipment ?? [], L.carton ?? []].flatMap((list) => rowsForSelection(list, sel).hidden);
 }
 
 export const TAB_WORDS: Record<KnowledgeTabId, Tri> = {

@@ -29,6 +29,7 @@ import {
   findDims,
   findWeights,
   isMultiBoxNote,
+  publishedWeight,
   weightToG,
   type Measure,
 } from './logistics';
@@ -470,7 +471,8 @@ function rowsOfSegment(seg: CompositeSegment, ctx: SpecContext, base: Partial<Sp
         ),
       ];
     default:
-      return [verified(baseRow(ctx, seg.target, { ...common, dataType: 'number', valueNum: seg.measures[0].value, unit: 'g', valueText: `${seg.measures[0].value} g` }))];
+      // The number in grams; the text as the source published it («31 kg», §G.2).
+      return [verified(baseRow(ctx, seg.target, { ...common, dataType: 'number', valueNum: seg.measures[0].value, unit: 'g', valueText: publishedWeight(seg.measures[0]) }))];
   }
 }
 
@@ -573,12 +575,18 @@ function rowsOfPair(rawPair: Pair, ctx: SpecContext, us: boolean, sourceKind: Sp
       keys.forEach((key, i) => {
         const vals = list.map((s) => (keys.length === 3 ? s.measures[i]?.value : s.measures[0]?.value)).filter((v) => v !== undefined);
         const unit = tgt === 'physical.recommended_space' || keys.length === 3 ? 'mm' : 'g';
+        // Weights as published («40.6 / 44.2 / 48.2 kg»); a mix of units keeps each one's own («500 g / 1 kg»).
+        const weights = unit === 'g' ? list.map((s) => s.measures[0]).filter((m): m is Measure => !!m) : [];
+        const words = weights.map((m) => publishedWeight(m));
+        const oneUnit = new Set(words.map((x) => x.split(' ')[1])).size === 1;
+        const text =
+          unit !== 'g' ? `${vals.join(' / ')} ${unit}` : oneUnit ? `${words.map((x) => x.split(' ')[0]).join(' / ')} ${words[0].split(' ')[1]}` : words.join(' / ');
         rows.push(
           applyRegion(
             baseRow(ctx, key, {
               ...base,
               dataType: 'string',
-              valueText: `${vals.join(' / ')} ${unit}`,
+              valueText: text,
               unit,
               status: 'unverified',
               testCondition: 'several values, not attributable to one option value',
@@ -741,7 +749,7 @@ function rowsOfOptions(ctx: SpecContext): SpecRow[] {
       if (g.canonical === 'net_weight') {
         const w = findWeights(v.nameEn)[0];
         const gram = w ? weightToG(w.value, w.written) : null;
-        if (gram) rows.push(baseRow(ctx, ctx.productType === 'filament' ? 'material.net_weight' : 'product.net_weight', { ...scope, dataType: 'number', valueNum: gram.value, unit: 'g', valueText: `${gram.value} g`, status: 'verified' }));
+        if (gram) rows.push(baseRow(ctx, ctx.productType === 'filament' ? 'material.net_weight' : 'product.net_weight', { ...scope, dataType: 'number', valueNum: gram.value, unit: 'g', valueText: publishedWeight(gram), status: 'verified' }));
       }
       if (g.kind === 'nozzle') {
         const m = /(\d(?:\.\d+)?)\s*mm\s*(.*)$/i.exec(v.nameEn);

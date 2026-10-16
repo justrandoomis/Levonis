@@ -6,8 +6,6 @@
  * prevents a card from regressing to array order while an old response is in
  * memory. This helper chooses; it never invents or rewrites product data.
  */
-import { productMediaForSelection } from '../../packages/pricing/src/productSelectionMedia';
-
 export { productSelectionComboKey, productVariantIdForSelection } from '../../packages/pricing/src/productSelectionMedia';
 
 export interface PrimaryImageProduct {
@@ -21,81 +19,19 @@ export interface PrimaryImageProduct {
   }[] | null;
 }
 
-export interface ProductGalleryMedia {
-  id?: string;
-  url: string;
-  alt_ar?: string;
-  alt_en?: string;
-  alt_ckb?: string;
-  order?: number;
-  primary?: boolean;
-  option_value_id?: string | null;
-  color_id?: string | null;
-  variant_id?: string | null;
-  /** The stored picture's size, when the media row carries it (the gallery's `sizes` and srcset follow it). */
-  width?: number | null;
-  height?: number | null;
-}
-
-export interface ProductGalleryBinding {
-  id?: string;
-  url: string;
-  option_value_id?: string | null;
-  color_id?: string | null;
-  variant_id?: string | null;
-}
-
 export interface ProductImageVariant {
   id: string;
   combo_key: string;
   active?: boolean | number | null;
 }
 
-/**
- * Reorders the gallery only after the customer explicitly chooses a variant.
- *
- * Before a choice, the server-published order is authoritative and therefore
- * keeps the admin-selected primary image first. A bound primary image must not
- * sink behind an unbound gallery image merely because no variant is selected.
+/*
+ * The product page's gallery for a selection is src/lib/productGallery.ts
+ * `galleryForSelection` (the Bambu import spec §G.3): the older
+ * de-duplicate-then-rank helper that lived here had no caller left, and a test
+ * mirroring it kept the page-versus-cart parity guard green on a function the
+ * page no longer ran (tests/productSelectionImage.test.ts now mirrors the page).
  */
-export function productGalleryForSelection<T extends ProductGalleryMedia>(
-  base: readonly T[],
-  bindings: readonly ProductGalleryBinding[],
-  selection: {
-    optionId?: string | null;
-    optionValueIds?: readonly string[] | null;
-    colorId?: string | null;
-    variantId?: string | null;
-  }
-): ProductGalleryMedia[] {
-  const { colorId, variantId } = selection;
-  const optionValueIds = selection.optionValueIds?.length
-    ? [...new Set(selection.optionValueIds.filter(Boolean))]
-    : selection.optionId
-      ? [selection.optionId]
-      : [];
-  if (!variantId && !colorId && optionValueIds.length === 0) return [...base];
-
-  const byId = new Map(bindings.filter((image) => image.id).map((image) => [image.id!, image]));
-  const byUrl = new Map(bindings.map((image) => [image.url, image]));
-  const candidates = base.map((image) => {
-    const binding = (image.id ? byId.get(image.id) : undefined) ?? byUrl.get(image.url) ?? image;
-    return {
-      image,
-      url: image.url,
-      primary: image.primary,
-      variant_id: binding.variant_id,
-      color_id: binding.color_id,
-      option_value_id: binding.option_value_id,
-    };
-  });
-
-  return productMediaForSelection(candidates, {
-    optionValueIds,
-    colorId,
-    variantId,
-  }).map(({ image }) => image);
-}
 
 export function productPrimaryImage(product: PrimaryImageProduct): string {
   const media = Array.isArray(product.media) ? product.media : [];

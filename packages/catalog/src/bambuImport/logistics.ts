@@ -14,6 +14,8 @@ export interface Measure {
   /** 'mm' | 'g' after conversion. */
   unit: string;
   written: string;
+  /** A weight's number as the source wrote it, in `written` (31 for «31 kg»); `value` is the stored grams. */
+  published?: number;
 }
 
 /** Edge 1–3,000 mm; weight 1 g–200 kg (§B.7 plausibility). */
@@ -80,7 +82,19 @@ export function findWeights(text: string): WeightHit[] {
 export function weightToG(value: number, written: string): Measure | null {
   const s = toStored(value, written);
   if (!s || s.unit !== 'g' || !plausibleWeight(s.value)) return null;
-  return { value: round(s.value, 3), unit: 'g', written };
+  return { value: round(s.value, 3), unit: 'g', written, published: value };
+}
+
+const WEIGHT_WORD: Readonly<Record<string, string>> = { kg: 'kg', kgs: 'kg', g: 'g', gr: 'g', gram: 'g', grams: 'g', lb: 'lb', lbs: 'lb' };
+
+/**
+ * A weight's text AS PUBLISHED — the source's own number in its own unit
+ * («31 kg», «1 kg» from «1kg», «500 g») — for `value_text` (the page shows it,
+ * §G.2 "the unit as published"); `value_num` stays in grams (§B.7).
+ */
+export function publishedWeight(m: Measure): string {
+  const unit = WEIGHT_WORD[m.written.toLowerCase()];
+  return m.published !== undefined && unit ? `${m.published} ${unit}` : `${m.value} g`;
 }
 
 /** A bare number (no unit written) followed later by a unit: "40.6; 44.2; 48.2 kg". */

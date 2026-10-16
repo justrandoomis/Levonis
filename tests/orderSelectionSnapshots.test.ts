@@ -14,7 +14,7 @@ import {
 import { acceptedPolicies } from './lib/policies';
 import { orderRoutes } from '../worker/routes/orders';
 import { cartRoutes } from '../worker/routes/cart';
-import { productGalleryForSelection } from '../src/lib/productImage';
+import { galleryForSelection } from '../src/lib/productGallery';
 import { seedCatalogue, orderBody } from './lib/bundles';
 import { addMysteryOffer } from './lib/mysteryOffer';
 import { q7Test } from './fixtures/q7';
@@ -130,7 +130,12 @@ test('authored and lexical multi-option order keep one image through Product, ca
       option_value_id: 'a_nozzle',
     },
   ];
-  const productLead = productGalleryForSelection(authoritativeGallery, authoritativeGallery, {
+  // The product page's own gallery (src/lib/productGallery.ts), over the page body's groups.
+  const groups = [
+    { id: 'g_model', values: [{ id: 'z_model' }] },
+    { id: 'g_nozzle', values: [{ id: 'a_nozzle' }] },
+  ];
+  const productLead = galleryForSelection(authoritativeGallery, authoritativeGallery, { groups, variants: [] }, {
     optionValueIds: ['z_model', 'a_nozzle'],
     colorId: null,
     variantId: null,

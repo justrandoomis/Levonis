@@ -71,7 +71,7 @@ import { monthsLabel } from '../components/orders/format';
 import { authPathWithSupportRef, captureSupportRefFromSearch } from '../lib/supportRef';
 import { productVariantIdForSelection } from '../lib/productImage';
 import { dedupeByUrl, galleryForSelection, mediaInStoredOrder } from '../lib/productGallery';
-import { NOT_OFFERED, defaultSelection, groupName, importedChooser, valueOffered } from '../lib/productChooser';
+import { NOT_OFFERED, chooseValue, defaultSelection, groupName, importedChooser, valueOffered } from '../lib/productChooser';
 import Section from '../components/product/Section';
 import { useTheme } from '../lib/theme';
 import {
@@ -2312,7 +2312,7 @@ export default function Product() {
     const ordered = galleryForSelection(
       rows,
       mediaBindings,
-      { groups: relationOptionGroups, variants: relations?.variants ?? [] },
+      { groups: relationOptionGroups, variants: relations?.variants ?? [], completeVariants: knowledgeChooser },
       { optionId, optionValueIds, colorId, variantId: selectedVariantId }
     );
     // THE MAIN IMAGE FOR THE THEME ON SCREEN (migration 0138): on the light
@@ -3334,7 +3334,8 @@ export default function Product() {
           {relationOptionGroups.map((group) => {
             const groupSelected = group.values.find((value) => optionValueIds.includes(value.id))?.id ?? '';
             // The import's rules (spec §G.3): a colour group as swatches; a value that forms no variant with
-            // the rest of the selection disabled with «غير متاح مع هذا الاختيار» — never «نفد».
+            // the rest of the selection says «غير متاح مع هذا الاختيار» — never «نفد» — and stays pressable:
+            // pressing it lets go of the other groups' clashing values (`chooseValue`), never a dead end.
             const swatches = knowledgeChooser && group.kind === 'color';
             const offered = (id: string) =>
               !knowledgeChooser || valueOffered(id, group.id, optionValueIds, relationOptionGroups, relations?.variants ?? []);
@@ -3361,14 +3362,19 @@ export default function Product() {
                     const label = option ? pickName(option.name_en, option.name, option.name_ar) : value.name_en || value.id;
                     const isOffered = offered(value.id);
                     const notOffered = tr(NOT_OFFERED.ar, NOT_OFFERED.en, NOT_OFFERED.ckb);
-                    /** One handler for the chip and the swatch: the group's value changes, the others are kept. */
+                    /**
+                     * One handler for the chip and the swatch: the group's value changes, the others are kept —
+                     * on an imported product, those that still form a variant with it (`chooseValue`).
+                     */
                     const choose = () => {
                       setOptionValueIds((current) =>
-                        relationOptionGroups.flatMap((candidateGroup) => {
-                          if (candidateGroup.id === group.id) return selected ? [] : [value.id];
-                          const kept = candidateGroup.values.find((item) => current.includes(item.id));
-                          return kept ? [kept.id] : [];
-                        })
+                        knowledgeChooser
+                          ? chooseValue(value.id, group.id, current, relationOptionGroups, relations?.variants ?? [])
+                          : relationOptionGroups.flatMap((candidateGroup) => {
+                              if (candidateGroup.id === group.id) return selected ? [] : [value.id];
+                              const kept = candidateGroup.values.find((item) => current.includes(item.id));
+                              return kept ? [kept.id] : [];
+                            })
                       );
                       /*
                         Any changed dimension asks the server afresh which
@@ -3406,11 +3412,10 @@ export default function Product() {
                           aria-pressed={selected}
                           aria-label={isOffered ? label : `${label} — ${notOffered}`}
                           title={isOffered ? label : `${label} — ${notOffered}`}
-                          disabled={!isOffered}
                           data-swatch={value.id}
                           data-offered={isOffered ? undefined : 'false'}
                           onClick={choose}
-                          className={`relative grid h-11 w-11 place-items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed ${
+                          className={`relative grid h-11 w-11 place-items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
                             selected ? 'bg-surface-selected' : 'hover:bg-white/5'
                           }`}
                         >
@@ -3448,10 +3453,9 @@ export default function Product() {
                         key={value.id}
                         type="button"
                         aria-pressed={selected}
-                        disabled={!isOffered}
                         data-offered={isOffered ? undefined : 'false'}
                         onClick={choose}
-                        className="lv-choice flex min-h-[48px] items-center gap-2 px-3 py-1.5 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50"
+                        className={`lv-choice flex min-h-[48px] items-center gap-2 px-3 py-1.5 text-sm font-bold ${isOffered ? '' : 'opacity-60'}`}
                       >
                         {optionImage(value.id) ? (
                           <SafeImage

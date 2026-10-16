@@ -12,7 +12,13 @@
  *   5. the packaging tab's weights and dimensions; no CBM;
  *   6. documents: title by kind, new tab, noopener noreferrer, the host and
  *      «يُفتح في موقع الشركة المصنّعة» (the component, rendered);
- *   7. the server's answer drives it end to end (the real route's DTO).
+ *   7. the import's own rows (buildImportPayload over the committed fixtures,
+ *      through the server's knowledgeRowOf): the US 110 V table is never the
+ *      product's value — only under «إصدارات أخرى» (§C.6, L-20) — and weights
+ *      read as published («31 kg», «1 kg»; §G.2);
+ *   8. the markup: a valid <dl> (dt and dd only in each row's div), a
+ *      disclosure that says it opens, a router link to a compatible product,
+ *      a desktop strip that wraps instead of clipping a label.
  *
  * Run: node --import tsx --test tests/productKnowledgeTabs.test.ts
  */
@@ -20,7 +26,19 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router-dom';
 import { ROOT } from './fixtures/d1';
+import { sample, fixtureJson } from './fixtures/bambu/load';
+import { buildImportPayload } from '../packages/catalog/src/bambuImport/payload';
+import { extractionFingerprint } from '../packages/catalog/src/bambuImport/fingerprint';
+import { knowledgeRowOf, boxItemsOf, isOwnerOnlyKey, type SpecValueDbRow } from '../worker/lib/knowledge/productKnowledge';
+import { groupLabel } from '../worker/lib/knowledge/labels';
+import { defaultSelection } from '../src/lib/productChooser';
+import { productVariantIdForSelection } from '../packages/pricing/src/productSelectionMedia';
+import { LanguageProvider } from '../src/LanguageContext';
+import { TabBody } from '../src/components/product/ProductKnowledgeTabs';
 import {
   KNOWLEDGE_WORDS,
   STATE_WORDS,
@@ -29,6 +47,7 @@ import {
   knowledgeCovers,
   knowledgeTabs,
   packagingLines,
+  packagingOther,
   rowsForSelection,
   sourceLine,
   valueText,
@@ -183,13 +202,36 @@ test('packaging: net weight, the three axes together, recommended space, package
     shipment: [row({ key: 'shipment.gross_weight', value_text: '44.2 kg', status: 'unverified', region: 'us_110v' })],
     carton: [row({ key: 'carton.pieces', value_num: 1, label: { ar: 'عدد القطع في الكرتونة', en: 'Pieces per carton', ckb: 'ژمارەی پارچە لە کارتۆن' } })],
   };
-  const lines = packagingLines(L, [row({ key: 'physical.recommended_space', value_text: '1000 × 1000 × 1000 mm' })], { optionValueIds: [], variantId: null });
+  const recommended = [row({ key: 'physical.recommended_space', value_text: '1000 × 1000 × 1000 mm' })];
+  const none = { optionValueIds: [], variantId: null };
+  const lines = packagingLines(L, recommended, none);
   assert.deepEqual(
     lines.map((l) => l.label.en),
-    ['Net weight', 'Product dimensions', 'Recommended space', 'Package weight', 'package.length', 'Shipment gross weight', 'Pieces per carton']
+    ['Net weight', 'Product dimensions', 'Recommended space', 'Package weight', 'package.length', 'Pieces per carton'],
+    'the US 110 V shipment weight is no line of the product (L-20)'
   );
   assert.equal(lines[1].joined, '492 × 514 × 626 mm');
   assert.equal(lines[4].joined, undefined, 'one axis is shown as itself, never padded');
+  // It sits under «إصدارات أخرى» with the rows of other versions.
+  assert.deepEqual(packagingOther(L, recommended, none).map((r) => [r.key, r.region]), [['shipment.gross_weight', 'us_110v']]);
+  const k = { ...empty(), logistics: L };
+  assert.deepEqual(knowledgeTabs(k, none).packaging.other.map((r) => r.value_text), ['44.2 kg']);
+  // A packaging tab with only US facts still shows — its «إصدارات أخرى» is all it has.
+  const usOnly = { ...empty(), logistics: { product: [], package: [], shipment: L.shipment, carton: [] } };
+  assert.deepEqual(knowledgeTabs(usOnly, none).order, ['packaging']);
+});
+
+test('the US 110 V table is never the product’s value: under «إصدارات أخرى» whatever its scope; 220 V first (L-20)', () => {
+  const rows = [
+    row({ key: 'electrical.voltage', value_text: '100-120 VAC, 50/60 Hz', status: 'unverified', region: 'us_110v' }),
+    row({ key: 'electrical.max_power', value_text: '1320 W@110 V', status: 'unverified', region: 'us_110v', scope: { kind: 'option_value', id: 'combo' } }),
+    row({ key: 'electrical.max_power', value_text: '1000 W' }),
+    row({ key: 'electrical.max_power', value_text: '1320 W@220 V', region: 'intl_220v' }),
+    row({ key: 'electrical.voltage', value_text: '220-240 VAC, 50/60 Hz', region: 'intl_220v' }),
+  ];
+  const { shown, hidden } = rowsForSelection(rows, { optionValueIds: ['combo'], variantId: null });
+  assert.deepEqual(shown.map((r) => r.value_text), ['1320 W@220 V', '1000 W', '220-240 VAC, 50/60 Hz'], 'no US value in the table; a key’s 220 V row before its region-free row');
+  assert.deepEqual(hidden.map((r) => r.value_text), ['100-120 VAC, 50/60 Hz', '1320 W@110 V'], 'even the selection’s own US row');
 });
 
 // ------------------------------------------------------------------ 6. the component
@@ -208,4 +250,188 @@ test('the component: lazy-loaded data, the accordion on phones and tabs on deskt
   const page = readFileSync(join(ROOT, 'src/pages/Product.tsx'), 'utf8');
   assert.match(page, /React\.lazy\(\(\) => import\('\.\.\/components\/product\/ProductKnowledgeTabs'\)\)/, 'a lazy chunk of its own');
   assert.match(page, /rootMargin: '400px'/, 'fetched when it nears the viewport');
+});
+
+// ------------------------------------------------------------------ 7. the import's own rows
+
+/** The import's payload for a committed fixture. */
+function payloadOf(handle: 'h2d' | 'a1' | 'pla-basic-filament') {
+  const x = sample(handle);
+  return buildImportPayload({
+    extraction: x,
+    writeMode: 'create',
+    extractionSha256: extractionFingerprint(x),
+    targets: fixtureJson('compat-targets.json') as never,
+    retrievedAt: '2026-10-15T00:00:00Z',
+  }).payload;
+}
+
+/** The server's own row mapping and split (worker/lib/knowledge/productKnowledge.ts) over the import's rows. */
+function answerOf(p: ReturnType<typeof payloadOf>): KnowledgeAnswer {
+  const out = empty();
+  const groups = new Map<string, KnowledgeRow[]>();
+  for (const s of p.specs) {
+    if (s.visibility === 'owner' || isOwnerOnlyKey(s.key, s.group)) continue;
+    const db: SpecValueDbRow = {
+      canonical_key: s.key,
+      group_key: s.group,
+      scope_kind: s.scope_kind,
+      scope_id: s.scope_id,
+      region: s.region,
+      data_type: s.data_type,
+      original_label: s.original_label,
+      value_text: s.value_text,
+      value_num: s.value_num,
+      value_num_max: s.value_num_max,
+      value_bool: s.value_bool,
+      value_list: JSON.stringify(s.value_list),
+      unit: s.unit,
+      status: s.status,
+      source_kind: s.source_kind,
+      // The payload carries no store address (the writer adds it owner-side); a manual's own URL is not needed here.
+      source_ref: '',
+      source_title: s.source_title,
+      source_locator: s.source_locator,
+      source_excerpt: s.source_excerpt,
+      test_method: s.test_method,
+      test_condition: s.test_condition,
+      checked_sources: JSON.stringify(s.checked_sources),
+      conflict: s.conflict,
+      sort: s.sort,
+    };
+    if (s.key === 'package.contents') {
+      out.in_the_box.push(...(boxItemsOf(db) as KnowledgeAnswer['in_the_box']));
+      continue;
+    }
+    const r = knowledgeRowOf(db) as KnowledgeRow | null;
+    if (!r) continue;
+    const part = s.key.split('.')[0];
+    if (part === 'product' || part === 'package' || part === 'shipment' || part === 'carton') {
+      out.logistics[part].push(r);
+      continue;
+    }
+    groups.set(s.group, [...(groups.get(s.group) ?? []), r]);
+  }
+  out.specs = [...groups.entries()].map(([group, rows]) => ({ group, label: groupLabel(group), rows }));
+  return out;
+}
+
+/** What the page hands the tabs on opening (src/pages/Product.tsx): the default selection and its variant. */
+function openingSelection(p: ReturnType<typeof payloadOf>) {
+  const groups = p.groups.map((g) => ({ id: g.id, kind: g.kind, default_value_id: g.default_value_id, values: g.values.map((v) => ({ id: v.id })) }));
+  const variants = p.variants.map((v) => ({ id: v.id, combo_key: v.combo_key }));
+  const optionValueIds = defaultSelection(groups, variants);
+  return { optionValueIds, variantId: productVariantIdForSelection(variants, { optionValueIds }) };
+}
+
+test('the H2D as it opens: no US 110 V value in the specifications or as a packaging line — all of them under «إصدارات أخرى»', () => {
+  const p = payloadOf('h2d');
+  const us = p.specs.filter((s) => s.region === 'us_110v' && s.visibility === 'public').map((s) => s.key);
+  assert.ok(us.includes('electrical.voltage') && us.includes('shipment.gross_weight') && us.includes('package.length'), us.join(', '));
+  const sel = openingSelection(p);
+  const tabs = knowledgeTabs(answerOf(p), sel);
+  const tables = [...tabs.specs, ...tabs.materials].map((g) => rowsForSelection(g.rows, sel));
+  assert.deepEqual(tables.flatMap((t) => t.shown).filter((r) => r.region === 'us_110v').map((r) => `${r.key} = ${r.value_text}`), []);
+  assert.deepEqual(tabs.packaging.lines.filter((l) => l.rows.some((r) => r.region === 'us_110v')).map((l) => l.label.en), []);
+  const other = [...tables.flatMap((t) => t.hidden), ...tabs.packaging.other];
+  for (const key of ['electrical.voltage', 'shipment.gross_weight', 'package.length']) {
+    assert.ok(other.some((r) => r.key === key && r.region === 'us_110v'), `${key} is under «إصدارات أخرى»`);
+  }
+  // The product's own facts stay: its net weight and its own dimensions.
+  assert.deepEqual(tabs.packaging.lines.slice(0, 2).map((l) => l.label.en), ['Net weight', 'Product dimensions']);
+});
+
+test('weights read as published: H2D 31 kg and 40.6 / 44.2 / 48.2 kg, A1 8.3 kg, PLA Basic 1 kg — the number stays in grams', () => {
+  const h2d = answerOf(payloadOf('h2d'));
+  const net = h2d.logistics.product.find((r) => r.key === 'product.net_weight')!;
+  assert.deepEqual([valueText(net, 'ar').text, net.value_num, net.unit], ['31 kg', 31000, 'g']);
+  assert.deepEqual(h2d.logistics.shipment.map((r) => valueText(r, 'en').text).sort(), ['40.6 kg', '44.2 kg', '48.2 kg']);
+  const a1 = answerOf(payloadOf('a1'));
+  assert.equal(valueText(a1.logistics.product.find((r) => r.key === 'product.net_weight')!, 'ckb').text, '8.3 kg');
+  assert.deepEqual(a1.logistics.shipment.map((r) => valueText(r, 'en').text).sort(), ['13 kg', '13.5 kg']);
+  const pla = answerOf(payloadOf('pla-basic-filament'));
+  const plaNet = pla.specs.flatMap((g) => g.rows).find((r) => r.key === 'material.net_weight')!;
+  assert.deepEqual([valueText(plaNet, 'en').text, plaNet.value_num], ['1 kg', 1000]);
+});
+
+// ------------------------------------------------------------------ 8. the markup
+
+const render = (el: ReturnType<typeof createElement>) =>
+  renderToStaticMarkup(createElement(LanguageProvider, null, createElement(MemoryRouter, null, el)));
+
+test('the markup: each fact is one div of its <dl> holding only <dt> and <dd> — the notes are <dd>s too', () => {
+  const k = empty();
+  k.specs = [
+    {
+      group: 'electrical',
+      label: { ar: 'الكهرباء', en: 'Electrical', ckb: 'کارەبا' },
+      rows: [
+        row({ key: 'electrical.voltage', value_text: '220-240 V', region: 'intl_220v', test_method: 'Bench', source: { kind: 'manual', title: 'H2D User Manual', locator: '', excerpt: '', url: 'https://store.bblcdn.com/m.pdf' } }),
+        row({ key: 'electrical.voltage', value_text: '100-120 V', status: 'unverified', region: 'us_110v' }),
+        row({ key: 'electrical.max_power', value_text: '1000 W', scope: { kind: 'option_value', id: 'laser' } }),
+      ],
+    },
+  ];
+  k.logistics.shipment = [row({ key: 'shipment.gross_weight', value_text: '44.2 kg', status: 'unverified', region: 'us_110v', scope: { kind: 'option_value', id: 'combo' } })];
+  const sel = { optionValueIds: ['combo'], variantId: null };
+  const tabs = knowledgeTabs(k, sel);
+  const html = ['specs', 'packaging'].map((id) =>
+    render(createElement(TabBody, { id: id as 'specs', tabs, lang: 'en', selection: sel, scopeNames: { combo: 'H2D AMS Combo', laser: 'H2D Laser Full Combo' } }))
+  ).join('');
+  // Every child of a <dl> is a div; inside it, only <dt> and <dd>.
+  const dls = [...html.matchAll(/<dl[^>]*>([\s\S]*?)<\/dl>/g)].map((m) => m[1]);
+  assert.ok(dls.length >= 3, `three lists (the table, its other versions, the packaging's): ${dls.length}`);
+  for (const inner of dls) {
+    const rows = [...inner.matchAll(/<div[^>]*>([\s\S]*?)<\/div>/g)].map((m) => m[1]);
+    assert.ok(rows.length > 0);
+    assert.equal(inner.replace(/<div[^>]*>[\s\S]*?<\/div>/g, ''), '', 'nothing but rows directly in a <dl>');
+    for (const r of rows) {
+      const tops = r.replace(/<(dt|dd)\b[^>]*>[\s\S]*?<\/\1>/g, '');
+      assert.equal(tops, '', `a row holds only <dt> and <dd>: ${r.slice(0, 200)}`);
+      assert.doesNotMatch(r, /<p\b|<div\b/);
+    }
+  }
+  // The notes ride in the row: the US note, «Applies to», the test method, the source.
+  assert.match(html, /<dd class="col-span-2[^"]*" data-knowledge-note="us_110v">US version \(100–120 V\)<\/dd>/);
+  assert.match(html, /data-knowledge-note="applies-to">Applies to <bdi>H2D AMS Combo<\/bdi><\/dd>/);
+  assert.match(html, /<dd class="col-span-2[^"]*">Test method: <bdi>Bench<\/bdi><\/dd>/);
+});
+
+test('«إصدارات أخرى» says it opens: a chevron that turns, the native marker hidden — in the specifications and the packaging tab', () => {
+  const k = empty();
+  k.specs = [{ group: 'electrical', label: { ar: 'الكهرباء', en: 'Electrical', ckb: 'کارەبا' }, rows: [row({ key: 'electrical.voltage', value_text: '100-120 V', status: 'unverified', region: 'us_110v' })] }];
+  k.logistics.package = [row({ key: 'package.weight', value_text: '38 kg', status: 'unverified', region: 'us_110v' })];
+  const sel = { optionValueIds: [], variantId: null };
+  const tabs = knowledgeTabs(k, sel);
+  for (const id of ['specs', 'packaging'] as const) {
+    const html = render(createElement(TabBody, { id, tabs, lang: 'ar', selection: sel, scopeNames: {} }));
+    const details = /<details class="group[^"]*" data-knowledge-other="true">\s*<summary class="([^"]*)">([\s\S]*?)<\/summary>/.exec(html);
+    assert.ok(details, `${id}: a collapsed «إصدارات أخرى»`);
+    assert.match(details[1], /list-none/);
+    assert.match(details[1], /\[&amp;::-webkit-details-marker\]:hidden/);
+    assert.match(details[2], /<svg[^>]*class="[^"]*lucide-chevron-down[^"]*group-open:rotate-180[^"]*"[^>]*aria-hidden="true"/, 'a chevron that turns');
+    assert.match(details[2], /إصدارات أخرى/);
+    assert.match(html, /النسخة الأمريكية \(100–120 فولت\)/, 'with the US note');
+  }
+});
+
+test('a compatible product is the router’s link (no reload), its slug encoded; a target without a page is its label', () => {
+  const k = empty();
+  k.compatibility.compatible = [
+    { relation: 'compatible_with', label: 'Bambu Lab A1', scope: { kind: 'product', id: '' }, product: { slug: 'bambu-lab-a1', name: { ar: 'A1', en: 'Bambu Lab A1', ckb: 'A1' }, image: '' } },
+    { relation: 'compatible_with', label: 'AMS 2 Pro', scope: { kind: 'product', id: '' } },
+  ];
+  const tabs = knowledgeTabs(k, { optionValueIds: [], variantId: null });
+  const html = render(createElement(TabBody, { id: 'compatibility', tabs, lang: 'en', selection: { optionValueIds: [], variantId: null }, scopeNames: {} }));
+  assert.match(html, /<a [^>]*href="\/product\/bambu-lab-a1"[^>]*>/);
+  const src = readFileSync(join(ROOT, 'src/components/product/ProductKnowledgeTabs.tsx'), 'utf8');
+  assert.match(src, /<Link\s+to=\{`\/product\/\$\{encodeURIComponent\(item\.product\.slug\)\}`\}/, 'react-router’s Link, the slug encoded');
+  assert.doesNotMatch(src, /href=\{`\/product\//, 'no raw anchor to a product page');
+});
+
+test('the desktop tab strip wraps instead of clipping its last label (no hidden scroll row in a 68ch column)', () => {
+  const src = readFileSync(join(ROOT, 'src/components/product/ProductKnowledgeTabs.tsx'), 'utf8');
+  const strip = /<TabStrip\b[\s\S]*?\/>/.exec(src)?.[0] ?? '';
+  assert.match(strip, /className="flex-wrap\b/);
+  assert.doesNotMatch(strip, /overflow-x-auto|hide-scrollbar/);
 });

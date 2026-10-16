@@ -12,12 +12,21 @@
  * the value or the state's words — never 0 or «No» for a missing value — and
  * every word in Arabic, English and Sorani. Numbers sit in <bdi> with the
  * unit as published. Documents open in a new tab with `noopener noreferrer`,
- * show their host and say they open on the manufacturer's site.
+ * show their host and say they open on the manufacturer's site; a compatible
+ * product is an in-app link (the router's, no reload).
+ *
+ * «إصدارات أخرى» — the rows of other versions and the US 110 V table (L-20) —
+ * is a collapsed disclosure that SAYS it opens (a chevron that turns). Each
+ * fact is one `div` of its `<dl>` holding the `<dt>`, the value's `<dd>` and
+ * one `<dd>` per note (the HTML content model: a div of a dl holds dt and dd
+ * only). The desktop strip WRAPS rather than clip a label at the column's
+ * edge (the section is capped at 68ch beside the buy column).
  *
  * Nothing here is a price, a cost or a stock fact: the answer carries none.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Box, ExternalLink, FileText, Info, Link2, Package, Settings2, Thermometer } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Box, ChevronDown, ExternalLink, FileText, Info, Link2, Package, Settings2, Thermometer } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useMediaQuery } from '../../lib/useMediaQuery';
 import SafeImage from '../ui/SafeImage';
@@ -56,8 +65,10 @@ export interface ProductKnowledgeTabsProps {
 
 type Load = { state: 'loading' } | { state: 'failed' } | { state: 'ready'; k: KnowledgeAnswer };
 
-/** Label and value side by side, the label never squeezed under a long value (2 : 3). */
-const ROW_GRID = 'grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3';
+/** Label and value side by side, the label never squeezed under a long value (2 : 3); a note spans both. */
+const ROW_GRID = 'grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-x-3 gap-y-0.5';
+/** A row's quiet note (US version, applies to, test method, source): a `<dd>` of its own across the row. */
+const NOTE = 'col-span-2 text-[11px] text-text-muted';
 
 /** «المصدر: رسمي (Bambu Lab)» once under a tab's heading when any of its rows comes from the manufacturer's page. */
 function OfficialNote({ rows, lang }: { rows: readonly KnowledgeRow[]; lang: KnowledgeLang }) {
@@ -135,7 +146,7 @@ export default function ProductKnowledgeTabs({ slug, lang, selection, scopeNames
         group="product-knowledge"
         panels
         fill={false}
-        className="overflow-x-auto hide-scrollbar border-b border-border-subtle px-2"
+        className="flex-wrap border-b border-border-subtle px-2"
         indicatorClassName="bg-gold"
         label={w(KNOWLEDGE_WORDS.tabsLabel, lang)}
         value={current}
@@ -151,7 +162,8 @@ export default function ProductKnowledgeTabs({ slug, lang, selection, scopeNames
 
 // ------------------------------------------------------------------ the bodies
 
-function TabBody({
+/** One tab's body (exported for the markup tests; the page mounts the default export). */
+export function TabBody({
   id,
   tabs,
   lang,
@@ -175,7 +187,7 @@ function TabBody({
       </div>
     );
   }
-  if (id === 'packaging') return <PackagingBody lines={tabs.packaging.lines} box={tabs.packaging.box} lang={lang} scopeNames={scopeNames} />;
+  if (id === 'packaging') return <PackagingBody lines={tabs.packaging.lines} other={tabs.packaging.other} box={tabs.packaging.box} lang={lang} scopeNames={scopeNames} />;
   if (id === 'compatibility') {
     return (
       <div className="space-y-4" data-knowledge-tab="compatibility">
@@ -186,15 +198,15 @@ function TabBody({
               {b.items.map((item, i) => (
                 <li key={`${item.label}-${i}`}>
                   {item.product ? (
-                    <a
-                      href={`/product/${item.product.slug}`}
+                    <Link
+                      to={`/product/${encodeURIComponent(item.product.slug)}`}
                       className="lv-choice inline-flex min-h-[44px] items-center gap-2 px-3 py-1.5 text-sm"
                     >
                       {item.product.image ? (
                         <SafeImage src={item.product.image} alt="" aspect="square" fit="contain" className="h-8 w-8 shrink-0 rounded-md" sizes="32px" bgClassName="bg-surface-raised" />
                       ) : null}
                       <span dir="auto">{w(item.product.name, lang) || item.label}</span>
-                    </a>
+                    </Link>
                   ) : (
                     <span className="inline-flex min-h-[36px] items-center rounded-full border border-border-subtle px-3 py-1 text-sm text-text-secondary" dir="auto">
                       {item.label}
@@ -258,19 +270,26 @@ function RowsGroup({
           ))}
         </dl>
       ) : null}
-      {hidden.length ? (
-        <details className="mt-1 text-[13px]">
-          <summary className="min-h-[44px] flex items-center cursor-pointer text-text-secondary">
-            {w(KNOWLEDGE_WORDS.otherVersions, lang)} <bdi className="ms-1 tabular-nums">({hidden.length})</bdi>
-          </summary>
-          <dl className="text-sm">
-            {hidden.map((r, i) => (
-              <Row key={`h-${r.key}-${r.scope.id}-${i}`} r={r} lang={lang} scopeNames={scopeNames} />
-            ))}
-          </dl>
-        </details>
-      ) : null}
+      <OtherVersions rows={hidden} lang={lang} scopeNames={scopeNames} />
     </div>
+  );
+}
+
+/** «إصدارات أخرى (n)»: collapsed, with a chevron that says it opens and turns when it does. */
+function OtherVersions({ rows, lang, scopeNames }: { rows: KnowledgeRow[]; lang: KnowledgeLang; scopeNames: Record<string, string> }) {
+  if (!rows.length) return null;
+  return (
+    <details className="group mt-1 text-[13px]" data-knowledge-other>
+      <summary className="min-h-[44px] flex list-none items-center gap-1 cursor-pointer text-text-secondary [&::-webkit-details-marker]:hidden">
+        <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
+        {w(KNOWLEDGE_WORDS.otherVersions, lang)} <bdi className="ms-1 tabular-nums">({rows.length})</bdi>
+      </summary>
+      <dl className="text-sm">
+        {rows.map((r, i) => (
+          <Row key={`h-${r.key}-${r.scope.id}-${r.region}-${i}`} r={r} lang={lang} scopeNames={scopeNames} />
+        ))}
+      </dl>
+    </details>
   );
 }
 
@@ -282,9 +301,8 @@ function Row({ r, lang, scopeNames, label }: { r: KnowledgeRow; lang: KnowledgeL
   const src = r.source?.title ? sourceLine(r, lang) : null;
   const scoped = r.scope.kind !== 'product' && r.scope.id;
   return (
-    <div className="py-2 border-b border-border-subtle last:border-0" data-knowledge-row={r.key} data-status={r.status}>
-      <div className={ROW_GRID}>
-        <dt className="text-text-muted min-w-0 [overflow-wrap:anywhere]">{label ?? w(r.label, lang)}</dt>
+    <div className={`py-2 border-b border-border-subtle last:border-0 ${ROW_GRID}`} data-knowledge-row={r.key} data-status={r.status}>
+      <dt className="text-text-muted min-w-0 [overflow-wrap:anywhere]">{label ?? w(r.label, lang)}</dt>
         <dd className={`text-end min-w-0 [overflow-wrap:anywhere] ${v.absent ? 'text-text-muted' : 'text-text-primary'}`}>
           {r.status === 'not_found' && r.checked_sources?.length ? (
             <details className="inline-block text-start">
@@ -320,20 +338,19 @@ function Row({ r, lang, scopeNames, label }: { r: KnowledgeRow; lang: KnowledgeL
             </span>
           ) : null}
         </dd>
-      </div>
-      {r.region === 'us_110v' ? <p className="mt-0.5 text-[11px] text-text-muted">{w(US_110V_NOTE, lang)}</p> : null}
+      {r.region === 'us_110v' ? <dd className={NOTE} data-knowledge-note="us_110v">{w(US_110V_NOTE, lang)}</dd> : null}
       {scoped && scopeNames[r.scope.id] ? (
-        <p className="mt-0.5 text-[11px] text-text-muted">
+        <dd className={NOTE} data-knowledge-note="applies-to">
           {w(KNOWLEDGE_WORDS.appliesTo, lang)} <bdi>{scopeNames[r.scope.id]}</bdi>
-        </p>
+        </dd>
       ) : null}
       {r.test_method ? (
-        <p className="mt-0.5 text-[11px] text-text-muted">
+        <dd className={NOTE}>
           {w(KNOWLEDGE_WORDS.testMethod, lang)}: <bdi>{r.test_method}</bdi>
-        </p>
+        </dd>
       ) : null}
       {src ? (
-        <p className="mt-0.5 text-[11px] text-text-muted">
+        <dd className={NOTE}>
           {src.url ? (
             <a href={src.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
               {src.text}
@@ -341,7 +358,7 @@ function Row({ r, lang, scopeNames, label }: { r: KnowledgeRow; lang: KnowledgeL
           ) : (
             src.text
           )}
-        </p>
+        </dd>
       ) : null}
     </div>
   );
@@ -349,18 +366,20 @@ function Row({ r, lang, scopeNames, label }: { r: KnowledgeRow; lang: KnowledgeL
 
 function PackagingBody({
   lines,
+  other,
   box,
   lang,
   scopeNames,
 }: {
   lines: PackagingLine[];
+  other: KnowledgeRow[];
   box: KnowledgeAnswer['in_the_box'];
   lang: KnowledgeLang;
   scopeNames: Record<string, string>;
 }) {
   return (
     <div className="space-y-4" data-knowledge-tab="packaging">
-      <OfficialNote rows={lines.flatMap((l) => l.rows)} lang={lang} />
+      <OfficialNote rows={[...lines.flatMap((l) => l.rows), ...other]} lang={lang} />
       {lines.length ? (
         <dl className="text-sm">
           {lines.map((line, i) =>
@@ -377,6 +396,7 @@ function PackagingBody({
           )}
         </dl>
       ) : null}
+      <OtherVersions rows={other} lang={lang} scopeNames={scopeNames} />
       {box.length ? (
         <div>
           <h4 className="text-text-primary font-bold text-[13px] mb-2 flex items-center gap-2">

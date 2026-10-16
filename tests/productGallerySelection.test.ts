@@ -11,7 +11,12 @@
  *      the old function gave, for every selection; and with no selection the
  *      stored order stands for every product;
  *   4. the page's rule agrees with the import's own `contradicts` on every row
- *      of every fixture for every real variant.
+ *      of every fixture for every real variant;
+ *   5. AN EXISTING PRODUCT whose variant rows are partial (a pre-order-only
+ *      model has none) keeps its chosen value's own picture in the lead — the
+ *      picture the cart line and the order snapshot store
+ *      (worker/lib/productSelectionImage.ts) — and an imported product never
+ *      drops the selected value's own picture either.
  *
  * Run: node --import tsx --test tests/productGallerySelection.test.ts
  */
@@ -25,12 +30,17 @@ import {
   type GalleryMedia,
   type GalleryModel,
 } from '../src/lib/productGallery';
-import { productGalleryForSelection, productVariantIdForSelection } from '../src/lib/productImage';
+import { productVariantIdForSelection } from '../src/lib/productImage';
+import { productMediaForSelection } from '../packages/pricing/src/productSelectionMedia';
 import { contradicts } from '../packages/catalog/src/bambuImport/media';
+import { productImageForSelection } from '../worker/lib/productSelectionImage';
+import type { ProductDoc } from '../worker/lib/productModel';
+import type { ProductRelationsView } from '../worker/lib/productOverlay';
 import { fixtureRelations, type FixtureRelations } from './fixtures/bambuRelations';
 import { SAMPLE_HANDLES } from './fixtures/bambu/load';
 
-const modelOf = (f: FixtureRelations): GalleryModel => ({ groups: f.option_groups, variants: f.variants });
+/** An imported product's model: its variants are every real combination (the page passes `importedChooser`). */
+const modelOf = (f: FixtureRelations): GalleryModel => ({ groups: f.option_groups, variants: f.variants, completeVariants: true });
 
 /** The files the page shows, in order, for a selection of value names. */
 function shown(f: FixtureRelations, names: string[]): string[] {
@@ -40,10 +50,22 @@ function shown(f: FixtureRelations, names: string[]): string[] {
   return galleryForSelection(media, f.images, modelOf(f), { optionValueIds: ids, variantId }).map((m) => m.file);
 }
 
-/** What the page drew before this change: de-duplicate by URL first, then rank (src/pages/Product.tsx galleryOf). */
-function oldGallery<T extends GalleryMedia>(media: readonly T[], bindings: readonly GalleryMedia[], sel: { optionValueIds?: string[]; colorId?: string; variantId?: string | null }): T[] {
+/**
+ * What the page drew before this change, kept here as the reference: de-duplicate by URL first, then rank
+ * (src/pages/Product.tsx galleryOf over the old src/lib/productImage.ts productGalleryForSelection, which
+ * had no caller left and is gone).
+ */
+function oldGallery<T extends GalleryMedia>(media: readonly T[], bindings: readonly GalleryMedia[], sel: { optionValueIds?: string[]; optionId?: string; colorId?: string; variantId?: string | null }): T[] {
   const base = dedupeByUrl(mediaInStoredOrder(media));
-  return productGalleryForSelection(base, bindings, sel) as T[];
+  const optionValueIds = sel.optionValueIds?.length ? [...new Set(sel.optionValueIds.filter(Boolean))] : sel.optionId ? [sel.optionId] : [];
+  if (!sel.variantId && !sel.colorId && optionValueIds.length === 0) return [...base];
+  const byId = new Map(bindings.filter((b) => b.id).map((b) => [b.id!, b]));
+  const byUrl = new Map(bindings.map((b) => [b.url, b]));
+  const candidates = base.map((image) => {
+    const b = (image.id ? byId.get(image.id) : undefined) ?? byUrl.get(image.url) ?? image;
+    return { image, url: image.url, primary: image.primary, variant_id: b.variant_id, color_id: b.color_id, option_value_id: b.option_value_id };
+  });
+  return productMediaForSelection(candidates, { optionValueIds, colorId: sel.colorId, variantId: sel.variantId }).map(({ image }) => image);
 }
 
 // ------------------------------------------------------------------ 1. the spec's cases
@@ -191,4 +213,45 @@ test('a colour other than the selected one is left out; an unbound image always 
   assert.deepEqual(galleryForSelection(media, media, model, { optionValueIds: ['a'], colorId: 'blue' }).map((m) => m.id), ['2', '3']);
   const onlyBound = mediaInStoredOrder([{ id: '1', url: '/files/1.webp', primary: true, option_value_id: 'b' }]);
   assert.deepEqual(galleryForSelection(onlyBound, onlyBound, model, { optionValueIds: ['a'] }).map((m) => m.id), ['1'], 'never an empty gallery');
+});
+
+// ------------------------------------------------------------------ 5. an existing product's partial variants
+
+test('an existing product with partial variant rows: the chosen model’s own picture leads, as on the cart line', () => {
+  // Model A sold direct with red and blue linked (rows A×red, A×blue); model B by pre-order only: no row
+  // holds o:B (src/components/adminProducts/form/model.ts creates rows for direct sale only).
+  const media = mediaInStoredOrder([
+    { id: 'iP', url: '/files/p.webp', primary: true, order: 0 },
+    { id: 'iA', url: '/files/a.webp', order: 1, option_value_id: 'A' },
+    { id: 'iB', url: '/files/b.webp', order: 2, option_value_id: 'B' },
+    { id: 'iR', url: '/files/r.webp', order: 3, color_id: 'red' },
+  ]);
+  const groups = [{ id: 'gModel', values: [{ id: 'A' }, { id: 'B' }] }];
+  const variants = [
+    { id: 'v1', combo_key: 'o:A|c:red', active: 1 },
+    { id: 'v2', combo_key: 'o:A|c:blue', active: 1 },
+  ];
+  const page = galleryForSelection(media, media, { groups, variants }, { optionId: 'B', optionValueIds: ['B'] });
+  assert.deepEqual(page.map((m) => m.url), ['/files/b.webp', '/files/p.webp', '/files/r.webp'], 'B leads; A, another value of the chosen group, is left out');
+  const doc = { media: media.map((m) => ({ ...m, key: '', role: 'gallery', alt_ar: '', alt_en: '', alt_ckb: '', primary: !!m.primary, order: m.order ?? 0 })) } as unknown as ProductDoc;
+  const cart = productImageForSelection(doc, { optionValueIds: ['B'], colorId: null }, { variants } as unknown as ProductRelationsView);
+  assert.equal(page[0].url, cart, 'the page’s hero is the cart line’s picture');
+  // A second group: the nozzle n1 is modelled only with A (A×n1). Pre-order B with n1 may still be sold, so on
+  // an existing product n1's picture stays where the old gallery had it — the rule is the import's only.
+  const twoGroups = [...groups, { id: 'gNozzle', values: [{ id: 'n1' }, { id: 'n2' }] }];
+  const nozzleMedia = mediaInStoredOrder([...media, { id: 'iN1', url: '/files/n1.webp', order: 4, option_value_id: 'n1' }]);
+  const partial = [{ id: 'v3', combo_key: 'o:A|o:n1', active: 1 }];
+  const existing = galleryForSelection(nozzleMedia, nozzleMedia, { groups: twoGroups, variants: partial }, { optionValueIds: ['B'] }).map((m) => m.url);
+  assert.ok(existing.includes('/files/n1.webp'), existing.join(', '));
+  assert.ok(
+    !galleryForSelection(nozzleMedia, nozzleMedia, { groups: twoGroups, variants: partial, completeVariants: true }, { optionValueIds: ['B'] }).some((m) => m.url === '/files/n1.webp'),
+    'on an imported product (complete variants) n1 with B is an impossible combination'
+  );
+  // The same rows read as an imported product's (complete variants): B forms no variant, so its picture is
+  // an impossible choice for anyone who has not chosen it — but never for the one who has.
+  assert.equal(galleryForSelection(media, media, { groups, variants, completeVariants: true }, { optionValueIds: ['B'] })[0].url, '/files/b.webp');
+  assert.ok(
+    !galleryForSelection(media, media, { groups: [...groups, { id: 'gColour', values: [{ id: 'cr' }] }], variants, completeVariants: true }, { optionValueIds: ['cr'] }).some((m) => m.url === '/files/b.webp'),
+    'an imported product still leaves out a value no variant pairs with the selection'
+  );
 });

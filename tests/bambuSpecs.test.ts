@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 import { buildOptions, newProductId, type OptionModel } from '../packages/catalog/src/bambuImport/options';
 import { describe } from '../packages/catalog/src/bambuImport/describe';
 import { buildSpecs, compositeCell, typeValue, type SpecResult, type SpecRow } from '../packages/catalog/src/bambuImport/specs';
+import { publishedWeight } from '../packages/catalog/src/bambuImport/logistics';
 import { productTypeOf } from '../packages/catalog/src/bambuImport/registry/types';
 import { modelsInText } from '../packages/catalog/src/bambuImport/registry/models';
 import { keyForLabel, SPEC_KEYS } from '../packages/catalog/src/bambuImport/registry/specKeys';
@@ -77,6 +78,9 @@ test('H2D composite cells and the region rule (§C.6 golden)', () => {
   assert.deepEqual(['length', 'width', 'height'].map((e) => at(`package.${e}`)[0].valueNum), [580, 605, 750]);
   assert.deepEqual(at('physical.recommended_space')[0].valueList, [700, 700, 1100]);
   assert.equal(at('product.net_weight')[0].valueNum, 31000);
+  // The number in grams, the text as published (§G.2 «the unit as published»): «31 kg», never «31000 g».
+  assert.equal(at('product.net_weight')[0].valueText, '31 kg');
+  assert.deepEqual(r.rows.filter((x) => x.key === 'shipment.gross_weight').map((g) => g.valueText).sort(), ['40.6 kg', '44.2 kg', '48.2 kg']);
   const gross = r.rows.filter((x) => x.key === 'shipment.gross_weight');
   assert.deepEqual(gross.map((g) => [name(g.scopeId), g.valueNum, g.region]).sort((a, b) => Number(a[1]) - Number(b[1])), [
     ['H2D', 40600, 'us_110v'],
@@ -99,6 +103,7 @@ test('PLA Basic: net weight from the 1kg value, diameter and tolerance verified;
   assert.equal(net[0].scopeKind, 'option_value');
   assert.equal(name(net[0].scopeId), '1kg');
   assert.equal(net[0].valueNum, 1000);
+  assert.equal(net[0].valueText, '1 kg', 'the option «1kg» as published, the number in grams');
   assert.equal(net[0].confidence, 'official_variant');
   const d = r.rows.find((x) => x.key === 'material.diameter')!;
   const t = r.rows.find((x) => x.key === 'material.diameter_tolerance')!;
@@ -143,6 +148,7 @@ test('compositeCell: soft wraps, sub-labels, scopes, trailing units, and a versi
   assert.equal(foreign[0].scope, 'FOREIGN');
   const bare = compositeCell('Gross weight: H2D: 40.6; H2D AMS Combo: 44.2 kg', 'shipment.gross_weight', m, 'H2D');
   assert.deepEqual(bare.map((s) => s.measures[0].value), [40600, 44200], 'a trailing unit applies to the bare number before it');
+  assert.deepEqual(bare.map((s) => publishedWeight(s.measures[0])), ['40.6 kg', '44.2 kg'], 'and the published text takes the unit it inherits');
 });
 
 test('labels map case- and punctuation-insensitively; values type by the key', () => {

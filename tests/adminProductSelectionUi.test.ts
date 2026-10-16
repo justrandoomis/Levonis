@@ -20,11 +20,8 @@ import {
   type RelationsState,
 } from '../src/components/adminProducts/form/model';
 import { emptyDimensions } from '../src/lib/productTypes';
-import {
-  productGalleryForSelection,
-  productSelectionComboKey,
-  productVariantIdForSelection,
-} from '../src/lib/productImage';
+import { productSelectionComboKey, productVariantIdForSelection } from '../src/lib/productImage';
+import { galleryForSelection } from '../src/lib/productGallery';
 
 test('kg↔g and cm↔mm editor conversions round-trip exactly', () => {
   for (const grams of [1, 50, 999, 1000, 1234, 9400, 99_999_999]) {
@@ -165,7 +162,7 @@ test('selection media resolves variant > color > every selected option > primary
   );
   assert.equal(variantId, 'v-exact');
   assert.deepEqual(
-    productGalleryForSelection(base, bindings, {
+    galleryForSelection(base, bindings, { groups: [], variants: [{ id: 'v-exact', combo_key: 'o:model-a|o:size-l|c:red' }] }, {
       optionValueIds: ['model-a', 'size-l'], colorId: 'red', variantId,
     }).map((image) => image.url),
     ['/variant.webp', '/color.webp', '/o2.webp', '/o1.webp', '/primary.webp']

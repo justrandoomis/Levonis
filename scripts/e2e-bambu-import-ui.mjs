@@ -22,7 +22,13 @@
  *        - the knowledge tabs load only near the viewport and list the
  *          documents, each opening in a new tab with noopener noreferrer and
  *          saying it opens on the manufacturer's site.
- *   2  H2D: the specifications tab shows the typed rows (ar/en/ckb).
+ *   2  H2D: the specifications tab shows the typed rows (ar/en/ckb); on the
+ *      desktop (the review of step 7): the tab strip shows every label whole;
+ *      every US 110 V row sits under the collapsed «إصدارات أخرى», which shows
+ *      a chevron; each <dl> holds only rows of <dt>/<dd>; the packaging tab
+ *      reads the net weight as published («31 kg»); a compatible product opens
+ *      in the app (no reload); and the two versions the opening selection
+ *      does not offer are pressable, and a press selects one.
  *   3  The leak scan: no store page address, no swatch source and no CBM in any
  *      answer the page received.
  * Screens at 390×844 and 1280×900, light and dark, in SHOTS_DIR.
@@ -62,6 +68,21 @@ const UNPRICED = { ar: 'السعر غير متوفر حالياً', en: 'Price n
 const OPENS = { ar: 'يُفتح في موقع الشركة المصنّعة', en: "Opens on the manufacturer's site", ckb: 'لە ماڵپەڕی بەرهەمهێنەر دەکرێتەوە' };
 const TAB_DOCS = { ar: 'المستندات والأدلة', en: 'Documents & manuals', ckb: 'بەڵگەنامە و ڕێنماییەکان' };
 const TAB_SPECS = { ar: 'المواصفات', en: 'Specifications', ckb: 'تایبەتمەندییەکان' };
+const TAB_PACK = { ar: 'التغليف والشحن', en: 'Packaging & shipping', ckb: 'پاکەتکردن و ناردن' };
+const TAB_COMPAT = { ar: 'التوافق', en: 'Compatibility', ckb: 'گونجاوی' };
+
+/** In the open tab: every US 110 V note inside «إصدارات أخرى», and every <dl> holding only rows of <dt>/<dd>. */
+async function knowledgeMarkup(page) {
+  return page.evaluate(() => {
+    const us = [...document.querySelectorAll('[data-knowledge-note="us_110v"]')];
+    const outside = us.filter((n) => !n.closest('details[data-knowledge-other]')).map((n) => n.closest('[data-knowledge-row]')?.getAttribute('data-knowledge-row'));
+    const badDl = [...document.querySelectorAll('[data-knowledge] dl')].flatMap((dl) =>
+      [...dl.children].filter((row) => row.tagName !== 'DIV' || [...row.children].some((c) => c.tagName !== 'DT' && c.tagName !== 'DD')).map((row) => row.outerHTML.slice(0, 120))
+    );
+    const chevrons = [...document.querySelectorAll('details[data-knowledge-other] > summary')].map((s) => !!s.querySelector('svg'));
+    return { us: us.length, outside, badDl, chevrons };
+  });
+}
 const ENV = { ...process.env, WRANGLER_SEND_METRICS: 'false', CI: '1', NO_UPDATE_NOTIFIER: '1' };
 
 // ------------------------------------------------------------------ the local database
@@ -379,6 +400,60 @@ try {
       check(`${tag}: «${TAB_SPECS[lang]}» shows the typed rows`, rows > 10, rows);
       await specs.scrollIntoViewIfNeeded().catch(() => {});
       await shot(page, `h2d-knowledge-${tag}`);
+      if (view === 'desktop') {
+        // The tab strip: every label whole, inside the strip (it wraps rather than clip at the 68ch column).
+        const strip = await page.evaluate(() => {
+          const list = document.querySelector('[data-knowledge="tabs"] [role="tablist"]');
+          if (!list) return null;
+          const box = list.getBoundingClientRect();
+          const tabs = [...list.querySelectorAll('[role="tab"]')].map((t) => t.getBoundingClientRect());
+          return { overflow: list.scrollWidth - list.clientWidth, cut: tabs.filter((r) => r.left < box.left - 1 || r.right > box.right + 1).length, tabs: tabs.length };
+        });
+        check(`${tag}: the knowledge tab strip shows every label whole`, !!strip && strip.tabs >= 4 && strip.overflow <= 1 && strip.cut === 0, strip);
+        const specsMarkup = await knowledgeMarkup(page);
+        check(`${tag}: the US 110 V rows sit only under «إصدارات أخرى» (L-20)`, specsMarkup.us > 0 && specsMarkup.outside.length === 0, specsMarkup);
+        check(`${tag}: «إصدارات أخرى» shows a chevron`, specsMarkup.chevrons.length > 0 && specsMarkup.chevrons.every(Boolean), specsMarkup.chevrons);
+        check(`${tag}: each <dl> holds only rows of <dt>/<dd>`, specsMarkup.badDl.length === 0, specsMarkup.badDl.slice(0, 3));
+        // Packaging: the weight as published, the US package and weights under «إصدارات أخرى».
+        await page.locator('[role="tab"]').filter({ hasText: TAB_PACK[lang] }).first().click();
+        await page.waitForTimeout(500);
+        const pack = page.locator('[data-knowledge-tab="packaging"]').first();
+        const packText = await pack.innerText().catch(() => '');
+        check(`${tag}: the net weight reads as published («31 kg»)`, /\b31 kg\b/.test(packText) && !/31000 g/.test(packText), packText.slice(0, 300));
+        const packMarkup = await knowledgeMarkup(page);
+        check(`${tag}: no US 110 V line among the product's packaging facts`, packMarkup.outside.length === 0 && packMarkup.us > 0, packMarkup);
+        // Compatibility: the router's link — the page is not reloaded.
+        await page.locator('[role="tab"]').filter({ hasText: TAB_COMPAT[lang] }).first().click();
+        await page.waitForTimeout(500);
+        await page.evaluate(() => {
+          window.__noReload = true;
+        });
+        const link = page.locator('[data-knowledge-tab="compatibility"] a[href^="/product/"]').first();
+        if (await link.count()) {
+          await link.click();
+          await page.waitForURL(/\/product\/bambu-lab-a1/, { timeout: 10000 }).catch(() => {});
+          const same = await page.evaluate(() => window.__noReload === true);
+          check(`${tag}: a compatible product opens in the app, no reload`, /\/product\/bambu-lab-a1/.test(page.url()) && same, page.url());
+          await visit(page, `/product/${W.h2d.slug}`);
+        } else {
+          check(`${tag}: a compatible product is linked`, false, 'no link in the compatibility tab');
+        }
+        // The two versions the opening selection does not offer: pressable, and a press selects one.
+        const version = W.h2d.groups.find((g) => g.values.some((v) => v.name_en === 'H2D Laser Full Combo'));
+        const laser = version?.values.find((v) => v.name_en === 'H2D Laser Full Combo');
+        const groupBox = page.locator(`[data-option-group="${version?.id}"]:visible`).first();
+        const disabled = await groupBox.locator('button[disabled]').count();
+        check(`${tag}: no version is a disabled button on opening`, disabled === 0, disabled);
+        const laserBtn = groupBox.locator('button').filter({ hasText: 'H2D Laser Full Combo' }).first();
+        const offeredBefore = await laserBtn.getAttribute('data-offered');
+        await laserBtn.click();
+        await page.waitForTimeout(400);
+        check(
+          `${tag}: «H2D Laser Full Combo», not offered with «Standard», is chosen by one press`,
+          !!laser && offeredBefore === 'false' && (await laserBtn.getAttribute('aria-pressed')) === 'true',
+          { offeredBefore, pressed: await laserBtn.getAttribute('aria-pressed') }
+        );
+      }
       await ctx.close();
     }
   }

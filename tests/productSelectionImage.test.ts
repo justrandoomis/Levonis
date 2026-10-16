@@ -6,7 +6,8 @@ import {
   productSelectionComboKey,
   productVariantIdForSelection,
 } from '@levonis/pricing/productSelectionMedia';
-import { productGalleryForSelection } from '../src/lib/productImage';
+import { galleryForSelection, mediaInStoredOrder } from '../src/lib/productGallery';
+import { importedChooser, type ChooserGroup } from '../src/lib/productChooser';
 import { productImageForSelection } from '../worker/lib/productSelectionImage';
 import type { ProductDoc } from '../worker/lib/productModel';
 import type { ProductRelationsView } from '../worker/lib/productOverlay';
@@ -78,24 +79,27 @@ test('variant lookup is canonical for multi-option selections', () => {
   );
 });
 
+/** The groups the page's chooser reads off the relations (Product.tsx `relationOptionGroups`). */
+type GroupsView = { option_groups?: Array<ChooserGroup & { values: Array<{ id: string }> }> };
+
 function storefrontImageForSelection(
   product: ProductDoc,
   selection: { optionValueIds: string[]; colorId: string | null },
-  view?: ProductRelationsView | null
+  view?: (ProductRelationsView & GroupsView) | null
 ): string {
-  // Mirrors Product.galleryOf: public media arrives primary-first, but cached
-  // payloads are still normalised before the shared selection resolver runs.
-  const base = product.media
-    .filter((item) => !!item.url)
-    .map((item, index) => ({ item, index }))
-    .sort((a, b) =>
-      Number(!!b.item.primary) - Number(!!a.item.primary) ||
-      a.item.order - b.item.order ||
-      a.index - b.index
-    )
-    .map(({ item }) => item);
+  // Mirrors the product page's gallery (src/pages/Product.tsx → src/lib/productGallery.ts
+  // galleryForSelection): every media row in stored order, the relations' bindings, the option model —
+  // the impossible-combination rule only for an imported chooser — and the selection's variant.
+  const groups = view?.option_groups ?? [];
   const variantId = productVariantIdForSelection(view?.variants ?? [], selection);
-  return productGalleryForSelection(base, product.media, { ...selection, variantId })[0]?.url ?? '';
+  return (
+    galleryForSelection(
+      mediaInStoredOrder(product.media.filter((item) => !!item.url)),
+      product.media,
+      { groups, variants: view?.variants ?? [], completeVariants: importedChooser(groups) },
+      { ...selection, variantId }
+    )[0]?.url ?? ''
+  );
 }
 
 test('storefront gallery lead and Worker snapshot have exhaustive selection parity', () => {
@@ -112,17 +116,21 @@ test('storefront gallery lead and Worker snapshot have exhaustive selection pari
   } as ProductDoc;
   const parityView = {
     ...relations,
+    option_groups: [
+      { id: 'g-size', values: [{ id: 'large' }, { id: 'other' }] },
+      { id: 'g-conn', values: [{ id: 'wifi' }] },
+    ],
     variants: [
       { id: 'v-disabled', combo_key: 'o:large|c:blue', active: 0 },
       { id: 'v-exact', combo_key: 'o:large|o:wifi|c:red', active: 1 },
     ],
-  } as ProductRelationsView;
+  } as unknown as ProductRelationsView & GroupsView;
 
   const cases: Array<{
     name: string;
     selection: { optionValueIds: string[]; colorId: string | null };
     expected: string;
-    view?: ProductRelationsView | null;
+    view?: (ProductRelationsView & GroupsView) | null;
   }> = [
     {
       name: 'exact variant beats every broader binding',
@@ -169,6 +177,41 @@ test('storefront gallery lead and Worker snapshot have exhaustive selection pari
     assert.equal(storefront, item.expected, `${item.name}: Storefront`);
     assert.equal(storefront, worker, `${item.name}: parity`);
   }
+
+  // An existing product whose variant rows are partial (a pre-order-only model B has none): the chosen
+  // model's own picture leads the page exactly as it leads the cart line.
+  const partialDoc = {
+    ...doc,
+    media: [
+      media('p', '/p.webp', { primary: true, order: 0 }),
+      media('a', '/a.webp', { option_value_id: 'model-a', order: 1 }),
+      media('b', '/b.webp', { option_value_id: 'model-b', order: 2 }),
+    ],
+  } as ProductDoc;
+  const partialView = {
+    option_groups: [{ id: 'g-model', values: [{ id: 'model-a' }, { id: 'model-b' }] }],
+    variants: [{ id: 'v-a-red', combo_key: 'o:model-a|c:red', active: 1 }],
+  } as unknown as ProductRelationsView & GroupsView;
+  const sel = { optionValueIds: ['model-b'], colorId: null };
+  assert.equal(productImageForSelection(partialDoc, sel, partialView), '/b.webp');
+  assert.equal(storefrontImageForSelection(partialDoc, sel, partialView), '/b.webp', 'partial variants: parity');
+});
+
+/**
+ * THE ONE DELIBERATE DIFFERENCE (the Bambu import spec §G.3 step 1): when nothing is bound to the
+ * selection and the PRIMARY itself is bound to another colour (or another value of a chosen group), the
+ * page leaves that picture out — a blue choice never leads with the red picture — while the cart line and
+ * the order snapshot keep the Worker's precedence, which ends at the primary. Pinned here so a change to
+ * either side is a decision, not a drift (open for the owner: whether the snapshot adopts §G.3 step 1).
+ */
+test('the page leaves out a primary the selection contradicts; the snapshot keeps the primary (§G.3 step 1, pinned)', () => {
+  const contradicted = {
+    ...doc,
+    media: [media('p', '/red-primary.webp', { primary: true, order: 0, color_id: 'red' }), media('g', '/general.webp', { order: 1 })],
+  } as ProductDoc;
+  const sel = { optionValueIds: [], colorId: 'blue' };
+  assert.equal(storefrontImageForSelection(contradicted, sel, null), '/general.webp');
+  assert.equal(productImageForSelection(contradicted, sel, null), '/red-primary.webp');
 });
 
 test('shared resolver is canonical, stable, and does not mutate caller media', () => {
@@ -193,7 +236,7 @@ test('shared resolver is canonical, stable, and does not mutate caller media', (
     'selection array order cannot override the authoritative gallery order'
   );
   assert.equal(
-    productGalleryForSelection(input, [], {
+    galleryForSelection(input, [], { groups: [], variants: [] }, {
       optionValueIds: ['second'],
       colorId: null,
       variantId: null,
@@ -205,11 +248,15 @@ test('shared resolver is canonical, stable, and does not mutate caller media', (
 });
 
 test('both adapters delegate precedence to the shared resolver', () => {
-  const frontend = readFileSync(new URL('../src/lib/productImage.ts', import.meta.url), 'utf8');
+  const frontend = readFileSync(new URL('../src/lib/productGallery.ts', import.meta.url), 'utf8');
   const worker = readFileSync(new URL('../worker/lib/productSelectionImage.ts', import.meta.url), 'utf8');
   const pricing = readFileSync(new URL('../packages/pricing/src/productSelectionMedia.ts', import.meta.url), 'utf8');
   assert.match(frontend, /\.\.\/\.\.\/packages\/pricing\/src\/productSelectionMedia/);
-  assert.match(frontend, /productMediaForSelection\(candidates,/);
+  assert.match(frontend, /productMediaForSelection\(\s*pool\.map/);
+  // …and the product page runs that gallery, nothing else.
+  const page = readFileSync(new URL('../src/pages/Product.tsx', import.meta.url), 'utf8');
+  assert.match(page, /const ordered = galleryForSelection\(/);
+  assert.doesNotMatch(page, /productGalleryForSelection/);
   assert.match(worker, /@levonis\/pricing\/productSelectionMedia/);
   assert.match(worker, /resolveProductImageForSelection\(media,/);
   assert.match(pricing, /export function productMediaForSelection/);

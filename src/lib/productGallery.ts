@@ -10,13 +10,19 @@
  *
  *   1. DROP CONTRADICTING IMAGES. While a selection exists, leave out every
  *      image bound to a value of a group in which another value is selected;
- *      bound to a value that forms no variant with the rest of the selection
- *      (an impossible combination); bound to a variant whose `combo_key`
- *      contains such a value; bound to a colour other than the selected one;
- *      and every REPRESENTATIVE image whose source variant (`via_variant_id`)
- *      clashes so — its picture shows that variant, not merely the value it is
- *      bound to. Unbound images always stay. If nothing would remain, the full
- *      list is used.
+ *      bound to a variant whose `combo_key` contains such a value; bound to a
+ *      colour other than the selected one; and every REPRESENTATIVE image
+ *      whose source variant (`via_variant_id`) clashes so — its picture shows
+ *      that variant, not merely the value it is bound to. On an IMPORTED
+ *      product only (`completeVariants`: the import's variants are every real
+ *      combination), also an image bound to a value that forms no variant with
+ *      the rest of the selection (an impossible combination) — never the
+ *      selected value's own. An existing product's variant rows can be
+ *      partial (a pre-order-only model has none; the form creates rows only
+ *      for direct sale), so there that rule would drop the chosen model's own
+ *      picture and the page would lead with another picture than the cart
+ *      line (worker/lib/productSelectionImage.ts). Unbound images always
+ *      stay. If nothing would remain, the full list is used.
  *   2. RANK with `productMediaForSelection` (exact variant → colour → option →
  *      primary → general) over the FULL remaining list, so the second binding
  *      of a shared picture can lead.
@@ -56,6 +62,12 @@ export interface GalleryModel {
   groups: ReadonlyArray<{ id: string; values: ReadonlyArray<{ id: string }> }>;
   /** Active variants (the public relations carry active rows only). */
   variants: ReadonlyArray<{ id: string; combo_key: string; active?: boolean | number | null }>;
+  /**
+   * The variants are EVERY real combination (an imported product: src/lib/productChooser.ts
+   * `importedChooser`), so a value forming none with the selection is an impossible choice.
+   * Absent or false for every other product: its variant rows may be partial.
+   */
+  completeVariants?: boolean;
 }
 
 export interface GallerySelection {
@@ -101,6 +113,7 @@ interface Compiled {
   colorId: string;
   variants: Map<string, string[]>;
   combos: string[][];
+  completeVariants: boolean;
 }
 
 function compile(model: GalleryModel, selection: GallerySelection): Compiled {
@@ -113,7 +126,7 @@ function compile(model: GalleryModel, selection: GallerySelection): Compiled {
   }
   const active = model.variants.filter((v) => v.active !== false && v.active !== 0);
   const variants = new Map(active.map((v) => [v.id, v.combo_key.split('|').filter(Boolean)]));
-  return { groupOf, chosen, colorId: selection.colorId ?? '', variants, combos: [...variants.values()] };
+  return { groupOf, chosen, colorId: selection.colorId ?? '', variants, combos: [...variants.values()], completeVariants: model.completeVariants === true };
 }
 
 /** A combo part (`o:<value>` / `c:<colour>`) that the selection rules out. */
@@ -145,9 +158,11 @@ function contradicts(b: GalleryBinding, c: Compiled): boolean {
   if (b.option_value_id) {
     if (partClashes(`o:${b.option_value_id}`, c)) return true;
     // A value that forms no variant with the rest of the selection is an impossible choice: its picture
-    // must not lead or linger. Only where the product publishes its variants.
-    if (c.combos.length && c.groupOf.has(b.option_value_id)) {
+    // must not lead or linger. Only where the variants are every real combination (an imported product),
+    // and never the selected value's own picture.
+    if (c.completeVariants && c.combos.length && c.groupOf.has(b.option_value_id)) {
       const own = c.groupOf.get(b.option_value_id);
+      if (own && c.chosen.get(own) === b.option_value_id) return false;
       const others = [...c.chosen.entries()].filter(([g]) => g !== own).map(([, id]) => `o:${id}`);
       const mine = `o:${b.option_value_id}`;
       if (!c.combos.some((parts) => parts.includes(mine) && others.every((o) => parts.includes(o)))) return true;

@@ -10,8 +10,12 @@
  *     otherwise the first group's default alone.
  *   - A SINGLE-VALUE GROUP is auto-selected.
  *   - IMPOSSIBLE COMBINATIONS: a value that forms no active variant with the
- *     rest of the selection is shown disabled («غير متاح مع هذا الاختيار»,
- *     never «نفد»), from `variants[].combo_key`.
+ *     rest of the selection says so («غير متاح مع هذا الاختيار», never «نفد»),
+ *     from `variants[].combo_key` — and STAYS PRESSABLE: pressing it selects
+ *     it and lets go of the other groups' values that clash with it
+ *     (`chooseValue`). A disabled value was a dead end: the H2D opens on
+ *     «H2D AMS Combo + Standard», and its two other versions could only be
+ *     reached by first un-pressing «Standard», which nothing on the page said.
  *
  * NOTHING NEW FOR AN EXISTING PRODUCT. All three apply only to a product whose
  * groups carry the import's data (`importedChooser`): every product before the
@@ -88,6 +92,45 @@ export function valueOffered(
     .map((g) => g.values.find((v) => selected.includes(v.id))?.id)
     .filter((id): id is string => !!id);
   return formsVariant([valueId, ...others], variants);
+}
+
+/**
+ * The selection after pressing `valueId` of `groupId` on an imported
+ * product's chooser. Pressing the selected value un-presses it (as every
+ * chooser does). Otherwise the group takes the value, and every other group
+ * keeps its value while the whole still forms an active variant — in group
+ * order; a value that clashes is let go, and its group takes the one value
+ * that still fits when there is exactly one (H2D: «H2D» brings its own
+ * «standard») — then each single-value group that fits is selected again.
+ * In group order.
+ */
+export function chooseValue(
+  valueId: string,
+  groupId: string,
+  selected: readonly string[],
+  groups: readonly ChooserGroup[],
+  variants: readonly ChooserVariant[]
+): string[] {
+  const pressedGroup = groups.find((g) => g.id === groupId);
+  const current = (g: ChooserGroup) => g.values.find((v) => selected.includes(v.id))?.id;
+  if (pressedGroup && current(pressedGroup) === valueId) {
+    return groups.flatMap((g) => (g.id === groupId ? [] : current(g) ? [current(g) as string] : []));
+  }
+  const chosen = new Map<string, string>([[groupId, valueId]]);
+  const ids = () => [...chosen.values()];
+  const dropped = new Set<string>();
+  for (const g of groups) {
+    const kept = g.id === groupId ? undefined : current(g);
+    if (!kept) continue;
+    if (formsVariant([...ids(), kept], variants)) chosen.set(g.id, kept);
+    else dropped.add(g.id);
+  }
+  for (const g of groups) {
+    if (chosen.has(g.id) || (g.values.length !== 1 && !dropped.has(g.id))) continue;
+    const fits = g.values.filter((v) => formsVariant([...ids(), v.id], variants));
+    if (fits.length === 1) chosen.set(g.id, fits[0].id);
+  }
+  return groups.flatMap((g) => (chosen.has(g.id) ? [chosen.get(g.id) as string] : []));
 }
 
 /**

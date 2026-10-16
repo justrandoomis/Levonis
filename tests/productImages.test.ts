@@ -27,7 +27,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { classifyImageUrl, isUsableImageUrl, primaryRepair } from '../src/lib/imageUrl';
-import { productGalleryForSelection, productPrimaryImage } from '../src/lib/productImage';
+import { productPrimaryImage } from '../src/lib/productImage';
+import { galleryForSelection } from '../src/lib/productGallery';
 import { validateOutboundUrl } from '../worker/lib/fetchGuard';
 
 // ------------------------------------------------- 1. a string is not a URL
@@ -159,13 +160,13 @@ test('product detail keeps the authoritative primary first until a variant is se
   const bindings = [{ url: '/primary.png', option_value_id: 'combo', color_id: null }];
 
   assert.deepEqual(
-    productGalleryForSelection([primary, general], bindings, {}).map((image) => image.url),
+    galleryForSelection([primary, general], bindings, { groups: [], variants: [] }, {}).map((image) => image.url),
     ['/primary.png', '/general.png'],
     'an option-bound primary must not sink before the customer chooses an option'
   );
 
   assert.deepEqual(
-    productGalleryForSelection([primary, general], bindings, { optionId: 'combo' }).map((image) => image.url),
+    galleryForSelection([primary, general], bindings, { groups: [], variants: [] }, { optionId: 'combo' }).map((image) => image.url),
     ['/primary.png', '/general.png'],
     'the selected option may deliberately promote its bound image'
   );
