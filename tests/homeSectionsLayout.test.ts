@@ -449,6 +449,22 @@ test('nothing that stops the belt can latch, and the browser proof says so', () 
   assert.match(src, /reducedRef\.current/);
 });
 
+test('the belt\'s loop waits for the first screen, and stops off screen and while a page is on its way', () => {
+  // Speed audit 2026-10-16: it read and wrote the scroller from the frame that
+  // painted the home's data, ran on out of sight, and took its slice of every
+  // frame of a navigation away from the home (a transition React slices).
+  const src = read('src/components/home/Marquee.tsx');
+  assert.match(src, /const run = painted && onScreen && busyStore\.snapshot\(\)\.reason !== 'route';/);
+  assert.match(src, /const cancelPaint = afterCriticalPaint\(\(\) => \{\s*painted = true;\s*sync\(\);/);
+  assert.match(src, /new IntersectionObserver\(\(entries\) => \{\s*onScreen = entries\.some\(\(entry\) => entry\.isIntersecting\);\s*sync\(\);/);
+  assert.match(src, /const unsubscribeBusy = busyStore\.subscribe\(sync\);/);
+  // The loop is never started directly on mount any more: only `sync` starts it.
+  assert.equal((src.match(/frame = requestAnimationFrame\(tick\);/g) ?? []).length, 2, 'once in sync, once re-arming inside tick');
+  // And the browser proof measures both stops (scripts/e2e-marquee-drift.mjs, case G).
+  const fixture = read('tests/browser/marquee-fixture.tsx');
+  assert.match(fixture, /__beginBusy = beginBusy;/);
+});
+
 test('the belt has a real browser proof, and it drives the real component', () => {
   // The point of this test is that the proof EXISTS and is wired to the
   // shipped component. A source pin that guards a source pin would be the
@@ -473,6 +489,11 @@ test('the belt has a real browser proof, and it drives the real component', () =
     'prefers-reduced-motion must stop the drift',
     'a held finger must park the belt',
     'the drift must resume when the finger lifts',
+    // Speed audit 2026-10-16: the loop is out of the way of a navigation and of nobody's view.
+    'a page on its way must hold the belt still',
+    'the drift must resume once the page has arrived',
+    'a belt scrolled out of sight must not run',
+    'and must drift again when it is back in sight',
   ]) {
     assert.ok(e2e.includes(claim), `the browser proof still asserts: ${claim}`);
   }

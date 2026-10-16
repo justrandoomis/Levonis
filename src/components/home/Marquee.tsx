@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLanguage } from '../../LanguageContext';
 import { readPos, writePos } from '../../lib/useRail';
+import { afterCriticalPaint } from '../../lib/afterCriticalPaint';
+import { busyStore } from '../../lib/busy';
 
 /**
  * Marquee — one endless belt for the home page (the ads strip and the brands
@@ -220,8 +222,36 @@ export default function Marquee({
     window.addEventListener('pointerup', onRelease);
     window.addEventListener('pointercancel', onRelease);
 
+    /**
+     * THE LOOP RUNS ONLY WHERE IT IS SEEN AND OUT OF THE WAY (speed audit
+     * 2026-10-16). It reads and writes the scroller every frame, and it used
+     * to start the moment the belt mounted — in the frame that paints the
+     * home's data, while the first screen's photographs were still decoding
+     * — and to run on scrolled out of sight and through every navigation
+     * away from the home. A navigation renders in a transition that React
+     * slices between frames, so a loop that takes its slice of every frame
+     * slows the next page down: measured on a ×4 phone, removing the belt's
+     * loop took the home → catalogue grid from 702 to 525 ms. It now starts
+     * once the first screen is painted (`afterCriticalPaint`: the document,
+     * the fonts and the visible photographs, then an idle slot), stops while
+     * the belt is off screen, and holds still while a page is on its way
+     * (the `route` wait, src/lib/busy.ts). Nothing else changes: the same
+     * drift, picked up from where the belt actually is.
+     */
     let frame = 0;
     let last = 0;
+    let painted = false;
+    let onScreen = true;
+    const sync = () => {
+      const run = painted && onScreen && busyStore.snapshot().reason !== 'route';
+      if (run && !frame) {
+        last = 0;
+        frame = requestAnimationFrame(tick);
+      } else if (!run && frame) {
+        cancelAnimationFrame(frame);
+        frame = 0;
+      }
+    };
     const tick = (now: number) => {
       frame = requestAnimationFrame(tick);
       const el = containerRef.current;
@@ -297,9 +327,25 @@ export default function Marquee({
       // Record what the engine TOOK, not what we asked for.
       wroteRef.current = readPos(el, rtl);
     };
-    frame = requestAnimationFrame(tick);
+    const cancelPaint = afterCriticalPaint(() => {
+      painted = true;
+      sync();
+    });
+    const seen =
+      typeof IntersectionObserver === 'function'
+        ? new IntersectionObserver((entries) => {
+            onScreen = entries.some((entry) => entry.isIntersecting);
+            sync();
+          })
+        : null;
+    if (containerRef.current) seen?.observe(containerRef.current);
+    const unsubscribeBusy = busyStore.subscribe(sync);
     return () => {
+      cancelPaint();
+      seen?.disconnect();
+      unsubscribeBusy();
       cancelAnimationFrame(frame);
+      frame = 0;
       mq?.removeEventListener?.('change', onPref);
       window.removeEventListener('blur', onBlur);
       window.removeEventListener('pointerup', onRelease);
