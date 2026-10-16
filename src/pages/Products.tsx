@@ -9,13 +9,15 @@ import { Skeleton, ProductGridSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 import { readPageCache, writePageCache } from '../lib/pageCache';
 import ProductCard from '../components/home/ProductCard';
-import { availableFirst, laterIsPreorder } from '../lib/productCard';
+import { availableFirst, gridImageLoading, laterIsPreorder } from '../lib/productCard';
 import { UNPRICED_TEXT } from '../lib/priceStatus';
 import LiveSearch from '../components/search/LiveSearch';
 import { takePrimedJson } from '../lib/bootFetch';
 
 /** One page of the listing. The route's own ceiling (`limit` max 50). */
 const PAGE_SIZE = 50;
+/** The cards on a 360×800 phone's first screen: three rows of two under the 70 px bar. */
+const FIRST_SCREEN_CARDS = 6;
 
 export default function Products() {
   const { t, dir, loc } = useLanguage();
@@ -283,7 +285,7 @@ export default function Products() {
                     <span className="h-px flex-1 bg-border-subtle" />
                   </div>
                 )}
-                <ProductCard p={p} density="compact" compareToggle eager={i < 4} />
+                <ProductCard p={p} density="compact" compareToggle {...gridImageLoading(i, FIRST_SCREEN_CARDS)} />
               </React.Fragment>
             ))}
           </div>

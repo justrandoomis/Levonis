@@ -69,6 +69,8 @@ export default function ProductCard({
   width = 'fill',
   compareToggle = false,
   eager = false,
+  fetchPriority,
+  deferImage = false,
   imageSizes,
   className,
 }: {
@@ -80,8 +82,12 @@ export default function ProductCard({
   width?: 'rail' | 'fill';
   /** Offer the compare toggle (listings, shelves, home «أحدث المنتجات»). */
   compareToggle?: boolean;
-  /** Above-the-fold: load the photograph eagerly. */
+  /** Above-the-fold: load the photograph eagerly (no fade). */
   eager?: boolean;
+  /** The photograph's request priority (SafeImage `fetchPriority`): `high` only for the largest paint. */
+  fetchPriority?: 'high' | 'auto';
+  /** Below a grid's first screen: hold the photograph until it nears the screen (SafeImage `defer`). */
+  deferImage?: boolean;
   /** Override for a shelf that changes from a fixed-width rail to a grid. */
   imageSizes?: string;
   /** Extra classes on the compact card's root (a long grid's `lv-cv`). */
@@ -94,6 +100,8 @@ export default function ProductCard({
         widthClass={`${widthClass ?? (width === 'rail' ? 'w-[148px] shrink-0' : 'w-full')}${className ? ` ${className}` : ''}`}
         compareToggle={compareToggle}
         eager={eager}
+        fetchPriority={fetchPriority}
+        deferImage={deferImage}
         imageSizes={imageSizes ?? (width === 'rail' ? '148px' : GRID_CARD_SIZES)}
       />
     );
@@ -118,12 +126,16 @@ function CompactCard({
   widthClass,
   compareToggle,
   eager,
+  fetchPriority,
+  deferImage,
   imageSizes,
 }: {
   p: CardProduct;
   widthClass: string;
   compareToggle: boolean;
   eager: boolean;
+  fetchPriority?: 'high' | 'auto';
+  deferImage: boolean;
   imageSizes: string;
 }) {
   const { lang } = useLanguage();
@@ -155,6 +167,8 @@ function CompactCard({
           alt=""
           aspect="auto"
           eager={eager}
+          fetchPriority={fetchPriority}
+          defer={deferImage}
           sizes={imageSizes}
           className="h-full w-full"
           bgClassName={lightShown ? 'bg-surface-selected' : 'bg-charcoal'}

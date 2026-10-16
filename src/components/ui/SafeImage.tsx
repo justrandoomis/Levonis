@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ImageOff, RefreshCw } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { IMAGE_VARIANT_WIDTHS, variantSrcSet } from '../../../packages/contracts/src/imageSizing';
+import { whenNear } from '../../lib/nearViewport';
 
 /**
  * Image with a reserved box so nothing jumps (no CLS), lazy loading by
@@ -49,6 +50,8 @@ export default function SafeImage({
   sizes,
   naturalWidth,
   onStatus,
+  fetchPriority,
+  defer = false,
 }: {
   src?: string | null;
   alt?: string;
@@ -89,6 +92,21 @@ export default function SafeImage({
    * It reports, it does not repair: nothing here mutates a caller's state.
    */
   onStatus?: (status: 'loading' | 'loaded' | 'error', src: string) => void;
+  /**
+   * The request's priority. Default: `high` for an eager picture, `auto`
+   * otherwise. A grid's first screen is eager — never lazy, never faded — but
+   * only its first row is the largest paint: the rest pass `auto` so six
+   * high-priority pictures do not split the link the LCP card needs.
+   */
+  fetchPriority?: 'high' | 'auto' | 'low';
+  /**
+   * Hold the request until the picture is within about a row of the
+   * screen in the scroller it lives in (src/lib/nearViewport.ts). For a long
+   * grid below its first screen: native lazy loading would fetch some 16
+   * cards before any scroll. A deferred picture that is already ON the screen
+   * when it is released (a tall phone, a desktop) is not faded in either.
+   */
+  defer?: boolean;
 }) {
   const { lang } = useLanguage();
   const s = STRINGS[lang];
@@ -96,6 +114,16 @@ export default function SafeImage({
   const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
   const [attempt, setAttempt] = useState(0);
   const imgRef = useRef<HTMLImageElement | null>(null);
+  const boxRef = useRef<HTMLDivElement | null>(null);
+  // `onScreen` is only ever true for a deferred picture released on screen.
+  const [release, setRelease] = useState<{ near: boolean; onScreen: boolean }>(() => ({ near: !defer || eager, onScreen: false }));
+
+  useEffect(() => {
+    if (release.near) return;
+    const el = boxRef.current;
+    if (!el) return;
+    return whenNear(el, (onScreen) => setRelease({ near: true, onScreen }));
+  }, [release.near]);
 
   // A new src is a new load — never keep a previous image's state.
   useEffect(() => {
@@ -107,7 +135,7 @@ export default function SafeImage({
   useEffect(() => {
     const el = imgRef.current;
     if (el && el.complete && el.naturalWidth > 0) setStatus('loaded');
-  }, [cleanSrc, attempt]);
+  }, [cleanSrc, attempt, release.near]);
 
   // Reported from an effect rather than from the DOM handlers, so a parent
   // that re-renders on the news cannot re-enter setState during React's own
@@ -135,15 +163,16 @@ export default function SafeImage({
    * NO FADE ON AN EAGER PICTURE. The 300 ms opacity ramp is a courtesy for a
    * lazy card scrolling into view; on the above-the-fold picture it is 300 ms
    * added to the moment the largest paint is complete, on every visit, for
-   * nothing the visitor can see happen. Eager images are simply there.
+   * nothing the visitor can see happen. Eager images are simply there — and
+   * so is a deferred one released while already on the screen.
    */
-  const revealCls = eager
+  const revealCls = eager || release.onScreen
     ? 'opacity-100'
     : `transition-opacity duration-300 ${status === 'loaded' ? 'opacity-100' : 'opacity-0'}`;
 
   return (
-    <div className={`relative overflow-hidden ${aspectCls} ${bgClassName} ${className}`}>
-      {cleanSrc && status !== 'error' && (
+    <div ref={boxRef} className={`relative overflow-hidden ${aspectCls} ${bgClassName} ${className}`}>
+      {cleanSrc && status !== 'error' && release.near && (
         <img
           key={`${cleanSrc}#${attempt}`}
           ref={imgRef}
@@ -154,7 +183,7 @@ export default function SafeImage({
           referrerPolicy={referrerPolicy}
           loading={eager ? 'eager' : 'lazy'}
           decoding="async"
-          fetchPriority={eager ? 'high' : 'auto'}
+          fetchPriority={fetchPriority ?? (eager ? 'high' : 'auto')}
           onLoad={() => setStatus('loaded')}
           onError={() => setStatus('error')}
           className={`absolute inset-0 w-full h-full ${
