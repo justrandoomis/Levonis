@@ -325,7 +325,8 @@ test('synchronous product header ownership is scoped to the resolved main-site p
   assert.match(app.slice(declaration.index), /navHidden && !productRoute && <MotionCharacterFallbackHeader \/>/,
     'the pre-mount exclusion belongs to the resolved main shell');
   assert.match(app, /<RouteFallback productHeader=\{productRoute\} \/>/);
-  assert.match(app, /productHeader && <MotionCharacterRouteHeader busy \/>/);
+  // The product route's fallback is the product page's own loading screen: the bar, then its skeleton (src/App.tsx RouteFallback).
+  assert.match(app, /if \(productHeader\) \{[\s\S]{0,300}<MotionCharacterRouteHeader busy \/>\s*<div className="pb-10">\s*<ProductDetailSkeleton \/>/);
   assert.match(app, /<ChunkBoundary renderFallback=\{productRoute \? \(content\) => <><MotionCharacterRouteHeader reloadDocument \/>\{content\}<\/> : undefined\}>/,
     'a rejected product chunk retains its header without leaving an active loading hold');
 });

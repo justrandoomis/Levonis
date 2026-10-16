@@ -71,7 +71,8 @@ test('the merchant storefront is not in the apex entry bundle', () => {
     );
     assert.match(
       APP,
-      new RegExp(`const ${page} = React\\.lazy\\(\\(\\) => import\\('\\./pages/${page}'\\)\\)`),
+      // `prefetchable` is React.lazy with an early start and a prompt reveal (src/lib/routeReveal.ts).
+      new RegExp(`const ${page} = (?:React\\.lazy|prefetchable)\\(\\(\\) => import\\('\\./pages/${page}'\\)\\)`),
       `${page} must be code-split`
     );
   }

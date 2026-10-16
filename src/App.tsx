@@ -11,7 +11,9 @@ import NavigationRouter from './components/NavigationRouter';
 import { StoreProvider, useStore } from './StoreContext';
 import ChunkBoundary from './components/ChunkBoundary';
 import { afterCriticalPaint, allowsSpeculativeLoads } from './lib/afterCriticalPaint';
-import { navigationDataPath, primeGet } from './lib/bootFetch';
+import { INLINE_RESOLVE_ID, navigationDataPath, primeGet, readInlineJson } from './lib/bootFetch';
+import { prefetchable, routeReveal } from './lib/routeReveal';
+import { ProductDetailSkeleton } from './components/ui/Skeleton';
 /**
  * THE MERCHANT STOREFRONT IS NOT ON THE APEX'S CRITICAL PATH, AND IT WAS IN
  * THE APEX'S ENTRY BUNDLE.
@@ -32,9 +34,9 @@ import { navigationDataPath, primeGet } from './lib/bootFetch';
  * All three routes already sit inside the `Suspense` boundaries below, so
  * nothing else had to change.
  */
-const Storefront = React.lazy(() => import('./pages/Storefront'));
+const Storefront = prefetchable(() => import('./pages/Storefront'));
 const MerchantStart = React.lazy(() => import('./pages/MerchantStart'));
-const StorefrontProduct = React.lazy(() => import('./pages/StorefrontProduct'));
+const StorefrontProduct = prefetchable(() => import('./pages/StorefrontProduct'));
 import UpdateReadyToast from './components/pwa/UpdateReadyToast';
 /**
  * THE ONE BLOCKING WAIT, and it is mounted here for the same reason the intro
@@ -109,9 +111,22 @@ const BundleDetail = prefetchable(() => import('./pages/BundleDetail'));
  * route guards already render while the session is loading, so a chunk arriving
  * looks exactly like a session resolving and the page never flashes a second
  * kind of "loading".
+ *
+ * ON THE PRODUCT ROUTE IT IS THE LOADING SCREEN OF THE PRODUCT PAGE (speed audit
+ * 2026-10-16). A cold landing on /product/:slug — the page shared links open
+ * — showed an empty screen under the bar of the mascot for as long as the code
+ * of the page took (live: 631–1150 ms, median 855), then the loading screen
+ * of Product.tsx itself: the same bar and `ProductDetailSkeleton` (already in
+ * the entry).
+ * The fallback now draws that screen itself, on the same ground (no
+ * `bg-black` over the light of the canvas), so the code arriving changes
+ * nothing on screen but the back button in the bar.
  */
 const RouteFallback = ({ productHeader = false }: { productHeader?: boolean }) => {
   useCharacterBusy(true);
+  // Waiting for the code of a route: when it lands, the shell reveals it in an
+  // ordinary update, not React's throttled retry (src/lib/routeReveal.ts).
+  React.useLayoutEffect(() => routeReveal.hold(), []);
   /**
    * AND IT TAKES THE SCREEN, not just the routed rectangle — on the waits that
    * mount it: a cold boot, a session still loading, a shell switch. An
@@ -132,9 +147,21 @@ const RouteFallback = ({ productHeader = false }: { productHeader?: boolean }) =
    * `NavigationRouter` are the only two places the reason is taken.
    */
   useBusy(true, 'route');
+  if (productHeader) {
+    return (
+      <div className="w-full min-h-dvh text-text-secondary font-sans" aria-busy="true" aria-live="polite" data-route-fallback="product">
+        <MotionCharacterRouteHeader busy />
+        <div className="pb-10">
+          <ProductDetailSkeleton />
+        </div>
+        <span className="sr-only">…</span>
+      </div>
+    );
+  }
+  // On the ground of the shell, like every page (no `bg-black` over the light of
+  // the canvas): what replaces it changes nothing underneath.
   return (
-    <div className="min-h-dvh bg-black" aria-busy="true" aria-live="polite">
-      {productHeader && <MotionCharacterRouteHeader busy />}
+    <div className="min-h-dvh" aria-busy="true" aria-live="polite">
       <span className="sr-only">…</span>
     </div>
   );
@@ -142,33 +169,6 @@ const RouteFallback = ({ productHeader = false }: { productHeader?: boolean }) =
 
 // -------------------------------------------------------------- prefetching
 
-
-/**
- * A LAZY ROUTE THAT CAN BE FETCHED BEFORE IT IS NEEDED.
- *
- * `React.lazy` gives a component that downloads its chunk on first render —
- * which is the moment the user is already waiting. This wraps the same loader
- * so the chunk can also be requested EARLY, from idle time, and memoises the
- * promise so asking twice costs one request.
- *
- * The result is the best half of both: nothing extra in the entry bundle, and
- * nothing to wait for at the tap.
- */
-function prefetchable<P extends object>(load: () => Promise<{ default: React.ComponentType<P> }>) {
-  let started: Promise<{ default: React.ComponentType<P> }> | null = null;
-  const once = () => (started ??= load());
-  const Comp = React.lazy(once);
-  (Comp as unknown as { preload: () => void }).preload = () => {
-    void once().catch(() => {
-      // A prefetch that fails is not an error the customer should ever see:
-      // the route will simply fetch again, and report properly, when it is
-      // actually rendered. Swallowing it here also stops an unhandled
-      // rejection from a flaky network becoming a console error on every load.
-      started = null;
-    });
-  };
-  return Comp;
-}
 
 const preload = (c: unknown) => (c as { preload?: () => void }).preload?.();
 
@@ -313,7 +313,7 @@ const CommunitySaved = React.lazy(() => import('./pages/community/Saved'));
 const CommunityRequest = React.lazy(() => import('./pages/community/Request'));
 const Orders = React.lazy(() => import('./pages/Orders'));
 const OrderDetail = React.lazy(() => import('./pages/OrderDetail'));
-const Community = React.lazy(() => import('./pages/Community'));
+const Community = prefetchable(() => import('./pages/Community'));
 const CommunityStorePage = React.lazy(() => import('./pages/CommunityStorePage'));
 const FollowedStores = React.lazy(() => import('./pages/FollowedStores'));
 const SavedProducts = React.lazy(() => import('./pages/SavedProducts'));
@@ -430,9 +430,9 @@ const PrinterFinder = React.lazy(() => import('./pages/PrinterFinder'));
  * banners, shelves and «عرض الكل» links prefetch the next one on
  * pointerdown (src/lib/catalog/prefetch.ts).
  */
-const CategoriesExplorer = React.lazy(() => import('./pages/CategoriesExplorer'));
-const CategoryPage = React.lazy(() => import('./pages/CategoryPage'));
-const CategoryListing = React.lazy(() => import('./pages/CategoryListing'));
+const CategoriesExplorer = prefetchable(() => import('./pages/CategoriesExplorer'));
+const CategoryPage = prefetchable(() => import('./pages/CategoryPage'));
+const CategoryListing = prefetchable(() => import('./pages/CategoryListing'));
 /**
  * THE TWO SERVICES THE HOME RAIL NAMES AND THE ROUTER DID NOT SERVE.
  *
@@ -501,6 +501,43 @@ import { MotionCharacterFallbackHeader, MotionCharacterRouteHeader, useCharacter
 import { homeCriticalReadyStore } from './lib/appBootstrap';
 import { preloadMotionFeatures } from './lib/motionFeatures';
 import { useBusy } from './lib/busy';
+
+/**
+ * THE CODE OF THE OPENING PAGE IS ASKED FOR WITH THE ENTRY (speed audit 2026-10-16).
+ * The document already modulepreloads it on the pages the Worker rewrites
+ * (a product, the catalogue, the pages of a store), so the bytes are on their way;
+ * asking for the module here, at module evaluation, lets it be evaluated
+ * while the shell is still mounting — and once it is in memory the route
+ * renders in the first pass of the shell (`prefetchable`), with no fallback.
+ * Only the public pages a document lands on; a guarded page waits for its
+ * guard as before.
+ */
+export function openingRouteModule(pathname: string, host: 'main' | 'store' | null): unknown {
+  const path = pathname.toLowerCase();
+  if (host === 'store') {
+    if (/^\/p\/[^/]+\/?$/.test(path)) return StorefrontProduct;
+    return /^\/(?:|products|about|reviews)\/?$/.test(path) ? Storefront : null;
+  }
+  if (host !== 'main') return null;
+  if (/^\/product\/[^/]+\/?$/.test(path)) return Product;
+  if (/^\/products\/?$/.test(path)) return Products;
+  if (/^\/bundles\/[^/]+\/?$/.test(path)) return BundleDetail;
+  if (/^\/categories\/?$/.test(path)) return CategoriesExplorer;
+  if (/^\/categories\/[^/]+\/?$/.test(path)) return CategoryPage;
+  if (/^\/categories\/[^/]+\/[^/]+\/?$/.test(path)) return CategoryListing;
+  return null;
+}
+
+if (typeof window !== 'undefined') {
+  try {
+    const inline = readInlineJson<{ kind?: unknown }>(INLINE_RESOLVE_ID);
+    const canonical = ['levonis-iq.com', 'www.levonis-iq.com'].includes(window.location.hostname);
+    const host = inline?.kind === 'merchant' ? 'store' : inline?.kind === 'main' || (!inline && canonical) ? 'main' : null;
+    preload(openingRouteModule(window.location.pathname, host));
+  } catch {
+    // Nothing here may break a page load.
+  }
+}
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoaded } = useAuth();
@@ -690,6 +727,9 @@ function AppContent() {
 
   const { store, resolved, unknownStore, unavailableStore } = useStore();
   const navSuppressed = useBottomNavSuppressed();
+  // The code of a route landing while its fallback is on screen re-renders the
+  // shell here, in an ordinary update React does not throttle (src/lib/routeReveal.ts).
+  React.useSyncExternalStore(routeReveal.subscribe, routeReveal.snapshot, routeReveal.snapshot);
   // Fetch the catalogue, the product page, the cart and the address book once
   // the browser is idle, so a tap on a product card renders synchronously.
   useIdlePrefetch();
@@ -847,7 +887,7 @@ function AppContent() {
               element={
                 <Suspense
                   fallback={
-                    <div className="min-h-screen w-full bg-black flex items-center justify-center text-zinc-400 text-sm">
+                    <div className="min-h-screen w-full flex items-center justify-center text-zinc-400 text-sm">
                       …
                     </div>
                   }
