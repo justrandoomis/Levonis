@@ -215,3 +215,21 @@ export function availableFirst<T extends Pick<ApiProduct, 'direct_stock_availabl
 /** The «بطلب مسبق» divider's group is pre-order only — its own slice, never the catalog-only tail after it. */
 export const laterIsPreorder = (o: { items: Parameters<typeof cardAvailability>[0][]; splitAt: number; unpricedAt: number }): boolean =>
   o.splitAt > 0 && o.items.slice(o.splitAt, o.unpricedAt < 0 ? undefined : o.unpricedAt).every((p) => cardAvailability(p).state === 'preorder');
+
+/**
+ * HOW A GRID CARD'S PHOTOGRAPH LOADS (speed audit 2026-10-16).
+ *
+ *   first screen  eager: requested at once, never lazy, never faded in. A
+ *                 360×800 phone shows THREE rows of /products (six cards,
+ *                 tops 86 / 354 / 622) — `i < 4` left the third row lazy,
+ *                 late (Low priority after layout) and faded over 300 ms;
+ *   the lead row  `high` priority for the first two only, the largest paint;
+ *                 six high-priority pictures would split the link it needs;
+ *   the rest      held until they near the screen (SafeImage `defer`):
+ *                 native lazy loading fetched 16 of 26 pictures before any
+ *                 scroll (261 KB, 166 KB of it off screen).
+ */
+export const GRID_LEAD_CARDS = 2;
+export function gridImageLoading(index: number, firstScreen: number): { eager: boolean; fetchPriority: 'high' | 'auto'; deferImage: boolean } {
+  return { eager: index < firstScreen, fetchPriority: index < GRID_LEAD_CARDS ? 'high' : 'auto', deferImage: index >= firstScreen };
+}

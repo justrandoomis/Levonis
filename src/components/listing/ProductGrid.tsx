@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLanguage } from '../../LanguageContext';
 import ProductCard from '../home/ProductCard';
-import { availableFirst, laterIsPreorder } from '../../lib/productCard';
+import { availableFirst, gridImageLoading, laterIsPreorder } from '../../lib/productCard';
 import type { ApiProduct } from '../../lib/api';
 import { UNPRICED_TEXT } from '../../lib/priceStatus';
 import '../../styles/catalog.css';
@@ -18,10 +18,17 @@ import '../../styles/catalog.css';
  * stock word is never printed over items whose stock is not set. Any other
  * order is the shopper's own and gets no divider.
  *
+ * The first two rows load at once (a listing's grid starts under its search
+ * and toolbar, ~250 px down a phone); the rest wait until they near the
+ * screen (src/lib/productCard.ts `gridImageLoading`).
+ *
  * Rows past the first screen use `content-visibility: auto` with the card's
  * fixed 262 px as their intrinsic size, so a long list costs nothing until it
  * is scrolled to — and never jumps, because the size is the real one.
  */
+/** Two rows of two: the cards a phone shows above the fold of a listing. */
+const FIRST_SCREEN_CARDS = 4;
+
 export default function ProductGrid({ products, divider, withColumn }: { products: ApiProduct[]; divider: boolean; withColumn: boolean }) {
   const { loc } = useLanguage();
   const ordered = divider ? availableFirst(products) : { items: products, splitAt: -1, unpricedAt: -1 };
@@ -43,7 +50,7 @@ export default function ProductGrid({ products, divider, withColumn }: { product
               paint containment clips a descendant's ink at the container's
               edge, which would cut every card's clay shadow from the 9th on. */}
           <li className="flex">
-            <ProductCard p={p} density="compact" compareToggle eager={i < 4} className={i >= 8 ? 'lv-cv' : undefined} />
+            <ProductCard p={p} density="compact" compareToggle {...gridImageLoading(i, FIRST_SCREEN_CARDS)} className={i >= 8 ? 'lv-cv' : undefined} />
           </li>
         </React.Fragment>
       ))}

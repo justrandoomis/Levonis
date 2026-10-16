@@ -44,6 +44,7 @@ export default function ProductList({ products }: { products: ApiProduct[] }) {
                   alt=""
                   aspect="auto"
                   eager={i < 4}
+                  defer={i >= 4}
                   className="h-full w-full"
                   bgClassName="bg-charcoal"
                   fallbackClassName="text-snow/35"
