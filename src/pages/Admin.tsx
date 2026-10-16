@@ -188,8 +188,10 @@ type AdminTab =
  * reopen finance, preserving their report section and date range.
  * `?tab=products&edit=<id>` opens one product's editor — the link from
  * «صيغ الأرقام التسلسلية» (owner decision 2) to a product with no brand.
+ * `?tab=offers` is «فتح في العروض الخاصة» on the product form's «تخفيض السعر»
+ * card (docs/ux/PRODUCT-DISCOUNT.md §6.4).
  */
-const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in', 'price_protection', 'finance', 'inventory', 'earnings', 'pricing', 'products', 'security'];
+const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in', 'price_protection', 'finance', 'inventory', 'earnings', 'pricing', 'products', 'offers', 'security'];
 
 function initialAdminTab(): AdminTab {
   try {
