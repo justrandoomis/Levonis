@@ -121,6 +121,12 @@ export const ROUTES: readonly RouteRule[] = [
   // it is not marked cacheable here — a second copy under another key would
   // only be something else to purge.
   { prefix: '/api/public/v1', hosts: 'main', owner: 'CORE', flipPhase: null, requires: 'none', rateClass: 'public-read' },
+  // The one-time Bambu Lab import's door (DECISIONS row 241, worker/routes/catalogImportOps.ts):
+  // a machine caller with a run's own bearer token, checked by the core, which answers
+  // one uniform 404 to anything else. No session, so nothing for the edge to require;
+  // the main host only, and it stays with the core (the import writes core tables
+  // under the 0195 guard triggers and is retired when its run closes).
+  { prefix: '/api/ops/catalog-import', hosts: 'main', owner: 'CORE', flipPhase: null, requires: 'none', rateClass: 'webhook', note: 'import token checked by the core; a uniform 404 otherwise' },
   // «خبرني لما يرجع». A standing request against ONE product's stock, armed
   // and refused by what the catalogue knows about that product
   // (worker/lib/stockAlertResolve.ts). It is delivered through Notifications
@@ -208,6 +214,10 @@ export const ROUTES: readonly RouteRule[] = [
   { prefix: '/api/admin/stock-operations', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/template', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'upload' },
   { prefix: '/api/admin/import', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'upload' },
+  // The owner's read-only view of the one-time Bambu Lab import (DECISIONS row 241,
+  // worker/routes/adminCatalogImport.ts): runs, items and their reports, requireOwner
+  // on every route, so the edge shuts it to every other admin too.
+  { prefix: '/api/admin/catalog-import', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin:owner', rateClass: 'admin-write' },
   { prefix: '/api/admin/media/ingest', hosts: 'main', owner: 'FILES', flipPhase: 4, requires: 'admin', rateClass: 'upload' },
   { prefix: '/api/admin/media', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/price-reports', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },

@@ -25,6 +25,9 @@ const EXPECTED_OWNER: Record<string, string> = {
   '/api/catalog': 'CATALOG',
   '/api/printer-finder': 'CATALOG',
   '/api/public/v1': 'CORE',
+  // DECISIONS row 241: the one-time Bambu Lab import's door stays with the core; the owner's read-only view is a catalogue screen.
+  '/api/ops/catalog-import': 'CORE',
+  '/api/admin/catalog-import': 'CATALOG',
   '/api/stock-alerts': 'CATALOG',
   '/api/price-reports': 'CATALOG',
   // DECISIONS row 240 (0193): «طلب السعر», the catalogue's demand signal beside «لكيتها بمكان أرخص».
