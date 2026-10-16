@@ -70,7 +70,7 @@ import { ErrorState, NotFoundState } from '../components/ui/AsyncStates';
 import { monthsLabel } from '../components/orders/format';
 import { authPathWithSupportRef, captureSupportRefFromSearch } from '../lib/supportRef';
 import { productVariantIdForSelection } from '../lib/productImage';
-import { dedupeByUrl, galleryForSelection, mediaInStoredOrder } from '../lib/productGallery';
+import { dedupeByUrl, galleryForSelection, lightMainImageSize, LIGHT_ASPECT_TOLERANCE, mediaInStoredOrder, withLightMainImage } from '../lib/productGallery';
 import { NOT_OFFERED, chooseValue, defaultSelection, groupName, importedChooser, valueOffered } from '../lib/productChooser';
 import Section from '../components/product/Section';
 import { useTheme } from '../lib/theme';
@@ -591,6 +591,13 @@ interface ProductDetail {
   gini_url?: string;
   /** «الصورة الرئيسية للوضع الفاتح» (migration 0138), only when there is one. */
   light_image?: string;
+  /**
+   * The OWN stored size of the light file, when the answer carries it. Absent
+   * today: the page then draws it at the size of the primary
+   * (src/lib/productGallery.ts `lightMainImageSize`), which every live pair shares.
+   */
+  light_image_width?: number | null;
+  light_image_height?: number | null;
   /** The CHEAPEST way to buy this product, resolved at the viewer's tier —
    *  the same number the card showed. Never `price_iqd`, which is the base
    *  row and may be a price nobody is charged. */
@@ -1282,6 +1289,11 @@ export default function Product() {
   }, []);
 
   const [galleryIndex, setGalleryIndex] = useState(0);
+  // The shape of the light main image, measured once it has loaded, kept ONLY
+  // when it is not the shape of the primary (src/lib/productGallery.ts
+  // `lightMainImageSize`): its size is then dropped rather than assumed. null —
+  // the usual case — keeps the size of the primary and costs no render.
+  const [lightShape, setLightShape] = useState<{ url: string; aspect: number } | null>(null);
   const [lightbox, setLightbox] = useState(false);
   // The zoom control the lightbox came out of. The viewer scales FROM this
   // button and collapses back INTO it, so the enlarged photo is visibly the
@@ -1290,6 +1302,7 @@ export default function Product() {
   // typed useRef on the element) keeps the button conditional — it only
   // renders when there is a media URL — without fighting ref variance.
   const zoomBtnRef = useRef<HTMLElement | null>(null);
+  const heroRef = useRef<HTMLDivElement | null>(null);
 
   const [addingToCart, setAddingToCart] = useState(false);
   // Set only from the server's CART_SHIPPING_CONFLICT refusal. null = no dialog.
@@ -2580,10 +2593,18 @@ export default function Product() {
     // THE MAIN IMAGE FOR THE THEME ON SCREEN (migration 0138): on the light
     // theme the primary's slot shows the light-theme main image, wherever the
     // selection has moved it; every other picture is the same in both themes.
-    const primaryUrl = dedupeByUrl(rows)[0]?.url;
+    const primary = dedupeByUrl(rows)[0];
     const light = theme === 'light' ? (product.light_image ?? '').trim() : '';
-    // The light picture is another file: the stored size of the primary does not describe it.
-    return light && primaryUrl ? ordered.map((m) => (m.url === primaryUrl ? { ...m, url: light, width: null, height: null } : m)) : ordered;
+    if (!light || !primary?.url) return ordered;
+    // The light picture is another file, drawn at its own stored size when the
+    // answer carries one, else at the size of its twin — so `sizes` and the
+    // srcset describe the drawn picture in both themes (speed audit 2026-10-16).
+    const size = lightMainImageSize(
+      primary,
+      { width: product.light_image_width, height: product.light_image_height },
+      lightShape?.url === light ? lightShape.aspect : null
+    );
+    return withLightMainImage(ordered, primary.url, light, size);
   })();
   const optionImage = (id: string): string =>
     mediaBindings.find((image) => image.option_value_id === id)?.url ?? '';
@@ -5072,7 +5093,7 @@ export default function Product() {
             <section aria-label={s.gallery}>
               {/* `data-gallery-hero` / `data-gallery-strip`: the hooks the import's browser check reads the main picture
                   and the thumbnails by (scripts/bambu-import/browser.ts) — never a style. */}
-              <div className="lv-surface relative w-full h-[min(78vw,340px)] sm:h-[420px] lg:h-[520px] xl:h-[560px] overflow-hidden" data-gallery-hero>
+              <div ref={heroRef} className="lv-surface relative w-full h-[min(78vw,340px)] sm:h-[420px] lg:h-[520px] xl:h-[560px] overflow-hidden" data-gallery-hero>
                 <SafeImage
                   key={activeMedia?.url || 'empty'}
                   src={activeMedia?.url}
@@ -5087,6 +5108,17 @@ export default function Product() {
                   // same pair from the same media row (worker/lib/socialPreview.ts).
                   sizes={productGallerySizes(mediaAspect(activeMedia))}
                   naturalWidth={activeMedia?.width}
+                  onStatus={(status, src) => {
+                    // The light main image drawn at the size of its twin: once it
+                    // is here, check it has the shape of the twin (lightMainImageSize).
+                    if (status !== 'loaded' || theme !== 'light' || src !== (product.light_image ?? '').trim()) return;
+                    if (product.light_image_width && product.light_image_height) return;
+                    const img = heroRef.current?.querySelector('img');
+                    const assumed = mediaAspect(activeMedia);
+                    if (!img || !img.naturalWidth || !img.naturalHeight || !assumed) return;
+                    const aspect = img.naturalWidth / img.naturalHeight;
+                    if (Math.abs(aspect / assumed - 1) > LIGHT_ASPECT_TOLERANCE) setLightShape({ url: src, aspect });
+                  }}
                   className="w-full h-full"
                   bgClassName="bg-surface"
                   imgClassName="p-3"
