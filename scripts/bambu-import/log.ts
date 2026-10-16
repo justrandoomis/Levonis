@@ -133,6 +133,7 @@ const PARAM_SHAPES: Readonly<Record<string, RegExp>> = {
   what: WORD,
   name: /^[a-z0-9][a-z0-9._-]{0,80}\.sealed$/,
   run: RUN_ID,
+  gone: /^(?:yes|no|unconfirmed)$/,
 };
 
 const MASK = '[?]';

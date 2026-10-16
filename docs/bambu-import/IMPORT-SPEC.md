@@ -329,8 +329,8 @@ Unhandled exceptions print `err.name` plus a scrubbed message: hex runs of 32+ c
 When the queue holds no DISCOVERED, in-flight or RETRYING item and the end-of-run audit (§I.3) is green, workflow 60 `mode=close`:
 
 1. calls `/run/protect-snapshot {phase:'after'}`;
-2. calls `/run/finish`, which closes as `closed`, or `partial` when any item is BLOCKED or WITHDRAWN_AT_SOURCE;
-3. asserts `/hello` now answers 404 with the job's token;
+2. calls `/run/finish`, which closes as `closed`, or `partial` when any item is BLOCKED or WITHDRAWN_AT_SOURCE or an end-of-queue hold is still queued (the held items `/run/status` lists are not open work: the close subtracts them, and `/run/finish` names them);
+3. asserts `/hello` now answers 404 with the job's token: a 200 fails the close; a transient answer (429, 5xx, none) is asked again with backoff inside the deadline, and one that never settles is recorded `unconfirmed` without failing the close (the run is already finished, and a second close could not start: its first `/hello` meets the 404);
 4. seals and uploads the report.
 
 Nothing is scheduled: no cron, trigger, webhook or Worker binding. `tests/noImportSync.test.ts` asserts that the `wrangler.jsonc` crons are unchanged and that no `scheduled()` branch references `catalog_import`. The ops route stays in the code, inert (404 without an open run), until a later cleanup commit removes it (L-15).

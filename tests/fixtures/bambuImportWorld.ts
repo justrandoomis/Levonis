@@ -103,8 +103,11 @@ export interface Injection {
   method?: string;
   path: RegExp;
   times: number;
-  /** The answer instead of the Worker's (it sees the request body: an answer about what was sent). */
-  respond: (body: Record<string, unknown> | null) => Response;
+  /**
+   * The answer instead of the Worker's (it sees the request body: an answer about what was sent); null lets this
+   * request through to the Worker without using one of `times`.
+   */
+  respond: (body: Record<string, unknown> | null) => Response | null;
 }
 
 export interface WorldEvent {
@@ -240,7 +243,7 @@ export class World {
     return this.items.get(this.sid(handle))!;
   }
 
-  inject(path: RegExp, times: number, respond: (body: Record<string, unknown> | null) => Response, method?: string): void {
+  inject(path: RegExp, times: number, respond: (body: Record<string, unknown> | null) => Response | null, method?: string): void {
     this.injections.push({ path, times, respond, method });
   }
 
@@ -266,8 +269,17 @@ export class World {
       this.calls.push({ seq: ++this.seq, method, path: u.pathname.slice('/api/ops/catalog-import'.length), body, headers, at: this.clock.now() });
       for (const inj of this.injections) {
         if (inj.times > 0 && inj.path.test(u.pathname) && (!inj.method || inj.method === method)) {
+          let answer: Response | null;
+          try {
+            answer = inj.respond(body);
+          } catch (err) {
+            // No answer at all (a thrown fetch): it uses one of `times` like an answer.
+            inj.times--;
+            throw err;
+          }
+          if (!answer) continue;
           inj.times--;
-          return inj.respond(body);
+          return answer;
         }
       }
       if (headers.authorization !== `Bearer ${TOKEN}` || headers['x-levonis-import-protocol'] !== '2' || this.runState === 'closed') return json(404, { error: 'Not found' });

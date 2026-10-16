@@ -105,6 +105,8 @@ const LEASE_CLASH_WAIT_MS = 30_000;
 export const LEASE_KEEP_MS = 10 * 60_000;
 /** A transition outside a stage's retries: this many tries (30 s × 2^k apart) before the item is left to the next job. */
 const TRANSITION_ATTEMPTS = 4;
+/** How many times close asks /hello after /run/finish before the old token's end is recorded as unconfirmed. */
+const TOKEN_GONE_ATTEMPTS = 5;
 
 /** The Worker's `catalog_import_items.payload_sha256` of a payload (worker/lib/catalogImport/reviewed.ts payloadSha256). */
 export function payloadDigest(payload: unknown): string {
@@ -1361,16 +1363,34 @@ export class Importer {
     const fin = await this.ops.finish();
     this.log.info('finish', { state: fin.state });
     if (fin.held.length) this.finishedHeld = fin.held;
-    let gone = false;
-    try {
-      await this.ops.hello();
-    } catch (err) {
-      gone = err instanceof OpsError && err.kind === 'gone';
-    }
+    const gone = await this.tokenGone();
     this.log.info('token_gone', { gone });
     this.seal('close-report.json', { run_id: this.runId, status: this.status, sitemap: diff, sweep, protect_after: after, finish: fin, token_gone: gone });
     this.writeSummary(false, fin.state);
-    return gone && (fin.state === 'closed' || fin.state === 'partial') ? 0 : 1;
+    return gone !== 'no' && (fin.state === 'closed' || fin.state === 'partial') ? 0 : 1;
+  }
+
+  /**
+   * After /run/finish: does the old token answer 404 now? A 404 is `yes`; an answer (200, or a refusal that is not
+   * transient) is `no` — the token still opens a door. A transient one (429, 5xx, no answer) is neither: asked again
+   * with backoff inside the deadline, and when it never settles the end is `unconfirmed`. The run is finished either
+   * way, and a second close could not confirm it (its first /hello meets the 404 and the importer never starts), so
+   * an unconfirmed end is recorded, never a failed close.
+   */
+  private async tokenGone(): Promise<'yes' | 'no' | 'unconfirmed'> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await this.ops.hello();
+        return 'no';
+      } catch (err) {
+        if (!(err instanceof OpsError)) throw err;
+        if (err.kind === 'gone') return 'yes';
+        if (err.kind !== 'transient') return 'no';
+        const wait = Math.max(err.retryAfterMs ?? 0, backoff(attempt));
+        if (attempt + 1 >= TOKEN_GONE_ATTEMPTS || !this.deadline.fits(wait, 60_000)) return 'unconfirmed';
+        await this.pause(wait);
+      }
+    }
   }
 
   private async publicSweep(): Promise<{ visible: number; pages: number; unpriced: number }> {

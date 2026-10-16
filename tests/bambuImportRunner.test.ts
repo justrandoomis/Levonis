@@ -476,6 +476,48 @@ test('mode close: refused while the queue holds work; then the sitemaps, the swe
   }
 });
 
+test('mode close: a transient answer on the /hello after /run/finish is asked again; one that never settles is recorded unconfirmed, never a failed close', async () => {
+  const sid = '6945416380552';
+  const done = { [sid]: { state: 'COMPLETE', last_completed: 'VERIFYING_LIVE' } };
+  const afterFinish = (w: World, answer: () => Response) => () => (callsTo(w, /\/run\/finish$/).length > 0 ? answer() : null);
+  // 503, 429 and no answer at all (one /hello's own tries), then the 404: the token is gone.
+  const settles = new World({ handles: ['filament-buffer'], items: done });
+  try {
+    const answers = [() => json(503, { code: 'D1_OVERLOADED', message: 'busy' }), () => json(429, { code: 'RATE_LIMITED', message: 'slow' }), (): Response => { throw new TypeError('fetch failed'); }];
+    let n = 0;
+    settles.inject(/\/hello$/, 3, afterFinish(settles, () => answers[n++]()));
+    const before = settles.calls.length;
+    assert.equal(await settles.importer({ mode: 'close' }).main(), 0, settles.logLines.join('\n'));
+    assert.deepEqual(settles.calls.slice(before).map((c) => c.path), ['/hello', '/run/status', '/run/protect-snapshot', '/run/finish', '/hello', '/hello', '/hello', '/hello']);
+    assert.ok(settles.logLines.some((l) => /the old token now answers 404: yes/.test(l)), settles.logLines.join('\n'));
+    assert.equal(callsTo(settles, /\/run\/finish$/).length, 1);
+  } finally {
+    settles.dispose();
+  }
+  // It never settles: the run is finished, the end is recorded unconfirmed, the close succeeds.
+  const never = new World({ handles: ['filament-buffer'], items: done });
+  try {
+    never.inject(/\/hello$/, 1000, afterFinish(never, () => json(503, { code: 'D1_OVERLOADED', message: 'busy' })));
+    assert.equal(await never.importer({ mode: 'close' }).main(), 0, never.logLines.join('\n'));
+    assert.ok(never.logLines.some((l) => /the old token now answers 404: unconfirmed/.test(l)), never.logLines.join('\n'));
+    assert.ok(never.logLines.some((l) => /run finished: state closed/.test(l)));
+    assert.ok(callsTo(never, /\/hello$/).length > 2, 'asked again');
+    assert.equal(callsTo(never, /\/run\/finish$/).length, 1);
+    assert.ok(never.sealed.some((s) => s.name === 'close-report.json'));
+  } finally {
+    never.dispose();
+  }
+  // The token still answers 200 after /run/finish: that is a failed close.
+  const alive = new World({ handles: ['filament-buffer'], items: done });
+  try {
+    alive.inject(/\/hello$/, 1, afterFinish(alive, () => json(200, { protocol: 2 })));
+    assert.equal(await alive.importer({ mode: 'close' }).main(), 1);
+    assert.ok(alive.logLines.some((l) => /the old token now answers 404: no/.test(l)), alive.logLines.join('\n'));
+  } finally {
+    alive.dispose();
+  }
+});
+
 test('mode withdraw: only with the second fetch gone and the sitemap no longer listing it', async () => {
   const blocked = { '6945416380552': { state: 'BLOCKED', last_completed: '', blocker_code: 'SOURCE_WITHDRAWN' } };
   const w = new World({ handles: ['filament-buffer'], items: blocked, storePage: () => new Response('gone', { status: 404 }) });
