@@ -32,6 +32,11 @@
  *   8  merge          before_fp_equal from /write;
  *   11 compare        GET /api/compare?ids=<id> → 200 with the card; the
  *                     candidates when the type has ≥ 3 compare keys with values.
+ *                     With fewer, a product with nothing to compare on is
+ *                     answered 400 COMPARE_NO_SPECS (worker/routes/compare.ts):
+ *                     exactly that answer, naming this product, is the absence
+ *                     §I.1.11 expects for the type (`not_applicable`); with ≥ 3
+ *                     it fails, and any other refusal fails either way.
  *
  * THE GALLERY AS WRITTEN. The Worker collapses byte-identical gallery images
  * into the earliest position (§C.4 step 1), so the images, the bindings, the
@@ -567,23 +572,52 @@ export async function verifyPublic(site: Site, ctx: VerifyContext): Promise<Veri
   // 8. existing products
   if (ctx.merge) record('merge', { ok: ctx.merge.before_fp_equal === true, hard: true, detail: { before_fp_equal: ctx.merge.before_fp_equal, source: ctx.merge.source ?? 'write' } });
 
-  // 11. compare
+  // 11. compare (§I.1.11): the card; with ≥ 3 compare keys the candidates too, with fewer the absence is expected.
   const cmp = await site.read('GET', `/api/compare?ids=${encodeURIComponent(ctx.productId)}`);
-  const cmpOk = cmp.status === 200 && JSON.stringify(cmp.json ?? {}).includes(ctx.productId);
-  const compareKeys = new Set(
-    ctx.payload.specs.filter((s) => isPublicSpec(s) && (s.status === 'verified' || s.status === 'unverified') && specKey(s.key)?.compare).map((s) => s.key)
-  ).size;
+  const compareKeys = compareKeysOf(ctx.payload);
+  const typed = compareKeys >= COMPARE_HARD_KEYS;
+  const noSpecs = compareNoSpecs(cmp, ctx.productId);
+  const compare: 'card' | 'not_applicable' | 'failed' =
+    cmp.status === 200 && JSON.stringify(cmp.json ?? {}).includes(ctx.productId) ? 'card' : noSpecs && !typed ? 'not_applicable' : 'failed';
   let candidates: 'present' | 'absent_expected' | 'missing' = 'absent_expected';
-  if (compareKeys >= 3) {
+  if (typed) {
     const c = await site.read('GET', `/api/compare/candidates?q=${encodeURIComponent(title.slice(0, 120))}`);
     candidates = c.status === 200 && JSON.stringify(c.json ?? {}).includes(ctx.productId) ? 'present' : 'missing';
   }
-  record('compare', { ok: cmpOk && candidates !== 'missing', hard: true, status: cmp.status, counts: { compare_keys: compareKeys }, detail: { candidates } });
+  record('compare', {
+    ok: compare !== 'failed' && candidates !== 'missing',
+    hard: true,
+    status: cmp.status,
+    // `not_applicable` is a count too: the Worker keeps a check's counts and status, never its detail.
+    counts: { compare_keys: compareKeys, ...(compare === 'not_applicable' ? { not_applicable: 1 } : {}) },
+    detail: {
+      compare,
+      candidates,
+      ...(noSpecs ? { reason: typed ? 'COMPARE_NO_SPECS with >= 3 compare keys with values' : 'COMPARE_NO_SPECS: fewer than 3 compare keys with values for the type' } : {}),
+    },
+  });
 
   const ok = Object.values(checks).every((c) => c.ok || !c.hard);
   // The breadcrumb names the section the product IS in (the leaf of its public sections); none named, none matched.
   const leafName = tree.find((n) => n.slug === leafSlug)?.name_ar ?? '';
   return { ok, checks, leafName, sections: { leaf: leafSlug, root: rootSlug, secondary }, cacheMs: cacheMs || CACHE_WAIT_MAX };
+}
+
+/** §I.1.11: with this many compare keys with values, the compare card and the candidates are hard checks. */
+export const COMPARE_HARD_KEYS = 3;
+
+/** The registry's compare keys the product states a public value for (verified or unverified), each counted once. */
+export function compareKeysOf(payload: Pick<ImportPayload, 'specs'>): number {
+  return new Set(payload.specs.filter((s) => isPublicSpec(s) && (s.status === 'verified' || s.status === 'unverified') && specKey(s.key)?.compare).map((s) => s.key)).size;
+}
+
+/**
+ * The compare route's refusal of a product with nothing to compare on (worker/routes/compare.ts: 400
+ * `{code: 'COMPARE_NO_SPECS', details: {product_id}}`), for THIS product — no other code, no other product.
+ */
+export function compareNoSpecs(a: Pick<SiteAnswer, 'status' | 'json'>, productId: string): boolean {
+  const details = isRec(a.json?.details) ? (a.json!.details as Rec) : {};
+  return a.status === 400 && a.json?.code === 'COMPARE_NO_SPECS' && details.product_id === productId;
 }
 
 /** The default selection the page opens with (§G.3, selection.ts): what the quote and the request door are asked with. */

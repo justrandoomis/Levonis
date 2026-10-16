@@ -25,7 +25,11 @@
  *     VERIFY passes on those rows — the payload's pre-collapse list fails it;
  *     the runner's recompute of the collapse (a resume with no written rows)
  *     gives the Worker's rows, a general primary handed to its bound copy
- *     included.
+ *     included;
+ *   - compare (§I.1.11): 400 COMPARE_NO_SPECS for this product is the
+ *     expected absence when the type has fewer than 3 compare keys with
+ *     values (recorded `not_applicable`), a failure with 3 or more, and any
+ *     other refusal fails either way.
  *
  * Run: node --import tsx --test tests/bambuImportVerify.test.ts
  */
@@ -85,6 +89,8 @@ interface Live {
   ahead?: number;
   /** The image rows the Worker wrote (default: the payload's, when no two pictures are byte-identical). */
   written?: GalleryImage[];
+  /** The compare route's answer for `?ids=<id>` (default: 200 with the card). */
+  compare?: () => { status: number; body: unknown };
 }
 
 const files = (l: Live, id: string) => {
@@ -182,7 +188,10 @@ function fetcher(l: Live, reads: string[] = []) {
         return answer(200, { success: true, category: { slug: cat }, suggestion: null, products: all.slice(offset, offset + 50) });
       }
       if (p === '/api/public/v1/search') return answer(200, { data: { products: [{ slug: l.slug }] } });
-      if (p === '/api/compare') return answer(200, { success: true, products: [{ id: l.productId }] });
+      if (p === '/api/compare') {
+        const c = l.compare?.();
+        return c ? answer(c.status, c.body) : answer(200, { success: true, products: [{ id: l.productId }] });
+      }
       if (p === '/api/compare/candidates') return answer(200, { success: true, products: [{ id: l.productId }] });
       return answer(404, { success: false, error: 'Not found' });
     },
@@ -400,4 +409,58 @@ test('the written rows as the Worker answers them: read whole or not at all', ()
   assert.equal(writtenImagesOf(undefined), null, 'an answer without rows: the runner recomputes');
   assert.equal(writtenImagesOf([...good, { id: 'pi_2', source_media_id: 'm2', sort_order: 1 }]), null, 'a row without its stored key is no gallery');
   assert.deepEqual(writtenImagesOf([]), []);
+});
+
+// ---------------------------------------------------------------- compare (§I.1.11)
+
+const noSpecs = (productId: string) => () => ({
+  status: 400,
+  body: { success: false, error: 'No specifications are recorded for “x”, so there is nothing to compare it on.', code: 'COMPARE_NO_SPECS', details: { product_id: productId } },
+});
+
+test('compare: COMPARE_NO_SPECS is the expected absence for a type with fewer than 3 compare keys, recorded not_applicable', async () => {
+  const payload = payloadOf('build-plate-combo');
+  const reads: string[] = [];
+  const o = await verify(live('build-plate-combo', { payload, compare: noSpecs(payload.product_id) }), {}, reads);
+  assert.deepEqual(failed(o), []);
+  const c = o.checks.compare;
+  assert.deepEqual({ ok: c.ok, hard: c.hard, status: c.status }, { ok: true, hard: true, status: 400 });
+  assert.equal(c.counts?.compare_keys, 0);
+  assert.equal(c.counts?.not_applicable, 1, 'kept by the Worker, which stores a check\'s counts and never its detail');
+  assert.equal(c.detail?.compare, 'not_applicable');
+  assert.match(String(c.detail?.reason), /COMPARE_NO_SPECS: fewer than 3 compare keys/);
+  assert.ok(!reads.some((r) => r.includes('/api/compare/candidates')), 'no candidates are expected for the type');
+  const ev = edgeEvidence(o, null, `${SITE}/product/build-plate-combo`, payload, 1) as { checks: Record<string, { detail?: Record<string, unknown> }> };
+  assert.equal(ev.checks.compare.detail?.compare, 'not_applicable');
+  // Two compare keys with values are still fewer than 3.
+  const two = await verify(live('pla-basic-filament', { sections: ['filament', 'pla'], compare: noSpecs(payloadOf('pla-basic-filament').product_id) }));
+  assert.equal(two.checks.compare.counts?.compare_keys, 2);
+  assert.equal(two.checks.compare.ok, true);
+  // The card answered: passes too, and says so.
+  const card = await verify(live('build-plate-combo', { payload }));
+  assert.equal(card.checks.compare.detail?.compare, 'card');
+  assert.equal(card.checks.compare.counts?.not_applicable, undefined);
+});
+
+test('compare: a type with 3 or more compare keys must show the card and the candidates; any other refusal fails either way', async () => {
+  const h2d = payloadOf('h2d');
+  const reads: string[] = [];
+  const o = await verify(live('h2d', { payload: h2d, sections: ['printers', 'fdm-printers'], compare: noSpecs(h2d.product_id) }), {}, reads);
+  assert.ok(o.checks.compare.counts!.compare_keys >= 3);
+  assert.deepEqual(failed(o), ['compare']);
+  assert.equal(o.checks.compare.detail?.compare, 'failed');
+  assert.ok(reads.some((r) => r.includes('/api/compare/candidates')), 'the candidates are read for the type');
+  const ok = await verify(live('h2d', { payload: h2d, sections: ['printers', 'fdm-printers'] }));
+  assert.deepEqual({ ok: ok.checks.compare.ok, compare: ok.checks.compare.detail?.compare, candidates: ok.checks.compare.detail?.candidates }, { ok: true, compare: 'card', candidates: 'present' });
+  // Fewer than 3 keys, but not exactly this product's COMPARE_NO_SPECS: another code, another product, a 500.
+  const plate = payloadOf('build-plate-combo');
+  for (const compare of [
+    () => ({ status: 400, body: { success: false, error: 'x', code: 'COMPARE_NOT_VISIBLE' } }),
+    noSpecs('p_some_other_product'),
+    () => ({ status: 400, body: { success: false, error: 'x', code: 'COMPARE_NO_SPECS' } }),
+    () => ({ status: 500, body: { success: false, error: 'x', code: 'INTERNAL' } }),
+  ]) {
+    const bad = await verify(live('build-plate-combo', { payload: plate, compare }));
+    assert.deepEqual(failed(bad), ['compare'], JSON.stringify(compare()));
+  }
 });
