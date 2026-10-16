@@ -2032,11 +2032,11 @@ export default function Product() {
         const before = inCartQty;
         const data = await api.post<{ items: CartItem[] }>('/api/cart/items', body);
         // Success is claimed ONLY after the server returns the saved cart.
+        const items = Array.isArray(data.items) ? data.items : [];
         const count = countCartItems(data.items);
         // The response is the saved cart, so the note below the price updates
         // from the same answer that proved the add worked — no second request,
         // and no window in which the badge and the note disagree.
-        const items = Array.isArray(data.items) ? data.items : [];
         setCartLines(items);
         // The answer IS the whole cart: the page now knows what every line holds.
         setCartLinesLoaded(true);

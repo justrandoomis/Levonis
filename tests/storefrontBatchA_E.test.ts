@@ -124,13 +124,19 @@ test('the count is about THIS selection, not this product', () => {
   const product = read('src/pages/Product.tsx');
   const at = product.indexOf('const inCartQty = useMemo(');
   assert.ok(at > 0);
-  const body = product.slice(at, at + 900);
+  // The several-colours panel counts each row the same way, so the rule lives
+  // in one place: lineQtyIn (src/lib/colourQuantities.ts).
+  assert.ok(product.slice(at, at + 300).includes('lineQtyIn(cartLines, product.id, optionValueIds, optionId, colorId)'));
+  const lib = read('src/lib/colourQuantities.ts');
+  const from = lib.indexOf('export function lineQtyIn(');
+  assert.ok(from > 0);
+  const body = lib.slice(from, from + 900);
   // The same identity the server upserts a line on: product + full selection +
   // colour. Counting by product alone would tell a customer choosing white
   // that they already have two, when the two are black.
-  assert.ok(body.includes('line.productId !== product.id'));
-  assert.ok(body.includes("(line.color_id || '') !== (colorId || '')"));
-  assert.ok(body.includes('[...ids].sort().join'), 'group order is the admin’s, not the customer’s');
+  assert.ok(body.includes('line.productId !== productId'));
+  assert.ok(body.includes("(line.color_id || '') !== (colour || '')"));
+  assert.ok(body.includes('[...v].sort().join'), 'group order is the admin’s, not the customer’s');
   assert.ok(body.includes('legacy'), 'and a line written before option_value_ids still matches');
 });
 
@@ -141,12 +147,15 @@ test('the note is above the quantity, on both the desktop panel and the phone ba
     1,
     'one note component, rendered in both places — not two copies to drift apart'
   );
+  // One slot above the stepper carries the note, or — when nothing of this
+  // selection is in the cart — the «per colour» tip of docs/ux/COLOUR-QUANTITIES.md §3.10.
+  assert.match(product, /const noteSlot = inCartNote \?\? bigQtyTip;/);
   // Desktop: inside qtyControl, before the stepper row.
   const qty = product.indexOf('const qtyControl = (');
   assert.ok(qty > 0);
-  assert.ok(product.slice(qty, qty + 300).includes('{inCartNote}'), 'above the stepper');
+  assert.ok(product.slice(qty, qty + 300).includes('{noteSlot}'), 'above the stepper');
   // Phone: the bar is the only place a quantity decision is made below `lg`.
-  assert.match(product, /\{!notice \? <div className="mx-auto w-full max-w-\[640px\]">\{inCartNote\}<\/div> : null\}/);
+  assert.match(product, /\{!notice \? <div className="mx-auto w-full max-w-\[640px\]">\{noteSlot\}<\/div> : null\}/);
 });
 
 test('it comes from the server’s cart and is refreshed by the add that changed it', () => {
