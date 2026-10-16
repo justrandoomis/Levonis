@@ -228,6 +228,210 @@ export function lineQtyIn(lines: readonly CartLineIdentity[], productId: string,
 export const liveRows = (order: readonly string[], rows: Readonly<Record<string, number>>): Array<[string, number]> =>
   order.filter((id) => (rows[id] ?? 0) > 0).map((id) => [id, rows[id]]);
 
+/**
+ * WHAT A MERGE ENDS AT — the server's own arithmetic (worker/lib/cartAdd.ts
+ * `ceiling`, the upsert's `MIN(ceiling, qty + excluded.qty)`): the line holds
+ * `before + want`, held to `max(want, min(LINE_QTY_MAX, maxQty))`. A capped
+ * merge ends at the shelf, never at «before + the shelf».
+ */
+export function expectedAfterMerge(before: number, want: number, maxQty: number | null): number {
+  const shelf = maxQty === null || !Number.isFinite(maxQty) ? LINE_QTY_MAX : Math.min(LINE_QTY_MAX, Math.max(0, Math.trunc(maxQty)));
+  return Math.min(Math.max(0, before) + want, Math.max(want, shelf));
+}
+
+/** One line of an add whose answer was lost, re-read from the cart. */
+export interface LostAnswerLine {
+  id: string;
+  /** What the page believed the line held when it pressed. */
+  before: number;
+  want: number;
+  /** What the cart holds now. */
+  after: number;
+  /** The selection's `max_qty` from its quote; null = untracked. */
+  maxQty: number | null;
+  /** The press was «empty the cart and add»: every line started from 0. */
+  replaced?: boolean;
+}
+
+/**
+ * DID THE PRESS WHOSE ANSWER WAS LOST LAND? (§3.7) A line landed when the
+ * cart now holds exactly what that press would have left. The page opens the
+ * confirmation for the lines that landed and never says «nothing was added»
+ * about them; a line that does not match is named as missing, never claimed.
+ */
+export function lostAnswerVerdict(lines: readonly LostAnswerLine[]): { landed: string[]; missing: string[] } {
+  const landed: string[] = [];
+  const missing: string[] = [];
+  for (const l of lines) {
+    const from = l.replaced ? 0 : l.before;
+    (l.after > 0 && l.after === expectedAfterMerge(from, l.want, l.maxQty) ? landed : missing).push(l.id);
+  }
+  return { landed, missing };
+}
+
+/**
+ * AN OPTION LEFT FEWER THAN TWO COLOURS THAT CAN TAKE A QUANTITY (§3.2, §3.4):
+ * «عدة ألوان» closes the way its switch does. Rows whose colour is no longer
+ * offered are removed and named; exactly one row left becomes the single
+ * selection with ITS quantity; otherwise the single mode takes `held` (the
+ * colour the page keeps in hand, an offered one) — or the colour held before
+ * the mode, when it is still offered — at 1. The quantity the single mode had
+ * before «عدة ألوان» never comes back on its own.
+ */
+export function closeMultiForOption(
+  rows: Readonly<Record<string, number>>,
+  offered: ReadonlySet<string>,
+  before: string,
+  held: string
+): { colour: string; qty: number; dropped: string[]; remembered: Record<string, number> } {
+  const kept: Record<string, number> = {};
+  const dropped: string[] = [];
+  for (const [id, q] of Object.entries(rows)) {
+    if (!(q > 0)) continue;
+    if (offered.has(id)) kept[id] = q;
+    else dropped.push(id);
+  }
+  const back = leaveMulti(kept, offered.has(before) ? before : held);
+  return { colour: back.colour, qty: back.qty, dropped, remembered: back.remembered };
+}
+
+/**
+ * WHAT THE CART ALREADY HOLDS ON A SHELF THE COLOURS SHARE: the shelf's
+ * `max_qty` does not count the cart, so the rows' pool is the shelf less this.
+ * A product or base shelf is drawn on by every line of the product; an option
+ * shelf by the lines with the same options. A per-colour counter shares nothing.
+ */
+export function heldOnSharedCounter(lines: readonly CartLineIdentity[], productId: string, scope: string, sharedIds: readonly string[]): number {
+  if (scope !== 'product' && scope !== 'base' && scope !== 'option') return 0;
+  return lines.reduce((sum, line) => {
+    if (line.productId !== productId || line.kind === 'gift') return sum;
+    if (scope === 'option') {
+      const ids = line.option_value_ids && line.option_value_ids.length ? line.option_value_ids : line.option_id ? [line.option_id] : [];
+      if (!sharedIds.every((id) => ids.includes(id))) return sum;
+    }
+    return sum + (Number(line.qty) || 0);
+  }, 0);
+}
+
+/** What the single buy button says, before it is put into words. */
+export type BuyLabelKind = 'signIn' | 'adding' | 'added' | 'addedColour' | 'chooseColour' | 'unavailable' | 'addColour' | 'addToCart';
+
+/**
+ * THE SINGLE BUY BUTTON (D3). «اختر لونًا أولًا» is said only when THIS
+ * selection has a colour to choose — a model that is intentionally colourless
+ * keeps «أضف إلى السلة» — and it comes before «غير متوفر»: a colour-stock
+ * filament with no colour chosen is «unavailable» only because no colour is.
+ */
+export function buyLabelKind(input: {
+  signedIn: boolean;
+  adding: boolean;
+  /** The 3 s after an add, while the selection and the quantity are still what was added. */
+  justAdded: boolean;
+  lastAdded: ColourLine | null;
+  unavailable: boolean;
+  /** The CURRENT selection offers colours (not the product as a whole). */
+  colourToChoose: boolean;
+  chosen: ColourLine | null;
+}): BuyLabelKind {
+  if (!input.signedIn) return 'signIn';
+  if (input.adding) return 'adding';
+  if (input.justAdded) return input.lastAdded ? 'addedColour' : 'added';
+  if (input.chosen) return input.unavailable ? 'unavailable' : 'addColour';
+  if (input.colourToChoose) return 'chooseColour';
+  return input.unavailable ? 'unavailable' : 'addToCart';
+}
+
+/**
+ * The selection a press would send, as one comparable string. «أُضيف 50 ×
+ * Black» stays on the button only while this is still what was added: a
+ * colour tap or a new quantity is a different press, and the button names it.
+ */
+export function pressKey(sel: { colour: string; optionValueIds: readonly string[]; qty: number; orderType: string; route: string; warranty: string }): string {
+  return JSON.stringify([sel.colour || '', [...sel.optionValueIds].sort(), sel.qty, sel.orderType || '', sel.route || '', sel.warranty || '']);
+}
+
+/**
+ * QUANTITIES TYPED FOR COLOURS THE CUSTOMER MOVED AWAY FROM (D4), for this
+ * view: «Black 50», then «Cold White 5». «حدّد كمية لكل لون» and the switch
+ * carry all of them into the rows, so the first colour is not lost at the
+ * third. Tapping back to a colour makes its number the stepper's again.
+ */
+export function rememberAfterTap(memory: Readonly<Record<string, number>>, tap: { from: string; to: string; qty: number }): Record<string, number> {
+  const next = { ...memory };
+  if (qtyAfterColourChange(tap).hint) next[tap.from] = tap.qty;
+  if (tap.to) delete next[tap.to];
+  return next;
+}
+
+/**
+ * D6's window: the colours seen in the last 30 s, the colour the tap left
+ * included — the colour the page opened on is a colour the customer saw
+ * chosen, so two taps away from it are three colours.
+ */
+export function tapWindow(
+  taps: ReadonlyArray<{ id: string; at: number }>,
+  from: string,
+  to: string,
+  now: number,
+  windowMs = 30_000
+): { taps: Array<{ id: string; at: number }>; distinct: string[] } {
+  const next = taps.filter((t) => now - t.at <= windowMs);
+  if (from && !next.some((t) => t.id === from)) next.push({ id: from, at: now });
+  if (to) next.push({ id: to, at: now });
+  return { taps: next, distinct: [...new Set(next.map((t) => t.id))] };
+}
+
+/** «56 × Beige»: a count and an isolated name, the same in every language. */
+export const countTimesName = (line: ColourLine, opts: { short?: boolean } = {}): string =>
+  `${n(line.qty)} × ${isolate(opts.short ? shortColourName(line.name) : line.name)}`;
+
+/** ⚡ NAMES WHAT IT BUYS (principle 2): «شراء سريع: 56 × Beige». */
+export function quickBuyLabel(lang: ColourLang, line: ColourLine, opts: { short?: boolean } = {}): string {
+  const what = countTimesName(line, opts);
+  return lang === 'en' ? `Quick Buy: ${what}` : lang === 'ckb' ? `کڕینی خێرا: ${what}` : `شراء سريع: ${what}`;
+}
+
+/**
+ * THE SEVERAL-COLOURS BUTTON. A guest reads the page's own «سجّل الدخول
+ * للشراء», as in single mode: the press goes to sign-in, and a label that
+ * promised an add would hide that. With no row filled it is `aria-disabled`,
+ * not `disabled`, so the focus can come back to it when the confirmation
+ * closes (§3.8); the press then does nothing.
+ */
+export function multiAddButton(input: {
+  lang: ColourLang;
+  signedIn: boolean;
+  signInLabel: string;
+  busy: boolean;
+  gateOpen: boolean;
+  lines: readonly ColourLine[];
+}): { label: string; ariaLabel?: string; disabled: boolean; ariaDisabled: boolean } {
+  const live = input.lines.filter((l) => l.qty > 0);
+  if (!input.signedIn) {
+    return {
+      label: input.signInLabel,
+      ariaLabel: live.length > 0 ? `${input.signInLabel} — ${addLabel(input.lang, live)}` : input.signInLabel,
+      disabled: input.busy,
+      ariaDisabled: false,
+    };
+  }
+  const label = addLabel(input.lang, live, { short: true });
+  if (live.length === 0) return { label, disabled: input.busy, ariaDisabled: !input.busy };
+  return { label, ariaLabel: addLabel(input.lang, live), disabled: input.busy || !input.gateOpen, ariaDisabled: false };
+}
+
+/**
+ * A CART OR CHECKOUT GROUP'S HEADER COUNTS COLOURS, NOT LINES: Black on a
+ * spool and Black as a refill are one colour in two lines. A group with no
+ * colour at all (option lines of a colourless product) names its pieces only.
+ */
+export function groupSummaryText(lang: ColourLang, lines: ReadonlyArray<{ colourId: string; qty: number }>): string {
+  const words = COLOUR_STRINGS[lang];
+  const pieces = lines.reduce((sum, l) => sum + (Number(l.qty) || 0), 0);
+  const colours = new Set(lines.map((l) => l.colourId).filter(Boolean)).size;
+  return colours === 0 ? words.groupPieces(pieces) : words.groupSummary(colours, pieces);
+}
+
 // --------------------------------------------------------------------- words
 
 type Fn1 = (a: string) => string;
@@ -246,7 +450,7 @@ export interface ColourStrings {
   clearQuantities: string;
   quantitiesCleared: string;
   undo: string;
-  totalLine: (pieces: string, colours: string) => string;
+  totalLine: (pieces: number, colours: number) => string;
   totalCaption: string;
   sharedStock: Fn1;
   sharedQuota: Fn1;
@@ -272,13 +476,25 @@ export interface ColourStrings {
   keepShopping: string;
   viewCart: string;
   colourA11y: Fn1;
-  groupSummary: (colours: string, pieces: string) => string;
+  groupSummary: (colours: number, pieces: number) => string;
+  groupPieces: (pieces: number) => string;
   groupSelect: Fn1;
-  announceTotal: (pieces: string, colours: string, money: string) => string;
+  announceTotal: (pieces: number, colours: number, money: string) => string;
   announceModeOn: string;
   announceModeOff: string;
   inCart: Fn1;
   genericFailure: string;
+  /** «عدة ألوان» closed because the option left fewer than two colours; `names` = the removed ones ('' for none). */
+  multiClosed: Fn1;
+  /** A lost answer: some colours landed, some did not. */
+  partlyAdded: string;
+  /** A grouped cart line's delete and checkbox name the colour. */
+  lineDelete: Fn1;
+  lineSelect: (product: string, colour: string) => string;
+  /** The confirmation sheet's line name: «Black، 50» / "Black, 50". */
+  sheetLine: (name: string, count: string) => string;
+  /** The Quick Buy toast names what was bought. */
+  quickBuyAdded: Fn1;
 }
 
 /**
@@ -302,7 +518,7 @@ export const COLOUR_STRINGS: Record<ColourLang, ColourStrings> = {
     clearQuantities: 'تصفير الكميات',
     quantitiesCleared: 'صُفّرت الكميات',
     undo: 'تراجع',
-    totalLine: (p, k) => `مجموع القطع: ${p} — الألوان: ${k}`,
+    totalLine: (p, k) => `مجموع القطع: ${n(p)} — الألوان: ${n(k)}`,
     totalCaption: 'الإجمالي',
     sharedStock: (m) => `المخزون مشترك بين الألوان: ${m} متوفر لها كلها معًا`,
     sharedQuota: (m) => `حصة الطلب المسبق مشتركة بين الألوان: بقي ${m}`,
@@ -328,13 +544,21 @@ export const COLOUR_STRINGS: Record<ColourLang, ColourStrings> = {
     keepShopping: 'متابعة التسوق',
     viewCart: 'عرض السلة',
     colourA11y: (name) => `اللون: ${name}`,
-    groupSummary: (k, p) => `الألوان: ${k} · القطع: ${p}`,
+    groupSummary: (k, p) => `الألوان: ${n(k)} · القطع: ${n(p)}`,
+    groupPieces: (p) => `القطع: ${n(p)}`,
     groupSelect: (product) => `تحديد كل ألوان ${product}`,
-    announceTotal: (p, k, money) => `مجموع القطع ${p}، الألوان ${k}، الإجمالي ${money}`,
+    announceTotal: (p, k, money) => `مجموع القطع ${n(p)}، الألوان ${n(k)}، الإجمالي ${money}`,
     announceModeOn: 'عدة ألوان: حدّد الكمية لكل لون',
     announceModeOff: 'لون واحد',
     inCart: (m) => `في السلة: ${m}`,
     genericFailure: 'تعذّرت الإضافة الآن. لم يُضَف شيء.',
+    multiClosed: (names) =>
+      `لا تتوفر عدة ألوان مع هذا الخيار، فعادت الصفحة إلى لون واحد.${names ? ` أُزيلت: ${names}` : ''}`,
+    partlyAdded: 'أُضيف بعض الألوان فقط. راجع سلتك قبل أن تضغط مرة أخرى.',
+    lineDelete: (name) => `حذف ${name}`,
+    lineSelect: (product, colour) => `${product} — اللون: ${colour}`,
+    sheetLine: (name, count) => `${name}، ${count}`,
+    quickBuyAdded: (what) => `أُضيف إلى طلب الشراء السريع: ${what}\u00a0⚡`,
   },
   en: {
     colourModeLabel: 'How to pick colours',
@@ -350,7 +574,7 @@ export const COLOUR_STRINGS: Record<ColourLang, ColourStrings> = {
     clearQuantities: 'Clear quantities',
     quantitiesCleared: 'Quantities cleared',
     undo: 'Undo',
-    totalLine: (p, k) => `${p} pieces in ${k} colours`,
+    totalLine: (p, k) => `${n(p)} ${p === 1 ? 'piece' : 'pieces'} in ${n(k)} ${k === 1 ? 'colour' : 'colours'}`,
     totalCaption: 'Total',
     sharedStock: (m) => `Stock is shared by the colours: ${m} available for all of them together`,
     sharedQuota: (m) => `The pre-order quota is shared by the colours: ${m} left`,
@@ -376,13 +600,21 @@ export const COLOUR_STRINGS: Record<ColourLang, ColourStrings> = {
     keepShopping: 'Keep shopping',
     viewCart: 'View cart',
     colourA11y: (name) => `Colour: ${name}`,
-    groupSummary: (k, p) => `${k} colours · ${p} pieces`,
+    groupSummary: (k, p) => `${n(k)} ${k === 1 ? 'colour' : 'colours'} · ${n(p)} ${p === 1 ? 'piece' : 'pieces'}`,
+    groupPieces: (p) => `${n(p)} ${p === 1 ? 'piece' : 'pieces'}`,
     groupSelect: (product) => `Select every colour of ${product}`,
-    announceTotal: (p, k, money) => `${p} pieces in ${k} colours, total ${money}`,
+    announceTotal: (p, k, money) => `${n(p)} ${p === 1 ? 'piece' : 'pieces'} in ${n(k)} ${k === 1 ? 'colour' : 'colours'}, total ${money}`,
     announceModeOn: 'Several colours: set a quantity for each',
     announceModeOff: 'One colour',
     inCart: (m) => `In your cart: ${m}`,
     genericFailure: 'The add could not be completed right now. Nothing was added.',
+    multiClosed: (names) =>
+      `Several colours are not offered with this option, so the page is back to one colour.${names ? ` Removed: ${names}` : ''}`,
+    partlyAdded: 'Only some colours were added. Check your cart before you tap again.',
+    lineDelete: (name) => `Delete ${name}`,
+    lineSelect: (product, colour) => `${product} — Colour: ${colour}`,
+    sheetLine: (name, count) => `${name}, ${count}`,
+    quickBuyAdded: (what) => `Added to your Quick Buy order: ${what}\u00a0⚡`,
   },
   ckb: {
     colourModeLabel: 'شێوازی هەڵبژاردنی ڕەنگەکان',
@@ -391,14 +623,14 @@ export const COLOUR_STRINGS: Record<ColourLang, ColourStrings> = {
     perColourLegend: 'بڕی هەر ڕەنگێک',
     perColourIntro: 'کرتە لە + ی هەر ڕەنگێک بکە کە دەتەوێت، پاشان هەموویان بە یەک کرتە زیاد بکە.',
     rowQty: (name) => `بڕی ${name}`,
-    rowIncrease: (name) => `زیادکردنی ${name}`,
-    rowDecrease: (name) => `کەمکردنەوەی ${name}`,
+    rowIncrease: (name) => `زیادکردنی بڕی ${name}`,
+    rowDecrease: (name) => `کەمکردنەوەی بڕی ${name}`,
     rowSoldOutZero: 'نەماوە — زیاد ناکرێت',
     showAllColours: (k) => `هەموو ڕەنگەکان پیشان بدە (${k})`,
     clearQuantities: 'پاککردنەوەی بڕەکان',
     quantitiesCleared: 'بڕەکان پاک کرانەوە',
     undo: 'پاشگەزبوونەوە',
-    totalLine: (p, k) => `کۆی پارچەکان: ${p} — ڕەنگەکان: ${k}`,
+    totalLine: (p, k) => `کۆی پارچەکان: ${n(p)} — ڕەنگەکان: ${n(k)}`,
     totalCaption: 'کۆی گشتی',
     sharedStock: (m) => `کۆگا لە نێوان ڕەنگەکاندا هاوبەشە: ${m} بەردەستە بۆ هەموویان پێکەوە`,
     sharedQuota: (m) => `پشکی پێشداواکاری لە نێوان ڕەنگەکاندا هاوبەشە: ${m} ماوە`,
@@ -424,13 +656,21 @@ export const COLOUR_STRINGS: Record<ColourLang, ColourStrings> = {
     keepShopping: 'بەردەوامبە لە بازاڕکردن',
     viewCart: 'بینینی سەبەتە',
     colourA11y: (name) => `ڕەنگ: ${name}`,
-    groupSummary: (k, p) => `${k} ڕەنگ · ${p} پارچە`,
+    groupSummary: (k, p) => `${n(k)} ڕەنگ · ${n(p)} پارچە`,
+    groupPieces: (p) => `${n(p)} پارچە`,
     groupSelect: (product) => `هەموو ڕەنگەکانی ${product} دیاری بکە`,
-    announceTotal: (p, k, money) => `کۆی پارچەکان ${p}، ڕەنگەکان ${k}، کۆی گشتی ${money}`,
+    announceTotal: (p, k, money) => `کۆی پارچەکان ${n(p)}، ڕەنگەکان ${n(k)}، کۆی گشتی ${money}`,
     announceModeOn: 'چەند ڕەنگێک: بڕی هەر ڕەنگێک دیاری بکە',
     announceModeOff: 'یەک ڕەنگ',
     inCart: (m) => `لە سەبەتەکەتدا: ${m}`,
     genericFailure: 'زیادکردن ئێستا تەواو نەبوو. هیچ شتێک زیاد نەکرا.',
+    multiClosed: (names) =>
+      `چەند ڕەنگێک لەگەڵ ئەم هەڵبژاردەیە پێشکەش ناکرێت، بۆیە پەڕەکە گەڕایەوە بۆ یەک ڕەنگ.${names ? ` لابران: ${names}` : ''}`,
+    partlyAdded: 'تەنها هەندێک لە ڕەنگەکان زیادکران. پێش ئەوەی دووبارە کرتە بکەیت سەبەتەکەت بپشکنە.',
+    lineDelete: (name) => `سڕینەوەی ${name}`,
+    lineSelect: (product, colour) => `${product} — ڕەنگ: ${colour}`,
+    sheetLine: (name, count) => `${name}، ${count} پارچە`,
+    quickBuyAdded: (what) => `زیادکرا بۆ داواکاری کڕینی خێرا: ${what}\u00a0⚡`,
   },
 };
 

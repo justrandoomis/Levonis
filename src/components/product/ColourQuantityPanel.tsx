@@ -39,11 +39,13 @@ import { groupedNumber } from '../../lib/localeNumber';
 import { refusalText, stockRefusal } from '../../lib/refusalStrings';
 import { LINE_QTY_MAX } from '../../../packages/pricing/src/quantity';
 import {
-  addLabel,
   colourLang,
   colourStrings,
+  heldOnSharedCounter,
   isolate,
   lineQtyIn,
+  lostAnswerVerdict,
+  multiAddButton,
   rowCeilings,
 } from '../../lib/colourQuantities';
 
@@ -90,6 +92,8 @@ export interface ColourQuantityPanelProps {
   cartLines: CartItem[];
   cartLinesLoaded: boolean;
   isAuthenticated: boolean;
+  /** The page's own «سجّل الدخول للشراء»: a guest's press goes to sign-in, and the button says so. */
+  signInLabel: string;
   onSignIn: () => void;
   onCartItems: (items: CartItem[]) => void;
   /** The row to focus when the list opens (a hint's colour). */
@@ -164,6 +168,7 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
     cartLines,
     cartLinesLoaded,
     isAuthenticated,
+    signInLabel,
     onSignIn,
     onCartItems,
     focusRow,
@@ -305,7 +310,12 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
       const q = freshQuote(r.id);
       if (!q) continue;
       const shared = q.preorder ? q.quotaTracked : q.tracked && SHARED_SCOPES.has(q.scope);
-      if (shared) pool = pool === null ? q.maxQty : Math.min(pool, q.maxQty);
+      if (!shared) continue;
+      // The shelf's `max_qty` does not count the cart: what the cart already holds on this
+      // shelf is not there for the rows (the batch door refuses the sum, worker/routes/cart.ts 6b).
+      const held = q.preorder ? 0 : heldOnSharedCounter(cartLinesLoaded ? cartLines : [], productId, q.scope, sharedOptionValueIds);
+      const left = Math.max(0, q.maxQty - held);
+      pool = pool === null ? left : Math.min(pool, left);
     }
     return pool;
   })();
@@ -374,7 +384,7 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
     if (live.length === 0) return;
     // Written 600 ms after the last change, so holding + is not read out on every step.
     const t = window.setTimeout(
-      () => setAnnounced(cs.announceTotal(groupedNumber(pieces), groupedNumber(live.length), total === null ? '—' : money(total))),
+      () => setAnnounced(cs.announceTotal(pieces, live.length, total === null ? '—' : money(total))),
       600
     );
     return () => window.clearTimeout(t);
@@ -392,14 +402,15 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
       return !!q && !q.unpriced && q.errors.length === 0 && (quantities[r.id] ?? 0) <= ceilingOf(r.id);
     });
   const lines = live.map((r) => ({ name: r.name, qty: quantities[r.id] ?? 0 }));
-  const label = addLabel(cl, lines, { short: true });
-  const fullLabel = addLabel(cl, lines);
+  const btn = multiAddButton({ lang: cl, signedIn: isAuthenticated, signInLabel, busy, gateOpen, lines });
 
   // ------------------------------------------------------------- the add
   const [conflict, setConflict] = useState<{ cartType: unknown; incomingType: unknown } | null>(null);
-  const [sheet, setSheet] = useState<{ lines: AddedLine[] } | null>(null);
+  /** `keep`: rows that stay after the sheet closes (a lost answer where only some colours landed). */
+  const [sheet, setSheet] = useState<{ lines: AddedLine[]; keep?: Record<string, number> } | null>(null);
   const addButtonRef = useRef<HTMLButtonElement | null>(null);
   const sentInCart = useRef<Record<string, number>>({});
+  const sentReplace = useRef(false);
 
   const rowOfLine = (l: { color_id?: unknown; option_value_ids?: unknown }): string | null => {
     if (dimension.kind === 'color') return typeof l.color_id === 'string' ? l.color_id : null;
@@ -429,6 +440,7 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
     const sent: Record<string, number> = {};
     for (const id of order) sent[id] = inCartOf(id);
     sentInCart.current = sent;
+    sentReplace.current = replaceCart;
     try {
       const body: Record<string, unknown> = {
         productId,
@@ -471,29 +483,45 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
     }
     if (err.code === 'CART_LINES_CHANGED') {
       // The earlier press may have landed and only its answer was lost: the cart says which.
+      // A line landed when it holds what that press would have left — a merge held to the
+      // shelf ends AT the shelf (min(before + want, max(want, max_qty))), never at before + shelf.
       try {
         const fresh = await api.get<{ items: CartItem[] }>('/api/cart');
         const items = Array.isArray(fresh.items) ? fresh.items : [];
         onCartItems(items);
-        const landed = order.map((id) => {
-          const before = sentInCart.current[id] ?? 0;
-          const want = quantities[id] ?? 0;
-          const after = inCartOf(id, items);
-          return { id, before, want, after, ok: after === before + want || (after > before && after === ceilingOf(id) + before) };
-        });
-        if (landed.every((l) => l.ok)) {
+        const read = order.map((id) => ({
+          id,
+          before: sentInCart.current[id] ?? 0,
+          want: quantities[id] ?? 0,
+          after: inCartOf(id, items),
+          maxQty: freshQuote(id)?.maxQty ?? rows.find((r) => r.id === id)?.ownMax ?? null,
+          replaced: sentReplace.current,
+        }));
+        const verdict = lostAnswerVerdict(read);
+        if (verdict.landed.length > 0) {
+          // What landed is confirmed from the re-read cart, never «nothing was added».
+          const keep: Record<string, number> = {};
+          for (const id of verdict.missing) keep[id] = quantities[id] ?? 0;
           setSheet({
-            lines: landed.map((l, index) => ({
-              index,
-              line_id: null,
-              option_value_ids: lineIds(l.id),
-              color_id: lineColour(l.id),
-              requested: l.want,
-              before: l.before,
-              after: l.after,
-              capped: l.after < l.before + l.want,
-            })),
+            lines: read
+              .filter((l) => verdict.landed.includes(l.id))
+              .map((l, index) => {
+                const from = l.replaced ? 0 : l.before;
+                return {
+                  index,
+                  line_id: null,
+                  option_value_ids: lineIds(l.id),
+                  color_id: lineColour(l.id),
+                  requested: l.want,
+                  before: from,
+                  after: l.after,
+                  capped: l.after < from + l.want,
+                };
+              }),
+            keep,
           });
+          setConflict(null);
+          if (verdict.missing.length > 0) setTop({ text: cs.partlyAdded });
           return;
         }
       } catch {
@@ -548,8 +576,11 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
   };
 
   const closeSheet = () => {
+    const keep = sheet?.keep ?? {};
     setSheet(null);
-    onQuantities({});
+    onQuantities(keep);
+    // The button stays focusable with no row filled (aria-disabled, `multiAddButton`), so the
+    // focus really comes back to it (§3.8) instead of falling to <body>.
     window.setTimeout(() => addButtonRef.current?.focus(), 0);
   };
 
@@ -566,21 +597,25 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
       type="button"
       data-testid="product-cta"
       data-colour-multi-add={slot}
-      onClick={() => void send(false)}
-      disabled={busy || (isAuthenticated && !gateOpen)}
+      onClick={() => {
+        if (btn.ariaDisabled) return;
+        void send(false);
+      }}
+      disabled={btn.disabled}
+      aria-disabled={btn.ariaDisabled || undefined}
       aria-busy={busy || undefined}
-      aria-label={live.length > 0 ? fullLabel : undefined}
+      aria-label={btn.ariaLabel}
       className="lv-button lv-button-primary w-full min-h-[50px] text-[15px] active:scale-[0.985] [touch-action:manipulation]"
     >
       <ShoppingCart aria-hidden="true" className="w-5 h-5" />
-      <span className="truncate">{label}</span>
+      <span className="truncate">{btn.label}</span>
     </button>
   );
 
   const summary = (
     <div className="space-y-1.5" data-colour-summary>
       <div className="flex items-center justify-between gap-3 text-[13px]">
-        <span className="tabular-nums text-text-secondary">{cs.totalLine(groupedNumber(pieces), groupedNumber(live.length))}</span>
+        <span className="tabular-nums text-text-secondary">{cs.totalLine(pieces, live.length)}</span>
         {live.length > 0 ? (
           <button type="button" onClick={clearAll} className="lv-button lv-button-ghost lv-button-sm min-h-[44px] shrink-0">
             {cs.clearQuantities}
@@ -611,7 +646,8 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
     <p role="alert" className="lv-alert lv-alert-danger text-red-200 text-[13px]" data-colour-batch-refusal>
       {top.text}
       {top.reload ? (
-        <button type="button" onClick={() => window.location.reload()} className="ms-2 font-bold underline underline-offset-2">
+        // The only way forward from this state: a 44 px target around the words (`lv-hit`).
+        <button type="button" onClick={() => window.location.reload()} className="relative lv-hit ms-2 font-bold underline underline-offset-2">
           {cs.reloadPage}
         </button>
       ) : null}
@@ -714,7 +750,8 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
         <p role="status" className="mt-2 text-[12px] text-text-secondary">{shareNotice}</p>
       ) : null}
       <p className="sr-only" aria-live="polite" aria-atomic="true">{announced}</p>
-      <div className="mt-3 space-y-2">{topBlock}</div>
+      {/* ONE role="alert" per layout: on the desktop the sentence rides in the panel beside the button. */}
+      {!(panelSlot && wide) ? <div className="mt-3 space-y-2">{topBlock}</div> : null}
 
       {barSlot
         ? createPortal(
@@ -759,6 +796,8 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
         // detent would add the grabber button, whose two words have no Sorani yet (src/components/ui/Sheet.tsx).
         detents={['medium']}
         defaultDetent="medium"
+        // From `sm` up a short list in a short window: each colour sits beside its «× n», not 1,200 px away.
+        panelClassName="sm:max-w-[440px] sm:w-[92vw]"
         header={
           <h2 className="px-5 pt-1 pb-2 text-[17px] font-black text-text-primary" data-added-sheet-title>
             {cs.addedSheetTitle}
@@ -783,7 +822,7 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
               const name = row?.name ?? id;
               const added = Math.max(0, l.after - l.before);
               return (
-                <li key={`${l.index}-${id}`} className="py-2.5" aria-label={`${isolate(name)}، ${groupedNumber(added)}`}>
+                <li key={`${l.index}-${id}`} className="py-2.5" aria-label={cs.sheetLine(isolate(name), groupedNumber(added))}>
                   <div className="flex items-center justify-between gap-3">
                     <ColourTag name={name} hex={row?.hex} image={row?.image} />
                     <span className="shrink-0 text-[14px] font-bold tabular-nums text-text-primary">× {groupedNumber(added)}</span>

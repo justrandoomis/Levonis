@@ -469,8 +469,8 @@ Every string exists in Arabic, English and real Sorani (`ckb`). No `ckb` slot co
 | `perColourLegend` | الكمية لكل لون | Quantity per colour | بڕی هەر ڕەنگێک |
 | `perColourIntro` | اضغط + على كل لون تريده، ثم أضفها كلها بضغطة واحدة. | Tap + on each colour you want, then add them all with one tap. | کرتە لە + ی هەر ڕەنگێک بکە کە دەتەوێت، پاشان هەموویان بە یەک کرتە زیاد بکە. |
 | `rowQty(name)` | كمية {name} | Quantity of {name} | بڕی {name} |
-| `rowIncrease(name)` | زيادة {name} | Increase {name} | زیادکردنی {name} |
-| `rowDecrease(name)` | إنقاص {name} | Decrease {name} | کەمکردنەوەی {name} |
+| `rowIncrease(name)` | زيادة {name} | Increase {name} | زیادکردنی بڕی {name} |
+| `rowDecrease(name)` | إنقاص {name} | Decrease {name} | کەمکردنەوەی بڕی {name} |
 | `rowSoldOutZero` | نفد — لن يُضاف | Sold out — will not be added | نەماوە — زیاد ناکرێت |
 | `showAllColours(n)` | عرض كل الألوان ({n}) | Show all colours ({n}) | هەموو ڕەنگەکان پیشان بدە ({n}) |
 | `clearQuantities` | تصفير الكميات | Clear quantities | پاککردنەوەی بڕەکان |
@@ -734,3 +734,42 @@ After the owner approves, record a DECISIONS row naming D1 to D8.
 - **The cart's shipping sheet** sends `{ shippingMethodId }` (`Cart.tsx:983-985`), but the PATCH route never reads that field, so it is a 200 that does nothing.
 - **No record of cart adds:** nothing records what is added to a cart on the live site. The `AddToCart` event is bound only in the dark environment, and there is no audit row. The next dispute will meet the same blind spot. A structured server log line per add, without the user's identity in clear, is worth a separate decision.
 - **Re-order** (`ReorderButton.tsx`) adds lines one request at a time and reports each line's result. It could use the batch door for all-or-nothing behaviour.
+
+---
+
+## 15. After the review (2026-10-16): what changed from the text above
+
+The review of the build found places where the page could still say one thing and do another. Each was fixed with a failing test first. Where this changes a rule written above, the new rule is here.
+
+**The add door and the cart**
+
+- **«Empty the cart and add» over the same colour.** The cart line's identity has no route, so the same colour can sit in the cart under another shipping type (3 Black by air, now 5 Black on the shelf). `inCart` is compared with what the cart held **before** the emptying; the merge report still starts each line from 0. Before, this press was refused with `CART_LINES_CHANGED` on every try (§4.3 step 6).
+- **A shared shelf counts the cart (§4.3 step 6b).** After the existing-lines read, every line of the product that draws on one counter is summed: the batch's lines (with what their own line already holds) and the cart's other lines. Over the counter, the answer is `400 QTY_UNAVAILABLE`, `shared: true`, and `available` is what is left **after** the cart. A counter only one line draws on is a merge with itself and is still held to the ceiling, never refused. The panel's shared pool also subtracts what the cart holds on that shelf. The single door is unchanged here.
+- **The single door takes `inCart` too.** `POST /api/cart/items` accepts an optional `inCart` and answers `409 CART_LINES_CHANGED` (`details.in_cart`) when the line holds something else, with nothing written. The page sends it when it read the cart. After a lost answer (`CART_LINES_CHANGED`, or a network failure or timeout) the page re-reads the cart: if the line holds what the press would have left, the add is confirmed as an add. This replaces D9's «the single door keeps its behaviour» for this one optional field. A client that sends no `inCart` gets exactly the old behaviour. Both doors read «this line» the way the page's `lineQtyIn` does (the selection as a set, the colour, every ordinary row summed), so an older row whose `option_id` is not the canonical first id never locks the button.
+- **A lost answer with a capped line (§3.7).** A line landed when the cart holds `min(before + want, max(want, max_qty))`, the server's own arithmetic. When only some lines match, the sheet confirms those, the other rows stay, and the page says «أُضيف بعض الألوان فقط. راجع سلتك قبل أن تضغط مرة أخرى.». It never says «nothing was added» about a line that landed.
+
+**The product page**
+
+- **An option that leaves fewer than two colours (§3.2, §3.4).** «عدة ألوان» closes the way its switch does: rows whose colour is no longer offered are removed and named in the hint («لا تتوفر عدة ألوان مع هذا الخيار، فعادت الصفحة إلى لون واحد. أُزيلت: White، Beige»), one row left becomes the single selection with its quantity, otherwise quantity 1. The quantity from before «عدة ألوان» never comes back. The switch is not drawn while fewer than two colours can take a quantity (§3.1 is unchanged).
+- **«اختر لونًا أولًا» (D3)** is said only when **this selection** has a colour to choose, and before «غير متوفر». A model whose colours belong to another model keeps «أضف إلى السلة».
+- **«أُضيف 50 × Black» (D5)** stays on the button only while the selection and the quantity are still what was added. A colour tap or a new quantity inside the 3 s gives the label of the next press.
+- **The memory of D4.** Every quantity typed for a colour the customer moved away from is kept for this view, not only the last: at the third colour, «حدّد كمية لكل لون» and the switch bring Black 50 and White 5. «أبقِ 50 لـ White» drops Black's number (the customer meant White). A successful add clears it.
+- **D6 counts the colour the tap left**, so the colour the page opened on counts: two taps away from it are three colours.
+- **In «عدة ألوان» the header's shelf note is hidden.** It described the colour the page holds behind the scenes, which is in no line being added.
+- **⚡ names what it buys** (principle 2): «شراء سريع: 56 × Beige», "Quick Buy: 56 × Beige", «کڕینی خێرا: 56 × Beige», with the full name as its accessible name. Its success toast names what was bought: «أُضيف إلى طلب الشراء السريع: 56 × Beige». A confirmation step for ⚡ is not added (open question Q6).
+- **The several-colours button for a guest** reads «سجّل الدخول للشراء», as single mode does. Rows are still not carried through sign-in (Q4).
+- **Focus after the confirmation sheet (§3.8).** With no row filled, the add button is `aria-disabled` rather than `disabled`, so focus really returns to it; its press then does nothing.
+- **Desktop.** The confirmation sheet is 440 px wide from `sm` up. A refusal is one `role="alert"` per layout, not two. «حدّث الصفحة» has a 44 px target.
+
+**Words and paper**
+
+- English counts agree with their nouns: «1 piece in 1 colour», «5 pieces in 1 colour».
+- The Sorani row buttons are «زیادکردنی بڕی {name}» and «کەمکردنەوەی بڕی {name}» (§8.1), so they never sound like the add button.
+- The sheet's line names use each language's comma («Black, 50» in English).
+- The cart and checkout group header counts **colours**, not lines; a group with no colour counts pieces only. A coloured cart line's checkbox, quantity and delete name the colour («كمية Black», «حذف Black»).
+- A swatch's ring is the 3:1 field line (`--clay-field`), not `border-subtle`: black now reads on the dark theme, white on the light.
+- The courier waybill prints a bundle or mystery **parent** as its name and count only. Its stored selection is the member list, which a third-party courier is not told.
+
+**New open question**
+
+- **Q6. A confirmation step for ⚡.** ⚡ goes straight to an order paid from the wallet. With the label and the toast naming the colour and the count, it now has guards 3 and 4. A one-tap «تأكيد» for a large quantity after several colour taps would add a fifth; it is the owner's call because it slows every Quick Buy.

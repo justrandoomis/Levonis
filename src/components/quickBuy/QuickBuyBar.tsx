@@ -102,7 +102,13 @@ export interface QuickBuyBarProps {
    * (docs/ux/COLOUR-QUANTITIES.md §9).
    */
   cart: { icon: React.ReactNode; label: React.ReactNode; ariaLabel?: string; disabled: boolean; busy: boolean; onPress: () => void };
-  buy: { disabled: boolean; busy: boolean; onPress: () => void };
+  /**
+   * `label`: what ⚡ buys when a colour is involved («شراء سريع: 56 × Beige»,
+   * docs/ux/COLOUR-QUANTITIES.md principle 2) — the press goes straight to an
+   * order, so it names the colour and the count like the cart's button does.
+   * `ariaLabel`: the full name when the visible one is shortened.
+   */
+  buy: { label?: string; ariaLabel?: string; disabled: boolean; busy: boolean; onPress: () => void };
 }
 
 interface Drag {
@@ -446,7 +452,7 @@ export function QuickBuyBar(props: QuickBuyBarProps) {
         ref={quickCap}
         type="button"
         data-quick-buy-capsule="quick"
-        aria-label={quick ? undefined : words.turnOn}
+        aria-label={quick ? buy.ariaLabel : words.turnOn}
         aria-disabled={(quick && buy.disabled) || undefined}
         aria-busy={(quick && buy.busy) || undefined}
         onClick={onQuickClick}
@@ -478,7 +484,7 @@ export function QuickBuyBar(props: QuickBuyBarProps) {
           </span>
         </span>
         <span ref={quickLabel} className="absolute top-1/2 left-1/2 whitespace-nowrap">
-          {buy.busy ? words.ctaBusy : words.cta}
+          {buy.busy ? words.ctaBusy : buy.label ?? words.cta}
         </span>
       </button>
 

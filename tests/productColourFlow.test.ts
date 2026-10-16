@@ -28,13 +28,16 @@ function constBlock(name: string): string {
   return SRC.slice(at, end);
 }
 
-test('D3: the button reads addLabel whenever a colour is chosen; «أضف إلى السلة» only without a colour dimension', () => {
+test('D3: the button reads addLabel whenever a colour is chosen; «أضف إلى السلة» only when this selection has no colour to choose', () => {
   const label = constBlock('buyButtonLabel');
-  assert.match(label, /chosenColour\s*\?\s*addLabel\(cl, \[\{ name: chosenColour\.name, qty \}\], \{ short: true \}\)/);
-  assert.match(label, /: cs\.chooseColourFirst/, 'a colour still to choose says so');
-  assert.match(label, /!hasColourDimension\s*\?\s*s\.addToCart/, 'the bare label is the no-colour branch');
+  // The words come from buyLabelKind (src/lib/colourQuantities.ts, unit-tested), fed by the CURRENT selection.
+  assert.match(SRC, /const buyKind = buyLabelKind\(\{[\s\S]*?colourToChoose,[\s\S]*?\}\);/);
+  assert.match(SRC, /const colourToChoose = orderedColors\.length > 0 \|\| !!colourGroup;/, 'a colourless model keeps «أضف إلى السلة»');
+  assert.match(label, /buyKind === 'addColour'\s*\?\s*addLabel\(cl, \[\{ name: chosenColour!\.name, qty \}\], \{ short: true \}\)/);
+  assert.match(label, /buyKind === 'chooseColour'\s*\?\s*cs\.chooseColourFirst/, 'a colour still to choose says so');
+  assert.match(label, /buyKind === 'addToCart'\s*\?\s*s\.addToCart/);
   assert.equal((label.match(/s\.addToCart/g) ?? []).length, 1, 's.addToCart is reached from that one branch only');
-  assert.match(label, /lastAdded\s*\?\s*addedLabel\(cl, lastAdded, \{ short: true \}\)/, 'after an add: what WAS added');
+  assert.match(label, /buyKind === 'addedColour'\s*\?\s*addedLabel\(cl, lastAdded!, \{ short: true \}\)/, 'after an add: what WAS added');
   // The full name reaches assistive tech when the visible one is shortened.
   assert.match(SRC, /ariaLabel: buyButtonAria,/);
   assert.match(SRC, /aria-label=\{buyButtonAria\}/);
@@ -61,7 +64,8 @@ test('D5: after a successful add and a Quick Buy success the quantity returns to
   // The add's answer is the whole cart: a several-colours add right after it may send inCart.
   assert.match(add, /setCartLines\(items\);\s*\/\/[^\n]*\n\s*setCartLinesLoaded\(true\);/);
   const quick = SRC.slice(SRC.indexOf('const runQuickBuy = useCallback('), SRC.indexOf('runQuickBuyRef.current = '));
-  assert.match(quick, /if \(outcome\.kind === 'added' && chosenColourOf\(product, relations, colorId, optionValueIds\)\) \{\s*\/\/[^\n]*\n\s*setQty\(1\);/);
+  assert.match(quick, /const quickChosen = chosenColourOf\(product, relations, colorId, optionValueIds\);/);
+  assert.match(quick, /if \(outcome\.kind === 'added' && quickChosen\) \{\s*\/\/[^\n]*\n\s*setQty\(1\);/);
 });
 
 test('every buy button keeps data-testid="product-cta"', () => {
@@ -98,4 +102,92 @@ test('the hint, the switch and the gallery chip are on the page', () => {
   assert.match(SRC, /label=\{cs\.colourModeLabel\}/);
   assert.match(SRC, /data-gallery-colour-chip/);
   assert.match(SRC, /cs\.priceWithColour/);
+});
+
+// ------------------------------------------------------------- review fixes
+
+test('review: «أُضيف 50 × Black» lasts only while the selection and the quantity are still what was added', () => {
+  assert.match(SRC, /const justAdded = lastAdded \? addedFlash && addedKey === currentSelectionKey : !!notice;/);
+  assert.match(SRC, /const currentSelectionKey = pressKey\(\{ colour: colorId, optionValueIds, qty, orderType: requestedOrderType, route: effectiveTransport, warranty: warrantyPlanId \}\);/);
+  const add = SRC.slice(SRC.indexOf('const postAddToCart = useCallback('), SRC.indexOf('const handleAddToCart'));
+  assert.match(add, /setAddedKey\(pressKey\(\{ colour: colorId, optionValueIds, qty: 1, orderType: requestedOrderType, route: effectiveTransport, warranty: warrantyPlanId \}\)\);/);
+});
+
+test('review: the single door sends inCart, and a lost answer is re-read before another press can double the line', () => {
+  const add = SRC.slice(SRC.indexOf('const postAddToCart = useCallback('), SRC.indexOf('const handleAddToCart'));
+  assert.doesNotMatch(add, /Retrying after a failure is safe \(the server upserts one row\)/, 'the upsert ADDS: a retry was never safe');
+  assert.match(add, /if \(cartLinesLoaded\) body\.inCart = before;/);
+  assert.match(add, /err\.code === 'CART_LINES_CHANGED'/);
+  assert.match(add, /err\.status === 0/);
+  assert.match(add, /lostAnswerVerdict\(\[\{ id: 'line', before, want: qty, after: lineQtyIn\(fresh, product\.id, optionValueIds, optionId, colorId\), maxQty: availability\?\.stock\.max_qty \?\? null, replaced: replaceCart \}\]\)/);
+});
+
+test('review: an option that leaves fewer than two colours closes «عدة ألوان» with a notice, never silently back to the old single quantity', () => {
+  assert.match(SRC, /if \(colourMode === 'many' && !multiOffered\) \{[\s\S]{0,900}?closeMultiForOption\(/);
+  assert.match(SRC, /setColourHint\(\{ kind: 'closed', names: closed\.dropped\.map\(colourNameOf\) \}\);/);
+  assert.match(SRC, /colourHint\.kind === 'closed'\s*\?\s*cs\.multiClosed\(/);
+});
+
+test('review: the colours left behind are remembered for «حدّد كمية لكل لون» and the switch; the opening colour counts for D6', () => {
+  const tap = constBlock('afterColourTap');
+  assert.match(SRC, /colourMemory\.current = rememberAfterTap\(colourMemory\.current, \{ from, to, qty \}\);/);
+  assert.match(SRC, /const w = tapWindow\(colourTaps\.current, from, to, now\);/);
+  assert.ok(tap.length > 0);
+  assert.match(SRC, /setMultiRows\(prefillRows\(\{ \.\.\.multiRows, \.\.\.colourMemory\.current, \.\.\.seed \}, /);
+});
+
+test('review: in «عدة ألوان» the header says nothing about the colour the page holds behind the scenes', () => {
+  assert.match(SRC, /const stockNote = colourMulti \? '' : shelfNote;/);
+  assert.equal((SRC.match(/\{stockNote \?|\{stockNote &&|\{shelfNote/g) ?? []).length, 1, 'the note is drawn in one place, from the gated value');
+});
+
+test('review: ⚡ names what it buys, and its toast names what was bought', () => {
+  const bar = readFileSync(join(ROOT, 'src/components/quickBuy/QuickBuyBar.tsx'), 'utf8');
+  assert.match(bar, /\{buy\.busy \? words\.ctaBusy : buy\.label \?\? words\.cta\}/);
+  assert.match(bar, /aria-label=\{quick \? buy\.ariaLabel : words\.turnOn\}/);
+  assert.match(SRC, /label: quickBuyCapsuleLabel,/);
+  assert.match(SRC, /ariaLabel: quickBuyCapsuleAria,/);
+  const actions = readFileSync(join(ROOT, 'src/components/quickBuy/quickBuyActions.ts'), 'utf8');
+  assert.match(actions, /toast\.success\(ctx\.addedTitle \|\| t\.added,/);
+  const quick = SRC.slice(SRC.indexOf('const runQuickBuy = useCallback('), SRC.indexOf('runQuickBuyRef.current = '));
+  assert.match(quick, /addedTitle: quickChosen \? colourStrings\(lang\)\.quickBuyAdded\(countTimesName\(\{ name: quickChosen\.name, qty \}\)\) : undefined,/);
+});
+
+test('review: the several-colours panel — a lost capped answer, the guest label, focus after the sheet, one alert, the sheet width, the reload target', () => {
+  assert.match(PANEL, /lostAnswerVerdict\(/);
+  assert.match(PANEL, /cs\.partlyAdded/);
+  assert.doesNotMatch(PANEL, /after === ceilingOf\(id\) \+ before/, 'a capped merge never ends at before + the shelf');
+  assert.match(PANEL, /const btn = multiAddButton\(\{ lang: cl, signedIn: isAuthenticated, signInLabel, busy, gateOpen, lines \}\);/);
+  assert.match(PANEL, /disabled=\{btn\.disabled\}/);
+  assert.match(PANEL, /aria-disabled=\{btn\.ariaDisabled \|\| undefined\}/);
+  assert.match(PANEL, /\{!\(panelSlot && wide\) \? <div className="mt-3 space-y-2">\{topBlock\}<\/div> : null\}/, 'one role="alert" per layout');
+  assert.match(PANEL, /panelClassName="sm:max-w-\[440px\] sm:w-\[92vw\]"/);
+  assert.match(PANEL, /className="relative lv-hit ms-2 font-bold underline underline-offset-2"/);
+  assert.match(PANEL, /aria-label=\{cs\.sheetLine\(isolate\(name\), groupedNumber\(added\)\)\}/);
+  assert.match(PANEL, /cs\.totalLine\(pieces, live\.length\)/);
+  assert.match(PANEL, /heldOnSharedCounter\(cartLinesLoaded \? cartLines : \[\], productId, q\.scope, sharedOptionValueIds\)/);
+});
+
+test('review: a swatch\'s ring is the 3:1 field line, so black reads on the dark theme and white on the light', async () => {
+  const tag = readFileSync(join(ROOT, 'src/components/product/ColourTag.tsx'), 'utf8');
+  assert.doesNotMatch(tag, /ring-border-subtle/);
+  assert.equal((tag.match(/ring-1 ring-\[var\(--clay-field\)\]/g) ?? []).length, 2, 'the colour circle and the picture circle');
+  const { contrast, parseColor } = (await import('../scripts/theme-tokens.mjs')) as { contrast: (a: number[], b: number[]) => number; parseColor: (v: string) => number[] };
+  const css = readFileSync(join(ROOT, 'src/index.css'), 'utf8');
+  const dark = css.slice(css.indexOf("[data-theme='dark']"));
+  const light = css.slice(css.indexOf("[data-theme='light']"), css.indexOf("[data-theme='dark']"));
+  const v = (block: string, name: string) => parseColor(new RegExp(`--${name}:([^;}]+)`).exec(block)![1].trim());
+  for (const g of ['surface', 'surface-raised', 'surface-selected', 'canvas']) {
+    assert.ok(contrast(v(dark, 'clay-field'), v(dark, `color-${g}`)) >= 3, `dark ring on ${g}`);
+    assert.ok(contrast(v(dark, 'clay-field'), parseColor('#111111')) >= 3, 'dark ring around a black swatch');
+    assert.ok(contrast(v(light, 'clay-field'), v(light, `color-${g}`)) >= 3, `light ring on ${g}`);
+    assert.ok(contrast(v(light, 'clay-field'), parseColor('#ffffff')) >= 3, 'light ring around a white swatch');
+  }
+});
+
+test('review: no colour chosen on a colour-stock filament — the sentence beside the button asks for a colour, it does not say «out of stock»', () => {
+  assert.match(
+    SRC,
+    /mode === 'unavailable' && availability\?\.reason \? \([\s\S]{0,600}?\{colourToChoose && !chosenColour \? reasonText\(s, 'COLOR_REQUIRED'\) : reasonText\(s, availability\.reason\)\}/
+  );
 });

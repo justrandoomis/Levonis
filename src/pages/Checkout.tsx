@@ -17,7 +17,7 @@ import { api, ApiAddress, ApiError, ApiOrder, CartItem, newIdempotencyKey, usdCe
 import { methodDesc, methodTitle } from '../lib/methodText';
 import type { CartColourTag, DeliveryDayOption } from '../lib/api';
 import { groupCartLines } from '../lib/cartGroups';
-import { colourStrings } from '../lib/colourQuantities';
+import { colourLang, colourStrings, groupSummaryText } from '../lib/colourQuantities';
 import { ColourTag } from '../components/product/ColourTag';
 import DeliveryDayPicker from '../components/orders/DeliveryDayPicker';
 /**
@@ -2559,7 +2559,7 @@ export default function Checkout() {
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm font-normal text-text-primary line-clamp-1">{entry.items[0].name}</h4>
                     <p className="text-[12px] tabular-nums text-text-muted">
-                      {colourWords.groupSummary(String(entry.items.length), String(entry.items.reduce((n, l) => n + l.qty, 0)))}
+                      {groupSummaryText(colourLang(lang), entry.items.map((l) => ({ colourId: l.colourTag?.id ?? '', qty: l.qty })))}
                     </p>
                     <ul className="mt-1.5 space-y-1">
                       {entry.items.map((line) => (

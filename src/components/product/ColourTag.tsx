@@ -7,9 +7,11 @@
  * the confirmation sheet, every cart line and every checkout line:
  *
  *   · the swatch is the colour's own picture when one is bound, else its hex
- *     in a circle with a subtle ring (white and black stay visible in both
- *     themes), else a neutral circle — and it is `aria-hidden`: colour is
- *     never the only cue;
+ *     in a circle, else a neutral circle — and it is `aria-hidden`: colour is
+ *     never the only cue. The ring is the field line (`--clay-field`, proven
+ *     at 3:1 on every ground in both themes by tests/claySystem.test.ts): the
+ *     subtle border measured 1.1:1 around a black swatch on the dark theme,
+ *     where a Black line's picture slot looked empty;
  *   · the name is in `<bdi>` (an English name inside an Arabic sentence keeps
  *     its own order) and truncates INSIDE the isolate, never cutting the count
  *     beside it;
@@ -47,7 +49,7 @@ export function ColourSwatch({
   const paint = typeof hex === 'string' && SAFE_HEX.test(hex.trim()) ? hex.trim() : '';
   if (image) {
     return (
-      <span aria-hidden="true" style={dim} className={`${box} block shrink-0 overflow-hidden rounded-full ring-1 ring-border-subtle ${className}`}>
+      <span aria-hidden="true" style={dim} className={`${box} block shrink-0 overflow-hidden rounded-full ring-1 ring-[var(--clay-field)] ${className}`}>
         <VariantImg src={image} sizes={`${px ?? 16}px`} alt="" className="h-full w-full object-cover" />
       </span>
     );
@@ -56,7 +58,7 @@ export function ColourSwatch({
     <span
       aria-hidden="true"
       data-colour-swatch
-      className={`${box} block shrink-0 rounded-full ring-1 ring-border-subtle ${paint ? '' : 'bg-surface-raised'} ${className}`}
+      className={`${box} block shrink-0 rounded-full ring-1 ring-[var(--clay-field)] ${paint ? '' : 'bg-surface-raised'} ${className}`}
       style={paint ? { ...dim, backgroundColor: paint } : dim}
     />
   );

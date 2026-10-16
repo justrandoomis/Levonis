@@ -96,6 +96,12 @@ export interface QuickBuyAddContext {
   navigate: (to: string) => void;
   /** Press the same button again — the toast's retry. Same selection, same key. */
   retry: () => void;
+  /**
+   * The success toast's title naming what was bought («أُضيف إلى طلب الشراء
+   * السريع: 56 × Beige», docs/ux/COLOUR-QUANTITIES.md principle 2). Without it
+   * the generic «تمت الإضافة إلى طلب الشراء السريع».
+   */
+  addedTitle?: string;
 }
 
 export type QuickBuyAddOutcome =
@@ -159,7 +165,7 @@ export async function quickBuyAdd(input: QuickBuyAddInput, ctx: QuickBuyAddConte
     const out = await addAction.run(signature, (key) => withBusyRetry(() => addQuickBuyItem(request, key, ctx.owner)));
     accepted = null;
     const remainingMs = remainingOf(out.session);
-    toast.success(t.added, {
+    toast.success(ctx.addedTitle || t.added, {
       id: 'quick-buy',
       description: t.remaining(isolate(formatQuickBuyClock(remainingMs))),
       action: { label: t.viewOrder, onClick: () => ctx.navigate('/orders') },

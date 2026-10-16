@@ -40,7 +40,7 @@ import { useMoney } from '../CurrencyContext';
 import VariantImg from '../components/ui/VariantImg';
 import { cartEmptyText } from '../lib/cartEmptyText';
 import { groupCartLines } from '../lib/cartGroups';
-import { colourStrings } from '../lib/colourQuantities';
+import { colourLang, colourStrings, groupSummaryText, isolate } from '../lib/colourQuantities';
 import { ColourSwatch, ColourTag } from '../components/product/ColourTag';
 
 /**
@@ -1371,7 +1371,9 @@ export default function Cart() {
           type="button"
           role="checkbox"
           aria-checked={selected}
-          aria-label={itemName(item)}
+          // A coloured line's controls name its colour: three «Bambu PLA Basic, checkbox» in a
+          // group told a screen-reader customer nothing about which colour they were changing.
+          aria-label={item.color_tag ? colourWords.lineSelect(itemName(item), isolate(item.color_tag.name)) : itemName(item)}
           onClick={() => toggleSelect(item.id)}
           className="shrink-0 w-9 sm:w-11 min-h-[44px] pt-4 sm:pt-6 flex items-start justify-center -ms-1 sm:-ms-2 [touch-action:manipulation]"
         >
@@ -1453,6 +1455,7 @@ export default function Cart() {
             <button
               type="button"
               onClick={() => deleteItem(item)}
+              aria-label={item.color_tag ? colourWords.lineDelete(isolate(item.color_tag.name)) : undefined}
               className="lv-button lv-button-ghost min-h-[44px] px-3 text-[13px] hover:text-danger [touch-action:manipulation]"
             >
               {loc('حذف', 'Delete', 'سڕینەوە')}
@@ -1522,7 +1525,9 @@ export default function Cart() {
           type="button"
           role="checkbox"
           aria-checked={selected}
-          aria-label={itemName(item)}
+          // A coloured line's controls name its colour: three «Bambu PLA Basic, checkbox» in a
+          // group told a screen-reader customer nothing about which colour they were changing.
+          aria-label={item.color_tag ? colourWords.lineSelect(itemName(item), isolate(item.color_tag.name)) : itemName(item)}
           onClick={() => toggleSelect(item.id)}
           className="shrink-0 w-9 sm:w-11 min-h-[44px] pt-4 sm:pt-6 flex items-start justify-center -ms-1 sm:-ms-2 [touch-action:manipulation]"
         >
@@ -1833,6 +1838,7 @@ export default function Cart() {
                 size="sm"
                 hintPlacement="above"
                 value={item.qty}
+                label={item.color_tag ? colourWords.rowQty(isolate(item.color_tag.name)) : undefined}
                 max={Math.min(LINE_QTY_MAX, lineCap(item) ?? LINE_QTY_MAX)}
                 limitKind={item.composition ? 'per_order' : quantityLimit(item.availability).kind}
                 onChange={(next) => setLineQuantity(item, next)}
@@ -1988,6 +1994,7 @@ export default function Cart() {
             <button
               type="button"
               onClick={() => deleteItem(item)}
+              aria-label={item.color_tag ? colourWords.lineDelete(isolate(item.color_tag.name)) : undefined}
               className="lv-button lv-button-ghost min-h-[44px] px-3 text-[13px] hover:text-danger [touch-action:manipulation]"
             >
               {loc('حذف', 'Delete', 'سڕینەوە')}
@@ -2003,7 +2010,6 @@ export default function Cart() {
     const first = lines[0];
     const chosen = lines.filter((l) => selectedIds.has(l.id)).length;
     const state: boolean | 'mixed' = chosen === 0 ? false : chosen === lines.length ? true : 'mixed';
-    const pieces = lines.reduce((sum, l) => sum + (Number(l.qty) || 0), 0);
     const name = itemName(first);
     return (
       <div key={`group-${productId}`} role="group" aria-label={name} data-cart-colour-group={productId} className="border-b border-border-subtle last:border-b-0">
@@ -2030,7 +2036,8 @@ export default function Cart() {
           </div>
           <div className="min-w-0">
             <h3 data-cart-group-title className="text-text-primary text-[14px] font-medium leading-snug line-clamp-2">{name}</h3>
-            <p className="text-[12px] tabular-nums text-text-secondary">{colourWords.groupSummary(String(lines.length), String(pieces))}</p>
+            {/* COLOURS, not lines: Black on a spool and Black as a refill are one colour. */}
+            <p className="text-[12px] tabular-nums text-text-secondary">{groupSummaryText(colourLang(lang), lines.map((l) => ({ colourId: l.color_tag?.id ?? l.color_id ?? '', qty: l.qty })))}</p>
           </div>
         </div>
         <div>{lines.map((l) => renderLine(l, true))}</div>

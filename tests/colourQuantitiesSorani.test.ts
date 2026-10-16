@@ -72,3 +72,23 @@ test('the four product-page sentences that stood in Arabic are Sorani now', () =
   assert.doesNotMatch(ckb, /NO SORANI IS INVENTED HERE/, 'the superseded rule is no longer cited');
   assert.match(ckb, /DECISIONS row 183/);
 });
+
+test('a row\'s + and − in Sorani say «the quantity of» the colour, so they never sound like the add button («زیادکردنی 50 × Black»)', () => {
+  const ckb = COLOUR_STRINGS.ckb;
+  assert.equal(ckb.rowIncrease('Black'), 'زیادکردنی بڕی Black');
+  assert.equal(ckb.rowDecrease('Black'), 'کەمکردنەوەی بڕی Black');
+  // The add button's own wording is never the row's.
+  assert.notEqual(ckb.rowIncrease('Black').split(' ').slice(0, 2).join(' '), 'زیادکردنی Black');
+  const spec = read('docs/ux/COLOUR-QUANTITIES.md');
+  assert.match(spec, /زیادکردنی بڕی \{name\}/, 'the spec table says the same');
+  assert.match(spec, /کەمکردنەوەی بڕی \{name\}/);
+});
+
+test('the new sentences of the review fixes are real Sorani', () => {
+  const ckb = COLOUR_STRINGS.ckb;
+  for (const s of [ckb.multiClosed('White، Beige'), ckb.multiClosed(''), ckb.partlyAdded, ckb.lineDelete('Black'), ckb.lineSelect('PLA', 'Black'), ckb.quickBuyAdded('5 × Black')]) {
+    assert.ok(s.trim(), 'empty');
+    assert.ok(!NOT_SORANI.test(s), s);
+  }
+  assert.notEqual(ckb.partlyAdded, COLOUR_STRINGS.ar.partlyAdded);
+});

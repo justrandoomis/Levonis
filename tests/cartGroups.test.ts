@@ -75,3 +75,17 @@ test('the cart and the checkout both group through it, and the checkout total is
   assert.match(checkout, /data-checkout-colour=\{line\.key\}/);
   assert.match(checkout, /× \{line\.qty\}/);
 });
+
+test('review: the group header counts colours (not lines), and every control of a coloured line names its colour', () => {
+  const cart = readFileSync(join(ROOT, 'src/pages/Cart.tsx'), 'utf8');
+  const checkout = readFileSync(join(ROOT, 'src/pages/Checkout.tsx'), 'utf8');
+  // «الألوان: 2» over two Black lines was a false colour count.
+  assert.doesNotMatch(cart, /groupSummary\(String\(lines\.length\)/);
+  assert.doesNotMatch(checkout, /groupSummary\(String\(entry\.items\.length\)/);
+  assert.match(cart, /groupSummaryText\(colourLang\(lang\), lines\.map\(\(l\) => \(\{ colourId: l\.color_tag\?\.id \?\? l\.color_id \?\? '', qty: l\.qty \}\)\)\)/);
+  assert.match(checkout, /groupSummaryText\(colourLang\(lang\), entry\.items\.map\(\(l\) => \(\{ colourId: l\.colourTag\?\.id \?\? '', qty: l\.qty \}\)\)\)/);
+  // Tabbing through «50 Black, 5 White, 1 Beige» says which colour each control changes.
+  assert.match(cart, /aria-label=\{item\.color_tag \? colourWords\.lineSelect\(itemName\(item\), isolate\(item\.color_tag\.name\)\) : itemName\(item\)\}/);
+  assert.match(cart, /label=\{item\.color_tag \? colourWords\.rowQty\(isolate\(item\.color_tag\.name\)\) : undefined\}/);
+  assert.match(cart, /aria-label=\{item\.color_tag \? colourWords\.lineDelete\(isolate\(item\.color_tag\.name\)\) : undefined\}/);
+});

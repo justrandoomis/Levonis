@@ -109,14 +109,22 @@ import { afterCriticalPaint, allowsSpeculativeLoads } from '../lib/afterCritical
 import {
   addLabel,
   addedLabel,
+  buyLabelKind,
+  closeMultiForOption,
   colourLang,
   colourStrings,
+  countTimesName,
   isolate,
   leaveMulti,
   lineQtyIn,
+  lostAnswerVerdict,
   noticeText,
   prefillRows,
   qtyAfterColourChange,
+  quickBuyLabel,
+  rememberAfterTap,
+  pressKey,
+  tapWindow,
 } from '../lib/colourQuantities';
 import { groupedNumber } from '../lib/localeNumber';
 import { ColourTag } from '../components/product/ColourTag';
@@ -916,7 +924,9 @@ function chosenColourOf(
 
 type ColourHint =
   | { kind: 'reset'; previous: { colour: string; qty: number }; to: string }
-  | { kind: 'discovery'; colours: string[] };
+  | { kind: 'discovery'; colours: string[] }
+  /** «عدة ألوان» closed because an option left fewer than two colours; `names` = the rows removed. */
+  | { kind: 'closed'; names: string[] };
 
 // ---------------------------------------------------------------- component
 
@@ -1148,6 +1158,8 @@ export default function Product() {
    */
   const [colourHint, setColourHint] = useState<ColourHint | null>(null);
   const colourTaps = useRef<Array<{ id: string; at: number }>>([]);
+  /** Quantities typed for colours the customer moved away from (D4), carried into «عدة ألوان». */
+  const colourMemory = useRef<Record<string, number>>({});
   const [discoveryDone, setDiscoveryDone] = useState(false);
   const [bigQtyDone, setBigQtyDone] = useState(false);
   const [colourMode, setColourMode] = useState<'one' | 'many'>('one');
@@ -1159,6 +1171,8 @@ export default function Product() {
   const [multiPanelSlot, setMultiPanelSlot] = useState<HTMLDivElement | null>(null);
   const [lastAdded, setLastAdded] = useState<{ name: string; qty: number; capped: { after: number } | null } | null>(null);
   const [addedFlash, setAddedFlash] = useState(false);
+  /** The selection «أُضيف 50 × Black» describes: the button says it only while this is still on screen. */
+  const [addedKey, setAddedKey] = useState('');
   const [noticeHeld, setNoticeHeld] = useState(false);
   const [stepperFlash, setStepperFlash] = useState(false);
   /** The polite «عدة ألوان: حدّد الكمية لكل لون» when the mode changes — never on first paint. */
@@ -1347,6 +1361,7 @@ export default function Product() {
         setQty(1);
         setColourHint(null);
         colourTaps.current = [];
+        colourMemory.current = {};
         setDiscoveryDone(false);
         setBigQtyDone(false);
         setColourMode('one');
@@ -1354,6 +1369,7 @@ export default function Product() {
         setMultiFocus(null);
         setLastAdded(null);
         setAddedFlash(false);
+        setAddedKey('');
         setWarrantyPlanId('');
         setWarrantyOpen(false);
         setActionError('');
@@ -2000,7 +2016,11 @@ export default function Product() {
     async (replaceCart: boolean) => {
       if (!product) return;
       // Double-tap guard: a ref, not state, so two taps in the same tick cannot
-      // both pass. Retrying after a failure is safe (the server upserts one row).
+      // both pass. A RETRY IS NOT SAFE BY ITSELF: the server's upsert ADDS the
+      // quantities, so a second press of 50 after a lost answer made 100. The
+      // press carries what the page believes the line holds (`inCart`), the door
+      // refuses a cart that holds something else, and a lost answer is re-read
+      // below before the button is offered again.
       if (addInFlight.current) return;
       if (!isAuthenticated) {
         navigate(authPathWithSupportRef(`/product/${product.slug}`));
@@ -2010,30 +2030,13 @@ export default function Product() {
       setAddingToCart(true);
       setActionError('');
       setNotice('');
-      try {
-        const body: Record<string, unknown> = { productId: product.id, qty };
-        if (optionId) body.optionId = optionId;
-        if (optionValueIds.length) body.optionValueIds = optionValueIds;
-        if (colorId) body.colorId = colorId;
-        // THE ROUTE TRAVELS WITH THE TYPE THAT NEEDS IT, not with the
-        // server's default mode. Gating on `availability.mode === 'preorder'`
-        // dropped the chosen route whenever the direct shelf still had units:
-        // a buyer who pressed «طلب مسبق» and picked «شحن بري» on such a
-        // product sent neither field, and the line landed as a direct sale.
-        if (requestedOrderType === 'pre_order' && effectiveTransport) body.transportMethod = effectiveTransport;
-        // The ORDER TYPE travels on its own, so the cart line records what the
-        // customer chose rather than what a transport implies.
-        if (requestedOrderType) body.fulfillmentType = requestedOrderType;
-        if (warrantyPlanId) body.warrantyPlanId = warrantyPlanId;
-        if (replaceCart) body.replaceCart = true;
-        // What THIS line held before the press: the confirmation compares it
-        // with what the server reports after, so a merge the door held to the
-        // most available is said, never silent (docs/ux/COLOUR-QUANTITIES.md §3.8).
-        const before = inCartQty;
-        const data = await api.post<{ items: CartItem[] }>('/api/cart/items', body);
-        // Success is claimed ONLY after the server returns the saved cart.
-        const items = Array.isArray(data.items) ? data.items : [];
-        const count = countCartItems(data.items);
+      // What THIS line held before the press: the confirmation compares it
+      // with what the server reports after, so a merge the door held to the
+      // most available is said, never silent (docs/ux/COLOUR-QUANTITIES.md §3.8).
+      const before = inCartQty;
+      /** The add landed: the answer, or a re-read cart after a lost answer, says so. */
+      const landed = (items: CartItem[]) => {
+        const count = countCartItems(items);
         // The response is the saved cart, so the note below the price updates
         // from the same answer that proved the add worked — no second request,
         // and no window in which the badge and the note disagree.
@@ -2050,10 +2053,13 @@ export default function Product() {
           const capped = after > 0 && after < before + qty ? { after } : null;
           setLastAdded({ name: chosen.name, qty, capped });
           setAddedFlash(true);
+          // The label names the previous add only while the selection is still this one at 1.
+          setAddedKey(pressKey({ colour: colorId, optionValueIds, qty: 1, orderType: requestedOrderType, route: effectiveTransport, warranty: warrantyPlanId }));
           setNotice(noticeText(colourLang(lang), { name: chosen.name, qty }, capped));
           setQty(1);
           setColourHint(null);
           colourTaps.current = [];
+          colourMemory.current = {};
           setBigQtyDone(true);
         } else {
           setLastAdded(null);
@@ -2062,10 +2068,56 @@ export default function Product() {
         // The nav badge is the one piece of confirmation visible from anywhere
         // on the page, including from the bottom of a long product.
         setCartCount(count);
+      };
+      try {
+        const body: Record<string, unknown> = { productId: product.id, qty };
+        if (optionId) body.optionId = optionId;
+        if (optionValueIds.length) body.optionValueIds = optionValueIds;
+        if (colorId) body.colorId = colorId;
+        // THE ROUTE TRAVELS WITH THE TYPE THAT NEEDS IT, not with the
+        // server's default mode. Gating on `availability.mode === 'preorder'`
+        // dropped the chosen route whenever the direct shelf still had units:
+        // a buyer who pressed «طلب مسبق» and picked «شحن بري» on such a
+        // product sent neither field, and the line landed as a direct sale.
+        if (requestedOrderType === 'pre_order' && effectiveTransport) body.transportMethod = effectiveTransport;
+        // The ORDER TYPE travels on its own, so the cart line records what the
+        // customer chose rather than what a transport implies.
+        if (requestedOrderType) body.fulfillmentType = requestedOrderType;
+        if (warrantyPlanId) body.warrantyPlanId = warrantyPlanId;
+        if (replaceCart) body.replaceCart = true;
+        // What the page believes this exact line holds — only when it really read the cart.
+        if (cartLinesLoaded) body.inCart = before;
+        const data = await api.post<{ items: CartItem[] }>('/api/cart/items', body);
+        // Success is claimed ONLY after the server returns the saved cart.
+        landed(Array.isArray(data.items) ? data.items : []);
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
           navigate(authPathWithSupportRef(`/product/${product.slug}`));
           return;
+        }
+        /**
+         * A LOST ANSWER: the write may have landed and only the reply was lost
+         * (a dropped connection, the 20 s deadline), or an earlier such press is
+         * what the door now refuses (CART_LINES_CHANGED). The cart is re-read:
+         * if this line holds what the press would have left, the add is
+         * confirmed as an add — never offered again for a second 50. Otherwise
+         * the page now knows the true cart and the sentence below is said.
+         */
+        if (err instanceof ApiError && (err.code === 'CART_LINES_CHANGED' || (err.status === 0 && err.code !== 'ABORTED'))) {
+          try {
+            const re = await api.get<{ items: CartItem[] }>('/api/cart');
+            const fresh = Array.isArray(re.items) ? re.items : [];
+            const verdict = lostAnswerVerdict([{ id: 'line', before, want: qty, after: lineQtyIn(fresh, product.id, optionValueIds, optionId, colorId), maxQty: availability?.stock.max_qty ?? null, replaced: replaceCart }]);
+            if (verdict.landed.length > 0) {
+              landed(fresh);
+              return;
+            }
+            setCartLines(fresh);
+            setCartLinesLoaded(true);
+            setCartCount(countCartItems(fresh));
+          } catch {
+            // Still offline: the page keeps what it knew, and the next press's inCart is refused if this one landed.
+          }
         }
         // A cart may hold exactly one shipping type. The SERVER owns that rule
         // and names both types when it refuses; we only ask the customer which
@@ -2141,7 +2193,7 @@ export default function Product() {
         setAddingToCart(false);
       }
     },
-    [product, relations, inCartQty, qty, optionId, optionValueIds, colorId, requestedOrderType, effectiveTransport, warrantyPlanId, isAuthenticated, navigate, s, lang, refreshQuote]
+    [product, relations, inCartQty, cartLinesLoaded, availability, qty, optionId, optionValueIds, colorId, requestedOrderType, effectiveTransport, warrantyPlanId, isAuthenticated, navigate, s, lang, refreshQuote]
   );
 
   const handleAddToCart = useCallback(() => postAddToCart(false), [postAddToCart]);
@@ -2226,6 +2278,7 @@ export default function Product() {
     setQuickBuyBusy(true);
     setActionError('');
     setNotice('');
+    const quickChosen = chosenColourOf(product, relations, colorId, optionValueIds);
     try {
       const { quickBuyAdd } = await loadQuickBuyActions();
       const outcome = await quickBuyAdd(
@@ -2238,13 +2291,22 @@ export default function Product() {
           ...(warrantyPlanId ? { warrantyPlanId } : {}),
           ...(acceptance ? { printerAcceptance: acceptance } : {}),
         },
-        { owner: user?.id, lang, money: moneyBoth, navigate, retry: () => runQuickBuyRef.current() }
+        {
+          owner: user?.id,
+          lang,
+          money: moneyBoth,
+          navigate,
+          retry: () => runQuickBuyRef.current(),
+          // The toast names what was bought: the stepper returns to 1 below, so it is the only place that still says 56.
+          addedTitle: quickChosen ? colourStrings(lang).quickBuyAdded(countTimesName({ name: quickChosen.name, qty })) : undefined,
+        }
       );
-      if (outcome.kind === 'added' && chosenColourOf(product, relations, colorId, optionValueIds)) {
+      if (outcome.kind === 'added' && quickChosen) {
         // D5: no next colour inherits a quantity from either door.
         setQty(1);
         setColourHint(null);
         colourTaps.current = [];
+        colourMemory.current = {};
       }
       if (outcome.kind === 'activate' || outcome.kind === 'reconsent' || outcome.kind === 'address') {
         openQuickBuySheet(outcome.kind);
@@ -2883,7 +2945,7 @@ export default function Product() {
    * contradiction the shopper has to resolve for themselves, and they will
    * resolve it wrongly.
    */
-  const stockNote = (() => {
+  const shelfNote = (() => {
     // No shelf word without a price (rows 239-240): stock is not set for what cannot be bought.
     if (noPrice) return '';
     if (!availability || effectiveMode !== 'direct_sale') return '';
@@ -3221,8 +3283,23 @@ export default function Product() {
   const cl = colourLang(lang);
   /** The colour dimension (§3.1): the product's colours, else the 0194 option group whose kind is `color`. */
   const colourGroup = (product.colors ?? []).length === 0 ? relationOptionGroups.find((g) => g.kind === 'color') ?? null : null;
-  const hasColourDimension = (product.colors ?? []).length > 0 || !!colourGroup;
+  /**
+   * THIS SELECTION has a colour to choose. A product whose colours belong to
+   * model A only leaves model B «intentionally colourless» (worker/routes/
+   * products.ts): there the button keeps «أضف إلى السلة», never «اختر لونًا أولًا».
+   */
+  const colourToChoose = orderedColors.length > 0 || !!colourGroup;
   const chosenColour = chosenColourOf(product, relations, colorId, optionValueIds);
+  /** A colour's English name by id, whether or not this option still offers it. */
+  const colourNameOf = (id: string): string => {
+    if (colourGroup) {
+      const value = colourGroup.values.find((v) => v.id === id);
+      const option = options.find((o) => o.id === id);
+      return (option ? pickName(option.name_en, option.name, option.name_ar) : '') || value?.name_en || id;
+    }
+    const col = (product.colors ?? []).find((c) => c.id === id);
+    return col ? pickName(col.name_en, col.name, col.name_ar) || id : id;
+  };
   /** The selection every colour shares: the options, without the colour group's own value. */
   const sharedIds = colourGroup ? optionValueIds.filter((id) => !colourGroup.values.some((v) => v.id === id)) : optionValueIds;
   const singleColourId = colourGroup ? (colourGroup.values.find((v) => optionValueIds.includes(v.id))?.id ?? '') : colorId;
@@ -3299,6 +3376,12 @@ export default function Product() {
   /** §3.1: a catalogue product, priced, with at least two colours that can take a quantity. */
   const multiOffered = source === 'catalog' && !catalogOnly && colourRows.filter((r) => r.offered).length >= 2;
   const colourMulti = multiOffered && colourMode === 'many';
+  /**
+   * In «عدة ألوان» the page holds one colour behind the scenes (`enterMulti`);
+   * its shelf («بقي 4 فقط») belongs to no line being added — each row carries
+   * its own — so the header says nothing about it.
+   */
+  const stockNote = colourMulti ? '' : shelfNote;
   const multiCount = Object.values(multiRows).filter((q) => q > 0).length;
 
   /** Sets the single mode's colour: a product colour, or the colour group's value (kept in group order). */
@@ -3326,7 +3409,9 @@ export default function Product() {
     singleColourBeforeMulti.current = singleColourId;
     // A number TYPED for the single colour (above 1) comes with it; the untouched 1 of a
     // colour the page may have opened on by itself is not a quantity anyone chose.
-    setMultiRows(prefillRows({ ...multiRows, ...seed }, carrySingle && singleColourId && qty > 1 ? { colour: singleColourId, qty } : null));
+    // The colours the customer moved away from come too («Black 50» at the third colour), not only the last.
+    setMultiRows(prefillRows({ ...multiRows, ...colourMemory.current, ...seed }, carrySingle && singleColourId && qty > 1 ? { colour: singleColourId, qty } : null));
+    colourMemory.current = {};
     setMultiFocus(focus);
     setColourMode('many');
     setColourHint(null);
@@ -3349,6 +3434,26 @@ export default function Product() {
     setSingleColour(back.colour);
     setQty(Math.max(1, back.qty));
   };
+  /**
+   * AN OPTION LEFT FEWER THAN TWO COLOURS THAT CAN TAKE A QUANTITY while the
+   * rows were open (§3.2, §3.4): the panel and the switch are gone, so the
+   * page closes «عدة ألوان» itself — the way the switch does, rows that are
+   * no longer offered removed and named in the hint. Before this, the page
+   * fell back to one colour silently with the quantity it had BEFORE the
+   * rows (Black 2 in the list came back as «Add 50 × Black»). Adjusted during
+   * render, before anything is painted with the stale mode.
+   */
+  if (colourMode === 'many' && !multiOffered) {
+    const offeredNow = new Set(colourRows.filter((r) => r.offered).map((r) => r.id));
+    const closed = closeMultiForOption(multiRows, offeredNow, singleColourBeforeMulti.current, offeredNow.has(singleColourId) ? singleColourId : '');
+    setColourMode('one');
+    setMultiRows(closed.remembered);
+    setMultiFocus(null);
+    setColourModeAnnounce(cs.announceModeOff);
+    if (closed.colour !== singleColourId) setSingleColour(closed.colour);
+    setQty(Math.max(1, closed.qty));
+    setColourHint({ kind: 'closed', names: closed.dropped.map(colourNameOf) });
+  }
 
   /**
    * D4 — IN THE TAP HANDLER, NEVER IN AN EFFECT. From one colour to another
@@ -3358,18 +3463,21 @@ export default function Product() {
    */
   const afterColourTap = (from: string, to: string) => {
     const r = qtyAfterColourChange({ from, to, qty });
+    // Every number typed for a colour left behind is kept for «حدّد كمية لكل لون» (not only the last one).
+    colourMemory.current = rememberAfterTap(colourMemory.current, { from, to, qty });
     if (r.hint) {
       setQty(r.qty);
       setColourHint(r.hint);
       setStepperFlash(true);
-    } else if (colourHint?.kind === 'reset') {
+    } else if (colourHint?.kind === 'reset' || colourHint?.kind === 'closed') {
       setColourHint(null);
     }
     if (!to) return;
     const now = Date.now();
-    const taps = [...colourTaps.current.filter((t) => now - t.at <= 30_000), { id: to, at: now }];
-    colourTaps.current = taps;
-    const distinct = [...new Set(taps.map((t) => t.id))];
+    // The colour the tap LEFT counts too: the page may have opened on it, and the customer saw it chosen.
+    const w = tapWindow(colourTaps.current, from, to, now);
+    colourTaps.current = w.taps;
+    const distinct = w.distinct;
     if (!r.hint && !discoveryDone && multiOffered && distinct.length >= 3) {
       setColourHint({ kind: 'discovery', colours: distinct });
       setDiscoveryDone(true);
@@ -3387,14 +3495,24 @@ export default function Product() {
     const shelf = colourShelf(colourHint.to);
     const ceiling = requestedOrderType === 'direct_sale' && shelf !== null ? shelf : Number.POSITIVE_INFINITY;
     setQty(Math.max(1, Math.min(colourHint.previous.qty, ceiling)));
+    // The customer meant the new colour, not the old one: the old number is not carried anywhere else.
+    const rest = { ...colourMemory.current };
+    delete rest[colourHint.previous.colour];
+    colourMemory.current = rest;
     setColourHint(null);
   };
   const colourHintBlock =
     colourHint && !colourMulti ? (
       <div role="status" data-colour-hint={colourHint.kind} className="mt-3 rounded-md lv-well p-3 text-[13px] leading-relaxed text-text-primary">
-        <p>{colourHint.kind === 'reset' ? cs.resetHint : cs.discoveryHint}</p>
+        <p>
+          {colourHint.kind === 'reset'
+            ? cs.resetHint
+            : colourHint.kind === 'closed'
+              ? cs.multiClosed(colourHint.names.map((name) => isolate(name)).join(cl === 'en' ? ', ' : '، '))
+              : cs.discoveryHint}
+        </p>
         <div className="mt-2 flex flex-wrap gap-2">
-          {multiOffered ? (
+          {multiOffered && colourHint.kind !== 'closed' ? (
             <button
               type="button"
               data-colour-hint-action="per-colour"
@@ -3402,7 +3520,9 @@ export default function Product() {
               onClick={() =>
                 colourHint.kind === 'reset'
                   ? enterMulti({ [colourHint.previous.colour]: colourHint.previous.qty }, colourHint.to, false)
-                  : enterMulti({}, colourHint.colours[0] ?? null, false)
+                  : colourHint.kind === 'discovery'
+                    ? enterMulti({}, colourHint.colours[0] ?? null, false)
+                    : undefined
               }
               className="lv-button lv-button-secondary lv-button-sm min-h-[44px]"
             >
@@ -3497,6 +3617,7 @@ export default function Product() {
             cartLines={cartLines}
             cartLinesLoaded={cartLinesLoaded}
             isAuthenticated={isAuthenticated}
+            signInLabel={s.signInToBuy}
             onSignIn={() => navigate(authPathWithSupportRef(`/product/${product.slug}`))}
             onCartItems={(items) => {
               setCartLines(items);
@@ -4468,7 +4589,9 @@ export default function Product() {
     <div className="space-y-2" aria-live="polite">
       {mode === 'unavailable' && availability?.reason ? (
         <p className="lv-alert lv-alert-danger text-red-200 text-[13px]">
-          {reasonText(s, availability.reason)}
+          {/* A colour-stock filament with no colour chosen answers «unavailable» only because no colour
+              is: beside «اختر لونًا أولًا» the sentence asks for one, never «نفد المخزون». */}
+          {colourToChoose && !chosenColour ? reasonText(s, 'COLOR_REQUIRED') : reasonText(s, availability.reason)}
         </p>
       ) : null}
       {source === 'community' ? (
@@ -4542,34 +4665,45 @@ export default function Product() {
   //
   // AND IT SAYS WHAT IT ADDS (D3, docs/ux/COLOUR-QUANTITIES.md): with a colour
   // chosen it reads «أضف 50 × Black», never the bare «أضف إلى السلة»; a colour
-  // still to choose reads «اختر لونًا أولًا». Only a product with no colour
-  // dimension keeps «أضف إلى السلة». After a colour add it reads «أُضيف 50 ×
-  // Black» for 3 s, built from what WAS added, not from the current state.
-  const justAdded = lastAdded ? addedFlash : !!notice;
-  const buyButtonLabel = !isAuthenticated
-    ? s.signInToBuy
-    : addingToCart
-      ? s.adding
-      : justAdded
-        ? lastAdded
-          ? addedLabel(cl, lastAdded, { short: true })
-          : s.added
-        : mode === 'unavailable'
-          ? s.unavailable
-          : !hasColourDimension
-            ? s.addToCart
-            : chosenColour
-              ? addLabel(cl, [{ name: chosenColour.name, qty }], { short: true })
-              : cs.chooseColourFirst;
+  // still to choose reads «اختر لونًا أولًا» — before «غير متوفر», which a
+  // colour-stock filament answers only because no colour is chosen. Only a
+  // selection with no colour to choose keeps «أضف إلى السلة». After a colour
+  // add it reads «أُضيف 50 × Black» for 3 s, built from what WAS added.
+  // «أُضيف 50 × Black» is said only while the button would still send that selection: a colour tap or
+  // a new quantity inside the 3 s is another press, and the button names THAT one.
+  const currentSelectionKey = pressKey({ colour: colorId, optionValueIds, qty, orderType: requestedOrderType, route: effectiveTransport, warranty: warrantyPlanId });
+  const justAdded = lastAdded ? addedFlash && addedKey === currentSelectionKey : !!notice;
+  const buyKind = buyLabelKind({
+    signedIn: isAuthenticated,
+    adding: addingToCart,
+    justAdded,
+    lastAdded,
+    unavailable: mode === 'unavailable',
+    colourToChoose,
+    chosen: chosenColour ? { name: chosenColour.name, qty } : null,
+  });
+  const buyButtonLabel =
+    buyKind === 'signIn'
+      ? s.signInToBuy
+      : buyKind === 'adding'
+        ? s.adding
+        : buyKind === 'addedColour'
+          ? addedLabel(cl, lastAdded!, { short: true })
+          : buyKind === 'added'
+            ? s.added
+            : buyKind === 'addColour'
+              ? addLabel(cl, [{ name: chosenColour!.name, qty }], { short: true })
+              : buyKind === 'chooseColour'
+                ? cs.chooseColourFirst
+                : buyKind === 'addToCart'
+                  ? s.addToCart
+                  : s.unavailable;
   /** The full name for assistive tech when the visible label shortened a long colour name. */
   const buyButtonAria =
-    isAuthenticated && !addingToCart && mode !== 'unavailable' && hasColourDimension
-      ? justAdded && lastAdded
-        ? addedLabel(cl, lastAdded)
-        : !justAdded && chosenColour
-          ? addLabel(cl, [{ name: chosenColour.name, qty }])
-          : undefined
-      : undefined;
+    buyKind === 'addedColour' ? addedLabel(cl, lastAdded!) : buyKind === 'addColour' ? addLabel(cl, [{ name: chosenColour!.name, qty }]) : undefined;
+  /** ⚡ names what it buys too (principle 2): the press goes straight to an order. */
+  const quickBuyCapsuleLabel = chosenColour ? quickBuyLabel(cl, { name: chosenColour.name, qty }, { short: true }) : undefined;
+  const quickBuyCapsuleAria = chosenColour ? quickBuyLabel(cl, { name: chosenColour.name, qty }) : undefined;
 
   /**
    * THE BUY ROW. For a signed-in customer on a catalogue product it is one
@@ -4601,6 +4735,8 @@ export default function Product() {
           onPress: handleAddToCart,
         }}
         buy={{
+          label: quickBuyCapsuleLabel,
+          ariaLabel: quickBuyCapsuleAria,
           disabled: quickBuyBusy || (isAuthenticated && !canBuy),
           busy: quickBuyBusy,
           onPress: () => void runQuickBuy(),
