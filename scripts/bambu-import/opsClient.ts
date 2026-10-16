@@ -13,7 +13,7 @@
  * THE CALLS (method, path, request body keys → answer keys read):
  *
  *   POST /hello                         {protocol, github_run_id, code_commit}
- *                                       → {protocol, expected_migration, migrations_present{0193,0194,0195}, reviewed{file: sha256}, run{id, state, cursor}, worker_build}
+ *                                       → {protocol, expected_migration, migrations_present{0193,0194,0195,0196}, reviewed{file: sha256}, run{id, state, cursor}, worker_build}
  *   POST /manifest                      {rows: [≤ 100 × {source_product_id, handle, type, curated, hold_code, queue_position,
  *                                                      canonical_url, source_collections, breadcrumbs, discovery_sources, discovered_at}]}
  *                                       → {accepted}
@@ -37,6 +37,10 @@
  *   POST /run/prepare-taxonomy          {}                       → {created_nodes?, brand_created?, synonyms_inserted?}
  *   POST /run/protect-snapshot          {phase: 'before'|'after'} → {subjects?, changed?}
  *   POST /run/finish                    {}                       → {state: 'closed'|'partial'}
+ *   POST /run/translations              {part, text}             → {part, skipped, rows, inserted, updated, unchanged, refs_added,
+ *                                                                   purge_ids, purge_truncated, purged_products}
+ *                                       (one committed part of the translation memory, I18N-DESIGN §A.4: its exact text,
+ *                                       proved by the Worker against its bundled index; idempotent by the part's ledger)
  *   GET  /run/status                                             → {run, counts, current, next, last_verified_url, …progress fields}
  *
  * Every body is JSON ≤ 2 MB. Errors are `{code, message}`; a token that is
@@ -356,6 +360,19 @@ export interface OpsClientOptions {
 /** The item calls that take or renew the lease (the Worker's holdLease / leaseItem). */
 const LEASE_CALL = /^\/items\/(\d{1,20})\/(?:lease|event|stage|media|write|publish-finish|complete)$/;
 
+/** `/run/translations`'s answer, as far as the runner reads it (counts; the purged ids stay in the Worker's answer). */
+export interface TranslationsAnswer {
+  part: string;
+  skipped: boolean;
+  rows: number;
+  inserted: number;
+  updated: number;
+  unchanged: number;
+  refs_added: number;
+  purge_truncated: boolean;
+  purged_products: number;
+}
+
 export class OpsClient {
   private readonly base: string;
   private readonly token: string;
@@ -577,6 +594,26 @@ export class OpsClient {
   async finish(): Promise<{ state: string; held: HeldRef[] }> {
     const a = await this.send('run/finish', 'POST', '/run/finish', {}, false);
     return { state: str(a.state), held: heldRefs(a.held) };
+  }
+
+  /**
+   * One committed part of the translation memory (I18N-DESIGN §A.4): the file's exact text. Idempotent (the Worker
+   * skips a part its ledger already holds), so it is retried in-call like any idempotent call. Counts only come back.
+   */
+  async loadTranslations(part: string, text: string): Promise<TranslationsAnswer> {
+    if (!/^p[0-9]{3,}$/.test(part)) throw new OpsError('run/translations', 'permanent', 'IMPORT_BAD_REQUEST', 0);
+    const a = await this.send('run/translations', 'POST', '/run/translations', { part, text }, true);
+    return {
+      part: str(a.part),
+      skipped: a.skipped === true,
+      rows: num(a.rows),
+      inserted: num(a.inserted),
+      updated: num(a.updated),
+      unchanged: num(a.unchanged),
+      refs_added: num(a.refs_added),
+      purge_truncated: a.purge_truncated === true,
+      purged_products: num(a.purged_products),
+    };
   }
 
   async status(): Promise<StatusAnswer> {

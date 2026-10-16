@@ -32,14 +32,16 @@
  *       migration count and last name equal the repository's, the 0195 table
  *       exists, and the Time Travel bookmark (the restore point) is printed. For
  *       preflight and open: no active run; for preflight also no CSV import
- *       lease. For run, close and withdraw: the run exists and is active.
+ *       lease. For run, close, withdraw and translations (the translation
+ *       memory's loader, docs/bambu-import/I18N-DESIGN.md §A.4): the run exists
+ *       and is active.
  *   node scripts/bambu-import/cf.mjs open --token-file <file> --run-file <file>
  *       Creates the run row (`cir_` + 24 hex, state open, the reviewed bundle's
  *       digest, the manifest size, the commit) with a fresh 256-bit token:
  *       the token goes to a 0600 file only the importer step reads, and only
  *       its SHA-256 is stored. The run id goes to its own file.
  *   node scripts/bambu-import/cf.mjs mint --run <cir_ + 24 hex> --chain-count <0-12> --token-file <file> --run-file <file>
- *       A fresh per-job token for an active run (run, close, withdraw): the
+ *       A fresh per-job token for an active run (run, close, withdraw, translations): the
  *       same 0600 file, the hash and its expiry on the run row. A run the kill
  *       switch stopped gets no token for a chained job (chain_count above 0:
  *       the chain job dispatched it, maybe before the owner pressed the
@@ -83,7 +85,9 @@ export const SNAPSHOT_FORMAT = 'levonis-bambu-snapshot/1';
 export const REPORT_FILE = 'report.sealed';
 export const REPORT_FORMAT = 'levonis-bambu-report/1';
 /** The modes workflow 60 runs cf.mjs preflight for. */
-export const PREFLIGHT_MODES = ['preflight', 'open', 'run', 'close', 'withdraw'];
+export const PREFLIGHT_MODES = ['preflight', 'open', 'run', 'close', 'withdraw', 'translations'];
+/** The modes that act on an existing, active run (its id is required, and it must be open, running or blocked). */
+const RUN_MODES = ['run', 'close', 'withdraw', 'translations'];
 /** The reviewed files the Worker bundles (scripts/bambu-import/discover.ts REVIEWED_FILES, §A.3). */
 export const REVIEWED_FILES = [
   'manifest.json',
@@ -226,7 +230,7 @@ export function parseArgs(argv) {
   if (mode === 'preflight') {
     const given = options(['--mode', '--run']);
     if (!PREFLIGHT_MODES.includes(given['--mode'])) throw new CfError(`preflight: --mode must be one of ${PREFLIGHT_MODES.join(', ')}`);
-    const needsRun = ['run', 'close', 'withdraw'].includes(given['--mode']);
+    const needsRun = RUN_MODES.includes(given['--mode']);
     if (needsRun) runOf(given['--run'], `preflight for ${given['--mode']}`);
     else if (given['--run'] !== '' && !RUN_ID_PATTERN.test(given['--run'] ?? '')) throw new CfError('preflight: --run is a run id or empty');
     return { mode, forMode: given['--mode'], runId: given['--run'] };
@@ -515,7 +519,7 @@ export function preflight(context, { forMode, runId }) {
     context.log(`preflight: CSV imports holding an apply lease: ${leases}`);
     if (leases !== 0) throw new CfError('a CSV import is applying: wait for it');
   }
-  if (['run', 'close', 'withdraw'].includes(forMode)) {
+  if (RUN_MODES.includes(forMode)) {
     const run = query(context, `SELECT COUNT(*) AS n FROM catalog_import_runs WHERE id = '${runId}' AND state IN ('open','running','blocked')`).results[0];
     if (Number(run?.n) !== 1) throw new CfError(`run ${runId} is not an active import run`);
     context.log(`preflight: run ${runId} is active`);

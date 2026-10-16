@@ -76,6 +76,27 @@ export const IMPORT_ERROR_MESSAGES: Readonly<Record<string, Tri>> = {
     'To track quantity, enter the stock quantity first.',
     'بۆ بەدواداچوونی بڕ، سەرەتا بڕی کۆگا بنووسە.'
   ),
+  // The translation memory's loader (docs/bambu-import/I18N-DESIGN.md §A.4).
+  TRANSLATIONS_PART_UNKNOWN: tri(
+    'جزء الترجمات هذا ليس في النسخة المنشورة؛ انتظر اكتمال النشر ثم أعد المحاولة.',
+    'This translations part is not in the deployed build; wait for the deploy, then retry.',
+    'ئەم بەشەی وەرگێڕانەکان لە وەشانی بڵاوکراوەدا نییە؛ چاوەڕێی تەواوبوونی بڵاوکردنەوە بکە و دووبارە هەوڵ بدەرەوە.'
+  ),
+  TRANSLATIONS_PART_MISMATCH: tri(
+    'محتوى جزء الترجمات لا يطابق النسخة المراجَعة، فلم يُحمَّل.',
+    'The translations part does not match the reviewed copy, so it was not loaded.',
+    'ناوەڕۆکی بەشی وەرگێڕانەکان لەگەڵ وەشانە پێداچوونەوەکراوەکە یەک ناگرێتەوە، بۆیە بار نەکرا.'
+  ),
+  TRANSLATIONS_ROW_INVALID: tri(
+    'سطر في جزء الترجمات لم يجتز الفحص، فلم يُحمَّل الجزء.',
+    'A row of the translations part failed validation, so the part was not loaded.',
+    'دێڕێک لە بەشی وەرگێڕانەکان لە پشکنین دەرنەچوو، بۆیە بەشەکە بار نەکرا.'
+  ),
+  TRANSLATIONS_SCHEMA_MISSING: tri(
+    'قاعدة البيانات لا تحوي جداول الترجمات بعد.',
+    'The database does not have the translation tables yet.',
+    'داتابەیسەکە هێشتا خشتەکانی وەرگێڕانی تێدا نییە.'
+  ),
 };
 
 // ---------------------------------------------------------------- the wire shape

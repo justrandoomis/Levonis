@@ -26,11 +26,11 @@ const H = 'a'.repeat(64);
 
 test('0196 applies twice and only creates its own three tables and one index', () => {
   const raw = dbThrough('0195');
-  const before = raw.prepare("SELECT type, name, sql FROM sqlite_master ORDER BY type, name").all();
+  const before = raw.prepare("SELECT type, name, sql FROM sqlite_master ORDER BY type, name").all() as Array<{ type: string; name: string; sql: string | null }>;
   raw.exec(SQL);
   raw.exec(SQL);
-  const after = raw.prepare("SELECT type, name, sql FROM sqlite_master ORDER BY type, name").all() as Array<{ type: string; name: string }>;
-  const added = after.filter((a) => !before.some((b) => (b as { name: string }).name === a.name)).map((a) => `${a.type}:${a.name}`).sort();
+  const after = raw.prepare("SELECT type, name, sql FROM sqlite_master ORDER BY type, name").all() as Array<{ type: string; name: string; sql: string | null }>;
+  const added = after.filter((a) => !before.some((b) => b.name === a.name)).map((a) => `${a.type}:${a.name}`).sort();
   assert.deepEqual(added, [
     'index:ix_ctr_h',
     'index:sqlite_autoindex_catalog_translation_parts_1',
@@ -39,8 +39,8 @@ test('0196 applies twice and only creates its own three tables and one index', (
     'table:catalog_translation_refs',
     'table:catalog_translations',
   ]);
-  for (const b of before as Array<{ name: string; sql: string | null }>) {
-    const a = (after as Array<{ name: string; sql: string | null }>).find((x) => x.name === b.name);
+  for (const b of before) {
+    const a = after.find((x) => x.name === b.name);
     assert.equal(a?.sql, b.sql, `${b.name} is untouched`);
   }
   assert.doesNotMatch(SQL, /\b(ALTER|DROP|DELETE|UPDATE)\b/i, 'additive only');
