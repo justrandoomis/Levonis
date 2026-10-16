@@ -33,6 +33,11 @@
  *   11 compare        GET /api/compare?ids=<id> → 200 with the card; the
  *                     candidates when the type has ≥ 3 compare keys with values.
  *
+ * THE GALLERY AS WRITTEN. The Worker collapses byte-identical gallery images
+ * into the earliest position (§C.4 step 1), so the images, the bindings, the
+ * primary and the fingerprint are expected from the rows it wrote
+ * (gallery.ts), never from the payload's pre-collapse list.
+ *
  * WHAT THE PUBLIC SITE CAN SHOW. A document whose ENRICH check found it dead
  * is stored inactive and never shown (§C.7, §G.2): it is not expected. A
  * relation's state moves when its target is written (pending → resolved,
@@ -57,6 +62,7 @@ import { specKey } from '@levonis/catalog/bambuImport/registry/specKeys';
 import type { ImportPayload } from '@levonis/catalog/bambuImport/payload';
 import { CACHE_WAIT_MAX, VERIFY_AFTER_CACHE_WAIT } from './deadline';
 import { HostFetcher, ImportStop } from './fetch';
+import type { GalleryImage } from './gallery';
 import type { DocumentCheck, MediaAnswerRow } from './opsClient';
 import { pageDefaultSelection } from './selection';
 
@@ -122,6 +128,8 @@ export interface VerifyContext {
   slug: string;
   /** source_media_id → what /media stored. */
   media: ReadonlyMap<string, MediaAnswerRow>;
+  /** The gallery as written (gallery.ts): the image rows the Worker wrote after the content-duplicate collapse. */
+  images: readonly GalleryImage[];
   /** ENRICH's document checks (sent with /write): a dead document is stored inactive and never shown. */
   documentChecks?: readonly DocumentCheck[];
   /** The taxonomy entry the leaf resolves from (`@key` of taxonomy-map `create`, or a catalog id). */
@@ -174,13 +182,21 @@ export function documentShown(doc: { id: string }, checks: readonly DocumentChec
   return !c || (c.check_status >= 200 && c.check_status < 400);
 }
 
-/** The facts the public answers must show, from the payload, the stored media and the document checks. */
-export function expectedFacts(payload: ImportPayload, media: ReadonlyMap<string, MediaAnswerRow>, documentChecks: readonly DocumentCheck[] = []) {
+/**
+ * The facts the public answers must show, from the payload, the gallery as written (the image rows the Worker
+ * wrote after the content-duplicate collapse, gallery.ts), the stored media and the document checks.
+ */
+export function expectedFacts(
+  payload: ImportPayload,
+  media: ReadonlyMap<string, MediaAnswerRow>,
+  documentChecks: readonly DocumentCheck[],
+  gallery: readonly GalleryImage[]
+) {
   const stored = (id: string) => {
     const m = media.get(id);
     return m && m.status === 'stored' && m.r2_key ? `/files/${m.r2_key}` : '';
   };
-  const images = payload.images.filter((i) => stored(i.source_media_id));
+  const images = gallery.filter((i) => stored(i.source_media_id));
   const publicSpecs = payload.specs.filter(isPublicSpec);
   const shownDocuments = payload.documents.filter((d) => documentShown(d, documentChecks));
   const box = publicSpecs.filter((s) => s.key === 'package.contents');
@@ -330,7 +346,7 @@ const ALLOWED_IMAGE = /^\/files\/[A-Za-z0-9/_.-]+\.webp$/;
 
 export async function verifyPublic(site: Site, ctx: VerifyContext): Promise<VerifyOutcome> {
   const checks: Record<string, CheckResult> = {};
-  const exp = expectedFacts(ctx.payload, ctx.media, ctx.documentChecks ?? []);
+  const exp = expectedFacts(ctx.payload, ctx.media, ctx.documentChecks ?? [], ctx.images);
   const title = ctx.payload.product.title_en;
   /** A merge keeps the existing product's own name, money, options and images (§E.2). */
   const merge = ctx.payload.write_mode === 'merge';
@@ -390,6 +406,13 @@ export async function verifyPublic(site: Site, ctx: VerifyContext): Promise<Veri
     sameTally(siteBindings, exp.bindings) &&
     (sf.images.find((i) => i.is_primary)?.id ?? '') === exp.primaryId &&
     sf.images.every((i) => ALLOWED_IMAGE.test(mediaPath(i.url)));
+  // The collapse moves a row and may hand the primary on; it never invents a row or rebinds one: every written row is
+  // a payload image with its own source medium and binding, so the payload stays the witness of what is bound where.
+  const payloadRow = new Map(ctx.payload.images.map((i) => [i.id, i]));
+  const writtenFromPayload = ctx.images.every((i) => {
+    const p = payloadRow.get(i.id);
+    return !!p && p.source_media_id === i.source_media_id && (p.option_value_id ?? null) === (i.option_value_id ?? null) && (p.variant_id ?? null) === (i.variant_id ?? null);
+  });
   const swatchUrl = new Map(sf.groups.flatMap((g) => g.values.map((v) => [v.id, v.swatch] as const)));
   const swatchesOk = exp.swatches.every((s) => !!swatchUrl.get(s.value_id));
   // A merge: the appended images are on the product (bound through the reviewed value map, so found by URL), each
@@ -398,17 +421,17 @@ export async function verifyPublic(site: Site, ctx: VerifyContext): Promise<Veri
   const appendedOk = appended.every((u) => siteUrls.has(u) && ALLOWED_IMAGE.test(u));
   const structureOk = merge
     ? siteAnswer.status === 200 && appendedOk
-    : siteAnswer.status === 200 && siteAnswer.json?.price_status === 'unpriced' && groupsOk && variantsOk && imagesOk && swatchesOk;
+    : siteAnswer.status === 200 && siteAnswer.json?.price_status === 'unpriced' && groupsOk && variantsOk && imagesOk && swatchesOk && writtenFromPayload;
   record(
     'structure',
     {
       ok: structureOk,
       hard: true,
       status: siteAnswer.status,
-      counts: { groups: sf.groups.length, variants: sf.variants.length, images: sf.images.length, swatches: exp.swatches.filter((s) => !!swatchUrl.get(s.value_id)).length, ...Object.fromEntries(Object.entries(siteBindings).map(([k, v]) => [`images_${k}`, v])) },
+      counts: { groups: sf.groups.length, variants: sf.variants.length, images: sf.images.length, expected_images: merge ? appended.length : exp.images.length, swatches: exp.swatches.filter((s) => !!swatchUrl.get(s.value_id)).length, ...Object.fromEntries(Object.entries(siteBindings).map(([k, v]) => [`images_${k}`, v])) },
       detail: merge
         ? { merge: true, appended_present: appendedOk }
-        : { unpriced: siteAnswer.json?.price_status === 'unpriced', groups_ok: groupsOk, variants_ok: variantsOk, images_ok: imagesOk, swatches_ok: swatchesOk },
+        : { unpriced: siteAnswer.json?.price_status === 'unpriced', groups_ok: groupsOk, variants_ok: variantsOk, images_ok: imagesOk, swatches_ok: swatchesOk, written_from_payload: writtenFromPayload },
     },
     siteAnswer
   );

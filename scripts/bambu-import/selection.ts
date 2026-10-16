@@ -93,8 +93,15 @@ export interface ExpectedGallery {
   forbidden: Set<string>;
 }
 
-/** The gallery the page shows for `selection` (§G.3, R6). */
-export function expectedGallery(payload: Pick<ImportPayload, 'groups' | 'variants' | 'images'>, media: ReadonlyMap<string, MediaAnswerRow>, selection: readonly string[]): ExpectedGallery {
+/**
+ * The gallery the page shows for `selection` (§G.3, R6). `images` are the rows as WRITTEN (gallery.ts: after the
+ * Worker's content-duplicate collapse), never the payload's pre-collapse list.
+ */
+export function expectedGallery(
+  payload: { groups: Groups; variants: Variants; images: readonly ImportPayload['images'][number][] },
+  media: ReadonlyMap<string, MediaAnswerRow>,
+  selection: readonly string[]
+): ExpectedGallery {
   const urlOf = (id: string) => {
     const m = media.get(id);
     return m && m.status === 'stored' && m.r2_key ? `/files/${m.r2_key}` : '';

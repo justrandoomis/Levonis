@@ -18,7 +18,11 @@
  *     deadline that releases and exits, and /write never started with less
  *     than 13 minutes left;
  *   - the chain outputs (more, blocked, run_id); the open, close and withdraw
- *     modes; the reviewed-bundle and revoked-token stops.
+ *     modes; the reviewed-bundle and revoked-token stops;
+ *   - byte-identical gallery images (§C.4 step 1): the Worker collapses them
+ *     and the item COMPLETEs on the rows it wrote — from this job's /write
+ *     answer, from stage_data, or recomputed on a resume — where the
+ *     payload's pre-collapse gallery would have failed VERIFY.
  *
  * Run: node --import tsx --test tests/bambuImportRunner.test.ts
  */
@@ -31,6 +35,8 @@ import { parseRobots, robotsAllows } from '../scripts/bambu-import/robots';
 import { ImportStop, StoreFetcher } from '../scripts/bambu-import/fetch';
 import { ExtractGate, stageAfter } from '../scripts/bambu-import/run';
 import { reviewedDifferences } from '../scripts/bambu-import/discover';
+import { expectedFacts } from '../scripts/bambu-import/verify';
+import type { MediaAnswerRow } from '../scripts/bambu-import/opsClient';
 
 const MIN = 60_000;
 const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
@@ -792,5 +798,74 @@ test('robots.txt that disallows a sitemap: withdraw and close refuse (a policy s
     assert.ok(!c.storeRequests.some((r) => r.path.endsWith('.xml')), 'no sitemap was read');
   } finally {
     c.dispose();
+  }
+});
+
+// ------------------------------------------------------------------ the gallery as written (§C.4 step 1)
+
+/** AMS 2 Pro's gallery holds `ams.jpg` twice (#15 and #18, two store ids): here the two are byte-for-byte one picture. */
+const AMS = '580876092009701376';
+const AMS_JPG = '581277809550905344';
+const AMS_JPG_AGAIN = '580881346700820480';
+const sameAms = (_h: string, id: string) => (id === AMS_JPG_AGAIN ? AMS_JPG : id);
+const galleryLine = (w: World) => w.logLines.find((l) => /gallery as written/.test(l)) ?? '';
+
+test('byte-identical gallery images: the Worker collapses them, and the item COMPLETEs on the rows it wrote (the pre-collapse gallery fails)', async () => {
+  const w = new World({ handles: ['ams-2-pro'], contentOf: sameAms });
+  try {
+    assert.equal(await w.importer().main(), 0, w.logLines.join('\n'));
+    const item = w.item('ams-2-pro');
+    assert.equal(item.state, 'COMPLETE', w.logLines.join('\n'));
+    const payload = item.payload!;
+    assert.equal(payload.images.length, 20);
+    assert.equal(item.media.get(AMS_JPG)!.r2_key, item.media.get(AMS_JPG_AGAIN)!.r2_key, 'one stored object for the two');
+    // The fake Worker wrote 19 rows: the later general copy went (writer.ts collapseContentDuplicates).
+    const dropped = payload.images.filter((i) => i.source_media_id === AMS_JPG_AGAIN).map((i) => i.id);
+    assert.equal(dropped.length, 1);
+    assert.deepEqual(item.written!.map((r) => r.id), payload.images.filter((i) => !dropped.includes(i.id)).map((i) => i.id));
+    assert.match(galleryLine(w), /19 image rows of 20 in the payload \(from write\)/);
+    const ev = callsTo(w, new RegExp(`${AMS}/complete$`))[0].body!.edge_evidence as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+    for (const [name, c] of Object.entries(ev.checks as Record<string, { ok: boolean }>)) assert.equal(c.ok, true, name);
+    assert.equal(ev.checks.structure.counts.images, 19);
+    assert.equal(ev.checks.fingerprint.detail.expected, ev.checks.fingerprint.detail.live);
+    assert.equal(ev.counts.images, 20, 'the evidence counts the payload written (stage_data.payload_counts)');
+    // The expectation the runner built before (the payload's pre-collapse gallery) is not what the site shows.
+    const media = new Map<string, MediaAnswerRow>([...item.media].map(([id, m]) => [id, { source_media_id: id, status: 'stored', r2_key: m.r2_key, width: 800, height: 800, error_code: '' }]));
+    assert.notEqual(expectedFacts(payload, media, [], payload.images).projection, ev.checks.fingerprint.detail.live);
+    assert.notEqual(payload.images.length, ev.checks.structure.counts.images);
+  } finally {
+    w.dispose();
+  }
+});
+
+test('byte-identical gallery images on a resume after /write: the rows from stage_data when the Worker records them, else recomputed', async () => {
+  // In this job: the /write committed and its answer was lost, so no rows are at hand: the collapse is recomputed.
+  const a = new World({ handles: ['ams-2-pro'], contentOf: sameAms });
+  try {
+    a.loseAnswer(new RegExp(`/items/${AMS}/write$`));
+    assert.equal(await a.importer().main(), 0, a.logLines.join('\n'));
+    assert.equal(a.item('ams-2-pro').state, 'COMPLETE', a.logLines.join('\n'));
+    assert.equal(writeCalls(a).length, 1, 'the committed write is not sent again');
+    assert.match(galleryLine(a), /19 image rows of 20 in the payload \(from recomputed\)/);
+  } finally {
+    a.dispose();
+  }
+  // Across jobs: job 1 parks at VERIFY; job 2 resumes there and reads the rows the Worker recorded in stage_data.
+  for (const recordImages of [true, false]) {
+    const b = new World({ handles: ['ams-2-pro'], contentOf: sameAms, recordImages });
+    try {
+      b.inject(new RegExp(`/items/${AMS}/complete$`), 1, () => json(503, { code: 'OVERLOADED', message: 'busy' }, { 'retry-after': '1500' }));
+      await b.importer({ deadlineMs: b.clock.now() + 22 * MIN }).main();
+      assert.equal(b.item('ams-2-pro').last_completed, 'PUBLISHING');
+      b.clock.t = Date.parse(b.item('ams-2-pro').retry_at) + 1000;
+      const lines = b.logLines.length;
+      assert.equal(await b.importer({ chainCount: 1 }).main(), 0, b.logLines.join('\n'));
+      assert.equal(b.item('ams-2-pro').state, 'COMPLETE', b.logLines.slice(lines).join('\n'));
+      assert.equal(writeCalls(b).length, 1);
+      const job2 = b.logLines.slice(lines).join('\n');
+      assert.match(job2, new RegExp(`19 image rows of 20 in the payload \\(from ${recordImages ? 'stage_data' : 'recomputed'}\\)`));
+    } finally {
+      b.dispose();
+    }
   }
 });

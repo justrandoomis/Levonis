@@ -25,7 +25,11 @@
  *   POST /items/:sid/media              {lease_token, media: [≤ 4 × {source_media_id, role, source_url}]}
  *                                       → {media: [{source_media_id, status, r2_key, width, height, error_code?}]}
  *   POST /items/:sid/write              {lease_token, payload_sha256, payload, document_checks}
- *                                       → {product_id, slug, created | merged, counts, before_fp_equal, after_money_default}
+ *                                       → {product_id, slug, created | merged, counts, before_fp_equal, after_money_default,
+ *                                          images: [{id, source_media_id, r2_key, sort_order, is_primary, option_value_id,
+ *                                                    variant_id, color_id, binding_rule}]}
+ *                                       (`images`: the rows the write bound AFTER the content-duplicate collapse, §C.4
+ *                                       step 1 — the gallery VERIFY expects, gallery.ts)
  *   POST /items/:sid/publish-finish     {lease_token}            → {state}
  *   GET  /items/:sid/readback                                    → {ok, mismatches, …}
  *   POST /items/:sid/complete           {lease_token, live_url, edge_evidence} → {state, seq?, d1_checks?}
@@ -207,6 +211,26 @@ export interface WriteAnswer {
   counts: Record<string, number>;
   before_fp_equal: boolean | null;
   after_money_default: boolean | null;
+  /** The image rows the write bound, after the content-duplicate collapse; null when the answer names none. */
+  images: WrittenImage[] | null;
+}
+
+/**
+ * One image row as the Worker wrote it (worker/lib/catalogImport/writer.ts ImportWriteResult.images): a payload
+ * image on its stored object, after the content-duplicate collapse (§C.4 step 1) — a payload image absent from the
+ * list was collapsed into the earlier copy of the same bytes; a later bound copy took that position
+ * (`binding_rule 'content_duplicate'`).
+ */
+export interface WrittenImage {
+  id: string;
+  source_media_id: string;
+  r2_key: string;
+  sort_order: number;
+  is_primary: boolean;
+  option_value_id: string | null;
+  variant_id: string | null;
+  color_id: string | null;
+  binding_rule: string;
 }
 
 export interface DocumentCheck {
@@ -236,6 +260,31 @@ const isRec = (v: unknown): v is Rec => !!v && typeof v === 'object' && !Array.i
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const num = (v: unknown, fallback = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
 const bool = (v: unknown): boolean | null => (typeof v === 'boolean' ? v : null);
+const idOrNull = (v: unknown): string | null => (typeof v === 'string' && v ? v : null);
+
+/**
+ * The written image rows of a /write answer (or of what the Worker records of it): null unless `raw` is a list
+ * whose every entry names an id, a source medium and a stored key — a half-read gallery is never an expectation.
+ */
+export function writtenImagesOf(raw: unknown): WrittenImage[] | null {
+  if (!Array.isArray(raw)) return null;
+  const out: WrittenImage[] = [];
+  for (const r of raw) {
+    if (!isRec(r) || !str(r.id) || !str(r.source_media_id) || !str(r.r2_key) || typeof r.sort_order !== 'number') return null;
+    out.push({
+      id: str(r.id),
+      source_media_id: str(r.source_media_id),
+      r2_key: str(r.r2_key),
+      sort_order: r.sort_order,
+      is_primary: r.is_primary === true || r.is_primary === 1,
+      option_value_id: idOrNull(r.option_value_id),
+      variant_id: idOrNull(r.variant_id),
+      color_id: idOrNull(r.color_id),
+      binding_rule: str(r.binding_rule),
+    });
+  }
+  return out;
+}
 
 function itemRef(v: unknown): ItemRef | null {
   if (!isRec(v)) return null;
@@ -454,6 +503,7 @@ export class OpsClient {
       counts,
       before_fp_equal: bool(a.before_fp_equal),
       after_money_default: bool(a.after_money_default),
+      images: writtenImagesOf(a.images),
     };
   }
 

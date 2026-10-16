@@ -4,7 +4,10 @@
  * legal graph, the in-flight index, stage attempts, the lease), a fake store
  * serving the committed fixture pages, a fake CDN for document checks, and a
  * fake public site whose answers are derived from what `/write` received —
- * the runner's verification reads them, never its own payload.
+ * the runner's verification reads them, never its own payload. Like the
+ * Worker, `/media` stores each picture under a content-addressed key and
+ * `/write` collapses byte-identical gallery images (§C.4 step 1), answers the
+ * rows it wrote, and the site shows those rows.
  *
  * Every store request and every ops event takes a number from one global
  * sequence, so a test can prove the order of things (EXTRACT never before the
@@ -19,6 +22,7 @@ import { canonicalJson } from '../../packages/catalog/src/bambuImport/fingerprin
 import { ROOT } from './d1';
 import type { Clock } from '../../scripts/bambu-import/deadline';
 import { isPublicSpec } from '../../scripts/bambu-import/verify';
+import { collapseContentDuplicates, type StoredGalleryRow } from '../../scripts/bambu-import/gallery';
 import { loadReviewedBundle, type ReviewedBundle } from '../../scripts/bambu-import/discover';
 import { ImportLog } from '../../scripts/bambu-import/log';
 import { SummaryWriter } from '../../scripts/bambu-import/summary';
@@ -82,6 +86,8 @@ export interface FakeItem {
   payload: ImportPayload | null;
   payload_sha: string;
   media: Map<string, { r2_key: string }>;
+  /** The image rows /write wrote (after the content-duplicate collapse): what the site shows. */
+  written: StoredGalleryRow[] | null;
   title: string;
   /** What /write did: a new product or a merge into a reviewed existing one. */
   match_kind: '' | 'created' | 'merged';
@@ -135,6 +141,13 @@ export interface WorldOptions {
   hostAnswer?: (host: string, method: string, path: string, headers: Record<string, string>) => Response | null;
   /** Reviewed existing-matches entries (a merge into an existing Levonis product, §E.1). */
   matches?: Array<{ source_product_id: string; decision: string; levonis_product_id: string; reason?: string }>;
+  /**
+   * What a medium's bytes are (default: its own id, so every picture differs). Two media with the same content get
+   * one content-addressed key, as the Worker stores them, and /write collapses them (§C.4 step 1).
+   */
+  contentOf?: (handle: string, sourceMediaId: string) => string;
+  /** The lease answers the written image rows in stage_data.images (a Worker that records them there). */
+  recordImages?: boolean;
 }
 
 export class World {
@@ -194,6 +207,7 @@ export class World {
         payload: null,
         payload_sha: '',
         media: new Map(),
+        written: null,
         title: r.title,
         match_kind: '',
         hidden: false,
@@ -307,7 +321,10 @@ export class World {
       attempts: i.attempts,
       stage_attempts: i.stage_attempts,
       retry_at: i.retry_at,
-      stage_data: this.opts.planted ? { note: this.planted() } : {},
+      stage_data: {
+        ...(this.opts.planted ? { note: this.planted() } : {}),
+        ...(this.opts.recordImages && i.written ? { images: i.written.map((r) => this.writtenRow(r)) } : {}),
+      },
       blocker_code: i.blocker_code,
       levonis_product_id: i.levonis_product_id,
       // A slug the item does not have yet (not COMPLETE, not even written): the planted one.
@@ -443,7 +460,7 @@ export class World {
       const media = (Array.isArray(body?.media) ? body!.media : []) as Array<{ source_media_id: string; source_url: string }>;
       return json(200, {
         media: media.map((x) => {
-          const key = `products/import/gallery/${sha(x.source_media_id)}.webp`;
+          const key = `products/import/gallery/${sha(this.opts.contentOf?.(i.handle, x.source_media_id) ?? x.source_media_id)}.webp`;
           i.media.set(x.source_media_id, { r2_key: key });
           return { source_media_id: x.source_media_id, status: 'stored', r2_key: key, width: 800, height: 800, ...(planted ? { note: planted } : {}) };
         }),
@@ -458,6 +475,9 @@ export class World {
       i.last_completed = 'WRITING';
       const merged = i.payload!.write_mode === 'merge';
       i.match_kind = merged ? 'merged' : 'created';
+      // The Worker's step 7: the payload's rows on their stored objects, then the content-duplicate collapse.
+      const rows = i.payload!.images.flatMap((x) => (i.media.get(x.source_media_id) ? [{ ...x, r2_key: i.media.get(x.source_media_id)!.r2_key }] : []));
+      i.written = collapseContentDuplicates(rows).rows;
       this.events.push({ seq: ++this.seq, sid: i.sid, state: 'WRITTEN', outcome: 'ok', code: '', release: false, retry_at: '' });
       return json(200, {
         product_id: i.levonis_product_id,
@@ -468,6 +488,7 @@ export class World {
         counts: { groups: i.payload!.groups.length },
         before_fp_equal: merged ? true : null,
         after_money_default: merged ? null : true,
+        images: i.written.map((r) => this.writtenRow(r)),
         ...(planted ? { note: planted } : {}),
       });
     }
@@ -491,6 +512,11 @@ export class World {
       return json(200, { state: 'COMPLETE', seq, d1_checks: { visible: true, sellable: false, ...(planted ? { names: planted } : {}) } });
     }
     return json(404, { code: 'NO_ROUTE', message: 'no route' });
+  }
+
+  /** One written image row as the Worker's /write answers it (writer.ts ImportWriteResult.images). */
+  private writtenRow(r: StoredGalleryRow): Rec {
+    return { id: r.id, source_media_id: r.source_media_id, r2_key: r.r2_key, sort_order: r.sort_order, is_primary: r.is_primary, option_value_id: r.option_value_id, variant_id: r.variant_id, color_id: null, binding_rule: r.binding_rule };
   }
 
   // ---------------------------------------------------------------- the fake public site
@@ -546,7 +572,8 @@ export class World {
     const i = v1 ? this.bySlug(decodeURIComponent(v1[1])) : siteP ? this.bySlug(decodeURIComponent(siteP[1])) : null;
     if (!i || !i.payload) return json(404, { success: false, error: 'Not found', code: 'NOT_FOUND' });
     const pay = i.payload;
-    const stored = pay.images.filter((x) => this.files(i, x.source_media_id));
+    // The rows the write wrote (byte-identical images collapsed), as the page shows them.
+    const stored = (i.written ?? pay.images).filter((x) => this.files(i, x.source_media_id));
     if (v1) {
       return json(200, {
         data: {

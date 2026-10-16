@@ -61,7 +61,7 @@ test('R6 over the whole selection: every value of PLA Basic on the step-7 page p
   const payload = payloadOf('pla-basic-filament');
   const media = mediaOf(payload);
   const page = new ModelProductPage(payload, media, { breadcrumb: LEAF });
-  const r = await inspectProductPage(page, { payload, media, leafName: LEAF, allValues: true });
+  const r = await inspectProductPage(page, { payload, media, images: payload.images, leafName: LEAF, allValues: true });
   assert.equal(r.checks.default_selection, true);
   assert.equal(r.checks.selection_images, true, JSON.stringify(r.counts));
   assert.equal(r.counts.values_failed, 0);
@@ -92,7 +92,7 @@ test('R6 the other way: a page that leads with another colour\'s picture once Bl
     breadcrumb: LEAF,
     heroFor: (sel, right) => (sel.includes(black.id) && sel.includes(spool.id) ? wrong : right),
   });
-  const r = await inspectProductPage(page, { payload, media, leafName: LEAF, allValues: true });
+  const r = await inspectProductPage(page, { payload, media, images: payload.images, leafName: LEAF, allValues: true });
   assert.equal(r.checks.selection_images, false);
   assert.ok(r.counts.values_failed >= 1);
 });
@@ -104,7 +104,7 @@ test('§G.3 opening selection: the defaults while they form a variant, else the 
   const opening = pageDefaultSelection(payload);
   assert.equal(opening.length, payload.groups.length, 'the single-value weight group is part of it');
   assert.ok(payload.variants.some((v) => v.value_ids.length === opening.length && opening.every((id) => v.value_ids.includes(id))));
-  const r = await inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF }), { payload, media, leafName: LEAF, allValues: false });
+  const r = await inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF }), { payload, media, images: payload.images, leafName: LEAF, allValues: false });
   assert.equal(r.checks.default_selection, true);
   assert.deepEqual(r.selections[0], opening, 'the opening selection is recorded first, whole');
 
@@ -116,10 +116,10 @@ test('§G.3 opening selection: the defaults while they form a variant, else the 
   const odd: ImportPayload = JSON.parse(JSON.stringify(payload));
   odd.groups.find((g) => g.id === colours.id)!.default_value_id = pair[0];
   odd.groups.find((g) => g.id === spools.id)!.default_value_id = pair[1];
-  const right = await inspectProductPage(new ModelProductPage(odd, media, { breadcrumb: LEAF }), { payload: odd, media, leafName: LEAF, allValues: false });
+  const right = await inspectProductPage(new ModelProductPage(odd, media, { breadcrumb: LEAF }), { payload: odd, media, images: odd.images, leafName: LEAF, allValues: false });
   assert.equal(right.checks.default_selection, true, 'the page that follows §G.3 passes');
   assert.ok(right.selections[0].includes(pair[0]) && !right.selections[0].includes(pair[1]));
-  const old = await inspectProductPage(new ModelProductPage(odd, media, { breadcrumb: LEAF, allDefaults: true }), { payload: odd, media, leafName: LEAF, allValues: false });
+  const old = await inspectProductPage(new ModelProductPage(odd, media, { breadcrumb: LEAF, allDefaults: true }), { payload: odd, media, images: odd.images, leafName: LEAF, allValues: false });
   assert.equal(old.checks.default_selection, false, 'a page that presses defaults forming no variant does not');
 });
 
@@ -127,20 +127,20 @@ test('impossible values (H2D): disabled with their helper and never clicked; wit
   const payload = payloadOf('h2d');
   const media = mediaOf(payload);
   const page = new ModelProductPage(payload, media, { breadcrumb: LEAF });
-  const r = await inspectProductPage(page, { payload, media, leafName: LEAF, allValues: true });
+  const r = await inspectProductPage(page, { payload, media, images: payload.images, leafName: LEAF, allValues: true });
   assert.ok(r.counts.values_not_offered >= 1, 'H2D has values not offered with the opening choice');
   assert.equal(r.checks.not_offered_helper, true);
   assert.equal(r.checks.selection_images, true, JSON.stringify(r.counts));
   for (const s of r.selections) assert.ok(formsVariant(s, payload.variants), `a recorded selection the page could not hold: ${s.join(',')}`);
   assert.ok(r.selections.slice(1).some((s) => s.length === payload.groups.length), 'the selections after a click are whole (the other groups kept)');
-  const bare = await inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF, noHelper: true }), { payload, media, leafName: LEAF, allValues: true });
+  const bare = await inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF, noHelper: true }), { payload, media, images: payload.images, leafName: LEAF, allValues: true });
   assert.equal(bare.checks.not_offered_helper, false);
 });
 
 test('a merge: the existing product keeps its chooser and money; only the main image, the dinar text and the breadcrumb are checked', async () => {
   const payload = payloadOf('a1', 'p_existing_a1_0001');
   const media = mediaOf(payload);
-  const r = await inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF }), { payload, media, leafName: LEAF, allValues: true });
+  const r = await inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF }), { payload, media, images: payload.images, leafName: LEAF, allValues: true });
   assert.deepEqual(Object.keys(r.checks).sort(), ['breadcrumb', 'image_contain', 'image_decodes', 'no_zero_dinar']);
   assert.ok(Object.values(r.checks).every(Boolean));
   assert.deepEqual(r.selections, []);
@@ -149,9 +149,9 @@ test('a merge: the existing product keeps its chooser and money; only the main i
 test('an absence is never a match: no leaf name fails the breadcrumb; a hero frame without its picture fails image_decodes', async () => {
   const payload = payloadOf('pla-basic-filament');
   const media = mediaOf(payload);
-  const noLeaf = await inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF }), { payload, media, leafName: '', allValues: false });
+  const noLeaf = await inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF }), { payload, media, images: payload.images, leafName: '', allValues: false });
   assert.equal(noLeaf.checks.breadcrumb, false);
-  const broken = await inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF, brokenHero: true }), { payload, media, leafName: LEAF, allValues: false });
+  const broken = await inspectProductPage(new ModelProductPage(payload, media, { breadcrumb: LEAF, brokenHero: true }), { payload, media, images: payload.images, leafName: LEAF, allValues: false });
   assert.equal(broken.checks.image_decodes, false);
 });
 
@@ -264,7 +264,7 @@ test('in Chromium, on the step-7 markup: swatches by value id in their fieldset,
     const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
     const checker = await BrowserChecker.launch(origin);
     try {
-      const r = await checker.check({ slug: 'small-pla', payload, media, leafName: LEAF, allValues: true, screenshot: false });
+      const r = await checker.check({ slug: 'small-pla', payload, media, images: payload.images, leafName: LEAF, allValues: true, screenshot: false });
       if (brokenHero) {
         assert.equal(r.checks.image_decodes, false, 'the thumbnails decode, the main image does not: the check reads the main one');
         continue;

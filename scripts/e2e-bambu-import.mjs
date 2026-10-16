@@ -22,7 +22,10 @@
  *   - Images: `--images double` (the sandbox, which cannot reach the CDN)
  *     serves every store.bblcdn.com path from the local stand-in through the
  *     dev-only var CATALOG_IMPORT_MEDIA_ORIGIN, which the ops endpoint must
- *     honour only under `wrangler dev --local` (an integration item);
+ *     honour only under `wrangler dev --local` (an integration item) — a
+ *     picture of its own per path (`standInPng`), so the Worker's collapse of
+ *     byte-identical gallery images (§C.4 step 1) does not fold a gallery
+ *     into one;
  *     `--images real` (the runner) lets the local Worker fetch the real CDN.
  *   - LOCAL ONLY for the browser: every request to a host other than
  *     127.0.0.1 is aborted and counted, and the run fails unless that count
@@ -50,6 +53,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { cpSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
+import { deflateSync } from 'node:zlib';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
@@ -136,8 +140,44 @@ export function runRowSql(runId, tokenHash, expiresAt, manifestTotal) {
   return `INSERT INTO catalog_import_runs (id, source, state, token_sha256, token_expires_at, github_run_id, manifest_total) VALUES ('${runId}', 'bambu_us', 'open', '${tokenHash}', '${expiresAt}', 'e2e', ${Number(manifestTotal) | 0})`;
 }
 
-/** A tiny valid PNG (1×1) the media stand-in answers for every CDN path. */
-export const PIXEL_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+const crc32 = (buf) => {
+  let c = 0xffffffff;
+  for (const b of buf) c = CRC_TABLE[(c ^ b) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+};
+const pngChunk = (type, data) => {
+  const len = Buffer.alloc(4);
+  len.writeUInt32BE(data.length);
+  const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(body));
+  return Buffer.concat([len, body, crc]);
+};
+
+/**
+ * A small valid PNG (8×8, one RGB colour taken from the SHA-256 of the CDN path) the media stand-in answers: the
+ * Worker stores media under a content-addressed key and collapses byte-identical gallery images into one (§C.4
+ * step 1), so one picture for every path would collapse every gallery into a single image. Distinct paths get
+ * distinct pixels (so distinct WebP bytes after conversion); the same path always gets the same bytes, as the CDN
+ * gives them.
+ */
+export function standInPng(path) {
+  const [r, g, b] = createHash('sha256').update(String(path)).digest();
+  const size = 8;
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(size, 0);
+  ihdr.writeUInt32BE(size, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 2; // colour type: RGB
+  const row = Buffer.concat([Buffer.from([0]), Buffer.from(Array.from({ length: size }, () => [r, g, b]).flat())]);
+  const raw = Buffer.concat(Array.from({ length: size }, () => row));
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), pngChunk('IHDR', ihdr), pngChunk('IDAT', deflateSync(raw)), pngChunk('IEND', Buffer.alloc(0))]);
+}
 
 /** The local stand-in for the store and its CDN: request path → { status, type, body } (pure). */
 export function storeAnswer(path, pages) {
@@ -150,7 +190,7 @@ export function storeAnswer(path, pages) {
   if (path === '/sitemap_collections_1.xml') return { status: 200, type: 'application/xml', body: '<?xml version="1.0"?><urlset></urlset>' };
   const m = /^\/products\/([a-z0-9-]+)$/.exec(path);
   if (m && pages[m[1]]) return { status: 200, type: 'text/html; charset=utf-8', body: pages[m[1]] };
-  if (/^\/(?:s\d+|cdn|files)\//.test(path) || /\.(png|jpe?g|webp|media)$/i.test(path)) return { status: 200, type: 'image/png', body: PIXEL_PNG };
+  if (/^\/(?:s\d+|cdn|files)\//.test(path) || /\.(png|jpe?g|webp|media)$/i.test(path)) return { status: 200, type: 'image/png', body: standInPng(path) };
   return { status: 404, type: 'text/plain', body: 'not found' };
 }
 

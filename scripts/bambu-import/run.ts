@@ -65,7 +65,8 @@ import {
 import { curatedGate, enrich, type EnrichReport } from './enrich';
 import { blockedStop, HostFetcher, ImportStop, StoreFetcher, transientStop, type FetchLike } from './fetch';
 import { ImportLog, type LogStage } from './log';
-import { OpsClient, OpsError, type DocumentCheck, type MediaAnswerRow, type MediaRequest, type StatusAnswer, type WriteAnswer } from './opsClient';
+import { OpsClient, OpsError, writtenImagesOf, type DocumentCheck, type MediaAnswerRow, type MediaRequest, type StatusAnswer, type WriteAnswer, type WrittenImage } from './opsClient';
+import { writtenGallery, type Gallery } from './gallery';
 import { NO_ROBOTS, parseRobots, robotsAllows, SITEMAP_PATHS, type Robots } from './robots';
 import { renderSummary, SummaryWriter, type SummaryItem } from './summary';
 import { AFTER_CACHE_WAIT, cacheWaitOf, edgeEvidence, modelCodesOf, Site, verifyPublic, type VerifyOutcome } from './verify';
@@ -272,6 +273,10 @@ interface ItemWork {
   writtenSha: string;
   /** stage_data.before_fp_equal, when the Worker records the merge's protected-fields result there. */
   stageFpEqual: boolean | null;
+  /** stage_data.images, when the Worker records the written image rows there (a resume after /write; gallery.ts). */
+  stageImages: WrittenImage[] | null;
+  /** The gallery VERIFY expected (gallery.ts), for the sealed report. */
+  gallery?: Gallery;
   /** /publish-finish ran for this item in this job (it purges, and republishes a product hidden on a block). */
   publishedThisJob: boolean;
 }
@@ -603,6 +608,7 @@ export class Importer {
       shots: [],
       writtenSha: lease.payload_sha256,
       stageFpEqual: stageFpEqualOf(lease.stage_data),
+      stageImages: writtenImagesOf(lease.stage_data.images),
       publishedThisJob: false,
     };
     const pos = row.queue_position;
@@ -704,6 +710,8 @@ export class Importer {
     if (lease.payload_sha256) w.writtenSha = lease.payload_sha256;
     const fp = stageFpEqualOf(lease.stage_data);
     if (fp !== null) w.stageFpEqual = fp;
+    const images = writtenImagesOf(lease.stage_data.images);
+    if (images) w.stageImages = images;
   }
 
   /**
@@ -1134,11 +1142,16 @@ export class Importer {
       w.publishedThisJob = true;
     }
     const isMerge = w.payload!.write_mode === 'merge' || (!!w.write && !w.write.created);
+    // The gallery as WRITTEN (§C.4 step 1: byte-identical images collapsed), never the payload's pre-collapse list.
+    const gallery = this.galleryOf(w);
+    w.gallery = gallery;
+    this.log.item(w.row.queue_position, w.row.handle, 'VERIFYING_LIVE', 'gallery', { rows: gallery.images.length, images: w.payload!.images.length, what: gallery.source });
     const ctx = {
       payload: w.payload!,
       productId: w.productId,
       slug: w.slug,
       media: w.media,
+      images: gallery.images,
       documentChecks: w.documentChecks,
       leaf: w.row.leaf ?? '',
       also: w.row.also ?? [],
@@ -1161,6 +1174,7 @@ export class Importer {
           slug: w.slug,
           payload: w.payload!,
           media: w.media,
+          images: gallery.images,
           leafName: outcome.leafName,
           allValues: audit,
           screenshot: audit || w.row.queue_position % 25 === 0,
@@ -1193,6 +1207,16 @@ export class Importer {
       await this.pause(wait);
     }
     throw blockedStop('VERIFY_FAILED_PERSISTENT', 'a check failed again after a purge and a wait');
+  }
+
+  /**
+   * The gallery VERIFY expects (gallery.ts): this job's /write answer; else the rows the Worker recorded in
+   * stage_data; else the Worker's collapse recomputed from the payload written (its digest was checked) and the
+   * stored keys /media answered.
+   */
+  private galleryOf(w: ItemWork): Gallery {
+    const written = w.write?.images ? { rows: w.write.images, source: 'write' as const } : w.stageImages ? { rows: w.stageImages, source: 'stage_data' as const } : null;
+    return writtenGallery(w.payload!, w.media, written);
   }
 
   /**
@@ -1234,6 +1258,7 @@ export class Importer {
       staged: { payload_sha256: w.stagedSha ?? '', invocation_estimate: w.estimate ?? 0, ...(w.stageAnswer ?? {}) },
       media: [...w.media.values()],
       write: w.write ?? null,
+      gallery: w.gallery ? { source: w.gallery.source, rows: w.gallery.images.length, payload_images: w.payload?.images.length ?? 0 } : null,
       verify: w.verify ?? null,
       browser: w.browser ? { ok: w.browser.ok, checks: w.browser.checks, counts: w.browser.counts } : null,
     });

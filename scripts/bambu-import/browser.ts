@@ -21,7 +21,8 @@
  *     chosen, and the WHOLE selection the page now holds (the other groups'
  *     choices kept, as the page keeps them) decides the expected gallery — the
  *     hero is one of the images that lead it, and no image the selection
- *     contradicts is in the gallery (R6);
+ *     contradicts is in the gallery (R6). The gallery is the rows the Worker
+ *     WROTE (gallery.ts: byte-identical images collapsed, §C.4 step 1);
  *   - the breadcrumb names the leaf section (a leaf the tree does not name
  *     fails it: nothing is not a match).
  * For a MERGE into an existing product the chooser, the price and the buying
@@ -106,6 +107,8 @@ export interface BrowserInput {
   slug: string;
   payload: ImportPayload;
   media: ReadonlyMap<string, MediaAnswerRow>;
+  /** The gallery as written (gallery.ts): what the page's images are expected from. */
+  images: readonly ImportPayload['images'][number][];
   /** The Arabic name of the section the product is filed under ('' when the tree does not name it: a failure). */
   leafName: string;
   /** All values (audit classes) or at most 12. */
@@ -160,6 +163,8 @@ export interface ProductPageDriver {
 export interface PageCheckInput {
   payload: ImportPayload;
   media: ReadonlyMap<string, MediaAnswerRow>;
+  /** The gallery as written (gallery.ts: after the Worker's content-duplicate collapse), never the payload's list. */
+  images: readonly ImportPayload['images'][number][];
   leafName: string;
   allValues: boolean;
 }
@@ -236,7 +241,7 @@ export async function inspectProductPage(
       }
       selection = withValue(selection, groups, g.id, v.id);
       counts.values_checked++;
-      const exp = expectedGallery(payload, media, selection);
+      const exp = expectedGallery({ groups, variants, images: input.images }, media, selection);
       const heroNow = mediaPath((await page.hero()).src);
       const gallery = (await page.gallery()).map((u) => mediaPath(u));
       const heroOk = exp.hero.size === 0 || exp.hero.has(heroNow);

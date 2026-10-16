@@ -8,7 +8,9 @@
  *     inside a git checkout, and never overwrites a file;
  *   - scripts/e2e-bambu-import.mjs, the local workerd dry run: its arguments,
  *     its refusal of any Cloudflare credential, the fixture bundle it builds,
- *     the run row, the store stand-in and the pass conditions.
+ *     the run row, the store stand-in (a picture of its own per CDN path, so
+ *     the Worker's collapse of byte-identical images does not fold every
+ *     gallery into one) and the pass conditions.
  *
  * Run: node --import tsx --test tests/bambuImportTools.test.ts
  */
@@ -18,12 +20,13 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { inflateSync } from 'node:zlib';
 import { ROOT } from './fixtures/d1';
 import { freshDb } from './fixtures/app';
 import { main as candidatesMain, matchCandidates, materialTokens, modelTokens, slugOverlap, tablesOf, manifestEntries } from '../scripts/bambu-import/match-candidates';
 import { loadReviewedBundle } from '../scripts/bambu-import/discover';
 // @ts-expect-error - plain ESM script (the local dry run), no types
-import { fixtureBundle, judge, parseArgs, refuseCredentials, runRowSql, storeAnswer, PIXEL_PNG, FIXTURE_HANDLES } from '../scripts/e2e-bambu-import.mjs';
+import { fixtureBundle, judge, parseArgs, refuseCredentials, runRowSql, storeAnswer, standInPng, FIXTURE_HANDLES } from '../scripts/e2e-bambu-import.mjs';
 
 const SNAPSHOT = {
   format: 'levonis-bambu-snapshot/1',
@@ -142,7 +145,28 @@ test('the dry run: arguments, no Cloudflare credential, the fixture bundle, the 
   assert.equal(storeAnswer('/products/gone', pages).status, 404);
   assert.match(storeAnswer('/robots.txt', pages).body, /User-agent: \*/);
   assert.match(storeAnswer('/sitemap_products_1.xml', pages).body, /\/products\/filament-buffer/);
-  assert.equal(storeAnswer('/s7/default/x/img.png', pages).body, PIXEL_PNG);
+  // The media stand-in: a valid PNG per CDN path, the same bytes for the same path, other pixels for another one.
+  const pathA = '/s7/default/x/img.png';
+  const pathB = '/s7/default/y/other.jpg';
+  const a = storeAnswer(pathA, pages);
+  assert.equal(a.type, 'image/png');
+  assert.deepEqual(a.body, standInPng(pathA));
+  assert.deepEqual(storeAnswer(pathA, pages).body, a.body, 'the same path, the same bytes (a real copy collapses, as on the CDN)');
+  assert.notDeepEqual(storeAnswer(pathB, pages).body, a.body);
+  const pixel = (png: Uint8Array) => {
+    const be32 = (at: number) => new DataView(png.buffer, png.byteOffset + at, 4).getUint32(0);
+    const ascii = (at: number) => String.fromCharCode(...png.subarray(at, at + 4));
+    assert.deepEqual([...png.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    assert.equal(ascii(12), 'IHDR');
+    assert.deepEqual([be32(16), be32(20), png[24], png[25]], [8, 8, 8, 2]);
+    let at = 8;
+    while (ascii(at + 4) !== 'IDAT') at += 12 + be32(at);
+    const raw = inflateSync(png.subarray(at + 8, at + 8 + be32(at)));
+    assert.equal(raw.length, 8 * (1 + 8 * 3));
+    return [...raw.subarray(1, 4)].join(',');
+  };
+  assert.notEqual(pixel(a.body), pixel(storeAnswer(pathB, pages).body), 'different pixels, so different WebP bytes after conversion');
+  assert.equal(pixel(standInPng('/s1/swatch.media')), pixel(storeAnswer('/s1/swatch.media', pages).body));
 
   const good = { items: [{ handle: 'a', processing_state: 'COMPLETE' }], products: [{ id: 'p', price_iqd: 0, stock: null }], refs: [{ product_id: 'p', stock_decision: 'not_configured' }], guardEvents: 0, rerunWrites: 0 };
   assert.deepEqual(judge(good), []);

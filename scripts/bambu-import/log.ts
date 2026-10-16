@@ -77,6 +77,7 @@ export const TEMPLATES = {
   media_done: 'media: {stored} stored, {failed} failed, {omitted} omitted of {total}',
   written: 'written: created {created}; groups {groups}; variants {variants}; images {images}; protected fields equal {fp_equal}',
   published: 'publish-finish: done ({ms} ms)',
+  gallery: 'gallery as written: {rows} image rows of {images} in the payload (from {what})',
   verify_check: 'verify {check}: ok {ok} (HTTP {status})',
   verify_done: 'verified: {passed} of {total} checks passed',
   cache_wait: 'verify: a stale answer; purge again and wait {seconds} s',

@@ -19,7 +19,13 @@
  *   - the listing is paged while a page is full (the 51st match is found);
  *   - the edge evidence carries the selections the page held, the opening
  *     one first (§G.3's, the single-value group included);
- *   - the runner never sends /complete without the browser's check 7.
+ *   - the runner never sends /complete without the browser's check 7;
+ *   - byte-identical gallery images (§C.4 step 1, A1's #3/#4 copies of A1 and
+ *     A1_C): the Worker collapses them, the page shows the rows it WROTE, and
+ *     VERIFY passes on those rows — the payload's pre-collapse list fails it;
+ *     the runner's recompute of the collapse (a resume with no written rows)
+ *     gives the Worker's rows, a general primary handed to its bound copy
+ *     included.
  *
  * Run: node --import tsx --test tests/bambuImportVerify.test.ts
  */
@@ -30,7 +36,8 @@ import { extractionFingerprint } from '../packages/catalog/src/bambuImport/finge
 import { fixtureJson, sample, type SampleHandle } from './fixtures/bambu/load';
 import { edgeEvidence, isPublicSpec, Site, verifyPublic, type VerifyContext } from '../scripts/bambu-import/verify';
 import type { HostFetcher } from '../scripts/bambu-import/fetch';
-import type { DocumentCheck, MediaAnswerRow } from '../scripts/bambu-import/opsClient';
+import { writtenImagesOf, type DocumentCheck, type MediaAnswerRow, type WrittenImage } from '../scripts/bambu-import/opsClient';
+import { collapseContentDuplicates, recomputedGallery, writtenGallery, type GalleryImage, type StoredGalleryRow } from '../scripts/bambu-import/gallery';
 import { pageDefaultSelection } from '../scripts/bambu-import/selection';
 import { RUN_ID, World } from './fixtures/bambuImportWorld';
 
@@ -76,6 +83,8 @@ interface Live {
   existing?: { groups: Rec[]; variants: Rec[]; images: Rec[]; name: string; priced: boolean };
   /** Products listed before this one for its own title (the listing's order), per category. */
   ahead?: number;
+  /** The image rows the Worker wrote (default: the payload's, when no two pictures are byte-identical). */
+  written?: GalleryImage[];
 }
 
 const files = (l: Live, id: string) => {
@@ -109,7 +118,7 @@ function knowledge(l: Live): Rec {
 
 function siteAnswer(l: Live): Rec {
   const p = l.payload;
-  const appended = p.images.filter((i) => files(l, i.source_media_id));
+  const appended = (l.written ?? p.images).filter((i) => files(l, i.source_media_id));
   if (l.existing) {
     // The existing product: its own options and images first, the import's appended after, product-level here.
     const images = [...l.existing.images, ...appended.map((i, n) => ({ id: `pi_appended_${n}`, url: files(l, i.source_media_id), is_primary: false, option_value_id: null, variant_id: null }))];
@@ -191,6 +200,7 @@ function verify(l: Live, ctx: Partial<VerifyContext> = {}, reads: string[] = [])
     productId: l.productId,
     slug: l.slug,
     media: l.media,
+    images: l.written ?? l.payload.images,
     documentChecks: [],
     leaf: `cat_${l.sections.at(-1)}`,
     also: [],
@@ -307,4 +317,87 @@ test('no browser, no COMPLETE: a browser that cannot launch stops the job before
   } finally {
     w.dispose();
   }
+});
+
+// ---------------------------------------------------------------- the gallery as written (§C.4 step 1)
+
+/** A1's gallery #3 and #4 (`A1-compressed.jpg`, `A1_C-compressed.jpg` again) are byte-for-byte A1 and A1_C (§C.4). */
+function a1WithCopies() {
+  const payload = payloadOf('a1');
+  const media = mediaOf(payload);
+  const byName = (name: string) => [...new Set(payload.images.filter((i) => i.source_url.endsWith(`/${name}`)).map((i) => i.source_media_id))];
+  const pairs = ['A1-compressed.jpg', 'A1_C-compressed.jpg'].map((name) => {
+    const ids = byName(name);
+    assert.equal(ids.length, 2, `${name}: two gallery entries (else this proves nothing)`);
+    const [first, copy] = ids.sort((a, b) => Math.min(...payload.images.filter((i) => i.source_media_id === a).map((i) => i.sort_order)) - Math.min(...payload.images.filter((i) => i.source_media_id === b).map((i) => i.sort_order)));
+    return { first, copy };
+  });
+  for (const { first, copy } of pairs) media.set(copy, { ...media.get(copy)!, r2_key: media.get(first)!.r2_key });
+  const copies = new Set(pairs.map((p) => p.copy));
+  // What the Worker writes (writer.ts collapseContentDuplicates): the copies are general, the originals bound, so
+  // the general copies go and nothing else moves.
+  const written = payload.images.filter((i) => !(copies.has(i.source_media_id) && i.binding_rule === 'general'));
+  assert.equal(written.length, payload.images.length - 2);
+  return { payload, media, written, copies };
+}
+
+const asWritten = (rows: readonly GalleryImage[], media: ReadonlyMap<string, MediaAnswerRow>): WrittenImage[] =>
+  rows.map((i) => ({ id: i.id, source_media_id: i.source_media_id, r2_key: media.get(i.source_media_id)!.r2_key, sort_order: i.sort_order, is_primary: i.is_primary, option_value_id: i.option_value_id, variant_id: i.variant_id, color_id: null, binding_rule: i.binding_rule }));
+
+test('byte-identical gallery images: the page shows the rows the Worker wrote; VERIFY passes on them, and the pre-collapse payload fails', async () => {
+  const { payload, media, written } = a1WithCopies();
+  const l = live('a1', { payload, media, written, sections: ['printers', 'fdm-printers'] });
+  // The expectation from the /write answer's rows (gallery.ts), as run.ts builds it.
+  const gallery = writtenGallery(payload, media, { rows: asWritten(written, media), source: 'write' });
+  assert.deepEqual(gallery.images.map((i) => i.id), written.map((i) => i.id));
+  const o = await verify(l, { images: gallery.images });
+  assert.deepEqual(failed(o), [], JSON.stringify(Object.fromEntries(Object.entries(o.checks).map(([k, c]) => [k, c.detail]))));
+  assert.equal(o.checks.fingerprint.ok, true);
+  assert.equal(o.checks.structure.counts?.images, payload.images.length - 2);
+  assert.equal(o.checks.structure.counts?.expected_images, payload.images.length - 2);
+  // The same live product checked against the payload's pre-collapse gallery (what VERIFY did before): it fails.
+  const before = await verify(l, { images: payload.images });
+  assert.ok(failed(before).includes('structure') && failed(before).includes('fingerprint'), JSON.stringify(failed(before)));
+  // The evidence the Worker compares with stage_data.payload_counts still counts the PAYLOAD's images.
+  const ev = edgeEvidence(o, null, `${SITE}/product/a1`, payload, 1) as { counts: Record<string, number> };
+  assert.equal(ev.counts.images, payload.images.length);
+  // A written row that is not a payload row with its own binding is not believed: the payload stays the witness.
+  const rebound = gallery.images.map((i, n) => (n === 1 ? { ...i, option_value_id: payload.groups[0].values.at(-1)!.id } : i));
+  assert.equal((await verify({ ...l, written: rebound }, { images: rebound })).checks.structure.detail?.written_from_payload, false);
+});
+
+test('the runner\'s recompute of the collapse (a resume with no written rows) gives the Worker\'s rows', () => {
+  const { payload, media, written } = a1WithCopies();
+  assert.deepEqual(recomputedGallery(payload, media), written, 'A1: the general copies of bound pictures go, nothing else moves');
+  assert.deepEqual(recomputedGallery(payload, mediaOf(payload)), payload.images, 'no two pictures alike: the payload\'s gallery');
+  // A general primary whose bytes come back later bound to a value: the general copy goes, the bound copy takes
+  // its position with rule content_duplicate (no representative's variant any more) and the primary.
+  const row = (id: string, key: string, sort: number, extra: Partial<StoredGalleryRow> = {}): StoredGalleryRow => ({
+    id, source_media_id: `m_${id}`, source_url: '', r2_key: key, sort_order: sort, is_primary: false, option_value_id: null, variant_id: null, via_variant_id: null, binding_rule: 'general', alt_en: '', alt_ar: '', alt_ckb: '', ...extra,
+  });
+  const rows = [
+    row('g0', 'k_same', 0, { is_primary: true }),
+    row('v1', 'k_v1', 1, { variant_id: 'pv_1', binding_rule: 'variant' }),
+    row('g2', 'k_g2', 2),
+    row('x3', 'k_same', 3, { option_value_id: 'ov_x', via_variant_id: 'pv_9', binding_rule: 'representative' }),
+    row('x4', 'k_same', 4, { option_value_id: 'ov_x', binding_rule: 'value' }),
+    row('g5', 'k_g2', 5),
+  ];
+  const out = collapseContentDuplicates(rows);
+  assert.equal(out.collapsed, 3);
+  assert.deepEqual(
+    out.rows.map((r) => [r.id, r.sort_order, r.is_primary, r.binding_rule, r.via_variant_id]),
+    [['v1', 1, false, 'variant', null], ['g2', 2, false, 'general', null], ['x3', 0, true, 'content_duplicate', null]]
+  );
+  // The rows of ONE entry (a value set: one picture, one row per value) never collapse into each other.
+  const set = [row('a', 'k', 0, { is_primary: true, option_value_id: 'ov_a', binding_rule: 'value_set' }), { ...row('b', 'k', 1, { option_value_id: 'ov_b', binding_rule: 'value_set' }), source_media_id: 'm_a' }];
+  assert.equal(collapseContentDuplicates(set).collapsed, 0);
+});
+
+test('the written rows as the Worker answers them: read whole or not at all', () => {
+  const good = [{ id: 'pi_1', source_media_id: 'm1', r2_key: 'products/import/gallery/a.webp', sort_order: 0, is_primary: true, option_value_id: null, variant_id: 'pv_1', color_id: null, binding_rule: 'variant' }];
+  assert.deepEqual(writtenImagesOf(good), good);
+  assert.equal(writtenImagesOf(undefined), null, 'an answer without rows: the runner recomputes');
+  assert.equal(writtenImagesOf([...good, { id: 'pi_2', source_media_id: 'm2', sort_order: 1 }]), null, 'a row without its stored key is no gallery');
+  assert.deepEqual(writtenImagesOf([]), []);
 });
