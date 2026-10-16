@@ -369,7 +369,7 @@ async function indexHasRows(db: D1Database): Promise<boolean> {
   return !!any;
 }
 
-/** The dictionary, as a map. Small enough to read whole; cached per request. */
+/** The dictionary, as a map. Small enough to read whole. */
 export async function loadSynonyms(db: D1Database): Promise<Map<string, string>> {
   const { results } = await db
     .prepare('SELECT term, canonical FROM search_synonyms LIMIT 5000')
@@ -377,6 +377,37 @@ export async function loadSynonyms(db: D1Database): Promise<Map<string, string>>
   const out = new Map<string, string>();
   for (const r of results ?? []) out.set(normalizeText(r.term), normalizeText(r.canonical));
   return out;
+}
+
+/**
+ * THE DICTIONARY, ONCE PER ISOLATE FOR HALF A MINUTE (speed audit 2026-10-16,
+ * «live search: every keystroke runs 5 dependent D1 round trips»).
+ *
+ * Every search answer read the whole dictionary first, and nothing else could
+ * start before it — the query's expansion and the vocabulary scan depend on
+ * it — so each keystroke of the live search paid one more dependent round
+ * trip to the primary (0.15–0.2 s from an Iraqi colo). The dictionary is the
+ * owner's vocabulary: it changes when the owner edits it or an import adds to
+ * it. Kept per D1 binding (one object for the life of an isolate; a fresh one
+ * per test database) like `pricingInputsFor` (worker/lib/membershipBenefits.ts),
+ * forgotten at once by the writes in this isolate (`forgetSearchSynonyms`), and
+ * re-read after `SYNONYMS_TTL_MS` everywhere else. A failed read is not kept.
+ */
+export const SYNONYMS_TTL_MS = 30_000;
+const synonymsMemo = new WeakMap<object, { at: number; map: Promise<Map<string, string>> }>();
+
+export function synonymsFor(db: D1Database, nowMs = Date.now()): Promise<Map<string, string>> {
+  const hit = synonymsMemo.get(db);
+  if (hit && nowMs - hit.at < SYNONYMS_TTL_MS) return hit.map;
+  const map = loadSynonyms(db);
+  synonymsMemo.set(db, { at: nowMs, map });
+  map.catch(() => synonymsMemo.delete(db));
+  return map;
+}
+
+/** Called by every write to `search_synonyms`, in the isolate that made it. */
+export function forgetSearchSynonyms(db: D1Database): void {
+  synonymsMemo.delete(db);
 }
 
 export interface SearchResult {
@@ -419,7 +450,7 @@ export async function searchProducts(
   opts: { limit?: number; synonyms?: ReadonlyMap<string, string>; completeLast?: boolean } = {}
 ): Promise<SearchResult> {
   const limit = opts.limit ?? 50;
-  const synonyms = opts.synonyms ?? (await loadSynonyms(db));
+  const synonyms = opts.synonyms ?? (await synonymsFor(db));
   const expanded = expandQuery(rawQuery, synonyms, { completeLast: opts.completeLast });
   /**
    * Nothing to look up — punctuation, or two bare letters with no word between
