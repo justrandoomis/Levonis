@@ -8,9 +8,12 @@
  *     (`allowHost` and `allowUrl`, through worker/lib/fetchGuard.ts): any other
  *     host, a redirect to http:// or to another port is `failed` /
  *     MEDIA_HOST_NOT_ALLOWED and nothing is requested from it.
- *   - An original over the source cap (or one the converter refuses for its
- *     input size) is asked once more as the CDN's 2400-px rendition (§C.4 step 2),
- *     recorded `fetched_variant = 'cdn_resized'`; the provenance stays the original.
+ *   - An original over the source cap (IMAGE_SOURCE_TOO_LARGE), or one the
+ *     converter refuses (IMAGE_CONVERT_FAILED: the IMAGES binding's area or
+ *     dimension refusal of a "huge PNG" under the cap lands there, §R-4), is asked
+ *     ONCE more as the CDN's 2400-px rendition (§C.4 step 2), recorded
+ *     `fetched_variant = 'cdn_resized'`; the provenance stays the original. A
+ *     rendition that fails too is answered with its own failure.
  *   - The bytes go through the app's own pipeline (ingestProductMediaUrl:
  *     guarded fetch, sniff, convert to WebP, content-addressed R2 key, cleanup
  *     intent, file_objects); the `catalog_import_media` row keeps the key
@@ -171,6 +174,9 @@ interface StoredRow {
   attempts: number;
 }
 
+/** The original's failures that §C.4 step 2 retries through the CDN rendition: too large to fetch, or refused by the converter. */
+export const RENDITION_RETRY: ReadonlySet<string> = new Set(['IMAGE_SOURCE_TOO_LARGE', 'IMAGE_CONVERT_FAILED']);
+
 const TRANSIENT_FETCH = new Set(['FETCH_TIMEOUT', 'FETCH_FAILED', 'FETCH_BUDGET_EXCEEDED']);
 const TRANSIENT_INGEST = new Set(['IMAGE_CONVERT_UNAVAILABLE', 'IMAGE_STORAGE_FAILED', 'IMAGE_REFERENCE_MISSING']);
 
@@ -278,9 +284,11 @@ export async function ingestImportMedia(env: MediaEnv, requestUrl: string, run: 
       try {
         r = await ingest(m.source_url, 'original');
       } catch (e) {
-        // §C.4 step 2: an original over the source cap, or one the converter refuses for its input size, is asked
-        // ONCE more through the CDN's own 2400-px rendition.
-        if (!(e instanceof ProductMediaIngestError && e.code === 'IMAGE_SOURCE_TOO_LARGE')) throw e;
+        // §C.4 step 2: an original over the source cap, or one the converter refuses, is asked ONCE more through the
+        // CDN's own 2400-px rendition. The converter's refusal is IMAGE_CONVERT_FAILED whatever its cause (an input
+        // over the binding's area or dimension limit included: productImageToWebp reads every binding error as
+        // 'failed'), so a corrupt original costs one more request, never a loop.
+        if (!(e instanceof ProductMediaIngestError && RENDITION_RETRY.has(e.code))) throw e;
         variant = 'cdn_resized';
         r = await ingest(cdnResizedUrl(m.source_url), 'cdn_resized');
       }

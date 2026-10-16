@@ -418,6 +418,64 @@ test('review 6b: an original over the source cap is fetched once more as the CDN
   }
 });
 
+test('review 6b, 2: an original the IMAGES binding refuses for its input size (under the 8 MB cap) is fetched once more as the 2400-px rendition', async () => {
+  const w = opsWorld();
+  const { sid, t } = await toIngesting(w);
+  const { imagesDouble, pngBytes } = await import('./fixtures/imageDoubles');
+  // The binding's area refusal (§R-4 "huge PNGs"): an input wider than 10 000 px is refused, anything else converted.
+  const base = imagesDouble();
+  const widthOf = (bytes: Uint8Array) => new DataView(bytes.buffer, bytes.byteOffset).getUint32(16);
+  w.env.IMAGES = {
+    info: base.binding.info,
+    input(stream: ReadableStream<Uint8Array>) {
+      const bytes = new Response(stream).arrayBuffer().then((b) => new Uint8Array(b));
+      let box: Record<string, unknown> | null = null;
+      const handle = {
+        transform(x: Record<string, unknown>) {
+          box = x;
+          return handle;
+        },
+        async output(o: { format: string; quality?: number }) {
+          const b = await bytes;
+          if (widthOf(b) > 10_000) throw Object.assign(new Error('ERROR 9413: Image exceeds the maximum area (100 megapixels)'), { code: 9413 });
+          let inner = base.binding.input(new Blob([b]).stream());
+          if (box) inner = inner.transform(box as never);
+          return inner.output(o);
+        },
+      };
+      return handle;
+    },
+  };
+  const real = globalThis.fetch;
+  const asked: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    asked.push(url);
+    const bytes = url.includes('__op__') ? pngBytes(2400, 2400) : pngBytes(12_000, 12_000);
+    return new Response(bytes as unknown as BodyInit, { status: 200, headers: { 'content-type': 'image/png' } });
+  }) as typeof fetch;
+  try {
+    const r = await w.call(`${OPS}/items/${sid}/media`, { body: { lease_token: t, media: [{ source_media_id: 'area1', role: 'gallery', source_url: 'https://store.bblcdn.com/s1/big.png' }] } });
+    const media = ((await r.json()) as { media: Array<{ status: string; error_code: string }> }).media;
+    assert.equal(media[0].status, 'stored', JSON.stringify(media));
+    assert.deepEqual(asked, ['https://store.bblcdn.com/s1/big.png', 'https://store.bblcdn.com/s1/big.png__op__resize,m_lfit,w_2400__op__format,f_auto__op__quality,q_90']);
+    const row = w.raw.prepare("SELECT status, fetched_variant, source_url, attempts FROM catalog_import_media WHERE source_media_id = 'area1'").get() as Record<string, unknown>;
+    assert.deepEqual({ ...row }, { status: 'stored', fetched_variant: 'cdn_resized', source_url: 'https://store.bblcdn.com/s1/big.png', attempts: 1 });
+    // A rendition the converter refuses too is failed at once (permanent), after exactly one more request.
+    asked.length = 0;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      asked.push(String(input));
+      return new Response(pngBytes(12_000, 12_000) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'image/png' } });
+    }) as typeof fetch;
+    const r2 = await w.call(`${OPS}/items/${sid}/media`, { body: { lease_token: t, media: [{ source_media_id: 'area2', role: 'gallery', source_url: 'https://store.bblcdn.com/s1/big2.png' }] } });
+    const m2 = ((await r2.json()) as { media: Array<{ status: string; error_code: string }> }).media;
+    assert.deepEqual(m2.map((m) => [m.status, m.error_code]), [['failed', 'IMAGE_CONVERT_FAILED']]);
+    assert.equal(asked.length, 2, 'one rendition request, never a loop');
+  } finally {
+    globalThis.fetch = real;
+  }
+});
+
 test('review 6b: a passing R2 error on a stored medium answers pending at /media (WRITING: no re-fetch; VERIFYING_LIVE: never failed), in both binding shapes', async () => {
   const { newWorld, stage, write, RUN_ID } = await import('./fixtures/catalogImportWorld');
   const { R2Double } = await import('./fixtures/imageDoubles');
