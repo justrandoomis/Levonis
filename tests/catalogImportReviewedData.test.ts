@@ -214,15 +214,12 @@ test('the manifest keeps the §J.4 queue: the canary, the eight audit classes, t
   assert.equal(rows[1114].hold_code, '');
 });
 
-test("the runner's reader takes the same files: the same SHA-256 per file, the same combined digest and the same write mode per source", async (t) => {
-  // scripts/bambu-import/discover.ts is the runner's (step 8, another lane until integrated): imported when present.
+test("the runner's reader takes the same files: the same SHA-256 per file, the same combined digest and the same write mode per source", async () => {
+  // scripts/bambu-import/discover.ts is the runner's (step 8, live): imported from this tree, or from LEVONIS_RUNNER_DISCOVER.
   const candidates = [process.env.LEVONIS_RUNNER_DISCOVER ?? '', join(ROOT, 'scripts/bambu-import/discover.ts')].filter(Boolean);
   const file = candidates.find((p) => existsSync(p));
-  if (!file) {
-    t.skip('the runner (scripts/bambu-import/discover.ts) is not in this tree; set LEVONIS_RUNNER_DISCOVER to its path');
-    return;
-  }
-  const runner = (await import(pathToFileURL(file).href)) as {
+  assert.ok(file, 'the runner (scripts/bambu-import/discover.ts) is in this tree');
+  const runner = (await import(pathToFileURL(file!).href)) as {
     loadReviewedBundle(dir: string): {
       sha256: Record<string, string>;
       rows: Array<{ source_product_id: string; handle: string; queue_position: number; hold_code?: string }>;
