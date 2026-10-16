@@ -22,6 +22,13 @@ export interface Env {
    */
   IMAGES?: ImagesBinding;
   ASSETS: Fetcher;
+  /**
+   * DEV ONLY (the Bambu import's local dry run, scripts/e2e-bambu-import.mjs): a loopback origin that serves the
+   * store.bblcdn.com paths under `wrangler dev --local --var CATALOG_IMPORT_MEDIA_ORIGIN:http://127.0.0.1:<port>`.
+   * Never declared in wrangler.jsonc, and honoured only for a request addressed to a loopback host with a
+   * loopback http origin (worker/lib/catalogImport/media.ts `standInFetcher`), so production cannot take it.
+   */
+  CATALOG_IMPORT_MEDIA_ORIGIN?: string;
   GOOGLE_CLIENT_ID: string;
   INITIAL_ADMIN_EMAIL: string;
   EXTRA_ALLOWED_ORIGINS: string;

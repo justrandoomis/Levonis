@@ -1,0 +1,146 @@
+/**
+ * /complete: BOTH SIDES PASS AND AGREE, OR NOTHING MOVES (Bambu import spec
+ * §I.1, §I.1.10; worker/lib/catalogImport/complete.ts).
+ *
+ *   - the runner's evidence and the Worker's own D1 recompute agree → COMPLETE
+ *     with live_url, verified_at, d1_checks, edge_evidence (no free detail) and
+ *     the lease-fenced COMPLETED event;
+ *   - a hard check the runner failed, a check it did not run, counts that are
+ *     not the written payload's, a D1 fact that disagrees → VERIFYING_LIVE, the
+ *     failed check NAMES only, the records kept for the owner;
+ *   - price-request eligibility through validatePriceRequestSelection: a
+ *     complete selection eligible, an incomplete one SELECTION_REQUIRED, a bogus
+ *     one fails the check — and no request row is ever created;
+ *   - the live URL must be this item's page on the origin called; a stale lease
+ *     aborts the COMPLETE whole.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { count, newWorld, RUN_ID, stage, write, type World } from './fixtures/catalogImportWorld';
+import type { ImportPayload } from '../packages/catalog/src/bambuImport/payload';
+import { OpsRefusal, type ImportRun } from '../worker/lib/catalogImport/auth';
+import { finishPublishing, itemBySource } from '../worker/lib/catalogImport/items';
+import { agreementOf, completeItem, EXPECTED_EDGE_CHECKS } from '../worker/lib/catalogImport/complete';
+import { payloadCounts } from '../worker/lib/catalogImport/writer';
+
+const RUN: ImportRun = { id: RUN_ID, state: 'running', token_expires_at: '', github_run_id: '42', reviewed_bundle_sha256: '', code_commit: '', manifest_total: 0, started_at: '' };
+const ORIGIN = 'https://levonis-iq.com';
+const URL_OF = (slug: string) => `${ORIGIN}/product/${slug}`;
+
+async function verifying(handle: 'ams-2-pro-feeder-unit' | 'h2d' = 'ams-2-pro-feeder-unit') {
+  const w = newWorld();
+  const s = stage(w, handle);
+  const { result } = await write(w, s);
+  const item = await itemBySource(w.db, RUN_ID, s.payload.source_product_id);
+  await finishPublishing(w.db, RUN, item);
+  return { w, s, result };
+}
+
+function evidence(p: ImportPayload, slug: string, over: { checks?: Record<string, unknown>; counts?: Record<string, number>; selections?: string[][] } = {}) {
+  const checks: Record<string, unknown> = {};
+  for (const k of EXPECTED_EDGE_CHECKS) checks[k] = { ok: true, hard: true, status: 200, counts: { n: 1 }, detail: { expected: 'a'.repeat(64), note: 'never stored' } };
+  return {
+    version: 1,
+    live_url: URL_OF(slug),
+    round: 1,
+    checks: { ...checks, ...(over.checks ?? {}) },
+    sections: { leaf: 'printer-parts', root: 'parts', secondary: [] },
+    selections_checked: over.selections ?? [p.groups.map((g) => g.default_value_id).filter(Boolean)],
+    counts: over.counts ?? payloadCounts(p),
+  };
+}
+
+const complete = async (w: World, sid: string, body: Record<string, unknown>) =>
+  completeItem({ DB: w.db, BUCKET: w.bucket as never, R2_PUBLIC: w.bucket as never, R2_PRIVATE: w.media.R2_PRIVATE as never }, `${ORIGIN}/api/ops/catalog-import/items/${sid}/complete`, RUN, await itemBySource(w.db, RUN_ID, sid), w.bundle, body);
+
+const itemRow = (w: World, id: string) => w.raw.prepare('SELECT processing_state AS state, live_url, verified_at, d1_checks, edge_evidence FROM catalog_import_items WHERE id = ?').get(id) as Record<string, string>;
+
+test('runner evidence and the Worker recompute agree: COMPLETE, the records stored without free detail, the fenced event', async () => {
+  const { w, s, result } = await verifying();
+  const a = await complete(w, s.payload.source_product_id, { lease_token: 'lease_test_0001', live_url: URL_OF(result.slug), edge_evidence: evidence(s.payload, result.slug) });
+  assert.equal(a.state, 'COMPLETE');
+  assert.equal(a.d1_checks.ok, true);
+  assert.deepEqual(a.d1_checks.agreement.failed, []);
+  assert.ok(typeof a.seq === 'number' && a.seq > 0);
+  const row = itemRow(w, s.itemId);
+  assert.equal(row.state, 'COMPLETE');
+  assert.equal(row.live_url, URL_OF(result.slug));
+  assert.ok(row.verified_at);
+  assert.doesNotMatch(row.edge_evidence, /never stored|detail/, 'a check\'s free detail is never stored');
+  assert.match(row.d1_checks, /"agreement"/);
+  assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM catalog_import_events WHERE item_id = ? AND stage = 'COMPLETED'", s.itemId), 1);
+  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM product_price_requests'), 0, 'eligibility created no request');
+});
+
+test('any disagreement moves nothing: counts not the written payload\'s, a hard check failed, a check missing, a D1 fact', async () => {
+  const { w, s, result } = await verifying();
+  const sid = s.payload.source_product_id;
+  const body = (ev: unknown) => ({ lease_token: 'lease_test_0001', live_url: URL_OF(result.slug), edge_evidence: ev });
+  const cases: Array<[string, unknown, string]> = [
+    ['counts', evidence(s.payload, result.slug, { counts: { ...payloadCounts(s.payload), images: 99 } }), 'counts.edge_vs_written_payload'],
+    ['a hard check', evidence(s.payload, result.slug, { checks: { search: { ok: false, hard: true } } }), 'edge.search'],
+    ['a missing check', (() => { const e = evidence(s.payload, result.slug); delete (e.checks as Record<string, unknown>).compare; return e; })(), 'edge.compare.missing'],
+    ['the browser', evidence(s.payload, result.slug, { checks: { browser: { ok: false, checks: { hero: false } } } }), 'edge.browser'],
+  ];
+  for (const [label, ev, failed] of cases) {
+    const a = await complete(w, sid, body(ev));
+    assert.equal(a.state, 'VERIFYING_LIVE', label);
+    assert.ok(a.d1_checks.agreement.failed.includes(failed), `${label}: ${JSON.stringify(a.d1_checks.agreement.failed)}`);
+    assert.equal(itemRow(w, s.itemId).state, 'VERIFYING_LIVE', `${label}: nothing moved`);
+  }
+  // A soft check that failed is not a disagreement.
+  assert.equal((await complete(w, sid, body(evidence(s.payload, result.slug, { checks: { search: { ok: false, hard: false } } })))).state, 'COMPLETE');
+  // The disagreements were recorded as info events, by code.
+  assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM catalog_import_events WHERE item_id = ? AND code = 'IMPORT_VERIFY_DISAGREES'", s.itemId), cases.length);
+});
+
+test('a D1 fact the runner cannot see: a lost image row refuses COMPLETE (d1.counts)', async () => {
+  const { w, s, result } = await verifying();
+  const img = w.raw.prepare('SELECT id FROM product_images WHERE product_id = ? AND is_primary = 0 LIMIT 1').get(s.payload.product_id) as { id: string };
+  w.raw.prepare('DELETE FROM product_images WHERE id = ?').run(img.id);
+  const a = await complete(w, s.payload.source_product_id, { lease_token: 'lease_test_0001', live_url: URL_OF(result.slug), edge_evidence: evidence(s.payload, result.slug) });
+  assert.equal(a.state, 'VERIFYING_LIVE');
+  assert.ok(a.d1_checks.agreement.failed.includes('d1.counts'));
+});
+
+test('price-request eligibility through the POST\'s validator: complete and incomplete selections pass, a bogus one fails; no request row', async () => {
+  const { w, s, result } = await verifying('h2d');
+  const sid = s.payload.source_product_id;
+  const values = s.payload.groups.flatMap((g) => g.values.map((v) => v.id));
+  const complete1 = s.payload.variants[0].value_ids;
+  const ok = await complete(w, sid, { lease_token: 'lease_test_0001', live_url: URL_OF(result.slug), edge_evidence: evidence(s.payload, result.slug, { selections: [complete1, [values[0]], ['ov_not_a_value']] }) });
+  assert.equal(ok.state, 'VERIFYING_LIVE');
+  assert.deepEqual(ok.d1_checks.agreement.failed, ['d1.price_request'], 'the bogus selection is neither eligible nor SELECTION_REQUIRED');
+  const good = await complete(w, sid, { lease_token: 'lease_test_0001', live_url: URL_OF(result.slug), edge_evidence: evidence(s.payload, result.slug, { selections: [complete1, [values[0]]] }) });
+  assert.equal(good.state, 'COMPLETE');
+  assert.equal(Number(good.d1_checks.counts.selections_checked), 3, 'the default selection and the two the runner checked');
+  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM product_price_requests'), 0);
+});
+
+test('the live URL must be this item\'s page on the origin called; a stale lease aborts the COMPLETE whole', async () => {
+  const { w, s, result } = await verifying();
+  const sid = s.payload.source_product_id;
+  for (const url of [`https://evil.example/product/${result.slug}`, `${ORIGIN}/product/another-slug`, `${ORIGIN}/product/${result.slug}?x=1`]) {
+    await assert.rejects(
+      () => complete(w, sid, { lease_token: 'lease_test_0001', live_url: url, edge_evidence: evidence(s.payload, result.slug) }),
+      (e: unknown) => e instanceof OpsRefusal && e.status === 400,
+      url
+    );
+  }
+  // The lease lapses between the read and the batch: the COMPLETED event's fence aborts it.
+  const item = await itemBySource(w.db, RUN_ID, sid);
+  w.raw.prepare("UPDATE catalog_import_items SET lease_until = '2020-01-01T00:00:00.000Z' WHERE id = ?").run(s.itemId);
+  await assert.rejects(
+    () => completeItem({ DB: w.db, BUCKET: w.bucket as never, R2_PUBLIC: w.bucket as never, R2_PRIVATE: w.media.R2_PRIVATE as never }, `${ORIGIN}/x`, RUN, item, w.bundle, { lease_token: 'lease_test_0001', live_url: URL_OF(result.slug), edge_evidence: evidence(s.payload, result.slug) }),
+    (e: unknown) => e instanceof OpsRefusal && e.code === 'IMPORT_LEASE_LOST'
+  );
+  assert.equal(itemRow(w, s.itemId).state, 'VERIFYING_LIVE');
+});
+
+test('a merge needs the runner\'s merge check (before_fp_equal) on top of the others', () => {
+  const ev = { version: 1 as const, live_url: '', round: 1, checks: Object.fromEntries(EXPECTED_EDGE_CHECKS.map((k) => [k, { ok: true, hard: true }])), browser: null, sections: { leaf: '', root: '', secondary: [] }, selections_checked: 1, counts: { groups: 1 } };
+  const d1 = { ok: true, checks: {}, counts: {}, failed: [] };
+  assert.deepEqual(agreementOf(ev, d1, { groups: 1 }, false).failed, []);
+  assert.deepEqual(agreementOf(ev, d1, { groups: 1 }, true).failed, ['edge.merge.missing']);
+  assert.deepEqual(agreementOf({ ...ev, checks: { ...ev.checks, merge: { ok: false, hard: true } } }, d1, { groups: 1 }, true).failed, ['edge.merge']);
+});

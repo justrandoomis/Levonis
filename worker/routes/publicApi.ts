@@ -116,7 +116,26 @@ function canonicalUrl(origin: string, route: PublicRoute, path: Record<string, s
 
 // ------------------------------------------------------------ serving
 
-const tooMany = (c: Context<AppContext>) =>
+/**
+ * THE CACHE KEYS `serve` STORES, FOR A PURGE (Bambu import spec §A.3 `/publish-finish`): the parameter-less
+ * product record and section page of each slug, built exactly as `serve` builds its key — the canonical URL
+ * on the given origin, then the catalogue cache epoch. A parameterised answer (a cursor, a filter) has one entry
+ * per parameter set and ages out within the route's s-maxage, like every other purge of this codebase.
+ */
+export function publicV1PurgeKeys(origin: string, slugs: { products?: readonly string[]; sections?: readonly string[] }): Request[] {
+  const base = origin.replace(/\/+$/, '');
+  const byPath = new Map(ALL_ROUTES.map((r) => [r.path, r]));
+  const out: Request[] = [];
+  const add = (path: string, slug: string) => {
+    const route = byPath.get(path);
+    if (route && slug) out.push(new Request(withCacheEpoch(canonicalUrl(base, route, { slug }, {})), { method: 'GET' }));
+  };
+  for (const s of slugs.products ?? []) add('/products/{slug}', s);
+  for (const s of slugs.sections ?? []) add('/sections/{slug}', s);
+  return out;
+}
+
+const tooMany =(c: Context<AppContext>) =>
   c.json(
     {
       success: false,

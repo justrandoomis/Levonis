@@ -100,6 +100,10 @@ import { catalogRoutes } from './routes/catalog';
 import { printerFinderRoutes } from './routes/printerFinder';
 import { priceReportRoutes, adminPriceReportRoutes } from './routes/priceReports';
 import { priceRequestRoutes } from './routes/priceRequests';
+// The Bambu catalogue import (DECISIONS row 241): the runner's ops door (inert, 404, without an open run) and
+// the owner's read-only dashboard API.
+import { catalogImportOpsRoutes } from './routes/catalogImportOps';
+import { adminCatalogImportRoutes } from './routes/adminCatalogImport';
 import { merchantPrinterRoutes } from './routes/merchantPrinters';
 import { merchantWorkshopRoutes } from './routes/merchantWorkshop';
 import { merchantCatalogRoutes } from './routes/merchantCatalog';
@@ -483,6 +487,10 @@ app.route('/api/public/v1', publicApiRoutes);
 app.route('/api/price-reports', priceReportRoutes);
 // «طلب السعر» (DECISIONS row 240, migration 0193): signed-in customers ask for a catalog-only product's price.
 app.route('/api/price-requests', priceRequestRoutes);
+// The import's ops door: a bearer token on the run row, every miss the same 404, every answer no-store
+// (worker/lib/catalogImport/auth.ts). CSRF-exempt by construction: no cookie, no Origin.
+app.route('/api/ops/catalog-import', catalogImportOpsRoutes);
+app.route('/api/admin/catalog-import', adminCatalogImportRoutes);
 app.route('/api', miscRoutes);
 app.route('/api/admin', adminRoutes);
 // The farm's balancing console. Under /api/admin/* on purpose: the apex-only

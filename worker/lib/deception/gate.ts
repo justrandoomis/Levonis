@@ -73,9 +73,14 @@ const SKIP_EXACT = new Set(['/manifest.webmanifest', '/robots.txt', '/sitemap.xm
 const SKIP_PREFIX = ['/files/', '/store-icon/'];
 export const skipsGate = (path: string) => SKIP_EXACT.has(path) || SKIP_PREFIX.some((p) => path.startsWith(p));
 
-/** Server-to-server doors: never a network block (a webhook's or Studio's egress address is shared). */
-const SERVER_TO_SERVER = ['/api/telegram/', '/api/studio/'];
-const serverToServer = (path: string) => SERVER_TO_SERVER.some((p) => path.startsWith(p));
+/**
+ * Server-to-server doors: never a network block (a webhook's or Studio's egress address is shared). The Bambu
+ * catalogue import's ops door is one of them: its runner is a GitHub Actions job on a shared address, a tool
+ * with no Sec-Fetch header by nature, authenticated by a bearer token on the run row — its uniform 404s are not
+ * probing, and a block of its network would stop the run (import spec §A.3).
+ */
+export const SERVER_TO_SERVER: readonly string[] = ['/api/telegram/', '/api/studio/', '/api/ops/catalog-import/'];
+export const serverToServer = (path: string) => SERVER_TO_SERVER.some((p) => path.startsWith(p));
 
 /** Where no block reaches: signing in, proving an address, resetting a password and signing out must stay possible. */
 export const signInPath = (path: string) => path === '/api/auth' || path.startsWith('/api/auth/') || path === '/api/settings/public';

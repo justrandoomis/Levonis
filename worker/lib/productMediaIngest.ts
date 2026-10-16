@@ -72,6 +72,12 @@ export interface ProductMediaFetchOptions {
   timeout_ms?: number;
   max_redirects?: number;
   cleanup_grace_minutes?: number;
+  /**
+   * Hosts this ingest may fetch from, asked on EVERY hop before its request is sent (fetchGuard.ts): the
+   * catalogue import passes store.bblcdn.com alone, so neither a payload URL nor a redirect can reach anything
+   * else. Absent: any public address, as before.
+   */
+  allowHost?: (hostname: string) => boolean;
 }
 
 export interface StagedProductWebpInput {
@@ -728,6 +734,7 @@ export async function ingestProductMediaUrl(
       timeoutMs: options.timeout_ms,
       budget: options.budget,
       fetcher: options.fetcher,
+      allowHost: options.allowHost,
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LevonisBot/1.0; +https://levonis-iq.com)' },
     });
   } catch (error) {

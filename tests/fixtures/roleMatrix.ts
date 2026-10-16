@@ -88,6 +88,8 @@ import { farmAdminRoutes } from '../../worker/routes/farmAdmin';
 import { adminPrintQuoteRoutes, printQuoteRoutes } from '../../worker/routes/printQuote';
 import { adminPriceReportRoutes, priceReportRoutes } from '../../worker/routes/priceReports';
 import { priceRequestRoutes } from '../../worker/routes/priceRequests';
+import { catalogImportOpsRoutes } from '../../worker/routes/catalogImportOps';
+import { adminCatalogImportRoutes } from '../../worker/routes/adminCatalogImport';
 import { warrantyAdminRoutes, warrantyPublicRoutes } from '../../worker/routes/warranty';
 import { adminCommunityRoutes } from '../../worker/routes/adminCommunity';
 import { adminChatRoutes } from '../../worker/routes/adminChats';
@@ -211,6 +213,10 @@ export const BASE_MOUNTS: readonly MountSpec[] = [
   ['/api/admin/print-quote', adminPrintQuoteRoutes as Router],
   ['/api/price-reports', priceReportRoutes as Router],
   ['/api/price-requests', priceRequestRoutes as Router],
+  // The Bambu import (DECISIONS row 241): the ops door answers every session role the uniform 404 (no bearer
+  // token), and the owner's read-only dashboard API.
+  ['/api/ops/catalog-import', catalogImportOpsRoutes as unknown as Router],
+  ['/api/admin/catalog-import', adminCatalogImportRoutes as Router],
   ['/api/admin/price-reports', adminPriceReportRoutes as Router],
   ['/api/admin/products-v2', adminProductsRoutes as Router],
   ['/api/admin/template', templateRoutes as Router],
