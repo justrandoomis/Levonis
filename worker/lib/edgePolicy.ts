@@ -339,6 +339,7 @@ export function cataloguePaths(slugs: readonly string[] = []): string[] {
   return [
     '/api/home',
     '/api/home/sections',
+    '/api/home/graded',
     '/api/products',
     ...named.map((s) => `/api/products/${s}`),
     ...named.map((s) => `/api/products/${s}/knowledge`),

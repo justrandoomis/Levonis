@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LayoutGrid } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
-import { api, fetchGradedStock, type ApiProduct } from '../lib/api';
+import { api } from '../lib/api';
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 import { Skeleton, SkeletonGroup } from '../components/ui/Skeleton';
 import PageTopBar from '../components/catalog/PageTopBar';
@@ -11,8 +11,8 @@ import CategoryRowBanners, { CategoryRowBanner, ROW_BANNER_SIZE } from '../compo
 import { useBannerPhotos } from '../components/catalog/useBannerPhotos';
 import DiscoveryFooterTiles from '../components/catalog/DiscoveryFooterTiles';
 import { useScrolledPast } from '../components/catalog/useScrolledPast';
-import { cachedTree, loadPhotoPool, loadTree } from '../lib/catalog/data';
-import { bannerRows, photoOf, type BannerPhoto, type PhotoCandidate } from '../lib/catalog/explorerModel';
+import { cachedTree, loadGradedSummary, loadPhotoPool, loadTree, type GradedSummary } from '../lib/catalog/data';
+import { bannerRows, type BannerPhoto, type PhotoCandidate } from '../lib/catalog/explorerModel';
 import { countNoun, explorerSubline } from '../lib/catalog/copy';
 import type { CatalogTreeResponse } from '../lib/catalog/types';
 
@@ -45,6 +45,10 @@ import type { CatalogTreeResponse } from '../lib/catalog/types';
  * last snapshot with a quiet note if a refresh fails; `ErrorState` with retry
  * when there is nothing to show; «لا توجد فئات بعد» with a way to every product
  * when the shop has no stocked section at all.
+ *
+ * THE TWO CONDITIONAL BANNERS (graded stock, bundles) sit under the map's
+ * rows, so they are asked for once the map has landed, never beside it; the
+ * graded one asks only for its count and one photograph (`/api/home/graded`).
  */
 export default function CategoriesExplorer() {
   const { lang, loc } = useLanguage();
@@ -55,7 +59,7 @@ export default function CategoriesExplorer() {
   const [poolSettled, setPoolSettled] = useState(false);
   const [heading, setHeading] = useState<HTMLHeadingElement | null>(null);
   const headingGone = useScrolledPast(heading);
-  const [extras, setExtras] = useState<{ used: ApiProduct[]; bundles: Array<{ id: string; image: string }> }>({ used: [], bundles: [] });
+  const [extras, setExtras] = useState<{ used: GradedSummary; bundles: Array<{ id: string; image: string }> }>({ used: { count: 0, photo: null }, bundles: [] });
 
   const load = useCallback(async () => {
     setError(null);
@@ -89,10 +93,12 @@ export default function CategoriesExplorer() {
   }, [needsPool]);
 
   // The two conditional banners: after the map, never before it.
+  const mapped = !!tree;
   useEffect(() => {
+    if (!mapped) return;
     let alive = true;
-    fetchGradedStock({ mascot: 'silent' })
-      .then((used) => alive && setExtras((x) => ({ ...x, used: used as ApiProduct[] })))
+    loadGradedSummary()
+      .then((used) => alive && setExtras((x) => ({ ...x, used })))
       .catch(() => undefined);
     api
       .get<{ bundles?: Array<{ id: string; image: string }> }>('/api/bundles?limit=4', { mascot: 'silent' })
@@ -101,7 +107,7 @@ export default function CategoriesExplorer() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [mapped]);
 
   const baseRows = useMemo(() => bannerRows(roots, pool), [roots, pool]);
   // A section neither the map nor the shared pool covered asks for its own photographs.
@@ -112,15 +118,15 @@ export default function CategoriesExplorer() {
   const productTotal = tree?.totals.products ?? 0;
 
   const extraBanners: Array<{ id: string; to: string; title: string; description: string; count: string; photo: BannerPhoto | null }> = [];
-  if (extras.used.length > 0) {
-    const first = extras.used.find((p) => photoOf(p));
+  if (extras.used.count > 0) {
+    const first = extras.used.photo;
     extraBanners.push({
       id: 'used',
       to: '/used-printers',
       title: loc('المنتجات المستعملة', 'Pre-owned'),
       description: loc('مستعمل ومجدّد و Open Box، بحالة موصوفة بصدق.', 'Used, refurbished and open box, honestly graded.'),
-      count: countNoun(extras.used.length, 'product', lang),
-      photo: first ? { src: photoOf(first), productPhoto: true, productId: first.id } : null,
+      count: countNoun(extras.used.count, 'product', lang),
+      photo: first ? { src: first.src, productPhoto: true, productId: first.product_id } : null,
     });
   }
   if (extras.bundles.length > 0) {

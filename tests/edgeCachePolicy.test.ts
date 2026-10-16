@@ -548,6 +548,8 @@ test('P2 review: an admin product write and a benefit rule purge the listing, th
     assert.deepEqual(cataloguePaths(['a', '', 'b c']), [
       '/api/home',
       '/api/home/sections',
+      // The explorer's graded banner (count and photograph of the home's graded shelf), purged with the home.
+      '/api/home/graded',
       '/api/products',
       '/api/products/a',
       '/api/products/b c',
