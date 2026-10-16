@@ -988,6 +988,127 @@ test('byte-identical gallery images on a resume after /write: the rows from stag
   }
 });
 
+// ---------------------------------------------------------------- review 2: the documents as the write stored them
+
+const CDN_HOSTS = new Set(['store.bblcdn.com', 'cdn.shopify.com']);
+/**
+ * Job 1 writes ams-2-pro (a create with store-CDN documents) and parks at VERIFY (/complete 503, a Retry-After that
+ * does not fit); job 2 resumes in VERIFYING_LIVE with no /write answer and checks the documents again. `doc(job, path)`
+ * answers a document request (null: the World's 200; a throw: no answer at all).
+ */
+async function resumedVerify(opts: { noDocumentsRecord?: boolean; doc?: (job: 1 | 2, path: string, method: string) => Response | null }) {
+  let job: 1 | 2 = 1;
+  const w: World = new World({
+    handles: ['ams-2-pro'],
+    noDocumentsRecord: opts.noDocumentsRecord,
+    hostAnswer: (host, method, path) => (CDN_HOSTS.has(host) ? opts.doc?.(job, path, method) ?? null : null),
+  });
+  w.inject(new RegExp(`/items/${AMS}/complete$`), 1, () => json(503, { code: 'OVERLOADED', message: 'busy' }, { 'retry-after': '1500' }));
+  await w.importer({ deadlineMs: w.clock.now() + 22 * MIN }).main();
+  assert.equal(w.item('ams-2-pro').state, 'RETRYING', w.logLines.join('\n'));
+  assert.equal(w.item('ams-2-pro').last_completed, 'PUBLISHING');
+  job = 2;
+  w.clock.t = Date.parse(w.item('ams-2-pro').retry_at) + 1000;
+  const lines = w.logLines.length;
+  const code = await w.importer({ chainCount: 1 }).main();
+  return { w, code, job2: w.logLines.slice(lines).join('\n') };
+}
+
+test('review 2: a VERIFY resumed in a later job judges the documents as the write stored them, never by checks taken again', async () => {
+  const docPaths = (w: World) => [...new Set(w.hostRequests.filter((r) => CDN_HOSTS.has(r.host)).map((r) => r.path))];
+  // One check of job 2 gets no answer (a timeout): the write stored every document active, and the page shows them.
+  let victim = '';
+  const blip = await resumedVerify({
+    doc: (job, path) => {
+      if (job !== 2) return null;
+      if (!victim) victim = path;
+      if (path === victim) throw new TypeError('fetch failed');
+      return null;
+    },
+  });
+  try {
+    assert.ok(docPaths(blip.w).length >= 2, 'the product has store-CDN documents');
+    assert.match(blip.job2, /enriched: \d+ documents checked \(1 dead\)/, 'the check of job 2 did fail');
+    assert.equal(blip.w.item('ams-2-pro').state, 'COMPLETE', blip.job2);
+    assert.equal(blip.code, 0);
+    assert.match(blip.job2, /documents as written: (\d+) of \1 shown \(from stage_data\)/);
+    assert.equal(callsTo(blip.w, /\/write$/).length, 1);
+  } finally {
+    blip.w.dispose();
+  }
+  // A link dead at the write (stored inactive) answers again in job 2: still not on the page, as written.
+  let dead = '';
+  const revived = await resumedVerify({
+    doc: (job, path) => {
+      if (job === 1 && (!dead || path === dead)) {
+        dead = path;
+        return new Response('gone', { status: 404 });
+      }
+      return null;
+    },
+  });
+  try {
+    assert.equal(revived.w.item('ams-2-pro').documentsInactive?.length, 1, 'the write stored one document inactive');
+    assert.equal(revived.w.item('ams-2-pro').state, 'COMPLETE', revived.job2);
+    assert.match(revived.job2, /documents as written: (\d+) of (\d+) shown \(from stage_data\)/);
+    const [, shown, total] = /documents as written: (\d+) of (\d+) shown/.exec(revived.job2)!;
+    assert.equal(Number(shown), Number(total) - 1);
+  } finally {
+    revived.w.dispose();
+  }
+  // A link that died after the write: D1 still holds it active, the page still shows it, and nothing rewrites it.
+  let died = '';
+  const after = await resumedVerify({
+    doc: (job, path) => {
+      if (job !== 2) return null;
+      if (!died) died = path;
+      return path === died ? new Response('gone', { status: 404 }) : null;
+    },
+  });
+  try {
+    assert.equal(after.w.item('ams-2-pro').state, 'COMPLETE', after.job2);
+  } finally {
+    after.w.dispose();
+  }
+  // A Worker that records nothing: the documents the page shows are accepted when the payload holds each one.
+  let lost = '';
+  const older = await resumedVerify({
+    noDocumentsRecord: true,
+    doc: (job, path) => {
+      if (job !== 2) return null;
+      if (!lost) lost = path;
+      if (path === lost) throw new TypeError('fetch failed');
+      return null;
+    },
+  });
+  try {
+    assert.equal(older.w.item('ams-2-pro').state, 'COMPLETE', older.job2);
+    assert.match(older.job2, /documents as written: (\d+) of \1 shown \(from not_recorded\)/);
+  } finally {
+    older.w.dispose();
+  }
+});
+
+test('review 2: in the job that wrote, VERIFY judges the documents by the checks sent with /write (a dead one is not on the page)', async () => {
+  let dead = '';
+  const w = new World({
+    handles: ['ams-2-pro'],
+    hostAnswer: (host, _method, path) => {
+      if (!CDN_HOSTS.has(host)) return null;
+      if (!dead) dead = path;
+      return path === dead ? new Response('gone', { status: 404 }) : null;
+    },
+  });
+  try {
+    assert.equal(await w.importer().main(), 0, w.logLines.join('\n'));
+    assert.equal(w.item('ams-2-pro').state, 'COMPLETE', w.logLines.join('\n'));
+    assert.equal(w.item('ams-2-pro').documentsInactive?.length, 1);
+    assert.ok(w.logLines.some((l) => /documents as written: \d+ of \d+ shown \(from write\)/.test(l)), w.logLines.join('\n'));
+  } finally {
+    w.dispose();
+  }
+});
+
 // ---------------------------------------------------------------- step 6b's door answers (writer 73aa4c9)
 
 test('close with end-of-queue holds: the held items are not open work; /run/finish closes partial and the summary names them', async () => {

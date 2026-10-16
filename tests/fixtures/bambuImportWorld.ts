@@ -93,6 +93,12 @@ export interface FakeItem {
   match_kind: '' | 'created' | 'merged';
   /** A merge's protected-fields result as the write recorded it in stage_data (null: not recorded). */
   fp_equal: boolean | null;
+  /**
+   * The documents /write stored inactive (a dead link at the checks it was sent, writer.ts documentAlive): the
+   * knowledge route leaves them out, and the write records their ids (stage_data.documents_inactive). null before
+   * the write.
+   */
+  documentsInactive: string[] | null;
   /** §A.10: a product this run created, hidden by a BLOCKED event after WRITTEN. */
   hidden: boolean;
   /** The edge still serves the hidden answers until /publish-finish purges them. */
@@ -156,6 +162,8 @@ export interface WorldOptions {
   recordImages?: boolean;
   /** A merge's write records no `before_fp_equal` in stage_data (a Worker before step 6b's review). */
   noFpRecord?: boolean;
+  /** The write records no `documents_inactive` in stage_data (a Worker before review 2 of step 8). */
+  noDocumentsRecord?: boolean;
   /** Manifest rows the reviewed bundle holds (handle → hold code): end-of-queue holds. */
   holds?: Record<string, 'OWNER_HIDDEN' | 'ORDER_TYPE_WORD'>;
 }
@@ -221,6 +229,7 @@ export class World {
         title: r.title,
         match_kind: '',
         fp_equal: null,
+        documentsInactive: null,
         hidden: false,
         cachedHidden: false,
         ...(opts.items?.[r.source_product_id] ?? {}),
@@ -355,6 +364,7 @@ export class World {
         ...(this.opts.planted ? { note: this.planted() } : {}),
         ...(this.opts.recordImages && i.written ? { images: i.written.map((r) => this.writtenRow(r)) } : {}),
         ...(i.fp_equal !== null ? { before_fp_equal: i.fp_equal } : {}),
+        ...(i.documentsInactive !== null && !this.opts.noDocumentsRecord ? { documents_inactive: i.documentsInactive } : {}),
       },
       blocker_code: i.blocker_code,
       levonis_product_id: i.levonis_product_id,
@@ -519,6 +529,19 @@ export class World {
       i.match_kind = merged ? 'merged' : 'created';
       // Step 6b: the write records a merge's protected-fields result in stage_data after its commit.
       i.fp_equal = merged && !this.opts.noFpRecord ? true : null;
+      // The writer's product_documents rows (one per address and scope): a document whose check answered neither 2xx
+      // nor 3xx is stored inactive; one with no check stays active.
+      const checks = new Map(((body?.document_checks ?? []) as Array<{ document_id: string; check_status: number }>).map((k) => [k.document_id, k.check_status]));
+      const seenDocs = new Set<string>();
+      i.documentsInactive = i.payload!.documents
+        .filter((d) => {
+          const at = `${d.url}|${d.scope_kind}|${d.scope_id}`;
+          if (seenDocs.has(at)) return false;
+          seenDocs.add(at);
+          const status = checks.get(d.id);
+          return status !== undefined && !(status >= 200 && status < 400);
+        })
+        .map((d) => d.id);
       // The Worker's step 7: the payload's rows on their stored objects, then the content-duplicate collapse.
       const rows = i.payload!.images.flatMap((x) => (i.media.get(x.source_media_id) ? [{ ...x, r2_key: i.media.get(x.source_media_id)!.r2_key }] : []));
       i.written = collapseContentDuplicates(rows).rows;
@@ -636,7 +659,7 @@ export class World {
       });
     }
     if (siteP?.[2] === '/quote') return json(409, { success: false, error: 'not available', code: 'PRICE_NOT_AVAILABLE', details: { price_status: 'unpriced' } });
-    if (siteP?.[2] === '/knowledge') return json(200, routeKnowledge(pay, i.media));
+    if (siteP?.[2] === '/knowledge') return json(200, routeKnowledge(pay, i.media, { inactiveDocuments: new Set(i.documentsInactive ?? []) }));
     return json(200, {
       price_status: 'unpriced',
       relations: {

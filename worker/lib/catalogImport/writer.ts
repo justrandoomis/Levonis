@@ -30,7 +30,8 @@
  *         n-2 the WRITTEN event (fenced by trg_cie_lease_fence)
  *         n-1 the checkpoint: PUBLISHING, last_completed_stage WRITING, and what only this transaction can
  *            prove — the merge's before_fp_equal (the texts compared again) or the create's after_money_default
- *            (the probe in SQL) — with the plan the readback compares against (readback_target)
+ *            (the probe in SQL) — with the plan the readback compares against (readback_target), the
+ *            image rows written (images) and the documents stored inactive (documents_inactive)
  *         …  merge: the fingerprint SELECTs again; create: the money-default probe
  *         n+1 DELETE the guard row
  *
@@ -1359,13 +1360,21 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
     ]),
   });
   const checks = new Map((input.documentChecks ?? []).map((k) => [k.document_id, k]));
+  const documentRows = dedupeBy(payload.documents, (d) => `${d.url}|${d.scope_kind}|${d.scope_id}`);
+  // The documents this write stores inactive (a dead link at the checks it was sent, §C.7), recorded at the
+  // checkpoint (stage_data.documents_inactive): a VERIFY resumed in a later job judges the page by what was written,
+  // never by checks it takes again — nothing rewrites `active` after WRITING.
+  const inactiveDocuments = documentRows.filter((d) => {
+    const k = checks.get(d.id);
+    return !!k && !documentAlive(k.check_status);
+  }).map((d) => d.id);
   side.push({
     table: 'product_documents',
     head: `INSERT INTO product_documents (id, product_id, kind, title_en, title_ar, title_ckb, url, host, scope_kind, scope_id, language, source_kind, retrieved_at, sort, active, import_run_id,
              tracker_source, content_type, byte_size, content_sha256, checked_at, check_status)`,
     row: `(${Array.from({ length: 22 }, () => '?').join(', ')})`,
     tail: 'ON CONFLICT DO NOTHING',
-    values: dedupeBy(payload.documents, (d) => `${d.url}|${d.scope_kind}|${d.scope_id}`).map((d) => {
+    values: documentRows.map((d) => {
       const k = checks.get(d.id);
       return [
         d.id, productId, d.kind, d.title_en, d.title_ar, ckbNotCopy(d.title_ar, d.title_ckb), d.url, d.host, d.scope_kind, d.scope_id, d.language, 'store_page', retrievedAt, d.sort,
@@ -1478,15 +1487,16 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
             SET processing_state = 'PUBLISHING', last_completed_stage = 'WRITING', levonis_product_id = ?1, slug = ?2, match_kind = ?3,
                 stage_attempts = 0, retry_at = '',
                 stage_data = json_set(json_remove(CASE WHEN json_valid(stage_data) THEN stage_data ELSE '{}' END, '$.fp_before', '$.readback', '$.readback_target'),
-                                      '$.written', json(?4), '$.payload_counts', json(?5), '$.images', json(?6)${target ? ", '$.readback_target', json(?10)" : ''}${proof}),
+                                      '$.written', json(?4), '$.payload_counts', json(?5), '$.images', json(?6), '$.documents_inactive', json(?10)${target ? ", '$.readback_target', json(?11)" : ''}${proof}),
                 updated_at = ${NOW_SQL}
           WHERE id = ?7 AND run_id = ?8 AND lease_token = ?9`
       )
-      // The rows written (after the content-duplicate collapse), in the same batch: a runner resumed after this
-      // write, with no /write answer, reads them from /lease (stage_data.images) instead of recomputing them.
+      // The rows written (after the content-duplicate collapse) and the documents stored inactive, in the same batch:
+      // a runner resumed after this write, with no /write answer, reads them from /lease (stage_data.images,
+      // stage_data.documents_inactive) instead of recomputing them.
       .bind(
         productId, slug, merge ? 'merged' : 'created', JSON.stringify(counts), JSON.stringify(payloadCounts(payload)), JSON.stringify(writtenImageRows(images)),
-        input.itemId, runId, input.leaseToken, ...(target ? [target] : [])
+        input.itemId, runId, input.leaseToken, JSON.stringify(inactiveDocuments), ...(target ? [target] : [])
       )
   );
   const afterStart = statements.length;

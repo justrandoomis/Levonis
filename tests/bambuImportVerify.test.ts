@@ -239,6 +239,38 @@ test('a dead document is stored inactive and never shown (§C.7): VERIFY does no
   assert.ok(failed(await verify({ ...l, inactive: new Set([dead.id]) }, { documentChecks: alive })).includes('knowledge'));
 });
 
+test('review 2: a resumed VERIFY reads the documents as the write stored them (stage_data), never its own checks; unrecorded, the live answer stands for them', async () => {
+  const l = live('pla-basic-filament', { sections: ['filament', 'pla'] });
+  const [dead, other] = l.payload.documents;
+  const timeout = (id: string): DocumentCheck => ({ document_id: id, check_status: 0, content_type: '', byte_size: null, content_sha256: '', checked_at: '2026-10-16T00:00:00Z', tracker_source: '' });
+  // Every document stored active; the re-taken checks lost one to a timeout: the record is what counts.
+  const recorded = await verify(l, { documentChecks: [timeout(dead.id)], writtenDocuments: { inactive: [] } });
+  assert.deepEqual(failed(recorded), []);
+  assert.equal(recorded.checks.knowledge.detail?.documents_from, 'stage_data');
+  assert.equal(recorded.checks.knowledge.counts?.expected_documents, l.payload.documents.length);
+  // One stored inactive: expected off the page — and its absence on the page is right, its presence a difference.
+  const off = await verify({ ...l, inactive: new Set([dead.id]) }, { writtenDocuments: { inactive: [dead.id] } });
+  assert.deepEqual(failed(off), []);
+  assert.equal(off.checks.knowledge.counts?.expected_documents, l.payload.documents.length - 1);
+  assert.ok(failed(await verify(l, { writtenDocuments: { inactive: [dead.id] } })).includes('knowledge'), 'the page shows one the write stored inactive');
+  assert.ok(failed(await verify({ ...l, inactive: new Set([other.id]) }, { writtenDocuments: { inactive: [] } })).includes('knowledge'), 'the page lost one the write stored active');
+  // Not recorded (a Worker before this review): the documents the page shows, each one the payload's, stand.
+  const unknown = await verify({ ...l, inactive: new Set([dead.id]) }, { writtenDocuments: 'not_recorded' });
+  assert.deepEqual(failed(unknown), []);
+  assert.equal(unknown.checks.knowledge.detail?.documents_from, 'not_recorded');
+  assert.equal(unknown.checks.knowledge.counts?.expected_documents, l.payload.documents.length - 1);
+  assert.equal(unknown.checks.fingerprint.ok, true);
+  // …but never one the payload does not hold: an extra document on the page still fails.
+  const foreign = await verify(
+    { ...l, knowledgeEdit: (k) => ({ ...k, documents: [...(k.documents as Rec[]), { ...(k.documents as Rec[])[0], url: 'https://store.bblcdn.com/s7/planted-foreign.pdf' }] }) },
+    { writtenDocuments: 'not_recorded' }
+  );
+  assert.ok(failed(foreign).includes('knowledge'), JSON.stringify(foreign.checks.knowledge));
+  // This job's /write: its checks are the ones it sent, as before.
+  const sent = await verify(l, {});
+  assert.equal(sent.checks.knowledge.detail?.documents_from, 'write');
+});
+
 test('a MERGE into an existing priced product (§E.2): its own name, money, options and images stay; the import\'s part is checked', async () => {
   const payload = payloadOf('h2d', 'p_existing_h2d_0001');
   const media = mediaOf(payload);

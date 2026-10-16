@@ -65,11 +65,11 @@ import {
 import { curatedGate, enrich, type EnrichReport } from './enrich';
 import { blockedStop, HostFetcher, ImportStop, StoreFetcher, transientStop, type FetchLike } from './fetch';
 import { ImportLog, type LogStage } from './log';
-import { OpsClient, OpsError, writtenImagesOf, type DocumentCheck, type HeldRef, type MediaAnswerRow, type MediaRequest, type StatusAnswer, type WriteAnswer, type WrittenImage } from './opsClient';
+import { OpsClient, OpsError, writtenDocumentsOf, writtenImagesOf, type DocumentCheck, type HeldRef, type MediaAnswerRow, type MediaRequest, type StatusAnswer, type WriteAnswer, type WrittenImage } from './opsClient';
 import { writtenGallery, type Gallery } from './gallery';
 import { NO_ROBOTS, parseRobots, robotsAllows, SITEMAP_PATHS, type Robots } from './robots';
 import { renderSummary, SummaryWriter, type SummaryItem } from './summary';
-import { AFTER_CACHE_WAIT, cacheWaitOf, edgeEvidence, modelCodesOf, Site, verifyPublic, type VerifyOutcome } from './verify';
+import { AFTER_CACHE_WAIT, cacheWaitOf, edgeEvidence, modelCodesOf, Site, verifyPublic, type VerifyContext, type VerifyOutcome } from './verify';
 import type { BrowserInput, BrowserResult } from './browser';
 // @ts-expect-error - plain ESM helper run by workflow 60, no types
 import { sealBuffer } from './seal.mjs';
@@ -302,6 +302,10 @@ interface ItemWork {
   stageFpEqual: boolean | null;
   /** stage_data.images, when the Worker records the written image rows there (a resume after /write; gallery.ts). */
   stageImages: WrittenImage[] | null;
+  /** stage_data.documents_inactive: the document ids the write stored inactive, when the Worker records them. */
+  stageDocumentsInactive: string[] | null;
+  /** The document checks this job sent with /write (whether or not its answer came back): what the write stored. */
+  writeChecks: DocumentCheck[] | null;
   /** The gallery VERIFY expected (gallery.ts), for the sealed report. */
   gallery?: Gallery;
   /** /publish-finish ran for this item in this job (it purges, and republishes a product hidden on a block). */
@@ -662,6 +666,8 @@ export class Importer {
       writtenSha: lease.payload_sha256,
       stageFpEqual: stageFpEqualOf(lease.stage_data),
       stageImages: writtenImagesOf(lease.stage_data.images),
+      stageDocumentsInactive: writtenDocumentsOf(lease.stage_data.documents_inactive),
+      writeChecks: null,
       publishedThisJob: false,
     };
     const pos = row.queue_position;
@@ -765,6 +771,8 @@ export class Importer {
     if (fp !== null) w.stageFpEqual = fp;
     const images = writtenImagesOf(lease.stage_data.images);
     if (images) w.stageImages = images;
+    const inactive = writtenDocumentsOf(lease.stage_data.documents_inactive);
+    if (inactive) w.stageDocumentsInactive = inactive;
   }
 
   /**
@@ -1137,6 +1145,8 @@ export class Importer {
   }
 
   private async writeItem(w: ItemWork): Promise<void> {
+    // Before the call: an answer lost after the commit still leaves these as what the write stored.
+    w.writeChecks = w.documentChecks;
     const a = await this.ops.write(w.sid, w.leaseToken, w.stagedSha!, w.payload!, w.documentChecks);
     w.write = a;
     w.productId = a.product_id || w.productId;
@@ -1205,7 +1215,7 @@ export class Importer {
       slug: w.slug,
       media: w.media,
       images: gallery.images,
-      documentChecks: w.documentChecks,
+      ...this.documentsOf(w),
       leaf: w.row.leaf ?? '',
       also: w.row.also ?? [],
       taxonomy: this.deps.bundle.taxonomy,
@@ -1218,6 +1228,14 @@ export class Importer {
       // Each round's reads must fit in what is left of VERIFY's worst case (§A.7 rule 1).
       this.siteBudgetEnd = this.deps.clock.now() + (round === 1 ? WORST.VERIFY : AFTER_CACHE_WAIT);
       const outcome = await verifyPublic(this.site, ctx);
+      if (round === 1) {
+        const k = outcome.checks.knowledge;
+        this.log.item(w.row.queue_position, w.row.handle, 'VERIFYING_LIVE', 'documents_written', {
+          shown: k?.counts?.expected_documents ?? null,
+          total: w.payload!.documents.length,
+          what: typeof k?.detail?.documents_from === 'string' ? k.detail.documents_from : null,
+        });
+      }
       let browser: BrowserResult | null = null;
       if (outcome.ok) {
         // Check 7 is part of every COMPLETE (§I.1): no browser, no /complete. runQueue launched it before item 1.
@@ -1294,6 +1312,18 @@ export class Importer {
     // The Worker records the write's own result in stage_data after its commit, and completes a merge only on that
     // record (complete.ts: `write.before_fp_equal`). Without it there is no proof here either: the check fails.
     return { before_fp_equal: null, source: 'not_recorded' };
+  }
+
+  /**
+   * The documents as the write stored them, for VERIFY (verify.ts writtenDocuments): the checks this job sent with
+   * /write; else, resumed in a later job, the ids the Worker recorded inactive at the write (stage_data); else not
+   * recorded — never the checks this job took again, which are not what /write stored (nothing rewrites a
+   * document's `active` after WRITING), so one timeout among a product's documents would fail a correct import.
+   */
+  private documentsOf(w: ItemWork): Pick<VerifyContext, 'documentChecks' | 'writtenDocuments'> {
+    if (w.writeChecks) return { documentChecks: w.writeChecks };
+    if (w.stageDocumentsInactive) return { writtenDocuments: { inactive: w.stageDocumentsInactive } };
+    return { writtenDocuments: 'not_recorded' };
   }
 
   /** Drops a rebuilt work so the next attempt reads the page again. */

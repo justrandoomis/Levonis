@@ -1005,6 +1005,18 @@ test('the runner\'s document checks land on product_documents; a dead link is wr
   assert.equal(alive.active, 1);
   assert.equal(alive.check_status, 200);
   assert.equal(alive.tracker_source, 'https://e.bambulab.com/t?c=abc');
+  // Review 2 of step 8: the checkpoint records which documents it stored inactive, in the same batch, so a VERIFY
+  // resumed in a later job judges the page by what was written, never by checks it takes again (/lease answers it).
+  const recorded = JSON.parse(String(one(w, 'SELECT stage_data FROM catalog_import_items WHERE id = ?', s.itemId).stage_data)) as Record<string, unknown>;
+  assert.deepEqual(recorded.documents_inactive, rows.filter((r) => r.active === 0).map((r) => r.id));
+  assert.deepEqual(recorded.documents_inactive, [docs[0].id]);
+  // No check sent: every document is stored active, and the record says so (an empty list, not a missing one).
+  const w2 = newWorld();
+  const s2 = stage(w2, 'a1');
+  await write(w2, s2);
+  const none = JSON.parse(String(one(w2, 'SELECT stage_data FROM catalog_import_items WHERE id = ?', s2.itemId).stage_data)) as Record<string, unknown>;
+  assert.deepEqual(none.documents_inactive, []);
+  assert.equal(count(w2.raw, 'SELECT COUNT(*) AS n FROM product_documents WHERE product_id = ? AND active = 0', s2.payload.product_id), 0);
 });
 
 // ---------------------------------------------------------------- review 6b: what the write records for a resume, swatch ownership

@@ -38,12 +38,12 @@ import { projectionFingerprint, projectionFromPayload, projectionFromSite, type 
 import type { ImportPayload } from '../packages/catalog/src/bambuImport/payload';
 import { specKey } from '../packages/catalog/src/bambuImport/registry/specKeys';
 import { reviewedBundleDigest, type ReviewedTexts } from '../worker/lib/catalogImport/reviewed';
-import { edgeEvidence, modelCodesOf, Site, verifyPublic, type VerifyOutcome } from '../scripts/bambu-import/verify';
+import { edgeEvidence, modelCodesOf, Site, verifyPublic, type VerifyContext, type VerifyOutcome } from '../scripts/bambu-import/verify';
 import { HostFetcher } from '../scripts/bambu-import/fetch';
 import { Deadline as RunnerDeadline } from '../scripts/bambu-import/deadline';
 import { writtenGallery } from '../scripts/bambu-import/gallery';
 import { NOT_APPLICABLE } from '../scripts/bambu-import/browser';
-import type { DocumentCheck as RunnerDocumentCheck, MediaAnswerRow, WrittenImage } from '../scripts/bambu-import/opsClient';
+import { writtenDocumentsOf, type DocumentCheck as RunnerDocumentCheck, type MediaAnswerRow, type WrittenImage } from '../scripts/bambu-import/opsClient';
 import { createHash } from 'node:crypto';
 
 after(() => {
@@ -521,6 +521,16 @@ test('a collapse that hands the primary on: the hotend\'s general lead picture i
  * /complete judges. The browser has no place in-process: its part is recorded as the runner records a passing one.
  */
 async function runItemVerifiedByRunner(w: OpsWorld, client: Client, f: Fixture, texts: ReviewedTexts, titles: string[]): Promise<{ outcome: VerifyOutcome; done: { state: string; d1_checks: Record<string, unknown> } }> {
+  const it = await writeThroughDoor(client, f);
+  const outcome = await verifyByRunner(w, client, f, texts, titles, it, { documentChecks: it.checks as unknown as RunnerDocumentCheck[] });
+  const browser = { ok: true, checks: { image_decodes: true, image_contain: true, selection_images: true }, counts: { values_checked: 1 }, selections: [], not_applicable: { ...NOT_APPLICABLE } };
+  const liveUrl = `https://levonis-iq.com/product/${it.written.slug}`;
+  const done = await client.complete(f.sid, it.t, liveUrl, edgeEvidence(outcome, browser, liveUrl, f.payload, 1));
+  return { outcome, done };
+}
+
+/** One item as run.ts sequences it up to VERIFY: lease, the stages, stage, media, write (with the checks), publish-finish. */
+async function writeThroughDoor(client: Client, f: Fixture) {
   const lease = await client.lease(f.sid);
   const t = lease.lease_token;
   await client.event(f.sid, t, { state: 'EXTRACTING', outcome: 'start' });
@@ -534,20 +544,33 @@ async function runItemVerifiedByRunner(w: OpsWorld, client: Client, f: Fixture, 
   const written = await client.write(f.sid, t, staged.payload_sha256, f.payload, checks);
   const rows = (writeAnswers.get(f.sid)?.images ?? []) as WrittenImage[];
   assert.equal((await client.publishFinish(f.sid, t)).state, 'VERIFYING_LIVE');
+  return { t, checks, media, written, rows };
+}
+
+/** The runner's verifyPublic over the real routes; `documents` says how it knows the documents' stored state. */
+async function verifyByRunner(
+  w: OpsWorld,
+  client: Client,
+  f: Fixture,
+  texts: ReviewedTexts,
+  titles: string[],
+  it: Awaited<ReturnType<typeof writeThroughDoor>>,
+  documents: Pick<VerifyContext, 'documentChecks' | 'writtenDocuments'>
+): Promise<VerifyOutcome> {
   // The runner's site reader, spaced on a clock that does not sleep, through this app.
   let now = Date.now();
   const fakeClock = { now: () => now, sleep: async (ms: number) => void (now += ms) };
   const fetcher = new HostFetcher({ fetch: (url, init) => w.fetch(url, init), clock: fakeClock, deadline: new RunnerDeadline(now + 6 * 3600_000, fakeClock), siteOrigin: 'https://levonis-iq.com' });
   const site = new Site('https://levonis-iq.com', fetcher, () => 0);
-  const runnerMedia = media as unknown as Map<string, MediaAnswerRow>;
-  const gallery = writtenGallery(f.payload, runnerMedia, { rows, source: 'write' });
-  const outcome = await verifyPublic(site, {
+  const runnerMedia = it.media as unknown as Map<string, MediaAnswerRow>;
+  const gallery = writtenGallery(f.payload, runnerMedia, { rows: it.rows, source: 'write' });
+  return verifyPublic(site, {
     payload: f.payload,
-    productId: written.product_id,
-    slug: written.slug,
+    productId: it.written.product_id,
+    slug: it.written.slug,
     media: runnerMedia,
     images: gallery.images,
-    documentChecks: checks as unknown as RunnerDocumentCheck[],
+    ...documents,
     leaf: String(f.row.leaf ?? ''),
     also: (f.row.also as string[]) ?? [],
     taxonomy: JSON.parse(texts.taxonomyMap) as Record<string, unknown>,
@@ -558,11 +581,56 @@ async function runItemVerifiedByRunner(w: OpsWorld, client: Client, f: Fixture, 
       return { ok: rb.ok, mismatches: rb.mismatches };
     },
   });
-  const browser = { ok: true, checks: { image_decodes: true, image_contain: true, selection_images: true }, counts: { values_checked: 1 }, selections: [], not_applicable: { ...NOT_APPLICABLE } };
-  const liveUrl = `https://levonis-iq.com/product/${written.slug}`;
-  const done = await client.complete(f.sid, t, liveUrl, edgeEvidence(outcome, browser, liveUrl, f.payload, 1));
-  return { outcome, done };
 }
+
+test('review 2 of step 8: a VERIFY resumed in a later job judges the A1\'s 19 documents as the real write stored them (stage_data on /lease), never by checks taken again', async () => {
+  const w = opsWorld();
+  const fx = fixtures()
+    .filter((f) => f.handle === 'a1')
+    .map((f) => ({ ...f, row: { ...f.row, queue_position: 1 } }));
+  const texts = textsFor(fx.map((f) => f.row));
+  setBundle(texts);
+  openRun(w.raw);
+  installCdnDouble(w);
+  try {
+    const client = await clientFor(w);
+    await client.hello();
+    await client.manifest(fx.map((f) => manifestRequestRow(f.row, new Date().toISOString())));
+    await client.prepareTaxonomy();
+    const f = fx[0];
+    const titles = [f.payload.product.title_en];
+    assert.ok(f.payload.documents.length > 3, 'the A1 has many documents');
+    // Job N writes with its checks: the first document dead (stored inactive), every other alive (active).
+    const it = await writeThroughDoor(client, f);
+    const dead = f.payload.documents[0].id;
+    assert.equal(Number((w.raw.prepare('SELECT active FROM product_documents WHERE id = ?').get(dead) as { active: number }).active), 0);
+    // Job N+1 takes the item over (a new lease, no /write answer): the write's record comes back with it.
+    const lease = await client.lease(f.sid);
+    assert.equal(lease.state, 'VERIFYING_LIVE');
+    const recorded = writtenDocumentsOf(lease.stage_data.documents_inactive);
+    assert.deepEqual(recorded, [dead], 'the documents the write stored inactive, from the real checkpoint');
+    // Its checks taken again differ: one link timed out (status 0), the dead one answers again.
+    const retaken = it.checks.map((k, i) => (i === 0 ? { ...k, check_status: 200 } : i === 1 ? { ...k, check_status: 0 } : k));
+    const old = await verifyByRunner(w, client, f, texts, titles, it, { documentChecks: retaken as unknown as RunnerDocumentCheck[] });
+    assert.equal(old.ok, false, 'judged by the re-taken checks, a correct import fails');
+    assert.ok((old.checks.knowledge.counts?.mismatched_documents ?? 0) > 0);
+    const outcome = await verifyByRunner(w, client, f, texts, titles, it, { documentChecks: retaken as unknown as RunnerDocumentCheck[], writtenDocuments: { inactive: recorded! } });
+    for (const [name, c] of Object.entries(outcome.checks)) assert.ok(c.ok || !c.hard, `${name} ${JSON.stringify({ status: c.status, counts: c.counts })}`);
+    assert.equal(outcome.checks.knowledge.counts?.mismatched_documents, 0);
+    assert.equal(outcome.checks.knowledge.detail?.documents_from, 'stage_data');
+    assert.equal(outcome.checks.fingerprint.ok, true);
+    // A Worker that records nothing: the documents the real route shows stand, each one the payload's.
+    const unknown = await verifyByRunner(w, client, f, texts, titles, it, { writtenDocuments: 'not_recorded' });
+    assert.equal(unknown.ok, true, JSON.stringify(unknown.checks.knowledge));
+    assert.equal(unknown.checks.knowledge.counts?.expected_documents, f.payload.documents.length - 1);
+    const browser = { ok: true, checks: { image_decodes: true, image_contain: true, selection_images: true }, counts: { values_checked: 1 }, selections: [], not_applicable: { ...NOT_APPLICABLE } };
+    const liveUrl = `https://levonis-iq.com/product/${it.written.slug}`;
+    const done = await client.complete(f.sid, lease.lease_token, liveUrl, edgeEvidence(outcome, browser, liveUrl, f.payload, 1));
+    assert.equal(done.state, 'COMPLETE', JSON.stringify(done.d1_checks));
+  } finally {
+    restoreFetch();
+  }
+});
 
 test('the runner\'s own VERIFY over the real routes (§I.1): H2D, PLA Basic and a collapsed hotend — every check passes, /knowledge fact by fact, COMPLETE on its evidence', async () => {
   const w = opsWorld();

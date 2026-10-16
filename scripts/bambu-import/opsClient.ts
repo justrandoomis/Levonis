@@ -304,6 +304,16 @@ export function writtenImagesOf(raw: unknown): WrittenImage[] | null {
   return out;
 }
 
+/**
+ * stage_data.documents_inactive: the payload document ids the write stored inactive (a dead link at the checks it
+ * was sent), recorded in its checkpoint for a VERIFY resumed in a later job. null when the Worker records none (one
+ * before review 2 of step 8) or the record is not a list of ids.
+ */
+export function writtenDocumentsOf(raw: unknown): string[] | null {
+  if (!Array.isArray(raw) || raw.length > 400) return null;
+  return raw.every((id) => typeof id === 'string' && id.length > 0 && id.length <= 80) ? (raw as string[]) : null;
+}
+
 function heldRefs(v: unknown): HeldRef[] {
   if (!Array.isArray(v)) return [];
   return v.filter(isRec).flatMap((r) => {

@@ -85,7 +85,7 @@
  */
 import { canonicalJson, mediaPath, projectionFingerprint, type Projection } from '@levonis/catalog/bambuImport/fingerprint';
 import { modelsInText } from '@levonis/catalog/bambuImport/registry/models';
-import type { ImportPayload, PayloadBoxItem } from '@levonis/catalog/bambuImport/payload';
+import type { ImportPayload, PayloadBoxItem, PayloadDocument } from '@levonis/catalog/bambuImport/payload';
 import { assembleKnowledge, isOwnerOnlyKey, type KnowledgeRows, type ProductKnowledge, type SpecValueDbRow } from '../../worker/lib/knowledge/answer';
 import { comparedFields } from '../../worker/lib/knowledge/compareKeys';
 import { CACHE_WAIT_MAX, VERIFY_AFTER_CACHE_WAIT } from './deadline';
@@ -160,6 +160,16 @@ export interface VerifyContext {
   images: readonly GalleryImage[];
   /** ENRICH's document checks (sent with /write): a dead document is stored inactive and never shown. */
   documentChecks?: readonly DocumentCheck[];
+  /**
+   * The documents as the WRITE stored them, for a VERIFY that sent no /write in this job (resumed in a later job):
+   * its checks were taken again, and a document that answers differently since — a timeout, a 429, a link that
+   * died or came back — is not what /write stored (nothing rewrites `product_documents.active` after WRITING).
+   * `{ inactive }`: the ids the Worker recorded inactive at the write (`stage_data.documents_inactive`).
+   * `'not_recorded'`: a Worker that records none — the documents the live answer shows are accepted when the
+   * payload holds each one on a live scope (one the payload does not hold still fails). Absent: `documentChecks`
+   * are the checks this job sent with /write.
+   */
+  writtenDocuments?: { inactive: readonly string[] } | 'not_recorded';
   /** The taxonomy entry the leaf resolves from (`@key` of taxonomy-map `create`, or a catalog id). */
   leaf: string;
   /** Secondary memberships (`also`), same notation. */
@@ -203,9 +213,16 @@ export function bindingOf(i: { option_value_id: string | null; variant_id: strin
   return i.variant_id ? 'variant' : i.option_value_id ? 'value' : 'general';
 }
 
-/** The Worker's rule (writer.ts documentAlive): a document answered 2xx/3xx is shown; one with no check stays active. */
-export function documentShown(doc: { id: string }, checks: readonly DocumentCheck[]): boolean {
-  const c = checks.find((k) => k.document_id === doc.id);
+/**
+ * Which of the payload's documents the write stored active: the checks it was sent (the Worker's rule, writer.ts
+ * documentAlive: one answered 2xx/3xx is shown, one with no check stays active), or a rule known otherwise (what the
+ * Worker recorded at the write, or what the live answer shows: VerifyContext.writtenDocuments).
+ */
+export type DocumentRule = readonly DocumentCheck[] | ((doc: PayloadDocument) => boolean);
+
+export function documentShown(doc: PayloadDocument, rule: DocumentRule): boolean {
+  if (typeof rule === 'function') return rule(doc);
+  const c = rule.find((k) => k.document_id === doc.id);
   return !c || (c.check_status >= 200 && c.check_status < 400);
 }
 
@@ -238,7 +255,7 @@ export function customerMediaUrl(raw: string): string {
  * scope, never to the product itself; swatches of live values with a stored picture. The route narrows its own reads
  * the same way before it hands them to the same assembly.
  */
-export function knowledgeRowsOf(payload: ImportPayload, media: ReadonlyMap<string, MediaAnswerRow>, documentChecks: readonly DocumentCheck[]): KnowledgeRows {
+export function knowledgeRowsOf(payload: ImportPayload, media: ReadonlyMap<string, MediaAnswerRow>, documentChecks: DocumentRule): KnowledgeRows {
   const live = liveScopeOf(payload);
   const stored = (id: string) => {
     const m = media.get(id);
@@ -304,8 +321,26 @@ export function knowledgeRowsOf(payload: ImportPayload, media: ReadonlyMap<strin
 }
 
 /** The knowledge answer the route gives for what was written (§G.1): its own assembly over `knowledgeRowsOf`. */
-export function expectedKnowledge(payload: ImportPayload, media: ReadonlyMap<string, MediaAnswerRow>, documentChecks: readonly DocumentCheck[]): ProductKnowledge {
+export function expectedKnowledge(payload: ImportPayload, media: ReadonlyMap<string, MediaAnswerRow>, documentChecks: DocumentRule): ProductKnowledge {
   return assembleKnowledge(knowledgeRowsOf(payload, media, documentChecks), { url: customerMediaUrl });
+}
+
+/**
+ * For a VERIFY that cannot know which documents the write stored active (`writtenDocuments: 'not_recorded'`): a
+ * payload document is expected when the live answer shows it — matched fact for fact through the route's own
+ * assembly of that one row — so a document stored inactive is not missed, while a live document the payload does
+ * not hold is still a difference.
+ */
+export function shownByLiveAnswer(payload: ImportPayload, live: Rec): (doc: PayloadDocument) => boolean {
+  const shown = new Set(knowledgeProjection(live).documents);
+  return (doc) => {
+    const one = assembleKnowledge(
+      { specs: [], documents: [{ kind: doc.kind, title_en: doc.title_en, title_ar: doc.title_ar, title_ckb: doc.title_ckb, url: doc.url, host: doc.host, scope_kind: doc.scope_kind, scope_id: doc.scope_id }], relations: [], swatches: [], sourceRoute: payload.route || null },
+      { url: customerMediaUrl }
+    );
+    const fact = knowledgeProjection(one as unknown as Rec).documents[0];
+    return fact !== undefined && shown.has(fact);
+  };
 }
 
 /** The comparable facts of a knowledge answer, per part, each a sorted list of canonical facts (a multiset). */
@@ -384,7 +419,7 @@ export function knowledgeDiff(expected: KnowledgeProjection, live: KnowledgeProj
 export function expectedFacts(
   payload: ImportPayload,
   media: ReadonlyMap<string, MediaAnswerRow>,
-  documentChecks: readonly DocumentCheck[],
+  documentChecks: DocumentRule,
   gallery: readonly GalleryImage[]
 ) {
   const stored = (id: string) => {
@@ -541,7 +576,12 @@ const ALLOWED_IMAGE = /^\/files\/[A-Za-z0-9/_.-]+\.webp$/;
 
 export async function verifyPublic(site: Site, ctx: VerifyContext): Promise<VerifyOutcome> {
   const checks: Record<string, CheckResult> = {};
-  const exp = expectedFacts(ctx.payload, ctx.media, ctx.documentChecks ?? [], ctx.images);
+  const written = ctx.writtenDocuments;
+  const inactive = written && written !== 'not_recorded' ? new Set(written.inactive) : null;
+  const documentsFrom = written === undefined ? 'write' : written === 'not_recorded' ? 'not_recorded' : 'stage_data';
+  // Not recorded: every payload document until the live answer is read (the documents count nowhere before it).
+  const rule: DocumentRule = inactive ? (d) => !inactive.has(d.id) : written === 'not_recorded' ? () => true : ctx.documentChecks ?? [];
+  let exp = expectedFacts(ctx.payload, ctx.media, rule, ctx.images);
   const title = ctx.payload.product.title_en;
   /** A merge keeps the existing product's own name, money, options and images (§E.2). */
   const merge = ctx.payload.write_mode === 'merge';
@@ -632,6 +672,9 @@ export async function verifyPublic(site: Site, ctx: VerifyContext): Promise<Veri
   );
 
   const know = await site.read('GET', `${slugPath}/knowledge`);
+  // Which documents the write stored active is not known (resumed, and a Worker that records none): those the live
+  // answer shows are expected when the payload holds each one. Only the documents change: every other fact stays.
+  if (written === 'not_recorded') exp = expectedFacts(ctx.payload, ctx.media, shownByLiveAnswer(ctx.payload, know.json ?? {}), ctx.images);
   const kf = knowledgeFacts(know.json ?? {});
   // A merge writes a scoped row only where the reviewed value map names the existing option (§E.2: an unmapped
   // one is a `variant_not_merged` conflict), so its counts are the write's, not the payload's: the Worker's recompute
@@ -652,7 +695,10 @@ export async function verifyPublic(site: Site, ctx: VerifyContext): Promise<Veri
         ...Object.fromEntries(Object.entries(kf.specsByStatus).map(([k, v]) => [`specs_${k}`, v])),
         // How many facts differ, per part (0 when the answer is the expected one; a merge is not compared).
         ...(merge ? {} : Object.fromEntries(Object.entries(mismatched).map(([k, v]) => [`mismatched_${k}`, v]))),
+        expected_documents: exp.documents,
       },
+      // Where the documents' stored state is known from: this job's /write, the write's record, or not recorded.
+      detail: { documents_from: documentsFrom },
     },
     know
   );
