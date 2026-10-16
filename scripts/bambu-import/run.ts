@@ -107,6 +107,8 @@ export const LEASE_KEEP_MS = 10 * 60_000;
 const TRANSITION_ATTEMPTS = 4;
 /** How many times close asks /hello after /run/finish before the old token's end is recorded as unconfirmed. */
 const TOKEN_GONE_ATTEMPTS = 5;
+/** How many times close sends /run/finish when /hello says an unsettled one did not commit (the run still answers). */
+const FINISH_ATTEMPTS = 3;
 
 /** The Worker's `catalog_import_items.payload_sha256` of a payload (worker/lib/catalogImport/reviewed.ts payloadSha256). */
 export function payloadDigest(payload: unknown): string {
@@ -1363,14 +1365,47 @@ export class Importer {
     this.log.info('sweep', { what: 'public', passed: sweep.visible, total: c.COMPLETE ?? 0 });
     const after = await this.ops.protectSnapshot('after');
     this.log.info('protect', { phase: 'after', subjects: after.subjects });
-    const fin = await this.ops.finish();
-    this.log.info('finish', { state: fin.state });
+    const fin = await this.finishSettled();
+    if (fin.state === 'unconfirmed') {
+      if (fin.gone === 'yes') this.log.warning('finish_unconfirmed', { gone: fin.gone });
+      else this.log.error('finish_unconfirmed', { gone: fin.gone });
+    } else this.log.info('finish', { state: fin.state });
     if (fin.held.length) this.finishedHeld = fin.held;
-    const gone = await this.tokenGone();
-    this.log.info('token_gone', { gone });
-    this.seal('close-report.json', { run_id: this.runId, status: this.status, sitemap: diff, sweep, protect_after: after, finish: fin, token_gone: gone });
+    const gone = fin.gone ?? (await this.tokenGone());
+    if (fin.gone === null) this.log.info('token_gone', { gone });
+    this.seal('close-report.json', { run_id: this.runId, status: this.status, sitemap: diff, sweep, protect_after: after, finish: { state: fin.state, held: fin.held }, token_gone: gone });
     this.writeSummary(false, fin.state);
+    // A lost /run/finish answer with the token gone: the run is finished as far as the door can say (a second close
+    // could not even start), so the close passes, unconfirmed, and the owner reads the state with mode=report. With
+    // /hello unsettled as well nothing is known: the report is sealed, and the close is not green.
+    if (fin.state === 'unconfirmed') return gone === 'yes' ? 0 : 1;
     return gone !== 'no' && (fin.state === 'closed' || fin.state === 'partial') ? 0 : 1;
+  }
+
+  /**
+   * /run/finish, settled. It is not idempotent, and its answer can be lost after it committed (a 5xx on the way
+   * back, no answer at all): then /hello says what happened, as after a finish that answered (tokenGone). A 404 —
+   * the run's token is gone: the finish committed (or the kill switch cleared the token) — records the end
+   * `unconfirmed`, never sent again. A 200 — the run still answers, so the finish did not commit — sends it again
+   * after the §B.5 wait, within the deadline (its UPDATE is guarded on an open run, so a second one cannot apply
+   * twice). A /hello that never settles leaves the end `unconfirmed` too, with the token unconfirmed.
+   */
+  private async finishSettled(): Promise<{ state: string; held: HeldRef[]; gone: 'yes' | 'unconfirmed' | null }> {
+    for (let attempt = 0; ; attempt++) {
+      let failure: OpsError;
+      try {
+        return { ...(await this.ops.finish()), gone: null };
+      } catch (err) {
+        if (!(err instanceof OpsError) || err.kind !== 'transient') throw err;
+        failure = err;
+      }
+      this.log.warning('finish_unsettled', { code: failure.code, status: failure.status });
+      const gone = await this.tokenGone();
+      if (gone !== 'no') return { state: 'unconfirmed', held: [], gone };
+      const wait = Math.max(failure.retryAfterMs ?? 0, backoff(attempt));
+      if (attempt + 1 >= FINISH_ATTEMPTS || !this.deadline.fits(wait, 60_000)) throw failure;
+      await this.pause(wait);
+    }
   }
 
   /**

@@ -98,6 +98,8 @@ export const TEMPLATES = {
   taxonomy: 'prepare-taxonomy: {nodes} nodes, brand created {brand}, {synonyms} synonyms',
   protect: 'protect-snapshot {phase}: {subjects} subjects',
   finish: 'run finished: state {state}',
+  finish_unsettled: 'ops run/finish: {code} (HTTP {status}), no settled answer: /hello says whether it committed',
+  finish_unconfirmed: 'run finished: unconfirmed (the /run/finish answer was lost; the old token answers 404: {gone}); confirm the run state with workflow 60 mode=report',
   token_gone: 'the old token now answers 404: {gone}',
   sitemap: 'sitemaps re-read: {listed} listed, {new} new, {removed} no longer listed',
   sweep: 'sweep {what}: {passed} of {total} passed',

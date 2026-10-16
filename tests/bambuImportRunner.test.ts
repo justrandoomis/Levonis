@@ -520,6 +520,53 @@ test('mode close: a transient answer on the /hello after /run/finish is asked ag
   }
 });
 
+test('review 2: /run/finish whose answer is lost — /hello says whether it committed: a 404 records the end unconfirmed, seals the report and passes; a 200 sends it again', async () => {
+  const sid = '6945416380552';
+  const done = { [sid]: { state: 'COMPLETE', last_completed: 'VERIFYING_LIVE' } };
+  // It committed (the run is closed, the token cleared) and the 502 came after: the next /hello meets the 404.
+  const lost = new World({ handles: ['filament-buffer'], items: done });
+  try {
+    lost.loseAnswer(/\/run\/finish$/);
+    const before = lost.calls.length;
+    assert.equal(await lost.importer({ mode: 'close' }).main(), 0, lost.logLines.join('\n'));
+    assert.equal(lost.runState, 'closed');
+    assert.deepEqual(lost.calls.slice(before).map((c) => c.path), ['/hello', '/run/status', '/run/protect-snapshot', '/run/finish', '/hello'], 'never sent again');
+    assert.ok(lost.logLines.some((l) => /ops run\/finish: BAD_GATEWAY \(HTTP 502\), no settled answer: \/hello says whether it committed/.test(l)), lost.logLines.join('\n'));
+    assert.ok(lost.logLines.some((l) => /run finished: unconfirmed \(the \/run\/finish answer was lost; the old token answers 404: yes\); confirm the run state with workflow 60 mode=report/.test(l)), lost.logLines.join('\n'));
+    assert.ok(lost.sealed.some((s) => s.name === 'close-report.json'), 'the close report is sealed all the same');
+    const summary = readFileSync(lost.summaryFile, 'utf8');
+    assert.match(summary, /^## Bambu Lab import: finished, unconfirmed/m, summary);
+    assert.match(summary, /mode=report/);
+  } finally {
+    lost.dispose();
+  }
+  // It did not commit (a 503 before the handler wrote anything): /hello still answers 200, so it is sent again.
+  const failed = new World({ handles: ['filament-buffer'], items: done });
+  try {
+    failed.inject(/\/run\/finish$/, 1, () => json(503, { code: 'D1_OVERLOADED', message: 'busy' }));
+    const before = failed.calls.length;
+    assert.equal(await failed.importer({ mode: 'close' }).main(), 0, failed.logLines.join('\n'));
+    assert.deepEqual(failed.calls.slice(before).map((c) => c.path), ['/hello', '/run/status', '/run/protect-snapshot', '/run/finish', '/hello', '/run/finish', '/hello']);
+    assert.equal(failed.runState, 'closed');
+    assert.ok(failed.logLines.some((l) => /run finished: state closed/.test(l)), failed.logLines.join('\n'));
+    assert.ok(failed.logLines.some((l) => /the old token now answers 404: yes/.test(l)));
+  } finally {
+    failed.dispose();
+  }
+  // Lost, and /hello never settles either: nothing is known — the report is sealed, the close is not green.
+  const dark = new World({ handles: ['filament-buffer'], items: done });
+  try {
+    dark.loseAnswer(/\/run\/finish$/);
+    dark.inject(/\/hello$/, 1000, () => (callsTo(dark, /\/run\/finish$/).length > 0 ? json(503, { code: 'D1_OVERLOADED', message: 'busy' }) : null));
+    assert.equal(await dark.importer({ mode: 'close' }).main(), 1, dark.logLines.join('\n'));
+    assert.equal(callsTo(dark, /\/run\/finish$/).length, 1, 'never sent again on a guess');
+    assert.ok(dark.logLines.some((l) => /run finished: unconfirmed \(the \/run\/finish answer was lost; the old token answers 404: unconfirmed\)/.test(l)), dark.logLines.join('\n'));
+    assert.ok(dark.sealed.some((s) => s.name === 'close-report.json'));
+  } finally {
+    dark.dispose();
+  }
+});
+
 test('mode withdraw: only with the second fetch gone and the sitemap no longer listing it', async () => {
   const blocked = { '6945416380552': { state: 'BLOCKED', last_completed: '', blocker_code: 'SOURCE_WITHDRAWN' } };
   const w = new World({ handles: ['filament-buffer'], items: blocked, storePage: () => new Response('gone', { status: 404 }) });

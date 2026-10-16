@@ -329,7 +329,7 @@ Unhandled exceptions print `err.name` plus a scrubbed message: hex runs of 32+ c
 When the queue holds no DISCOVERED, in-flight or RETRYING item and the end-of-run audit (§I.3) is green, workflow 60 `mode=close`:
 
 1. calls `/run/protect-snapshot {phase:'after'}`;
-2. calls `/run/finish`, which closes as `closed`, or `partial` when any item is BLOCKED or WITHDRAWN_AT_SOURCE or an end-of-queue hold is still queued (the held items `/run/status` lists are not open work: the close subtracts them, and `/run/finish` names them);
+2. calls `/run/finish`, which closes as `closed`, or `partial` when any item is BLOCKED or WITHDRAWN_AT_SOURCE or an end-of-queue hold is still queued (the held items `/run/status` lists are not open work: the close subtracts them, and `/run/finish` names them). The call is not idempotent: when its answer is lost (a 5xx, no answer), `/hello` says whether it committed. A 404 records the end `unconfirmed`, never sends it again, seals the report and passes (the owner reads the state with `mode=report`); a 200 means the run is still open, so it is sent again after the §B.5 wait (its `UPDATE` is guarded on an open run); a `/hello` that never settles leaves the end `unconfirmed` and the close not green;
 3. asserts `/hello` now answers 404 with the job's token: a 200 fails the close; a transient answer (429, 5xx, none) is asked again with backoff inside the deadline, and one that never settles is recorded `unconfirmed` without failing the close (the run is already finished, and a second close could not start: its first `/hello` meets the 404);
 4. seals and uploads the report.
 
