@@ -91,8 +91,10 @@ test('the committed reviewed files parse with the Worker\'s own parser, byte for
   for (const f of ['existing-matches.json', 'compat-targets.json', 'taxonomy-map.json']) {
     assert.equal((JSON.parse(read(DATA, f)) as { snapshot_sha256?: string }).snapshot_sha256, SNAPSHOT_SHA256, f);
   }
-  // Step 9: the reviewed P0 drafts, bundled with only their status line changed; no curated file yet (another job).
-  for (const f of ['manifest.json', 'identity-map.json', 'media-overrides.json', 'search-synonyms.json']) {
+  // Step 9: the reviewed P0 drafts, bundled with only their status line changed — and, in the manifest, the
+  // integrator's two queue decisions of 2026-10-16 (no row held; the withdrawn page last; positions renumbered).
+  // No curated file yet (another job).
+  for (const f of ['identity-map.json', 'media-overrides.json', 'search-synonyms.json']) {
     const strip = (t: string) => {
       const o = JSON.parse(t) as Record<string, unknown>;
       delete o.status;
@@ -100,6 +102,20 @@ test('the committed reviewed files parse with the Worker\'s own parser, byte for
     };
     assert.deepEqual(strip(read(DATA, f)), strip(read(P0, f)), `${f}: the P0 draft`);
   }
+  type Row = Record<string, unknown> & { source_product_id: string; handle: string };
+  const rowsOf = (t: string) => new Map((JSON.parse(t) as { rows: Row[] }).rows.map((r) => [r.source_product_id, r]));
+  const draft = rowsOf(read(P0, 'manifest.json'));
+  const bundled = rowsOf(read(DATA, 'manifest.json'));
+  assert.deepEqual([...bundled.keys()].sort(), [...draft.keys()].sort());
+  const changed: string[] = [];
+  for (const [sid, r] of bundled) {
+    const d = draft.get(sid)!;
+    const { queue_position: _q1, hold_code: h1, ...a } = r;
+    const { queue_position: _q2, hold_code: h2, ...c } = d;
+    assert.deepEqual(a, c, `${r.handle}: the P0 row apart from its place and hold`);
+    if (h1 !== h2) changed.push(`${r.handle}:${String(h2)}->${String(h1)}`);
+  }
+  assert.deepEqual(changed, ['cyberbrick-omnidirectional-forklift:ORDER_TYPE_WORD->']);
   assert.equal(b.manifest.rows.length, 1115);
   assert.equal(b.identity.size, 65);
   assert.equal(b.overrides.length, 0);
@@ -172,7 +188,7 @@ test('the committed manifest names every source, and the gate allows a merge onl
   assert.deepEqual(counts, { merge_ok: 21, merge_publish_ok: 14, create_refused: 35, other_target_refused: 35 });
 });
 
-test('the manifest keeps the P0 queue: the canary, the eight audit classes, no OWNER_HIDDEN hold, the one ORDER_TYPE_WORD hold last', () => {
+test('the manifest keeps the §J.4 queue: the canary, the eight audit classes, then by type and sitemap order; nothing held; the withdrawn page last', () => {
   const b = parseReviewedBundle(committedTexts());
   const rows = [...b.manifest.rows].sort((x, y) => x.queue_position - y.queue_position);
   assert.deepEqual(rows.map((r) => r.queue_position), Array.from({ length: 1115 }, (_, i) => i + 1));
@@ -184,11 +200,18 @@ test('the manifest keeps the P0 queue: the canary, the eight audit classes, no O
   // The audit classes now cover both merge paths: h2d and pla-basic-filament merge, ams-2-pro and bambu-hotend-a1-a2 merge and publish.
   const decision = (h: string) => b.matches.bySourceId.get(b.manifest.byHandle.get(h)!.source_product_id)?.decision ?? 'create';
   assert.deepEqual(['h2d', 'pla-basic-filament', 'ams-2-pro', 'bambu-hotend-a1-a2', 'filament-buffer'].map(decision), ['merge', 'merge', 'merge_publish', 'merge_publish', 'create']);
-  const held = rows.filter((r) => r.hold_code);
-  assert.deepEqual(held.map((r) => `${r.queue_position}:${r.handle}:${r.hold_code}`), ['1115:cyberbrick-omnidirectional-forklift:ORDER_TYPE_WORD']);
-  // Withdrawn at the store on 2026-10-16 (404): no hold code expresses it (0195), so it stays in its place and the run
-  // blocks it SOURCE_WITHDRAWN at its turn (spec §1 row 20, L-10).
-  assert.equal(b.manifest.byHandle.get('halloween-filament-special-combo')!.hold_code, '');
+  // Nothing is held: the owner settled the hidden matches (row 242) and the package reads "Omnidirectional" right (H-1).
+  assert.deepEqual(rows.filter((r) => r.hold_code).map((r) => r.handle), []);
+  // Positions 10 … 1114: by type, then sitemap order (§J.4) — the forklift in its makers_supply place.
+  const TYPES = ['printer', 'ams', 'laser_machine', 'filament', 'hotend', 'build_plate', 'accessory', 'spare_part', 'laser_material', 'makers_supply'];
+  const middle = rows.slice(9, 1114);
+  const rank = (r: (typeof rows)[number]) => TYPES.indexOf(r.type) * 1e6 + Number(r.sitemap_index);
+  assert.ok(middle.every((r, i) => i === 0 || rank(middle[i - 1]) < rank(r)), 'type order, then sitemap order');
+  assert.equal(b.manifest.byHandle.get('cyberbrick-omnidirectional-forklift')!.queue_position, 1098);
+  // Withdrawn at the store on 2026-10-16 (404): the integrator queued it after every other row, so its SOURCE_WITHDRAWN
+  // block comes last and the run closes partial instead of stopping at its turn.
+  assert.equal(rows[1114].handle, 'halloween-filament-special-combo');
+  assert.equal(rows[1114].hold_code, '');
 });
 
 test("the runner's reader takes the same files: the same SHA-256 per file, the same combined digest and the same write mode per source", async (t) => {
