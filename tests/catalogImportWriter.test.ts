@@ -495,3 +495,60 @@ test('the reviewed scope is enforced by the writer itself: an unlisted source is
   assert.equal(payloadSha256(s.payload).length, 64);
   nothingWritten(w, s.payload.product_id);
 });
+
+// ---------------------------------------------------------------- the step 5 review rule, and the document checks
+
+/** A published price on a product under the given id (only a raw write or a past release could put one there). */
+function pricedProduct(w: World, id: string): void {
+  w.raw.prepare("INSERT INTO products (id, slug, name, price_iqd, status) VALUES (?, ?, 'Owner product', 0, 'active')").run(id, `owner-${id.slice(-6)}`);
+  w.raw.exec(`INSERT INTO ops_guards (id, ok) VALUES ('engine-price:${id}', 1);
+    INSERT INTO pricing_v2_sku_results (product_id, combo_key, channel, method, anchor, final_price_iqd, exact_iqd, direct_price_iqd, direct_exact_iqd, usd_ceil6, usd_iqd_rate, usd_fx_version, inputs_seq, config_version, write_seq, computed_at)
+      VALUES ('${id}', '', 'direct_sale', 'usd', 'product_fixed', 1000, '1000', 1000, '1000', '1', '1600', 1, 1, 1, 9, 'x');
+    DELETE FROM ops_guards WHERE id = 'engine-price:${id}';`);
+}
+
+test('a create never records a created source row on a product with V2 results: refused before the plan, and inside the batch', async () => {
+  // Before the plan.
+  const w = newWorld();
+  const s = stage(w, 'ams-2-pro-feeder-unit');
+  const pid = s.payload.product_id;
+  pricedProduct(w, pid);
+  const e = await refused(() => plan(w, s), 'IMPORT_CREATE_ON_PRICED_PRODUCT');
+  assert.equal(e.blocker, 'REVIEWED_SCOPE_REFUSED');
+  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM product_source_refs WHERE product_id = ?', pid), 0);
+  // Inside the batch: the price appears between the plan and the write; the guard row's fence aborts it whole.
+  const w2 = newWorld();
+  const s2 = stage(w2, 'ams-2-pro-feeder-unit');
+  const { plan: p, ctx } = await plan(w2, s2);
+  pricedProduct(w2, s2.payload.product_id);
+  await refused(() => runImportWrite(ctx, p), 'IMPORT_CREATE_ON_PRICED_PRODUCT');
+  assert.equal(count(w2.raw, 'SELECT COUNT(*) AS n FROM product_source_refs'), 0, 'no created source row');
+  assert.equal(count(w2.raw, 'SELECT COUNT(*) AS n FROM product_images WHERE product_id = ?', s2.payload.product_id), 0);
+  assert.equal(count(w2.raw, 'SELECT COUNT(*) AS n FROM ops_guards WHERE id = ?', IMPORT_GUARD_ID), 0);
+});
+
+test('the runner\'s document checks land on product_documents; a dead link is written inactive, never shown', async () => {
+  const w = newWorld();
+  const s = stage(w, 'a1');
+  const docs = s.payload.documents;
+  assert.ok(docs.length >= 2);
+  const checks = docs.map((d, i) => ({
+    document_id: d.id,
+    check_status: i === 0 ? 404 : 200,
+    content_type: i === 0 ? 'text/html' : 'application/pdf',
+    byte_size: i === 0 ? null : 2048,
+    content_sha256: i === 0 ? '' : 'b'.repeat(64),
+    checked_at: '2026-10-15T00:00:00.000Z',
+    tracker_source: i === 1 ? 'https://e.bambulab.com/t?c=abc' : '',
+  }));
+  const ctx = importWriteContext(w.db, w.media as never);
+  const p = await planImportWrite(ctx, { mode: 'write', payload: s.payload, bundle: w.bundle, runId: RUN_ID, itemId: s.itemId, leaseToken: LEASE, documentChecks: checks });
+  await runImportWrite(ctx, p);
+  const rows = w.raw.prepare('SELECT id, active, check_status, content_type, byte_size, content_sha256, tracker_source FROM product_documents WHERE product_id = ? ORDER BY sort').all(s.payload.product_id) as Array<Record<string, unknown>>;
+  const dead = rows.find((r) => r.id === docs[0].id)!;
+  assert.deepEqual({ ...dead }, { id: docs[0].id, active: 0, check_status: 404, content_type: 'text/html', byte_size: null, content_sha256: '', tracker_source: '' });
+  const alive = rows.find((r) => r.id === docs[1].id)!;
+  assert.equal(alive.active, 1);
+  assert.equal(alive.check_status, 200);
+  assert.equal(alive.tracker_source, 'https://e.bambulab.com/t?c=abc');
+});

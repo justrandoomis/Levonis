@@ -67,6 +67,8 @@ import {
   planProductSave,
   postCommitProductSave,
   preflightProductSave,
+  reloadForVerification,
+  verifyApplied,
   type ProductSavePlan,
   type ProductWriteIntent,
   type RelationsResponse,
@@ -195,11 +197,48 @@ export interface ImportWriteInput {
   /** When the source page was fetched (product_source_refs.fetched_at, spec rows' retrieved_at). */
   retrievedAt?: string;
   /**
+   * The runner's document checks (§A.3 /write `document_checks`, §C.7): each names a payload document and what
+   * its HEAD/GET answered. They land on product_documents; a dead link is written `active = 0`, never shown.
+   */
+  documentChecks?: readonly DocumentCheck[];
+  /**
    * TEST-ONLY SEAM (tests/catalogImportAllowList.test.ts): skip the allow-list so
    * the DB guard is proven on its own. No route ever sets it.
    */
   unsafeSkipAllowListForTests?: true;
 }
+
+/** One document check of the runner (scripts/bambu-import/opsClient.ts `DocumentCheck`). */
+export interface DocumentCheck {
+  document_id: string;
+  check_status: number;
+  content_type: string;
+  byte_size: number | null;
+  content_sha256: string;
+  checked_at: string;
+  tracker_source: string;
+}
+
+/**
+ * The counts the runner's edge evidence carries (scripts/bambu-import/verify.ts `edgeEvidence`): the payload's
+ * own collection sizes. Stored at the write, so /complete can tell that the runner verified the payload this
+ * item wrote (§I.1 "their counts agree"); what D1 holds is compared with `written` separately.
+ */
+export function payloadCounts(payload: ImportPayload): Record<string, number> {
+  return {
+    groups: payload.groups.length,
+    values: payload.groups.reduce((n, g) => n + g.values.length, 0),
+    variants: payload.variants.length,
+    images: payload.images.length,
+    swatches: payload.swatches.length,
+    documents: payload.documents.length,
+    relations: payload.relations.length,
+    specs: payload.specs.length,
+  };
+}
+
+/** A link answered 2xx/3xx is alive; anything else (and 0: no answer) is dead and stays off the storefront. */
+export const documentAlive = (status: number): boolean => status >= 200 && status < 400;
 
 /** What the batch wrote, by kind (stored on the item as stage_data.written for /complete, §I.1.10). */
 export interface WrittenCounts {
@@ -265,6 +304,8 @@ export interface ImportWritePlan {
   images: ImportImageRow[];
   searchAliases: string[];
   warnings: string[];
+  /** The conflict rows the write records, by kind and field (never their detail): /stage answers these. */
+  conflicts: Array<{ kind: string; field: string }>;
 }
 
 export interface ImportWriteResult {
@@ -277,6 +318,14 @@ export interface ImportWriteResult {
   before_fp_equal: boolean | null;
   /** Create: every money, stock and package column of the new rows is at its default; null for a merge. */
   after_money_default: boolean | null;
+  /** verifyApplied's mismatches against this payload's plan, right after the commit (-1: the readback could not run). */
+  readback_mismatches: number;
+  /**
+   * The image rows this write bound, AFTER the content-duplicate collapse (§C.4 step 1): the runner computes the
+   * expected public projection from the payload, this answer and the /media results (§I.1.2) — a payload image
+   * absent here was collapsed into the earlier copy of the same bytes.
+   */
+  images: Array<Pick<ImportImageRow, 'id' | 'source_media_id' | 'r2_key' | 'sort_order' | 'is_primary' | 'option_value_id' | 'variant_id' | 'color_id' | 'binding_rule'>>;
 }
 
 // ---------------------------------------------------------------- small helpers
@@ -449,6 +498,15 @@ async function loadItem(db: D1Database, runId: string, itemId: string): Promise<
   }
   if (!row) throw new ImportWriteRefused('IMPORT_ITEM_NOT_FOUND', '', 404, 'item_not_in_run');
   return row;
+}
+
+/** Does the product have V2 results (a published price)? A database without the table has none. */
+async function hasV2Results(db: D1Database, productId: string): Promise<boolean> {
+  try {
+    return !!(await db.prepare('SELECT 1 AS x FROM pricing_v2_sku_results WHERE product_id = ? LIMIT 1').bind(productId).first());
+  } catch {
+    return false;
+  }
 }
 
 async function loadMedia(db: D1Database, runId: string, sourceProductId: string): Promise<Map<string, MediaRow>> {
@@ -696,6 +754,13 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
   const valueCount = payload.groups.reduce((n, g) => n + g.values.length, 0);
   if (payload.groups.length > IMPORT_ROW_CAP || valueCount > IMPORT_ROW_CAP || payload.variants.length > IMPORT_ROW_CAP || payload.images.length > IMPORT_ROW_CAP) {
     throw new ImportWriteRefused('ROW_CAP', 'ROW_CAP', 409, 'collection_over_400_rows');
+  }
+
+  // 3b. A create never lands on a product that already has V2 results (the step 5 review): the stock gate's
+  //     automatic-repricing exemption assumes no 'created' source row ever names a priced product. Read here,
+  //     and fenced again inside the batch (the guard row's condition), so a price published in between aborts it.
+  if (!merge && (await hasV2Results(db, payload.product_id))) {
+    throw new ImportWriteRefused('IMPORT_CREATE_ON_PRICED_PRODUCT', 'REVIEWED_SCOPE_REFUSED', 409, 'product_has_v2_results');
   }
 
   // 4. Brand and taxonomy, read from D1 (§A.4 step 2, §D.2).
@@ -1117,9 +1182,10 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
         `INSERT INTO ops_guards (id, ok) SELECT ?, CASE WHEN EXISTS (
            SELECT 1 FROM catalog_import_items i JOIN catalog_import_runs r ON r.id = i.run_id
             WHERE i.id = ? AND i.run_id = ? AND i.processing_state = 'WRITING' AND i.lease_token = ? AND i.lease_token <> ''
-              AND i.lease_until > ${NOW_SQL} AND i.payload_sha256 = ? AND r.state IN ('open','running')) THEN 1 ELSE 0 END`
+              AND i.lease_until > ${NOW_SQL} AND i.payload_sha256 = ? AND r.state IN ('open','running'))
+           ${merge ? '' : 'AND NOT EXISTS (SELECT 1 FROM pricing_v2_sku_results v WHERE v.product_id = ?)'} THEN 1 ELSE 0 END`
       )
-      .bind(IMPORT_GUARD_ID, input.itemId, input.runId, input.leaseToken, sha)
+      .bind(...[IMPORT_GUARD_ID, input.itemId, input.runId, input.leaseToken, sha, ...(merge ? [] : [productId])])
   );
   const beforeStart = statements.length;
   if (merge) for (const q of FINGERPRINT_QUERIES) statements.push(db.prepare(q.sql).bind(productId));
@@ -1180,14 +1246,21 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
       s.visibility, s.conflict, s.sort, runId,
     ]),
   });
+  const checks = new Map((input.documentChecks ?? []).map((k) => [k.document_id, k]));
   side.push({
     table: 'product_documents',
-    head: 'INSERT INTO product_documents (id, product_id, kind, title_en, title_ar, title_ckb, url, host, scope_kind, scope_id, language, source_kind, retrieved_at, sort, active, import_run_id)',
-    row: '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    head: `INSERT INTO product_documents (id, product_id, kind, title_en, title_ar, title_ckb, url, host, scope_kind, scope_id, language, source_kind, retrieved_at, sort, active, import_run_id,
+             tracker_source, content_type, byte_size, content_sha256, checked_at, check_status)`,
+    row: `(${Array.from({ length: 22 }, () => '?').join(', ')})`,
     tail: 'ON CONFLICT DO NOTHING',
-    values: dedupeBy(payload.documents, (d) => `${d.url}|${d.scope_kind}|${d.scope_id}`).map((d) => [
-      d.id, productId, d.kind, d.title_en, d.title_ar, ckbNotCopy(d.title_ar, d.title_ckb), d.url, d.host, d.scope_kind, d.scope_id, d.language, 'store_page', retrievedAt, d.sort, 1, runId,
-    ]),
+    values: dedupeBy(payload.documents, (d) => `${d.url}|${d.scope_kind}|${d.scope_id}`).map((d) => {
+      const k = checks.get(d.id);
+      return [
+        d.id, productId, d.kind, d.title_en, d.title_ar, ckbNotCopy(d.title_ar, d.title_ckb), d.url, d.host, d.scope_kind, d.scope_id, d.language, 'store_page', retrievedAt, d.sort,
+        k && !documentAlive(k.check_status) ? 0 : 1, runId,
+        k?.tracker_source ?? '', k?.content_type ?? '', k?.byte_size ?? null, k?.content_sha256 ?? '', k?.checked_at ?? '', k?.check_status ?? 0,
+      ];
+    }),
   });
   side.push({
     table: 'product_external_ids',
@@ -1278,11 +1351,12 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
       .prepare(
         `UPDATE catalog_import_items
             SET processing_state = 'PUBLISHING', last_completed_stage = 'WRITING', levonis_product_id = ?, slug = ?, match_kind = ?,
-                stage_data = json_set(CASE WHEN json_valid(stage_data) THEN stage_data ELSE '{}' END, '$.written', json(?)),
+                stage_attempts = 0, retry_at = '',
+                stage_data = json_set(CASE WHEN json_valid(stage_data) THEN stage_data ELSE '{}' END, '$.written', json(?), '$.payload_counts', json(?)),
                 updated_at = ${NOW_SQL}
           WHERE id = ? AND run_id = ? AND lease_token = ?`
       )
-      .bind(productId, slug, merge ? 'merged' : 'created', JSON.stringify(counts), input.itemId, runId, input.leaseToken)
+      .bind(productId, slug, merge ? 'merged' : 'created', JSON.stringify(counts), JSON.stringify(payloadCounts(payload)), input.itemId, runId, input.leaseToken)
   );
   const afterStart = statements.length;
   let probe = -1;
@@ -1295,7 +1369,7 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
   statements.push(db.prepare('DELETE FROM ops_guards WHERE id = ?').bind(IMPORT_GUARD_ID));
 
   // 14. The budget: the whole invocation (§A.5).
-  const postCommit = 2 /* catalog_import.write audit */ + (save.relations ? 2 : 0) + (save.detachedMedia.length ? 3 : 0) + (merge ? 1 : 0);
+  const postCommit = 2 /* catalog_import.write audit */ + (save.relations ? 2 : 0) + (save.detachedMedia.length ? 3 : 0) + (merge ? 1 : 0) + READBACK_STATEMENTS;
   const estimate: ImportWriteEstimate = {
     reads: ctx.counter.count + (input.mode === 'stage' ? stageMediaEstimate(images) : 0),
     batch: statements.length,
@@ -1324,6 +1398,7 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
     images,
     searchAliases: aliases,
     warnings,
+    conflicts: conflicts.map((c) => ({ kind: c.kind, field: c.field })),
   };
 }
 
@@ -1577,7 +1652,12 @@ export async function runImportWrite(ctx: ImportWriteContext, plan: ImportWriteP
   try {
     results = (await ctx.db.batch(plan.statements)) as Array<{ results?: unknown[] }>;
   } catch (e) {
-    throw refusalOfBatch(e);
+    const refused = refusalOfBatch(e);
+    // The guard row's fence failed: say which condition, when it is the priced product (read after the abort).
+    if (refused instanceof ImportWriteRefused && refused.code === 'IMPORT_ITEM_CHANGED' && plan.matchKind === 'created' && (await hasV2Results(ctx.db, plan.productId))) {
+      throw new ImportWriteRefused('IMPORT_CREATE_ON_PRICED_PRODUCT', 'REVIEWED_SCOPE_REFUSED', 409, 'product_has_v2_results');
+    }
+    throw refused;
   }
   const rowsAt = (i: number) => (results[i]?.results ?? []) as Array<Record<string, unknown>>;
   let beforeEqual: boolean | null = null;
@@ -1598,6 +1678,9 @@ export async function runImportWrite(ctx: ImportWriteContext, plan: ImportWriteP
   await postCommitProductSave(ctx.db, plan.save, [
     { action: 'catalog_import.write', detail: { run_id: plan.runId, item_id: plan.itemId, match_kind: plan.matchKind, ...plan.counts, image_bindings: undefined, specs_by_status: undefined, specs_by_region: undefined, relations_by_state: undefined } },
   ]);
+  // The readback (§A.3 GET /readback, §I.1.6): the stored product against the plan of this very payload —
+  // reloadForVerification + verifyApplied — recorded on the item, since /readback itself carries no payload.
+  const readback = await verifyWrite(ctx.db, plan);
   if (plan.matchKind === 'merged') {
     try {
       await ctx.db
@@ -1616,7 +1699,52 @@ export async function runImportWrite(ctx: ImportWriteContext, plan: ImportWriteP
     counts: plan.counts,
     before_fp_equal: beforeEqual,
     after_money_default: moneyDefault,
+    readback_mismatches: readback.mismatches,
+    images: plan.images.map((i) => ({
+      id: i.id,
+      source_media_id: i.source_media_id,
+      r2_key: i.r2_key,
+      sort_order: i.sort_order,
+      is_primary: i.is_primary,
+      option_value_id: i.option_value_id,
+      variant_id: i.variant_id,
+      color_id: i.color_id,
+      binding_rule: i.binding_rule,
+    })),
   };
+}
+
+/**
+ * Statements the readback spends after the batch, for §A.5: reloadForVerification's reads (22, measured on the
+ * fixtures: the row, the relations view and response, the catalogs, the printer fits) and the record, rounded up.
+ */
+export const READBACK_STATEMENTS = 24;
+
+/**
+ * verifyApplied over the freshly committed product, recorded as `stage_data.readback` (counts and section
+ * names, never a value). Never turns the committed write into a failure: a read that fails records -1.
+ */
+async function verifyWrite(db: D1Database, plan: ImportWritePlan): Promise<{ mismatches: number; sections: string[] }> {
+  let out = { mismatches: -1, sections: [] as string[] };
+  try {
+    const stored = await reloadForVerification(db, plan.productId);
+    const found = stored ? verifyApplied(plan.save, stored, { documentKeys: null }) : null;
+    out = found ? { mismatches: found.length, sections: [...new Set(found.map((m) => m.section))].sort() } : { mismatches: 1, sections: ['product_missing'] };
+  } catch (e) {
+    console.error('catalog_import_readback_failed', JSON.stringify({ code: 'IMPORT_READBACK_FAILED', reason: message(e).slice(0, 80) }));
+  }
+  try {
+    await db
+      .prepare(
+        `UPDATE catalog_import_items SET stage_data = json_set(CASE WHEN json_valid(stage_data) THEN stage_data ELSE '{}' END, '$.readback', json(?))
+          WHERE id = ? AND run_id = ?`
+      )
+      .bind(JSON.stringify(out), plan.itemId, plan.runId)
+      .run();
+  } catch (e) {
+    console.error('catalog_import_readback_not_stored', JSON.stringify({ code: 'IMPORT_READBACK_NOT_STORED', reason: message(e).slice(0, 80) }));
+  }
+  return out;
 }
 
 /** The database's refusal of an import batch, as the import's own code (never the SQL text). */
