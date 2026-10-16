@@ -2563,17 +2563,17 @@ export default function Checkout() {
                     </p>
                     <ul className="mt-1.5 space-y-1">
                       {entry.items.map((line) => (
-                        <li key={line.key} data-checkout-line={line.key} className="flex items-center justify-between gap-2 text-[13px]">
-                          <span className="flex min-w-0 items-center gap-1.5">
+                        <li key={line.key} data-checkout-line={line.key} className="text-[13px]">
+                          <div className="flex items-center justify-between gap-2">
                             {line.colourTag ? (
                               <ColourTag name={line.colourTag.name} hex={line.colourTag.hex} image={line.colourTag.image} qty={line.qty} a11yPrefix={colourWords.colourA11y('').trim()} />
                             ) : (
-                              <span className="truncate text-text-secondary">{line.variant} × {line.qty}</span>
+                              <span className="min-w-0 truncate text-text-secondary">{line.variant} × {line.qty}</span>
                             )}
-                            {line.optionsLabel ? <span className="truncate text-[12px] text-text-muted">· {line.optionsLabel}</span> : null}
-                          </span>
-                          {/* The server's line total, never recomputed from a unit price. */}
-                          <span className="shrink-0 font-medium tabular-nums text-text-primary">{money(line.lineTotal)}</span>
+                            {/* The server's line total, never recomputed from a unit price. */}
+                            <span className="shrink-0 font-medium tabular-nums text-text-primary">{money(line.lineTotal)}</span>
+                          </div>
+                          {line.colourTag && line.optionsLabel ? <p className="ps-5 text-[12px] text-text-muted truncate">{line.optionsLabel}</p> : null}
                         </li>
                       ))}
                     </ul>

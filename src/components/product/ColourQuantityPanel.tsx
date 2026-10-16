@@ -84,6 +84,8 @@ export interface ColourQuantityPanelProps {
   warrantyPlanId: string;
   /** The product-level half of the page's buy gate, without the colour. */
   sharedReady: boolean;
+  /** The shared selection in words («With spool · بيع مباشر»), for the notice when it changes (§3.4). */
+  sharedLabel?: string;
   cartLines: CartItem[];
   cartLinesLoaded: boolean;
   isAuthenticated: boolean;
@@ -94,6 +96,8 @@ export interface ColourQuantityPanelProps {
   onFocused: () => void;
   barSlot: HTMLElement | null;
   panelSlot: HTMLElement | null;
+  /** The desktop layout is on screen: the summary rides in the panel slot; on a phone it sits under the list. */
+  wide?: boolean;
   money: (iqd: number) => string;
   /** Quick Buy was on in single mode: ⚡ steps aside here, and says why. */
   quickBuyOn?: boolean;
@@ -155,6 +159,7 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
     transportMethod,
     warrantyPlanId,
     sharedReady,
+    sharedLabel = '',
     cartLines,
     cartLinesLoaded,
     isAuthenticated,
@@ -164,6 +169,7 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
     onFocused,
     barSlot,
     panelSlot,
+    wide = false,
     money,
     quickBuyOn = false,
     reasonFor,
@@ -286,7 +292,8 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
     }
     if (Object.keys(kept).length === 0 && dropped === 0) return;
     if (dropped > 0) onQuantities(kept);
-    setShareNotice(dropped > 0 ? cs.rowsDropped(groupedNumber(dropped)) : cs.optionChangedKept(''));
+    const changed = sharedLabel ? cs.optionChangedKept(isolate(sharedLabel)) : '';
+    setShareNotice([changed, dropped > 0 ? cs.rowsDropped(groupedNumber(dropped)) : ''].filter(Boolean).join(' '));
   }, [sharedKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ------------------------------------------------------------- ceilings
@@ -554,7 +561,7 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
   // -------------------------------------------------------------- pieces
   const button = (slot: 'bar' | 'panel') => (
     <button
-      ref={slot === 'panel' || !panelSlot ? addButtonRef : undefined}
+      ref={(slot === 'panel') === wide ? addButtonRef : undefined}
       type="button"
       data-testid="product-cta"
       data-colour-multi-add={slot}
@@ -631,7 +638,7 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
           const applied = q ? q.applied : r.levelApplied;
           const zero = r.offered && ceiling === 0;
           const facts: React.ReactNode[] = [];
-          if (r.chip && !zero) facts.push(<span key="chip" className={r.chip.cls}>{r.chip.text}</span>);
+          if (r.chip && !zero && !r.soldOut) facts.push(<span key="chip" className={r.chip.cls}>{r.chip.text}</span>);
           if (zero || r.soldOut) facts.push(<span key="zero" className="text-red-300">{cs.rowSoldOutZero}</span>);
           if (r.noPrice || q?.unpriced) facts.push(<span key="np">{lang === 'en' ? 'No price' : lang === 'ckb' ? 'بێ نرخ' : 'بلا سعر'}</span>);
           if (priceDiffers && unit !== null && !r.noPrice) {
@@ -718,7 +725,7 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
             barSlot
           )
         : null}
-      {panelSlot
+      {panelSlot && wide
         ? createPortal(
             <div className="space-y-3" data-colour-panel>
               {summary}
@@ -730,7 +737,7 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
             panelSlot
           )
         : null}
-      {!panelSlot ? <div className="mt-3">{summary}</div> : null}
+      {!wide ? <div className="mt-3">{summary}</div> : null}
 
       <ShippingConflictDialog
         open={conflict !== null}

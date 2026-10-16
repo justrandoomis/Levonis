@@ -3322,12 +3322,20 @@ export default function Product() {
   const enterMulti = (seed: Record<string, number>, focus: string | null, carrySingle: boolean) => {
     warmColourPanel();
     singleColourBeforeMulti.current = singleColourId;
-    setMultiRows(prefillRows({ ...multiRows, ...seed }, carrySingle && singleColourId ? { colour: singleColourId, qty } : null));
+    // A number TYPED for the single colour (above 1) comes with it; the untouched 1 of a
+    // colour the page may have opened on by itself is not a quantity anyone chose.
+    setMultiRows(prefillRows({ ...multiRows, ...seed }, carrySingle && singleColourId && qty > 1 ? { colour: singleColourId, qty } : null));
     setMultiFocus(focus);
     setColourMode('many');
     setColourHint(null);
     setColourModeAnnounce(cs.announceModeOn);
-    setSingleColour('');
+    // THE PAGE KEEPS ONE COLOUR IN HAND WHILE THE ROWS ARE OPEN — the single
+    // colour, or the first that can take a quantity — so the page's own quote
+    // keeps describing the SHARED selection (its order types, its routes)
+    // instead of «choose a colour». It is never added: the rows are. Leaving
+    // puts the customer's own single colour back.
+    const probe = colourRows.some((r) => r.id === singleColourId && r.offered) ? singleColourId : (colourRows.find((r) => r.offered)?.id ?? singleColourId);
+    if (probe !== singleColourId) setSingleColour(probe);
   };
   /** Back to one colour: exactly one row with a quantity becomes the selection; otherwise the rows wait. */
   const leaveMultiMode = () => {
@@ -3474,7 +3482,16 @@ export default function Product() {
             fulfillmentType={requestedOrderType}
             transportMethod={requestedOrderType === 'pre_order' ? effectiveTransport : ''}
             warrantyPlanId={warrantyPlanId}
-            sharedReady={source === 'catalog' && !catalogOnly && sharedSelectionComplete && routeReady && mode !== 'unavailable'}
+            sharedReady={source === 'catalog' && !catalogOnly && sharedSelectionComplete && routeReady}
+            sharedLabel={[
+              ...sharedIds.map((id) => {
+                const o = options.find((x) => x.id === id);
+                return o ? pickName(o.name_en, o.name, o.name_ar) : '';
+              }),
+              requestedOrderType === 'pre_order' ? s.preorderMode : requestedOrderType === 'direct_sale' ? s.directSale : '',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
             cartLines={cartLines}
             cartLinesLoaded={cartLinesLoaded}
             isAuthenticated={isAuthenticated}
@@ -3488,6 +3505,7 @@ export default function Product() {
             onFocused={() => setMultiFocus(null)}
             barSlot={multiBarSlot}
             panelSlot={multiPanelSlot}
+            wide={wideLayout}
             money={money}
             quickBuyOn={quickBuyFor === product.id}
             reasonFor={(code) => {
@@ -3558,7 +3576,13 @@ export default function Product() {
       </span>
     ) : null;
 
-  const selectionBlocks = (
+  /**
+   * The choosers, drawn in the phone column and in the desktop panel (one is
+   * hidden by CSS). `wide` says which: the lazy «عدة ألوان» panel — with its
+   * quotes and its portals into the bar — is mounted in the layout on screen
+   * only, as the price-request panel is.
+   */
+  const selectionBlocksFor = (wide: boolean) => (
     <>
       {/*
         THE ORDER OF THESE PANELS IS THE ORDER OF THE DECISION, stated by the
@@ -3776,7 +3800,7 @@ export default function Product() {
                 <fieldset key={group.id} className="lv-section" data-option-group={group.id} data-group-kind={group.kind || undefined} data-colour-fieldset>
                   <legend className="px-1 text-text-primary font-bold text-[14px]">{cs.perColourLegend}</legend>
                   {colourModeSwitch}
-                  {colourPanel}
+                  {wideLayout === wide ? colourPanel : null}
                 </fieldset>
               );
             }
@@ -4142,7 +4166,7 @@ export default function Product() {
             ) : null}
           </legend>
           {colourModeSwitch}
-          {colourMulti ? colourPanel : (
+          {colourMulti ? (wideLayout === wide ? colourPanel : null) : (
           <>
           <div className="mt-2 flex flex-wrap gap-2">
             {orderedColors.map((col) => {
@@ -4883,7 +4907,7 @@ export default function Product() {
             <div className="mt-5 space-y-3 lg:hidden">
               {noPrice ? unpricedBlock(false) : null}
               {priceBlock}
-              {selectionBlocks}
+              {selectionBlocksFor(false)}
               {noPrice ? null : statusMessages}
             </div>
 
@@ -5296,7 +5320,7 @@ export default function Product() {
             </div>
             {noPrice ? unpricedBlock(true) : null}
             {priceBlock}
-            {selectionBlocks}
+            {selectionBlocksFor(true)}
             {noPrice ? null : (
             <div className="lv-surface space-y-3 p-4">
               {colourMulti ? (
