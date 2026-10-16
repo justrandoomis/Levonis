@@ -523,6 +523,8 @@ export class Importer {
   /** mode=run: the queue, one item at a time, until max_items, the deadline or a BLOCKED item. */
   async runQueue(): Promise<{ more: boolean; blocked: boolean }> {
     await this.hello();
+    // The browser before any item: a job that cannot run check 7 claims nothing (§I.1: COMPLETE needs both sides).
+    if (!(await this.browserFor())) throw new JobStop('BROWSER_UNAVAILABLE', true);
     let processed = 0;
     let skips = 0;
     for (;;) {
@@ -1102,6 +1104,7 @@ export class Importer {
     return `${this.cfg.siteOrigin}/product/${w.slug}`;
   }
 
+  /** The job's one browser, launched once; null when it cannot be (the launch error is never printed: it may name paths). */
   private async browserFor(): Promise<BrowserLike | null> {
     if (this.browserChecker === undefined) this.browserChecker = await this.deps.browser().catch(() => null);
     return this.browserChecker;
@@ -1136,6 +1139,7 @@ export class Importer {
       productId: w.productId,
       slug: w.slug,
       media: w.media,
+      documentChecks: w.documentChecks,
       leaf: w.row.leaf ?? '',
       also: w.row.also ?? [],
       taxonomy: this.deps.bundle.taxonomy,
@@ -1150,26 +1154,26 @@ export class Importer {
       const outcome = await verifyPublic(this.site, ctx);
       let browser: BrowserResult | null = null;
       if (outcome.ok) {
+        // Check 7 is part of every COMPLETE (§I.1): no browser, no /complete. runQueue launched it before item 1.
         const checker = await this.browserFor();
-        if (checker) {
-          browser = await checker.check({
-            slug: w.slug,
-            payload: w.payload!,
-            media: w.media,
-            leafName: outcome.leafName,
-            allValues: audit,
-            screenshot: audit || w.row.queue_position % 25 === 0,
-          });
-          w.shots.push(...browser.screenshots);
-          this.log.item(w.row.queue_position, w.row.handle, 'VERIFYING_LIVE', 'browser', { checks: Object.keys(browser.checks).length, failed: Object.values(browser.checks).filter((v) => !v).length, screens: browser.screenshots.length });
-        }
+        if (!checker) throw new JobStop('BROWSER_UNAVAILABLE', true);
+        browser = await checker.check({
+          slug: w.slug,
+          payload: w.payload!,
+          media: w.media,
+          leafName: outcome.leafName,
+          allValues: audit,
+          screenshot: audit || w.row.queue_position % 25 === 0,
+        });
+        w.shots.push(...browser.screenshots);
+        this.log.item(w.row.queue_position, w.row.handle, 'VERIFYING_LIVE', 'browser', { checks: Object.keys(browser.checks).length, failed: Object.values(browser.checks).filter((v) => !v).length, screens: browser.screenshots.length });
       }
       const passed = Object.values(outcome.checks).filter((c) => c.ok).length;
       this.log.item(w.row.queue_position, w.row.handle, 'VERIFYING_LIVE', 'verify_done', { passed, total: Object.keys(outcome.checks).length });
       w.verify = outcome;
       w.browser = browser;
-      const allOk = outcome.ok && (!browser || browser.ok);
-      if (allOk) {
+      const allOk = outcome.ok && browser !== null && browser.ok;
+      if (allOk && browser) {
         const evidence = edgeEvidence(outcome, browser ? { ok: browser.ok, checks: browser.checks, counts: browser.counts, selections: browser.selections } : null, this.liveUrl(w), w.payload!, round);
         const done = await this.ops.complete(w.sid, w.leaseToken, this.liveUrl(w), evidence);
         if (done.state === 'COMPLETE') {

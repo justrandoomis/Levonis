@@ -529,7 +529,8 @@ export class World {
     }
     if (p === '/api/products' && method === 'GET') {
       const items = [...this.items.values()].filter((i) => i.payload && this.sectionsOf(i.handle).includes(u.searchParams.get('category') ?? ''));
-      return json(200, { products: items.map((i) => ({ slug: i.slug, id: i.levonis_product_id })), total: items.length, truncated: false });
+      // listCatalogProducts without a listing key: no `total`, no `truncated` (the runner pages while a page is full).
+      return json(200, { success: true, suggestion: null, products: items.map((i) => ({ slug: i.slug, id: i.levonis_product_id })) });
     }
     if (p === '/api/public/v1/search') {
       const all = [...this.items.values()].filter((i) => i.payload);
@@ -622,7 +623,7 @@ export class World {
       check: async () => ({
         ok: true,
         checks: { image_decodes: true, unpriced_label: true },
-        counts: { values_checked: 2, values_failed: 0, blocked_requests: 0, store_requests: 0, page_errors: 0 },
+        counts: { values_checked: 2, values_failed: 0, values_not_offered: 0, blocked_requests: 0, store_requests: 0, page_errors: 0 },
         selections: [],
         screenshots: [Buffer.from('PNG-SCREENSHOT')],
         ...result,
