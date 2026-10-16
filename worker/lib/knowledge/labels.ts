@@ -51,6 +51,8 @@ export const GROUP_LABELS: Readonly<Record<string, Tri>> = {
   physical: tri('الهيكل وبيئة التشغيل', 'Body & environment', 'جەستە و ژینگەی کارکردن'),
   ams: tri('نظام AMS', 'AMS', 'سیستەمی AMS'),
   part: tri('القطعة', 'Part', 'پارچە'),
+  // The registry's `contents.pieces` («Quantity» on spare parts and plates); `package.contents` is the box, not this heading.
+  contents: tri('المحتويات والكمية', 'Contents & quantity', 'ناوەڕۆک و ژمارە'),
   compat: tri('التوافق', 'Compatibility', 'گونجاوی لەگەڵ ئامێرەکان'),
   safety: tri('السلامة والشهادات', 'Safety & certifications', 'سەلامەتی و بڕوانامەکان'),
   variant: tri('ملاحظات الخيارات', 'Option notes', 'تێبینییەکانی هەڵبژاردە'),

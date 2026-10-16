@@ -26,12 +26,13 @@ import { seedLiveCatalog, P } from './fixtures/liveCatalog';
 import { leaks, arithmeticLeaks } from './fixtures/costlyProduct';
 import { catalogLeaks } from './fixtures/catalogOnly';
 import { insertSpecValue, notFound, notPublished } from './fixtures/knowledgeModel';
-import { compareRoutes } from '../worker/routes/compare';
+import { compareRoutes, hasAnySpec } from '../worker/routes/compare';
+import { productRoutes } from '../worker/routes/products';
 import { compareProducts, inFieldUnit, knowledgeHasValue, type CompareInputProduct, type KnowledgeCell } from '../worker/lib/compareSpecs';
 import { COMPARE_KEY_FIELDS, knowledgeCellsFor, hasKnowledgeValue, type CompareKnowledgeRow } from '../worker/lib/knowledge/compare';
 import { VALUE_STATE_LABELS } from '../worker/lib/knowledge/labels';
 import { SPEC_KEYS } from '../packages/catalog/src/bambuImport/registry/specKeys';
-import { allTemplateGroups } from '../worker/lib/templateFamilies';
+import { allTemplateGroups, specGroupsFromFields } from '../worker/lib/templateFamilies';
 
 type Body = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -319,6 +320,30 @@ test('a sheet of facts is a sheet: a product with no typed spec but a fact is co
   const drawn = await compareOf(w, `${P.H2D},${P.X2D}`);
   assert.equal(drawn.status, 200, drawn.text);
   assert.equal(routeRow(drawn.body, 'build_volume')!.values[1].text, '256 × 256 × 260 mm');
+});
+
+test('the family is a filter’s code, never a row: not in the comparison, not a sheet to compare on, not on the page’s spec table', async () => {
+  const w = world({ knowledge: false });
+  w.raw.exec(`UPDATE products SET spec_fields = json_set(spec_fields, '$.product_family', 'bambu_lab_3d_printers') WHERE id IN ('${P.H2D}', '${P.X2D}')`);
+  const drawn = await compareOf(w, `${P.H2D},${P.X2D}`);
+  assert.equal(drawn.status, 200, drawn.text);
+  assert.equal(routeRow(drawn.body, 'product_family'), undefined, 'no «العائلة: bambu_lab_3d_printers» row');
+  assert.ok(!drawn.text.includes('bambu_lab_3d_printers'));
+  // A sheet that holds only the family says nothing to compare on.
+  w.raw.exec(`UPDATE products SET spec_fields = json_object('product_family', 'bambu_lab_3d_printers') WHERE id = '${P.X2D}'`);
+  const refused = await compareOf(w, `${P.H2D},${P.X2D}`);
+  assert.equal(refused.status, 400, refused.text);
+  assert.equal(refused.body.code, 'COMPARE_NO_SPECS');
+  assert.equal(hasAnySpec({ product_family: 'bambu_filament' }), false);
+  assert.equal(hasAnySpec({ product_family: 'bambu_filament', nozzle_temp_max: '300' }), true);
+  // The page body's spec table (productModel → specGroupsFromFields) leaves it out too.
+  const rows = specGroupsFromFields({ product_family: 'bambu_lab_3d_printers', nozzle_temp_max: '300' }).flatMap((g) => g.rows.map((r) => r.id));
+  assert.ok(rows.includes('sf_nozzle_temp_max') && !rows.includes('sf_product_family'), rows.join(', '));
+  const productApp = stubApp(w.db, null, (a) => a.route('/api/products', productRoutes), { publishV2: false });
+  const page = (await (await get(productApp, '/api/products/bambu-lab-h2d')).json()) as Body;
+  const pageRows = (page.product.spec_groups as Body[]).flatMap((g) => (g.rows as Body[]).map((r) => r.id));
+  assert.ok(pageRows.length > 0 && !pageRows.includes('sf_product_family'), pageRows.join(', '));
+  assert.ok(!JSON.stringify(page.product.spec_groups).includes('bambu_lab_3d_printers'));
 });
 
 // ------------------------------------------------------------------ 4. before 0194

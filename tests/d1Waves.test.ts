@@ -83,9 +83,9 @@ const CEILINGS: Array<{ path: string; host?: string; waves: [warm: number, cold:
   { path: '/api/print-quote/printers', waves: [2, 2, 3], prepares: 3 },
   { path: '/api/print-quote/accessories', waves: [1, 1, 1], prepares: 1 },
   { path: '/api/marketplace/print/catalog', waves: [1, 1, 1], prepares: 3 },
-  // The Bambu import (spec §G.1): the knowledge answer — the VISIBLE gate, then its five reads in one wave
-  // (the relation targets' pictures only when a relation links a visible product). Measured 2 / 2 / 2.
-  { path: `/api/products/${LIVE_PRODUCTS[0].slug}/knowledge`, waves: [2, 2, 2], prepares: 6 },
+  // The Bambu import (spec §G.1): the knowledge answer — the VISIBLE gate, then its six reads in one wave
+  // (the relation targets' pictures among them). Measured 2 / 2 / 2; the relation path has its own test below.
+  { path: `/api/products/${LIVE_PRODUCTS[0].slug}/knowledge`, waves: [2, 2, 2], prepares: 7 },
 ];
 
 /**
@@ -154,6 +154,39 @@ test('the Bambu import adds no wave: the page body carries swatches and source v
   assert.ok(list.waves <= 2, `the listing: ${list.waves} waves`);
   const cards = (await (await get(stubApp(w.db, null, mount, { env: ENV }), '/api/products')).json() as { products: Array<Record<string, unknown>> }).products;
   assert.ok(cards.some((c) => Array.isArray(c.key_specs) && c.section_name), 'the cards carry key_specs and section_name from the row and the taxonomy already read');
+});
+
+/**
+ * THE KNOWLEDGE ANSWER OF AN IMPORTED PRODUCT, measured on the path it really takes: a relation resolved to
+ * a VISIBLE product links it with its picture (nearly every imported printer, AMS, hotend, plate and filament).
+ * The picture rides the first wave — 2 / 2 / 2 and 7 statements, the same as a product with no relation.
+ * (It was a third, dependent wave; the ceiling above was measured on a product with no knowledge row.)
+ */
+test('the knowledge answer with a relation to a VISIBLE target: its picture rides the first wave — no third round trip', async () => {
+  const w = world();
+  w.raw.exec(`
+    INSERT INTO product_relations (id, product_id, relation, target_kind, target_product_id, target_source, target_source_handle, target_label, state, evidence_kind) VALUES
+      ('rel_w_a1', '${P.H2D}', 'compatible_with', 'printer', '${P.A1}', 'bambu_us', 'a1', 'Bambu Lab A1', 'resolved', 'compat_section'),
+      ('rel_w_x2d', '${P.H2D}', 'compatible_with', 'printer', '${P.X2D}', 'bambu_us', 'x2d', 'Bambu Lab X2D', 'resolved', 'compat_section'),
+      ('rel_w_ams', '${P.H2D}', 'requires', 'ams', NULL, 'bambu_us', 'ams-2-pro', 'AMS 2 Pro', 'pending', 'feature_bullet');
+    INSERT INTO product_images (id, product_id, url, r2_key, content_type, sort_order, is_primary) VALUES
+      ('img_w_a1', '${P.A1}', '/files/products/a1/a1-front.webp', 'products/a1/a1-front.webp', 'image/webp', 0, 1),
+      ('img_w_a1_side', '${P.A1}', '/files/products/a1/a1-side.webp', 'products/a1/a1-side.webp', 'image/webp', 1, 0);
+  `);
+  const path = `/api/products/${LIVE_PRODUCTS.find((p) => p.id === P.H2D)!.slug}/knowledge`;
+  const cold = await w.measure(path);
+  const warm = await w.measure(path);
+  const member = await w.measure(path, MEMBER);
+  for (const [name, c] of [['cold', cold], ['warm', warm], ['member', member]] as const) {
+    assert.ok(c.waves <= 2, `${name}: ${c.waves} waves\n${c.sqls.join('\n')}`);
+    assert.ok(c.prepares <= 7, `${name}: ${c.prepares} prepares\n${c.sqls.join('\n')}`);
+  }
+  const body = (await (await get(stubApp(w.db, null, mount, { env: ENV }), path)).json()) as {
+    compatibility: { compatible: Array<{ label: string; product?: { slug: string; image: string } }> };
+  };
+  const a1 = body.compatibility.compatible.find((c) => c.label === 'Bambu Lab A1')!;
+  assert.equal(a1.product?.image, '/files/products/a1/a1-front.webp', 'the visible target is linked with its own primary picture');
+  assert.equal(body.compatibility.compatible.length, 2);
 });
 
 test('the pricing inputs: one wave cold, no statement warm, forgotten at once by the seam, re-read after the TTL', async () => {

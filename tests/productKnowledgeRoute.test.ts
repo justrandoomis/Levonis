@@ -20,7 +20,9 @@
  *   6. the edge policy: five minutes for a guest, private for a session, purged
  *      by every catalogue write (`cataloguePaths`);
  *   7. a database without 0194: 200 and empty;
- *   8. the leak scanners over the answer.
+ *   8. the leak scanners over the answer;
+ *   9. a fact scoped to a value, group or variant the page body no longer
+ *      shows (deactivated, or deleted since) is not in the answer either.
  *
  * Run: node --import tsx --test tests/productKnowledgeRoute.test.ts
  */
@@ -33,11 +35,12 @@ import { leaks, arithmeticLeaks } from './fixtures/costlyProduct';
 import { catalogLeaks } from './fixtures/catalogOnly';
 import { productRoutes, KNOWLEDGE_LIFETIME } from '../worker/routes/products';
 import { cataloguePaths, cacheControlFor, SESSION_CACHE_CONTROL } from '../worker/lib/edgePolicy';
-import { specKey } from '../packages/catalog/src/bambuImport/registry/specKeys';
+import { specKey, SPEC_KEYS } from '../packages/catalog/src/bambuImport/registry/specKeys';
 import { insertSpecValue } from './fixtures/knowledgeModel';
 import { GROUP_LABELS } from '../worker/lib/knowledge/labels';
 import { completenessOf, knowledgeTypeOf } from '../worker/lib/knowledge/completeness';
 import { publicDocumentUrl, isOwnerOnlyKey } from '../worker/lib/knowledge/productKnowledge';
+import { knowledgeTabs, rowsForSelection, type KnowledgeAnswer } from '../src/lib/productKnowledge';
 
 const H2D = { id: P.H2D, slug: 'bambu-lab-h2d' };
 const A1 = { id: P.A1, slug: 'bambu-lab-a1' };
@@ -401,10 +404,108 @@ test('the leak scanners find nothing in the answer: no cost, no financial key, n
   assert.doesNotMatch(text, /price|cost|stock|"available"/i, 'no money or stock word in the knowledge answer');
 });
 
+test('every group a customer can see has its heading: no registry group falls back to its English code', () => {
+  const routed = new Set(['product', 'package', 'shipment', 'carton']);
+  const missing = [
+    ...new Set(
+      SPEC_KEYS.filter((k) => k.key !== 'package.contents' && !routed.has(k.key.split('.')[0]) && !isOwnerOnlyKey(k.key, k.group))
+        .map((k) => k.group)
+        .filter((g) => !GROUP_LABELS[g])
+    ),
+  ];
+  assert.deepEqual(missing, [], 'a spec group drawn with its code for a heading');
+});
+
+test('a spare part’s «Quantity» (contents.pieces): its group heading in Arabic, English and Sorani', async () => {
+  const w = world();
+  spec(w.raw, H2D.id, 'contents.pieces', { value_text: '6', value_num: 6, sort: 30 });
+  const { body } = await knowledgeOf(w);
+  const g = body.specs.find((x: Body) => x.rows.some((r: Body) => r.key === 'contents.pieces'));
+  assert.equal(g.group, 'contents');
+  assert.deepEqual(g.label, { ar: 'المحتويات والكمية', en: 'Contents & quantity', ckb: 'ناوەڕۆک و ژمارە' });
+});
+
 test('every group heading is written in three languages, the Sorani never the Arabic', () => {
   for (const [group, t] of Object.entries(GROUP_LABELS)) {
     assert.ok(t.ar && t.en && t.ckb, group);
     assert.notEqual(t.ckb, t.ar, `${group}: the Sorani copies the Arabic`);
     assert.match(t.ckb, /[ڕڵێۆەڤ]/, `${group}: the Sorani has no Sorani letter`);
   }
+});
+
+// ------------------------------------------------------------------ 9. scopes the page body no longer shows
+
+/**
+ * The owner deactivates a value («مخفي» in the relations editor), a whole group
+ * or a variant — or the value is deleted. The page body drops it
+ * (productOverlay.ts relationsBlock), so nothing scoped to it may reach the
+ * answer: not its swatch, a spec or logistics row, a box item, a document or a
+ * relation. Before the fix all of them did, and a non-logistics row drew under
+ * «إصدارات أخرى» with no «خاص بـ» name.
+ */
+function seedRetiredScopes(raw: DatabaseSync): void {
+  const SW = (n: string) => `/files/products/import/swatch/${n.repeat(32)}.webp`;
+  raw.exec(`
+    UPDATE product_option_values SET active = 1 WHERE id IN ('v_k_std', 'v_k_combo');
+    INSERT INTO product_option_values (id, product_id, group_id, name_en, sort, active) VALUES
+      ('v_k_withdrawn', '${H2D.id}', 'g_k_ver', 'H2D Laser Full Combo', 2, 0);
+    INSERT INTO product_option_groups (id, product_id, name_en, sort, active) VALUES ('g_k_gone', '${H2D.id}', 'Laser', 1, 0);
+    INSERT INTO product_option_values (id, product_id, group_id, name_en, sort, active) VALUES
+      ('v_k_in_gone_group', '${H2D.id}', 'g_k_gone', '40W', 0, 1);
+    INSERT INTO product_variants (id, product_id, combo_key, active) VALUES
+      ('pv_k_live', '${H2D.id}', 'o:v_k_combo', 1),
+      ('pv_k_gone', '${H2D.id}', 'o:v_k_std', 0);
+    INSERT INTO product_option_value_swatches (option_value_id, product_id, url, r2_key, width, height, published_hex, hex_source_ref, source_url) VALUES
+      ('v_k_withdrawn', '${H2D.id}', '${SW('ef')}', '', 128, 128, '#ABCDEF', 'hex-ref', ''),
+      ('v_k_in_gone_group', '${H2D.id}', '${SW('ee')}', '', 128, 128, '#ABCDEE', 'hex-ref', '');
+    INSERT INTO product_documents (id, product_id, kind, title_en, url, host, scope_kind, scope_id, active, sort) VALUES
+      ('doc_withdrawn', '${H2D.id}', 'manual', 'Laser module manual', 'https://store.bblcdn.com/withdrawn-laser.pdf', 'store.bblcdn.com', 'option_value', 'v_k_withdrawn', 1, 5),
+      ('doc_gone_variant', '${H2D.id}', 'quick_start', 'Gone variant guide', 'https://store.bblcdn.com/gone-variant.pdf', 'store.bblcdn.com', 'variant', 'pv_k_gone', 1, 6),
+      ('doc_live_variant', '${H2D.id}', 'quick_start', 'Combo quick start', 'https://store.bblcdn.com/combo-quick-start.pdf', 'store.bblcdn.com', 'variant', 'pv_k_live', 1, 7);
+    INSERT INTO product_relations (id, product_id, scope_kind, scope_id, relation, target_kind, target_label, state, evidence_kind) VALUES
+      ('rel_withdrawn', '${H2D.id}', 'option_value', 'v_k_withdrawn', 'requires', 'laser_module', 'Laser module 10W', 'pending', 'option_value'),
+      ('rel_deleted', '${H2D.id}', 'option_value', 'v_k_deleted', 'requires', 'laser_module', 'Cutting module', 'pending', 'option_value');
+  `);
+  const s = (key: string, over: Record<string, unknown>) => spec(raw, H2D.id, key, over);
+  s('printing.build_volume', { scope_kind: 'option_value', scope_id: 'v_k_withdrawn', value_text: '300 × 320 × 325 mm (withdrawn)', sort: 20 });
+  s('printing.build_volume', { scope_kind: 'option_value', scope_id: 'v_k_in_gone_group', value_text: '310 × 320 × 325 mm (hidden group)', sort: 21 });
+  s('printing.build_volume', { scope_kind: 'variant', scope_id: 'pv_k_gone', value_text: '320 × 320 × 325 mm (inactive variant)', sort: 22 });
+  s('printing.build_volume', { scope_kind: 'option_value', scope_id: 'v_k_deleted', value_text: '330 × 320 × 325 mm (deleted value)', sort: 23 });
+  s('printing.build_volume', { scope_kind: 'variant', scope_id: 'pv_k_live', value_text: '350 × 320 × 325 mm (combo)', sort: 24 });
+  s('shipment.gross_weight', { scope_kind: 'option_value', scope_id: 'v_k_withdrawn', value_text: '61.5 kg', value_num: 61500, sort: 25 });
+  s('package.contents', { scope_kind: 'option_value', scope_id: 'v_k_withdrawn', data_type: 'list', value_list: JSON.stringify(['Laser safety glasses']), sort: 26 });
+}
+
+test('a value, group or variant the page body no longer shows: nothing scoped to it is in the answer', async () => {
+  const w = world();
+  seedRetiredScopes(w.raw);
+  const page = (await (await get(w.app(), `/api/products/${H2D.slug}`)).json()) as Body;
+  const shown = new Set<string>(page.relations.option_groups.flatMap((g: Body) => g.values.map((v: Body) => v.id)));
+  const variants = new Set<string>(page.relations.variants.map((v: Body) => v.id));
+  assert.deepEqual([...shown].sort(), ['v_k_combo', 'v_k_std'], 'the page body shows only the active values of active groups');
+  assert.deepEqual([...variants], ['pv_k_live']);
+
+  const { body, text } = await knowledgeOf(w);
+  const live = (scope: Body) =>
+    scope.kind === 'product' || (scope.kind === 'option_value' ? shown.has(scope.id) : variants.has(scope.id));
+  const scopes: Array<[string, Body]> = [
+    ...rowsOf(body).map((r: Body) => [`row ${r.key} ${r.value_text}`, r.scope] as [string, Body]),
+    ...body.in_the_box.map((i: Body) => [`box ${i.text}`, i.scope] as [string, Body]),
+    ...body.documents.map((d: Body) => [`document ${d.url}`, d.scope] as [string, Body]),
+    ...Object.values(body.compatibility).flat().map((c) => [`relation ${(c as Body).label}`, (c as Body).scope] as [string, Body]),
+  ];
+  assert.deepEqual(scopes.filter(([, sc]) => !live(sc)).map(([what]) => what), [], 'a fact scoped off-screen reached the answer');
+  assert.deepEqual(body.swatches.map((x: Body) => x.option_value_id), ['v_k_std'], 'only the swatch of a value the page shows');
+  for (const gone of ['withdrawn', 'hidden group', 'inactive variant', 'deleted value', '61.5 kg', 'Laser safety glasses', 'Cutting module', 'Laser module 10W', '#ABCDEF', '#ABCDEE']) {
+    assert.ok(!text.includes(gone), `the answer carries «${gone}»`);
+  }
+  // A live variant's facts still arrive.
+  assert.ok(rowsOf(body).some((r: Body) => r.scope.kind === 'variant' && r.scope.id === 'pv_k_live'), 'a live variant’s row is answered');
+  assert.ok(body.documents.some((d: Body) => d.scope.id === 'pv_k_live'), 'a live variant’s document is answered');
+
+  // And on screen: with the Standard version selected, «إصدارات أخرى» holds only the live combo's row.
+  const tabs = knowledgeTabs(body as unknown as KnowledgeAnswer, { optionValueIds: ['v_k_std'], variantId: null });
+  const printing = tabs.specs.find((g) => g.group === 'printing')!;
+  const { hidden } = rowsForSelection(printing.rows, { optionValueIds: ['v_k_std'], variantId: null });
+  assert.deepEqual(hidden.map((r) => r.value_text), ['350 × 320 × 325 mm (combo)']);
 });

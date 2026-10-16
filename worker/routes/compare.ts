@@ -63,6 +63,7 @@ import { badRequest, notFound, str } from '../lib/http';
 import { rateLimit } from '../lib/ratelimit';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import {
+  FILTER_ONLY_FIELDS,
   isTemplateFamily,
   productTypeForBranch,
   type ProductTypeId,
@@ -236,9 +237,11 @@ function specSheet(raw: unknown): Record<string, unknown> {
 }
 
 /** Does this sheet say anything at all? An object full of empty strings is an
- *  empty sheet — the admin opened the form and saved it. */
+ *  empty sheet — the admin opened the form and saved it. A filter's code (the
+ *  family the importer mirrors, `FILTER_ONLY_FIELDS`) is no spec to compare on. */
 export function hasAnySpec(specs: Record<string, unknown>): boolean {
-  for (const value of Object.values(specs)) {
+  for (const [key, value] of Object.entries(specs)) {
+    if (FILTER_ONLY_FIELDS.has(key)) continue;
     if (value === null || value === undefined) continue;
     if (typeof value === 'string' ? value.trim() !== '' : true) return true;
   }

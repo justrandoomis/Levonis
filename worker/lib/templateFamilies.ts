@@ -130,11 +130,18 @@ const t = (
  * Shared by every family: the importer mirrors `identity.family` here
  * (`bambu_lab_3d_printers`, `bambu_filament` …) and the listing offers it as
  * the `family` facet (packages/catalog/src/discovery.ts FACET_FIELDS). A code
- * for the filter, not a line of the specification table.
+ * for the filter, not a line of the specification table: never a compare row
+ * (`compare.hidden`), never a row of the page's spec table
+ * (`specGroupsFromFields`), and no spec a comparison can stand on
+ * (worker/routes/compare.ts `hasAnySpec`) — `FILTER_ONLY_FIELDS`.
  */
 const PRODUCT_FAMILY_FIELD: TemplateField = t('product_family', 'العائلة', 'Family', 'text', {
+  compare: { parse: 'text', better: 'none', hidden: true },
   hint_ar: 'رمز العائلة للفلترة، مثال: bambu_filament',
 });
+
+/** Template fields that are codes for the listing's filters, never a line a customer reads (`product_family`). */
+export const FILTER_ONLY_FIELDS: ReadonlySet<string> = new Set([PRODUCT_FAMILY_FIELD.id]);
 
 /**
  * The values `use_cases` may hold, in the order the admin form offers them.
@@ -2243,7 +2250,7 @@ export function allTemplateGroups(): TemplateGroup[] {
 
 export function specGroupsFromFields(
   values: Record<string, string> | null | undefined,
-  exclude: readonly string[] = ['in_the_box', 'variant_specs']
+  exclude: readonly string[] = ['in_the_box', 'variant_specs', ...FILTER_ONLY_FIELDS]
 ): DerivedSpecGroup[] {
   if (!values) return [];
   const skip = new Set(exclude);
