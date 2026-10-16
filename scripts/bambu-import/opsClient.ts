@@ -98,6 +98,8 @@ export const TRANSIENT_CODES: ReadonlySet<string> = new Set([
   // The write committed but its read-back has not run yet; the media storage did not answer (both 503).
   'IMPORT_READBACK_PENDING',
   'IMPORT_STORAGE_UNAVAILABLE',
+  // An R2 error under /write, /complete or /media (writer lane, 503): the storage, not the image, failed.
+  'IMAGE_STORAGE_FAILED',
 ]);
 
 /** The Worker's code → the code the runner records. `IMPORT_` codes of §C.11 name the same blockers. */

@@ -1039,6 +1039,26 @@ test('the read-back not run yet (503 IMPORT_READBACK_PENDING) and media pending 
   }
 });
 
+test('an R2 error under /write (503 IMAGE_STORAGE_FAILED) and /complete (503 IMPORT_STORAGE_UNAVAILABLE) is transient: asked again, the item completes', async () => {
+  for (const code of ['IMAGE_STORAGE_FAILED', 'IMPORT_STORAGE_UNAVAILABLE']) {
+    assert.equal(classify(503, code), 'transient', code);
+    assert.equal(classify(409, code), 'transient', `${code} by its code, whatever the status`);
+  }
+  const w = new World({ handles: ['filament-buffer'] });
+  try {
+    w.inject(/\/write$/, 1, () => json(503, { code: 'IMAGE_STORAGE_FAILED', message: 'storage' }));
+    w.inject(/\/complete$/, 1, () => json(503, { code: 'IMPORT_STORAGE_UNAVAILABLE', message: 'storage' }));
+    assert.equal(await w.importer().main(), 0, w.logLines.join('\n'));
+    assert.equal(w.item('filament-buffer').state, 'COMPLETE', w.logLines.join('\n'));
+    assert.equal(w.item('filament-buffer').blocker_code, '');
+    assert.ok(callsTo(w, /\/write$/).length >= 2, 'the write was sent again');
+    assert.ok(callsTo(w, /\/complete$/).length >= 2, 'COMPLETE was asked again');
+    assert.equal(w.outputs.blocked, 'false');
+  } finally {
+    w.dispose();
+  }
+});
+
 test('the breadcrumb travels as not applicable (§1 row 28): in the evidence beside the browser\'s checks, never one of them', async () => {
   const w = new World({ handles: ['filament-buffer'] });
   try {
