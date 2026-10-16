@@ -32,6 +32,7 @@ import { asLang, countItems, formatDate, itemCountLabel, monthsLabel, orderStatu
 import { useMoney } from '../CurrencyContext';
 import type { Claim } from '../components/warranty/types';
 import VariantImg from '../components/ui/VariantImg';
+import { OfferSaving } from '../components/ui/OfferBadge';
 
 /** Its own chunk: only an order with a printer that has parts draws it. */
 const MaintenanceShelf = React.lazy(() => import('../components/product/MaintenanceShelf'));
@@ -723,6 +724,11 @@ export default function OrderDetail() {
                               <p className="text-[12px] text-text-secondary tabular-nums mt-0.5">
                                 × {it.qty} · {money(Number(unitPrice) || 0)}
                               </p>
+                              {/* A LIVE OFFER (docs/ux/PRODUCT-DISCOUNT.md §8.6): the frozen unit price it replaced,
+                                  struck, and its percent. A gift line never carries one. */}
+                              {!it.is_gift && typeof it.pricing?.offer_before_iqd === 'number' && it.pricing.offer_before_iqd > 0 ? (
+                                <OfferSaving className="mt-0.5" beforeIqd={it.pricing.offer_before_iqd} percent={it.pricing.offer_saving_percent} />
+                              ) : null}
                               {/* A GIFT LINE (0175): given, not bought — «هدية — 0 د.ع» with its value. */}
                               {it.is_gift && (
                                 <p className="mt-1 flex flex-wrap items-center gap-1.5" data-order-gift-line={it.id}>

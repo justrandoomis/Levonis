@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { type ApiProduct } from '../../lib/api';
 import SafeImage from '../ui/SafeImage';
 import CardPrice from '../CardPrice';
-import OfferBadge from '../ui/OfferBadge';
+import OfferBadge, { offerPercentSr, offerPercentText } from '../ui/OfferBadge';
 import Countdown from '../ui/Countdown';
 import { productMainImage, productPrimaryImage } from '../../lib/productImage';
 import { useTheme } from '../../lib/theme';
@@ -14,6 +14,42 @@ import { useLanguage } from '../../LanguageContext';
 import { conditionKindLabel } from '../../lib/condition';
 import { cardHref, cardKnowledgeLine, cardName, compareTypeOf, type CardProduct } from '../../lib/productCard';
 import { isUnpriced } from '../../lib/priceStatus';
+
+/**
+ * THE PHOTO BADGE (docs/ux/PRODUCT-DISCOUNT.md §8.2): a live offer's «−17٪» (the server's percent of the
+ * two numbers the card prints) when it has one, else today's SALE when the viewer's own price is below
+ * the regular one. Nothing when neither.
+ */
+function SaleBadge({ p, hasSale }: { p: ApiProduct; hasSale: boolean }) {
+  const { lang } = useLanguage();
+  const l = lang === 'en' || lang === 'ckb' ? lang : 'ar';
+  const n = typeof p.display_offer_saving_percent === 'number' && p.display_offer_saving_percent >= 1 ? p.display_offer_saving_percent : null;
+  if (n !== null) {
+    return (
+      <OfferBadge className="absolute top-2 end-2">
+        <bdi dir="ltr" aria-hidden>
+          {offerPercentText(n, l)}
+        </bdi>
+        <span className="sr-only">{offerPercentSr(n, l)}</span>
+      </OfferBadge>
+    );
+  }
+  return hasSale ? <OfferBadge className="absolute top-2 end-2">SALE</OfferBadge> : null;
+}
+
+/**
+ * THE OFFER CLOCK'S RULE (§8.2): «يبدأ خلال» for an upcoming window; «ينتهي خلال» for a live one with an
+ * end — but a PRICED window that lowers nothing on this card gets no clock (it would promise a sale the
+ * card does not show). An older payload without `priced` behaves as before.
+ */
+export function offerClock(p: Pick<ApiProduct, 'offer'>): { target: string | null; kind: 'opens' | 'ends' } | null {
+  const o = p.offer;
+  if (!o) return null;
+  if (o.schedule_state === 'upcoming') return { target: o.starts_at, kind: 'opens' };
+  if (!o.ends_at) return null;
+  if (o.schedule_state === 'live' && o.priced === true && o.price_source !== 'offer') return null;
+  return { target: o.ends_at, kind: 'ends' };
+}
 
 /**
  * THE SHOP'S PRODUCT CARD — one card for the home rails, the listings and
@@ -139,7 +175,11 @@ function CompactCard({
   const priced = !isUnpriced(p);
   const displayPrice = p.display_price_iqd ?? p.price_iqd;
   const regularPrice = p.display_regular_iqd ?? p.price_iqd;
-  const hasSale = priced && displayPrice != null && regularPrice != null && displayPrice < regularPrice;
+  const hasSale =
+    priced &&
+    displayPrice != null &&
+    ((regularPrice != null && displayPrice < regularPrice) || (typeof p.display_offer_before_iqd === 'number' && displayPrice < p.display_offer_before_iqd));
+  const clock = priced ? offerClock(p) : null;
   const type = compareToggle ? compareTypeOf(p) : null;
   const condition = p.condition?.kind ? conditionKindLabel(p.condition.kind, lang) : '';
   const line = cardKnowledgeLine(p, lang === 'en' || lang === 'ckb' ? lang : 'ar');
@@ -161,16 +201,13 @@ function CompactCard({
           fallbackClassName="text-snow/35"
           imgClassName="object-[50%_4%]"
         />
-        {hasSale && <OfferBadge className="absolute top-2 end-2">SALE</OfferBadge>}
+        {priced && <SaleBadge p={p} hasSale={hasSale} />}
         {/* A scheduled special offer (§12, §13.2): decoration only — the API
             refuses an expired offer, and the price is already the offer's. */}
-        {priced && p.offer && (p.offer.schedule_state === 'upcoming' || p.offer.ends_at) && (
+        {/* The clock's own spans are zinc (Countdown): on this onyx pill they read snow in either theme. */}
+        {clock && (
           <span className="absolute bottom-1.5 start-1.5 rounded-sm bg-onyx/80 px-1.5 py-0.5">
-            <Countdown
-              target={p.offer.schedule_state === 'upcoming' ? p.offer.starts_at : p.offer.ends_at}
-              kind={p.offer.schedule_state === 'upcoming' ? 'opens' : 'ends'}
-              className="text-[10px] text-snow"
-            />
+            <Countdown target={clock.target} kind={clock.kind} className="text-[10px] text-snow [&_*]:text-snow" />
           </span>
         )}
         {/* Graded stock says so on the card, on the photograph so the
@@ -239,7 +276,11 @@ function RegularCard({ p, widthClass }: { p: ApiProduct; widthClass: string }) {
   const priced = !isUnpriced(p);
   const displayPrice = p.display_price_iqd ?? p.price_iqd;
   const regularPrice = p.display_regular_iqd ?? p.price_iqd;
-  const hasSale = priced && displayPrice != null && regularPrice != null && displayPrice < regularPrice;
+  const hasSale =
+    priced &&
+    displayPrice != null &&
+    ((regularPrice != null && displayPrice < regularPrice) || (typeof p.display_offer_before_iqd === 'number' && displayPrice < p.display_offer_before_iqd));
+  const clock = priced ? offerClock(p) : null;
 
   return (
     <Link
@@ -254,16 +295,10 @@ function RegularCard({ p, widthClass }: { p: ApiProduct; widthClass: string }) {
           sizes="160px"
           className="w-full h-full"
         />
-        {hasSale && (
-          <OfferBadge className="absolute top-2 end-2">SALE</OfferBadge>
-        )}
-        {priced && p.offer && (p.offer.schedule_state === 'upcoming' || p.offer.ends_at) && (
+        {priced && <SaleBadge p={p} hasSale={hasSale} />}
+        {clock && (
           <span className="absolute bottom-2 start-2 rounded-sm bg-onyx/80 px-1.5 py-0.5">
-            <Countdown
-              target={p.offer.schedule_state === 'upcoming' ? p.offer.starts_at : p.offer.ends_at}
-              kind={p.offer.schedule_state === 'upcoming' ? 'opens' : 'ends'}
-              className="text-[10px] text-snow"
-            />
+            <Countdown target={clock.target} kind={clock.kind} className="text-[10px] text-snow [&_*]:text-snow" />
           </span>
         )}
       </div>

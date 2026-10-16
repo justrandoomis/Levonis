@@ -60,6 +60,7 @@ import { PRINTER_STANDARD_DELIVERY_POLICY, chooseDeliveryMethod, printerStandard
 import { GINI_ORDER_NO_RE } from '../../packages/pricing/src/paymentPolicy';
 import GiniCheckoutOption from '../components/checkout/GiniCheckoutOption';
 import BundleContents, { type BundleContentLine } from '../components/bundles/BundleContents';
+import { OfferSaving } from '../components/ui/OfferBadge';
 import AddressForm from '../components/address/AddressForm';
 /**
  * THE ORDER IS PLACED; THIS IS ABOUT WHAT HAPPENS NEXT.
@@ -167,7 +168,12 @@ interface CheckoutQuoteLineDto {
     applied_iqd: number;
     unit_subtotal_iqd: number;
     transport?: { method: string } | null;
+    offer_before_iqd?: number | null;
+    offer_saving_percent?: number | null;
   };
+  /** A live offer lowered this line (docs/ux/PRODUCT-DISCOUNT.md §8.5): the struck UNIT before price and its percent. */
+  offer_before_iqd?: number | null;
+  offer_saving_percent?: number | null;
 }
 
 /**
@@ -540,6 +546,16 @@ const DEFAULT_OFFERED_PAYMENT_IDS = ['wallet', 'cash'];
  * `loc` is the app's translator. Both sentences carry their own Sorani
  * (DECISIONS row 183: a Sorani slot never carries the Arabic).
  */
+/**
+ * A LIVE OFFER ON A SUMMARY LINE (docs/ux/PRODUCT-DISCOUNT.md §8.5): the struck total is the server's unit
+ * before price × the quantity, beside the line total, and the badge is the line's own percent.
+ */
+function offerLineOf(beforeUnit: number | null | undefined, percent: number | null | undefined, qty: number): { offerBeforeIqd: number | null; offerSavingPercent: number | null } {
+  return typeof beforeUnit === 'number' && beforeUnit > 0
+    ? { offerBeforeIqd: beforeUnit * Math.max(1, qty), offerSavingPercent: typeof percent === 'number' ? percent : null }
+    : { offerBeforeIqd: null, offerSavingPercent: null };
+}
+
 function counterNamed(code: string): string {
   if (code === 'PREORDER_CAPACITY_EXHAUSTED') {
     return loc(
@@ -1092,6 +1108,9 @@ export default function Checkout() {
     included?: BundleContentLine[];
     componentTotalIqd?: number | null;
     savingPercent?: number | null;
+    /** A live offer (§8.5): the struck LINE total before it (unit × qty) and its percent. */
+    offerBeforeIqd?: number | null;
+    offerSavingPercent?: number | null;
     mysterySpools?: number | null;
     /** A gift line (0175): the server priced it at 0; the «هدية» chip and its value are shown. */
     gift?: { level: number; value_iqd: number } | null;
@@ -1131,6 +1150,8 @@ export default function Checkout() {
             // a payload that predates these two fields.
             componentTotalIqd: l.component_total_iqd ?? cartLine?.composition?.component_total_iqd ?? null,
             savingPercent: l.saving_percent ?? cartLine?.composition?.saving_percent ?? null,
+            // The same rule for a live offer: the quote's figures, the cart line only as the fallback.
+            ...offerLineOf(l.offer_before_iqd ?? cartLine?.breakdown?.offer_before_iqd ?? null, l.offer_saving_percent ?? cartLine?.breakdown?.offer_saving_percent ?? null, l.qty),
             mysterySpools: l.mystery ? l.mystery.spools : (cartLine?.composition?.mystery?.spool_qty ?? null),
           };
         })
@@ -1156,6 +1177,7 @@ export default function Checkout() {
             })),
           componentTotalIqd: i.composition?.component_total_iqd ?? null,
           savingPercent: i.composition?.saving_percent ?? null,
+          ...offerLineOf(i.breakdown?.offer_before_iqd ?? null, i.breakdown?.offer_saving_percent ?? null, i.qty),
         }));
   // A pre-order cart: which pricing rule is in force, said once, in one line,
   // and ONLY when there is something to say. Read from the quote, never
@@ -2513,6 +2535,9 @@ export default function Checkout() {
                       <p className="text-xs text-text-muted mb-1.5 font-light">{line.variant}</p>
                     )}
                     <span className="text-sm font-medium text-text-primary tabular-nums">{money(line.lineTotal)}</span>
+                    {line.offerBeforeIqd ? (
+                      <OfferSaving className="mt-0.5" beforeIqd={line.offerBeforeIqd} percent={line.offerSavingPercent} />
+                    ) : null}
                     {line.gift && (
                       <span className="mt-1 flex flex-wrap items-center gap-1.5" data-checkout-gift-line={line.key}>
                         <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 w-max bg-gold/10 text-gold text-[11px] font-bold">

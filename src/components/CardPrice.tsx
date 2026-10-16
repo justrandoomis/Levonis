@@ -69,7 +69,9 @@ function RegularPrice({ p, compact }: { p: ApiProduct; compact: boolean }) {
   const main = (p.display_price_iqd ?? p.price_iqd) as number;
   const regular = (p.display_regular_iqd ?? p.price_iqd) as number;
   const appliedTier = p.display_applied_tier ?? 'regular';
-  const struck = main < regular ? regular : null;
+  // A LIVE OFFER strikes the published price it replaced (docs/ux/PRODUCT-DISCOUNT.md §8.2, F1) — the
+  // server's number, never `regular`, which already IS the offer price; a member saving strikes as before.
+  const struck = typeof p.display_offer_before_iqd === 'number' ? p.display_offer_before_iqd : main < regular ? regular : null;
   const from = !!p.display_from;
 
   const teasers: Array<{ label: string; price: number }> = [];
@@ -135,11 +137,13 @@ function RegularPrice({ p, compact }: { p: ApiProduct; compact: boolean }) {
  * rows, so a grid of cards keeps one height whatever the viewer's tier:
  *
  *   row 1   «يبدأ من» 10 muted · the amount 15/20 800 tabular · «د.ع» 10.5
- *   row 2   ONE member line — the cheapest rung below what this viewer pays
+ *   row 2   A LIVE OFFER'S struck before price first (docs/ux/PRODUCT-DISCOUNT.md
+ *           §8.2: `display_offer_before_iqd`; the member line yields to it). Else
+ *           ONE member line — the cheapest rung below what this viewer pays
  *           (src/lib/productCard.ts `memberLine`): ✧ 674,100 لأعضاء PRO.
  *           When there is no cheaper rung but the viewer's own price is below
- *           the regular one (a member, or a live offer), the struck regular
- *           price takes the row instead. Otherwise the row stays empty.
+ *           the regular one (a member), the struck regular price takes the row
+ *           instead. Otherwise the row stays empty.
  *
  * The main amount keeps CardPrice's colour rule: PRO's red for a PRO viewer,
  * gold for PRIME and PLUS, the foreground for everyone else. Same fields,
@@ -153,8 +157,9 @@ function CompactPrice({ p }: { p: ApiProduct }) {
   const regular = (p.display_regular_iqd ?? p.price_iqd) as number;
   const applied = p.display_applied_tier ?? 'regular';
   const [amount, unit] = splitMoney(money(main));
-  const line = memberLine(p);
-  const struck = !line && main < regular ? regular : null;
+  const offerBefore = typeof p.display_offer_before_iqd === 'number' ? p.display_offer_before_iqd : null;
+  const line = offerBefore === null ? memberLine(p) : null;
+  const struck = offerBefore ?? (!line && main < regular ? regular : null);
   const amountTone =
     applied === 'pro' ? 'text-coral' : applied === 'regular' ? 'text-text-primary' : 'text-gold';
 
@@ -182,14 +187,14 @@ function CompactPrice({ p }: { p: ApiProduct }) {
               <Star aria-hidden className="size-2.5 shrink-0 fill-current text-gold" />
             )}
             <bdi dir="ltr" className="font-semibold tabular-nums">{splitMoney(money(line.price))[0]}</bdi>
-            {/* OWNER: Sorani to be written by hand («لأعضاء» before a tier name). */}
-            <span className="truncate">{loc('لأعضاء', 'for')}</span>
+            {/* «لأعضاء» before a tier name; its own Sorani (DECISIONS row 183, F6). */}
+            <span className="truncate">{loc('لأعضاء', 'for', 'بۆ ئەندامانی')}</span>
             <b className={`font-extrabold tracking-[0.02em] ${line.tier === 'PRO' ? 'text-coral' : 'text-gold'}`}>{line.tier}</b>
           </>
         ) : struck !== null ? (
           <>
-            {/* OWNER: Sorani to be written by hand («بدل» — instead of). */}
-            <span className="sr-only">{loc('بدل', 'instead of')} </span>
+            {/* «بدل» — instead of; its own Sorani (F6). */}
+            <span className="sr-only">{loc('بدل', 'instead of', 'لە جیاتی')} </span>
             <bdi dir="ltr" className="text-text-muted line-through tabular-nums">{splitMoney(money(struck))[0]}</bdi>
           </>
         ) : null}

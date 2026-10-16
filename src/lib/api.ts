@@ -427,6 +427,9 @@ export interface ApiProduct {
      *  `composition.availability_state`. */
     schedule_state?: 'upcoming' | 'live' | 'ended';
     price_source?: 'ladder' | 'offer';
+    /** The window carries a price (docs/ux/PRODUCT-DISCOUNT.md §8.2): a priced window that lowers
+     *  nothing on this card shows no clock. Absent on an older payload. */
+    priced?: boolean;
     locked?: boolean;
   } | null;
   /** The offer's PLUS rung, offer-scoped only (§4.4). */
@@ -503,6 +506,10 @@ export interface ApiProduct {
    *  the PLUS price at the door. No ordinary product row ever carries it. */
   display_applied_tier?: 'regular' | 'plus' | 'pro' | 'prime';
   display_regular_iqd?: number;
+  /** A LIVE OFFER lowered the card's figure (docs/ux/PRODUCT-DISCOUNT.md §8.1): the struck
+   *  published price, and the server's «−N٪» of the two. Null otherwise. IQD only. */
+  display_offer_before_iqd?: number | null;
+  display_offer_saving_percent?: number | null;
   /** Cheapest explicit PRIME / PRO price across levels; null = none exists.
    *  Feed the card's faint tier-teaser lines. */
   display_prime_iqd?: number | null;
@@ -625,6 +632,10 @@ export interface CartItem {
     warranty?: CartWarrantySnapshot | null;
     unit_subtotal_iqd: number;
     errors: string[];
+    /** A live offer lowered this line (docs/ux/PRODUCT-DISCOUNT.md §8.4): the struck unit price and
+     *  its «−N٪», from the server. Null otherwise. */
+    offer_before_iqd?: number | null;
+    offer_saving_percent?: number | null;
   };
   /** The chosen extended-warranty plan id ('' = none). One plan per line,
    *  applied to every unit of the line. */
@@ -807,6 +818,10 @@ export interface OrderItemTransport {
 
 /** Per-line price breakdown frozen at checkout (cost fields stripped). */
 export interface OrderItemPricing {
+  /** The line was sold under a live offer (docs/ux/PRODUCT-DISCOUNT.md §8.6): its frozen before price
+   *  per unit, and the «−N٪» of it and the frozen applied price. */
+  offer_before_iqd?: number | null;
+  offer_saving_percent?: number | null;
   applied_iqd?: number;
   applied_tier?: 'regular' | 'pro' | 'prime' | string;
   regular_iqd?: number;
