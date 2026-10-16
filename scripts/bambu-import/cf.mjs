@@ -17,13 +17,16 @@
  *       carries row counts and migration names, never a row.
  *   node scripts/bambu-import/cf.mjs revoke --run <cir_ + 24 hex>
  *   node scripts/bambu-import/cf.mjs revoke --run-file <file the open/mint step wrote>
- *       The kill switch (§A.3): `token_sha256 = ''` on that run, so every ops
- *       path answers 404. Until migration 0195 is live there is no
- *       catalog_import_runs table and no token: a notice, and exit 0. With
- *       --run-file (the always() step after a mode that minted a token): no
- *       file means no token was minted in this job — a notice, and exit 0.
- *       The revoke never refuses for the job deadline: it is what must still
- *       run after the importer used its time (see openContext).
+ *       `token_sha256 = ''` on that run, so every ops path answers 404. With
+ *       --run (THE KILL SWITCH, §A.3, workflow 60 mode=revoke) it also marks
+ *       the run stopped by its owner (`notes = 'kill_switch'`): no chained
+ *       job's mint re-arms it, only the owner's own dispatch (see mint). Until
+ *       migration 0195 is live there is no catalog_import_runs table and no
+ *       token: a notice, and exit 0. With --run-file (the always() step after
+ *       a mode that minted a token): no file means no token was minted in this
+ *       job — a notice, and exit 0; the mark is never touched. The revoke
+ *       never refuses for the job deadline: it is what must still run after
+ *       the importer used its time (see openContext).
  *   node scripts/bambu-import/cf.mjs preflight --mode <mode> --run <run id or ''>
  *       Every job that writes starts here (§A.1, §K.2 step 11): the live
  *       migration count and last name equal the repository's, the 0195 table
@@ -35,9 +38,13 @@
  *       digest, the manifest size, the commit) with a fresh 256-bit token:
  *       the token goes to a 0600 file only the importer step reads, and only
  *       its SHA-256 is stored. The run id goes to its own file.
- *   node scripts/bambu-import/cf.mjs mint --run <cir_ + 24 hex> --token-file <file> --run-file <file>
+ *   node scripts/bambu-import/cf.mjs mint --run <cir_ + 24 hex> --chain-count <0-12> --token-file <file> --run-file <file>
  *       A fresh per-job token for an active run (run, close, withdraw): the
- *       same 0600 file, the hash and its expiry on the run row.
+ *       same 0600 file, the hash and its expiry on the run row. A run the kill
+ *       switch stopped gets no token for a chained job (chain_count above 0:
+ *       the chain job dispatched it, maybe before the owner pressed the
+ *       switch, maybe after a door that did not settle); the owner's own
+ *       dispatch (chain_count 0) lifts the switch, and says so.
  *   node scripts/bambu-import/cf.mjs report --run <cir_ + 24 hex> --seal <public key> --out <dir>
  *       The run's ledger read from D1 (§H.3: items, states, codes, counts,
  *       public URLs, the Worker's checks next to the runner's evidence), sealed
@@ -106,7 +113,7 @@ const USAGE = [
   '       node scripts/bambu-import/cf.mjs revoke --run <cir_ + 24 hex> | --run-file <file>',
   '       node scripts/bambu-import/cf.mjs preflight --mode <mode> --run <cir_ + 24 hex or empty>',
   '       node scripts/bambu-import/cf.mjs open --token-file <file> --run-file <file>',
-  '       node scripts/bambu-import/cf.mjs mint --run <cir_ + 24 hex> --token-file <file> --run-file <file>',
+  '       node scripts/bambu-import/cf.mjs mint --run <cir_ + 24 hex> --chain-count <0-12> --token-file <file> --run-file <file>',
   '       node scripts/bambu-import/cf.mjs report --run <cir_ + 24 hex> --seal <public key> --out <dir>',
 ].join('\n');
 
@@ -229,8 +236,15 @@ export function parseArgs(argv) {
     return { mode, tokenFile: fileOf(given['--token-file'], '--token-file'), runFile: fileOf(given['--run-file'], '--run-file') };
   }
   if (mode === 'mint') {
-    const given = options(['--run', '--token-file', '--run-file']);
-    return { mode, runId: runOf(given['--run']), tokenFile: fileOf(given['--token-file'], '--token-file'), runFile: fileOf(given['--run-file'], '--run-file') };
+    const given = options(['--run', '--chain-count', '--token-file', '--run-file']);
+    if (!/^(?:[0-9]|1[0-2])$/.test(given['--chain-count'] ?? '')) throw new CfError('mint: --chain-count must be a whole number from 0 to 12');
+    return {
+      mode,
+      runId: runOf(given['--run']),
+      chainCount: Number(given['--chain-count']),
+      tokenFile: fileOf(given['--token-file'], '--token-file'),
+      runFile: fileOf(given['--run-file'], '--run-file'),
+    };
   }
   throw new CfError('the first argument is snapshot, revoke, preflight, open, mint or report');
 }
@@ -393,7 +407,15 @@ export function snapshot(context, { publicKey, outDir }) {
   return 0;
 }
 
-export function revoke(context, { runId }) {
+/** The run's mark of the kill switch (catalog_import_runs.notes): set by `revoke --run`, cleared by the owner's dispatch. */
+export const KILL_MARK = 'kill_switch';
+
+/**
+ * `kill`: the kill switch (workflow 60 mode=revoke). It also marks the run, so that a chained job — dispatched a
+ * moment before, or after a door that did not settle while the token was being cleared — never mints it a token
+ * again (mint). The always() revoke of every job (`--run-file`) clears the token only.
+ */
+export function revoke(context, { runId, kill = false }) {
   if (!RUN_ID_PATTERN.test(runId)) throw new CfError('revoke: not a run id');
   resolveDatabase(context);
   const table = query(context, "SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'catalog_import_runs'").results[0];
@@ -403,7 +425,7 @@ export function revoke(context, { runId }) {
     return 0;
   }
   // runId matched RUN_ID_PATTERN (cir_ + 24 hex): it cannot carry a quote.
-  query(context, `UPDATE catalog_import_runs SET token_sha256 = '' WHERE id = '${runId}'`);
+  query(context, `UPDATE catalog_import_runs SET token_sha256 = ''${kill ? `, notes = '${KILL_MARK}'` : ''} WHERE id = '${runId}'`);
   const check = query(
     context,
     `SELECT COUNT(*) AS run_rows, COALESCE(SUM(token_sha256 <> ''), 0) AS run_tokens, (SELECT COUNT(*) FROM catalog_import_runs WHERE token_sha256 <> '') AS live_tokens FROM catalog_import_runs WHERE id = '${runId}'`
@@ -411,7 +433,13 @@ export function revoke(context, { runId }) {
   if (Number(check?.run_rows) !== 1) throw new CfError(`revoke: there is no run ${runId} in catalog_import_runs`);
   if (Number(check?.run_tokens) !== 0) throw new CfError(`revoke: the token of ${runId} is still set`);
   context.log(`revoke: ${runId}: token cleared; tokens still live on any run: ${Number(check.live_tokens)}`);
-  summary(context.env, ['## Bambu import: revoke', '', `Run \`${runId}\`: token cleared. Tokens still live on any run: ${Number(check.live_tokens)}.`]);
+  if (kill) context.log(`revoke: ${runId}: the kill switch holds: no chained job mints a token again; the owner's own dispatch (chain_count 0) lifts it`);
+  summary(context.env, [
+    '## Bambu import: revoke',
+    '',
+    `Run \`${runId}\`: token cleared. Tokens still live on any run: ${Number(check.live_tokens)}.`,
+    ...(kill ? ['', 'The kill switch holds: no chained job mints a token for this run again. Dispatching the run yourself (chain_count 0) lifts it; cancel any dispatch of yours still queued.'] : []),
+  ]);
   return 0;
 }
 
@@ -560,22 +588,31 @@ export function open(context, { tokenFile, runFile }) {
   return 0;
 }
 
-export function mint(context, { runId, tokenFile, runFile }) {
+export function mint(context, { runId, chainCount, tokenFile, runFile }) {
+  if (!Number.isInteger(chainCount) || chainCount < 0 || chainCount > 12) throw new CfError('mint: the chain count is 0 to 12');
   const expires = tokenExpiry(context);
   resolveDatabase(context);
   writeRunFile(runFile, runId);
+  const killed = () => Number(query(context, `SELECT COUNT(*) AS n FROM catalog_import_runs WHERE id = '${runId}' AND notes = '${KILL_MARK}'`).results[0]?.n) === 1;
+  const stopped = () => new CfError(`run ${runId} was stopped by the kill switch: a chained job never re-arms it; dispatch mode=run with chain_count 0 to continue`);
+  // A chained job (the chain job dispatched it) never re-arms a run its owner stopped; the owner's dispatch does.
+  const chained = chainCount > 0;
+  const wasKilled = killed();
+  if (wasKilled && chained) throw stopped();
   const hash = newToken(tokenFile);
   try {
+    // Chained: fenced on the mark as well, so a kill switch pressed between the read above and this write still wins.
     query(
       context,
-      `UPDATE catalog_import_runs SET token_sha256 = '${hash}', token_expires_at = '${expires}', github_run_id = '${githubRunOf(context.env)}' WHERE id = '${runId}' AND state IN ('open','running','blocked')`
+      `UPDATE catalog_import_runs SET token_sha256 = '${hash}', token_expires_at = '${expires}', github_run_id = '${githubRunOf(context.env)}'${wasKilled ? ", notes = ''" : ''} WHERE id = '${runId}' AND state IN ('open','running','blocked')${chained ? ` AND notes <> '${KILL_MARK}'` : ''}`
     );
     const check = query(context, `SELECT COUNT(*) AS n FROM catalog_import_runs WHERE id = '${runId}' AND token_sha256 = '${hash}'`).results[0];
-    if (Number(check?.n) !== 1) throw new CfError(`run ${runId} is not an active import run: no token was stored`);
+    if (Number(check?.n) !== 1) throw chained && killed() ? stopped() : new CfError(`run ${runId} is not an active import run: no token was stored`);
   } catch (failure) {
     rmSync(tokenFile, { force: true });
     throw failure;
   }
+  if (wasKilled) context.log(`mint: run ${runId}: the kill switch is lifted by this dispatch of the owner (chain_count 0)`);
   context.log(`mint: run ${runId}: a job token was minted, only its hash is stored; it expires ${expires}`);
   return 0;
 }
@@ -640,7 +677,8 @@ export function main(argv, { env = process.env, log = console.log, error = conso
       case 'snapshot':
         return snapshot(context, parsed);
       case 'revoke':
-        return parsed.runFile ? revokeFromFile(context, parsed) : revoke(context, parsed);
+        // --run is the kill switch (workflow 60 mode=revoke); --run-file the always() revoke of a job's own token.
+        return parsed.runFile ? revokeFromFile(context, parsed) : revoke(context, { ...parsed, kill: true });
       case 'preflight':
         return preflight(context, parsed);
       case 'open':

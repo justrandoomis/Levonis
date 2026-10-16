@@ -381,6 +381,13 @@ test('no token travels through the job env or GITHUB_ENV; the importer alone rea
   assert.equal(run(revoke).trim(), 'node scripts/bambu-import/cf.mjs revoke --run-file "$RUNNER_TEMP/import-run"');
   assert.match(String(revoke.if), /^always\(\) && \(/, 'the revoke runs whatever happened before it');
   assert.ok(STEPS.indexOf(revoke) > STEPS.indexOf(importer));
+  // Review 2: the kill switch lasts. Its step (--run) marks the run; the job's mint tells cf.mjs whether a chain job
+  // dispatched it (chain_count above 0), and cf.mjs refuses a marked run to such a job (tests/bambuImportCf.test.ts).
+  const mint = STEPS.find((s) => /cf\.mjs mint\b/.test(run(s)))!;
+  assert.equal(run(mint).trim(), 'node scripts/bambu-import/cf.mjs mint --run "$IN_RUN_ID" --chain-count "$IN_CHAIN_COUNT" --token-file "$RUNNER_TEMP/import-token" --run-file "$RUNNER_TEMP/import-run"');
+  const kill = STEPS.find((s) => /cf\.mjs revoke --run "/.test(run(s)))!;
+  assert.equal(run(kill).trim(), 'node scripts/bambu-import/cf.mjs revoke --run "$IN_RUN_ID"');
+  assert.equal(String(kill.if), "env.IN_MODE == 'revoke'", 'the marking revoke is the kill switch alone');
 });
 
 test('only sealed files are uploaded, for three days at most', () => {

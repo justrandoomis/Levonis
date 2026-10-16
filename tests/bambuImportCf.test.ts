@@ -394,7 +394,8 @@ test('revoke with the 0195 table: exactly that run\'s token_sha256 is cleared', 
       { id: RUN_B, state: 'closed', token_sha256: HASH_B, token_expires_at: '2099-01-01T00:00:00.000Z' },
     ]);
     const sqls = f.calls().slice(1).map((c) => c.args[EXECUTE.length]);
-    assert.equal(sqls[1], `UPDATE catalog_import_runs SET token_sha256 = '' WHERE id = '${RUN_A}'`, 'the one write, on the §B.3 columns');
+    assert.equal(sqls[1], `UPDATE catalog_import_runs SET token_sha256 = '', notes = 'kill_switch' WHERE id = '${RUN_A}'`, 'the one write, on the §B.3 columns: the token and the kill switch\'s mark');
+    assert.deepEqual(f.query<{ id: string; notes: string }>('SELECT id, notes FROM catalog_import_runs ORDER BY id'), [{ id: RUN_A, notes: 'kill_switch' }, { id: RUN_B, notes: '' }]);
     assert.equal(sqls.length, 3);
     for (const secret of [HASH_A, HASH_B]) assert.ok(!result.stdout.includes(secret) && !result.stderr.includes(secret));
 
@@ -553,7 +554,7 @@ test('mint: a fresh token for an active run only; a closed run gets none, and it
     withRun(f, 'running');
     const tokenFile = join(f.dir, 'tmp', 'import-token');
     const runFile = join(f.dir, 'tmp', 'import-run');
-    const r = f.run(['mint', '--run', RUN_A, '--token-file', tokenFile, '--run-file', runFile], { DEADLINE_EPOCH: deadlineIn(330), GITHUB_RUN_ID: '42' });
+    const r = f.run(['mint', '--run', RUN_A, '--chain-count', '0', '--token-file', tokenFile, '--run-file', runFile], { DEADLINE_EPOCH: deadlineIn(330), GITHUB_RUN_ID: '42' });
     assert.equal(r.status, 0, r.stderr);
     const token = readFileSync(tokenFile, 'utf8').trim();
     assert.equal(f.query<{ token_sha256: string }>(`SELECT token_sha256 FROM catalog_import_runs WHERE id = '${RUN_A}'`)[0].token_sha256, sha256(token));
@@ -569,12 +570,62 @@ test('mint: a fresh token for an active run only; a closed run gets none, and it
   try {
     withRun(g, 'closed');
     const tokenFile = join(g.dir, 'tmp', 'import-token');
-    const r = g.run(['mint', '--run', RUN_A, '--token-file', tokenFile, '--run-file', join(g.dir, 'tmp', 'import-run')], { DEADLINE_EPOCH: deadlineIn(330) });
+    const r = g.run(['mint', '--run', RUN_A, '--chain-count', '0', '--token-file', tokenFile, '--run-file', join(g.dir, 'tmp', 'import-run')], { DEADLINE_EPOCH: deadlineIn(330) });
     assert.equal(r.status, 1);
     assert.match(r.stderr, /is not an active import run: no token was stored/);
     assert.ok(!existsSync(tokenFile));
   } finally {
     g.dispose();
+  }
+});
+
+/** Workflow 60's own mint step, as the job runs it (its `run:` line, the job's IN_* values and the runner's temp directory). */
+function workflowMint(f: ReturnType<typeof fixture>, chainCount: string, env: Record<string, string>) {
+  const yml = readFileSync(join(ROOT, '.github/workflows/bambu-import.yml'), 'utf8');
+  const line = /^\s*run: node scripts\/bambu-import\/cf\.mjs (mint .*)$/m.exec(yml)?.[1];
+  assert.ok(line, 'workflow 60 has a mint step');
+  const vars: Record<string, string> = { IN_RUN_ID: RUN_A, IN_CHAIN_COUNT: chainCount, RUNNER_TEMP: join(f.dir, 'tmp') };
+  const args = (line.match(/"[^"]*"|\S+/g) ?? []).map((a) => a.replace(/^"|"$/g, '').replace(/\$([A-Z_]+)/g, (_m, name: string) => vars[name] ?? `$${name}`));
+  rmSync(join(f.dir, 'tmp', 'import-token'), { force: true });
+  return f.run(args, env);
+}
+
+test('review 2: the kill switch lasts — a chained job\'s mint never re-arms a run the owner stopped; the owner\'s own dispatch does, and says so', () => {
+  const f = fixture();
+  try {
+    withRun(f, 'running');
+    const env = { DEADLINE_EPOCH: deadlineIn(330), GITHUB_RUN_ID: '42' };
+    const token = () => f.query<{ token_sha256: string }>(`SELECT token_sha256 FROM catalog_import_runs WHERE id = '${RUN_A}'`)[0].token_sha256;
+    // An ordinary chain: the always() revoke of job N, then job N+1's mint — the chain goes on.
+    const runFile = join(f.dir, 'tmp', 'import-run');
+    writeFileSync(runFile, `${RUN_A}\n`);
+    assert.equal(f.run(['revoke', '--run-file', runFile]).status, 0);
+    assert.equal(token(), '');
+    const chained = workflowMint(f, '3', env);
+    assert.equal(chained.status, 0, chained.stderr);
+    assert.match(token(), /^[0-9a-f]{64}$/);
+    // The kill switch (mode=revoke). Then a 503 window lets job N end more=true, and the chain dispatches job N+1:
+    // its mint is refused, nothing is stored, its token file is gone, and its own always() revoke changes nothing.
+    assert.equal(f.run(['revoke', '--run', RUN_A]).status, 0);
+    assert.equal(token(), '');
+    const refused = workflowMint(f, '4', env);
+    assert.equal(refused.status, 1, refused.stdout);
+    assert.match(refused.stderr, new RegExp(`run ${RUN_A} was stopped by the kill switch: a chained job never re-arms it; dispatch mode=run with chain_count 0 to continue`));
+    assert.equal(token(), '', 'the kill switch holds');
+    assert.ok(!existsSync(join(f.dir, 'tmp', 'import-token')));
+    assert.equal(f.run(['revoke', '--run-file', runFile]).status, 0);
+    assert.equal(workflowMint(f, '1', env).status, 1, 'still stopped after the job\'s always() revoke');
+    assert.equal(token(), '');
+    // The owner dispatches the run again (chain_count 0): that lifts the kill switch, in the log.
+    const owner = workflowMint(f, '0', env);
+    assert.equal(owner.status, 0, owner.stderr);
+    assert.match(owner.stdout, new RegExp(`mint: run ${RUN_A}: the kill switch is lifted by this dispatch of the owner \\(chain_count 0\\)`));
+    assert.match(token(), /^[0-9a-f]{64}$/);
+    // …and the chain it starts goes on as before.
+    assert.equal(f.run(['revoke', '--run-file', runFile]).status, 0);
+    assert.equal(workflowMint(f, '1', env).status, 0);
+  } finally {
+    f.dispose();
   }
 });
 

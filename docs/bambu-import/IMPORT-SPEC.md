@@ -205,7 +205,7 @@ Every answer is `Cache-Control: private, no-store`. The route is CSRF-exempt (be
 
 Every body is JSON ≤ 2 MB. Errors are `{ code, message }`, message ≤ 300 chars from fixed templates plus ids, never echoed input or SQL text.
 
-**Kill switch.** Workflow 60 `mode=revoke` sets `token_sha256 = ''` (one wrangler command). With no open run every path is 404.
+**Kill switch.** Workflow 60 `mode=revoke` sets `token_sha256 = ''` and marks the run stopped (`notes = 'kill_switch'`, one wrangler command). With no open run every path is 404. The mark lasts: the mint step of a chained job (`chain_count` above 0, dispatched before the switch or after a door that only answered 503s while the token was cleared) refuses the marked run, so no chain re-arms it. Only the owner's own dispatch (`chain_count 0`) lifts it, and its mint step says so. The always() revoke at the end of every job clears the token only.
 
 ### A.4 Inside `/write`: reusing the app's write path
 
@@ -1902,7 +1902,7 @@ A separate `chain` job (`needs: import`, `permissions: { actions: write }`, no c
 - `needs.import.outputs.more == 'true'` and `needs.import.outputs.blocked != 'true'`;
 - the mode is `run`, the input `chain` is true, `max_items` is `0` (a bounded job is reviewed before the next one; the first step refuses `chain` with any other `max_items`), and `chain_count < 12`.
 
-It dispatches with `mode=run`, the same `run_id` and `seal_pubkey`, and `chain_count + 1`. It builds the request body with `jq` from env values, which it validates again. `GITHUB_TOKEN` may dispatch a `workflow_dispatch` (a documented exception to the no-recursion rule). Because the deadline rules make the import job exit cleanly, a job is not killed by its timeout in normal operation; if it is, the chain stops and the agent resumes by hand. **Nothing is scheduled at any time.** The agent watches each job's log and the dashboard, and stops the chain by not re-dispatching after any anomaly.
+It dispatches with `mode=run`, the same `run_id` and `seal_pubkey`, and `chain_count + 1`. It builds the request body with `jq` from env values, which it validates again. `GITHUB_TOKEN` may dispatch a `workflow_dispatch` (a documented exception to the no-recursion rule). Because the deadline rules make the import job exit cleanly, a job is not killed by its timeout in normal operation; if it is, the chain stops and the agent resumes by hand. **Nothing is scheduled at any time.** The agent watches each job's log and the dashboard, and stops the chain by not re-dispatching after any anomaly. A chained job never re-arms a run the kill switch stopped (§A.3): its mint step refuses it.
 
 ---
 
@@ -2173,7 +2173,7 @@ jobs:
         run: node scripts/bambu-import/cf.mjs snapshot --seal "$IN_SEAL_PUBKEY" --out "$RUNNER_TEMP/out"
       - name: Mint the job token (0600 file; hash stored on the run row)    # open/run/close/withdraw
         env: { CLOUDFLARE_API_TOKEN: …, CLOUDFLARE_ACCOUNT_ID: … }
-        run: node scripts/bambu-import/cf.mjs mint --run "$IN_RUN_ID" --token-file "$RUNNER_TEMP/import-token"
+        run: node scripts/bambu-import/cf.mjs mint --run "$IN_RUN_ID" --chain-count "$IN_CHAIN_COUNT" --token-file "$RUNNER_TEMP/import-token"
       - id: run
         name: Importer                                  # reads and deletes the token file at start; no Cloudflare env
         env: { IMPORT_TOKEN_FILE: '${{ runner.temp }}/import-token' }

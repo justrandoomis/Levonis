@@ -55,13 +55,17 @@
 #             of a product the store removed (BLOCKED SOURCE_WITHDRAWN): the
 #             second fetch and the sitemap absence are the evidence.
 #   revoke    the kill switch: clears catalog_import_runs.token_sha256 of
-#             `run_id`, so every ops path answers 404. Before migration 0195
-#             there is no run table: a notice, and green. It runs in a
-#             concurrency group of its own, AT ONCE, beside a running import
-#             job: that job's next ops call answers 404, it stops blocked and
-#             dispatches no chain. A chain job that dispatched a moment before
-#             the kill switch ran mints a fresh token for its own job: cancel
-#             that run in the Actions UI too (its always() step revokes it).
+#             `run_id`, so every ops path answers 404, and marks the run
+#             stopped (notes = 'kill_switch'). Before migration 0195 there is
+#             no run table: a notice, and green. It runs in a concurrency group
+#             of its own, AT ONCE, beside a running import job: that job's next
+#             ops call answers 404 and it stops blocked — or, if the door
+#             answers only 503s for a while (an overloaded D1, no network), it
+#             ends more=true and the chain dispatches. Either way no CHAINED
+#             job (chain_count above 0, dispatched before or after the switch)
+#             gets a token: its mint step refuses the marked run. Only your own
+#             dispatch of the run (chain_count 0) lifts the switch, and its
+#             mint step says so: cancel any dispatch of yours still queued.
 #
 # Every job that writes starts with the preflight step and its restore point,
 # mints a fresh token into a 0600 file that only the importer step reads (and
@@ -264,7 +268,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: node scripts/bambu-import/cf.mjs mint --run "$IN_RUN_ID" --token-file "$RUNNER_TEMP/import-token" --run-file "$RUNNER_TEMP/import-run"
+        run: node scripts/bambu-import/cf.mjs mint --run "$IN_RUN_ID" --chain-count "$IN_CHAIN_COUNT" --token-file "$RUNNER_TEMP/import-token" --run-file "$RUNNER_TEMP/import-run"
 
       # The importer reads the token file and deletes it at once. No Cloudflare
       # credential exists here: the ops endpoint is its only door.
