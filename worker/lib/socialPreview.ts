@@ -670,6 +670,69 @@ export function routeModuleFor(path: string, onStore: boolean): string | null {
   return null;
 }
 
+/** What one main-host opening document starts before React: its page module (a manifest key, or none) and its first reads. */
+export interface MainOpening {
+  route: string | null;
+  fetches: string[];
+}
+
+/** One path segment as the page's `useParams` reads it and `encodeURIComponent` writes it back, or null. */
+function segmentForApi(raw: string): string | null {
+  try {
+    const value = decodeURIComponent(raw);
+    return value && !/[/\\?#]/.test(value) ? encodeURIComponent(value) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * THE MAIN HOST'S OPENING DOCUMENTS (speed audit 2026-10-16, findings «category
+ * pages get no head start» and «the 5-step serial waterfall»). Each one is
+ * written with the main host's resolve answer (no database read) so the app
+ * renders on its first frame, the modulepreloads of its page's chunk closure,
+ * and a `preload as=fetch` of the FIRST read its page makes — exactly the URL
+ * the page asks for, so the browser hands the page that response instead of
+ * the page starting it after its code has arrived:
+ *
+ *   /                          /api/home (Home is in the entry)
+ *   /products                  the listing the page opens on (src/lib/bootFetch.ts's own path)
+ *   /categories                CategoriesExplorer: /api/catalog/tree
+ *   /categories/<slug>         CategoryPage: /api/catalog/<slug> (src/lib/catalog/data.ts)
+ *   /categories/<a>/<b>        CategoryListing: /api/catalog/tree (its listing needs the
+ *                              section id the tree answers, so it stays one step behind)
+ *   /community                 Community: /api/community/access (the gate's question)
+ *
+ * Mirrors src/App.tsx's routes and the pages' own reads; tests/documentPreloads.test.ts
+ * holds the two together, so a renamed page or a changed read fails a test, not a visitor.
+ * Every path here is also in `run_worker_first` (wrangler.jsonc), or the asset layer
+ * answers it before the Worker exists.
+ */
+export function mainOpeningFor(pathname: string, search = ''): MainOpening | null {
+  if (pathname === '/') return { route: null, fetches: ['/api/home'] };
+  if (pathname === '/products') {
+    const query = new URLSearchParams(search);
+    const params = new URLSearchParams();
+    for (const key of ['search', 'category']) {
+      const value = query.get(key);
+      if (value) params.set(key, value);
+    }
+    params.set('limit', '50');
+    return { route: 'src/pages/Products.tsx', fetches: [`/api/products?${params}`] };
+  }
+  const path = pathname.replace(/\/+$/, '') || '/';
+  if (path === '/categories') return { route: 'src/pages/CategoriesExplorer.tsx', fetches: ['/api/catalog/tree'] };
+  const page = /^\/categories\/([^/]+)$/.exec(path);
+  if (page) {
+    // Written back as the page writes it (never a SQL value: this file binds every slug it reads).
+    const section = segmentForApi(page[1]);
+    return { route: 'src/pages/CategoryPage.tsx', fetches: section ? [`/api/catalog/${section}`] : [] };
+  }
+  if (/^\/categories\/[^/]+\/[^/]+$/.test(path)) return { route: 'src/pages/CategoryListing.tsx', fetches: ['/api/catalog/tree'] };
+  if (path === '/community') return { route: 'src/pages/Community.tsx', fetches: ['/api/community/access'] };
+  return null;
+}
+
 /** Every manifest key reachable from `key` through STATIC imports, `key` first. */
 function staticClosure(manifest: ViteManifest, key: string): string[] {
   const seen = new Set<string>();

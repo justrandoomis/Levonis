@@ -17,6 +17,7 @@ import {
   productImagePreload,
   storeImagePreload,
   injectSocialPreview,
+  mainOpeningFor,
   MANIFEST_PATH,
   preloadImagePath,
   previewStoreRef,
@@ -309,9 +310,11 @@ app.use('*', async (c, next) => {
    * icon. Neither reads `user`: `/` matches no route (the SPA fallback below
    * answers it, with a card that is the same for every visitor), and an icon
    * cannot depend on who asks. `/community/store/<ref>` is the store's page
-   * on the main site, rewritten the same way.
+   * on the main site, rewritten the same way. The main host's other opening
+   * documents (`mainOpeningFor`: the category map and its pages, the
+   * community home) carry only the anonymous resolve and public hints.
    */
-  if (path === '/' || path === '/products' || path.startsWith('/store-icon/') || storeHomeRef(path) !== null) {
+  if (path === '/' || path === '/products' || path.startsWith('/store-icon/') || storeHomeRef(path) !== null || mainOpeningFor(path) !== null) {
     await next();
     return;
   }
@@ -889,24 +892,20 @@ async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
   const onStore = host.kind === 'merchant' && !!host.slug;
   const homeRef = storeHomeRef(c.req.path);
   const storeHome = onStore ? c.req.path === '/' : homeRef !== null;
-  const mainOpening = host.kind === 'main' && (c.req.path === '/' || c.req.path === '/products');
-  if (mainOpening && asset.ok && /^text\/html\b/i.test(asset.headers.get('Content-Type') || '')) {
+  // THE MAIN HOST'S OPENING DOCUMENTS (worker/lib/socialPreview.ts `mainOpeningFor`):
+  // the home, the listing, the category map and its pages, the community — each with
+  // the main host's resolve answer (no database read), its page's chunk closure and its
+  // first read started by the preload scanner instead of after React has mounted.
+  const opening = host.kind === 'main' ? mainOpeningFor(c.req.path, new URL(c.req.url).search) : null;
+  if (opening && asset.ok && /^text\/html\b/i.test(asset.headers.get('Content-Type') || '')) {
     try {
-      const url = new URL(c.req.url);
-      const params = new URLSearchParams();
-      for (const key of ['search', 'category']) {
-        const value = url.searchParams.get(key);
-        if (value) params.set(key, value);
-      }
-      params.set('limit', '50');
-      const openingPath = url.pathname === '/' ? '/api/home' : `/api/products?${params}`;
       // The main-host resolve answer is public configuration, with no DB read.
       // Start the actual viewer-priced API request in the HTML preload scanner
       // rather than after the entry bundle has downloaded and React mounted.
       const resolve = { success: true, kind: host.kind, store: null, root_domain: rootDomainFrom(c.env) };
-      const manifest = url.pathname === '/products' ? await viteManifest(c) : null;
-      const chunks = manifest ? chunkPreloads(manifest, 'src/pages/Products.tsx') : { scripts: [], styles: [] };
-      const html = injectDocumentPreloads(await asset.clone().text(), { ...chunks, image: null, resolve, fetches: [openingPath] });
+      const manifest = opening.route ? await viteManifest(c) : null;
+      const chunks = manifest && opening.route ? chunkPreloads(manifest, opening.route) : { scripts: [], styles: [] };
+      const html = injectDocumentPreloads(await asset.clone().text(), { ...chunks, image: null, resolve, fetches: opening.fetches });
       const headers = new Headers(asset.headers);
       headers.delete('Content-Length');
       headers.set('ETag', await weakEtag(html));

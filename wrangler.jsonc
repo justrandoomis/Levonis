@@ -112,6 +112,15 @@
       "/files/*",
       "/product/*",
       "/products",
+      // THE MAIN HOST'S OTHER OPENING DOCUMENTS (speed audit 2026-10-16): the
+      // category map, its pages and the community home get the head start
+      // /products has — the resolve answer inline, their page code and their
+      // first read named in the document (worker/lib/socialPreview.ts
+      // `mainOpeningFor`). Unlisted, the asset layer answers them first and
+      // the page waits on resolve → its chunks → its read, one after another.
+      "/categories",
+      "/categories/*",
+      "/community",
       "/bundles/*",
       "/p/*",
       "/community/store/*",
@@ -280,6 +289,10 @@
           "/files/*",
           "/product/*",
           "/products",
+          // The main host's opening documents — see the top-level block. Not inherited.
+          "/categories",
+          "/categories/*",
+          "/community",
           "/bundles/*",
           "/p/*",
           "/community/store/*",
@@ -385,6 +398,10 @@
           "/files/*",
           "/product/*",
           "/products",
+          // The main host's opening documents — see the top-level block. Not inherited.
+          "/categories",
+          "/categories/*",
+          "/community",
           "/bundles/*",
           "/p/*",
           "/community/store/*",
