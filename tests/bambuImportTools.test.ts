@@ -29,7 +29,8 @@ import { freshDb } from './fixtures/app';
 import { main as candidatesMain, matchCandidates, materialTokens, modelTokens, slugOverlap, tablesOf, manifestEntries } from '../scripts/bambu-import/match-candidates';
 import { loadReviewedBundle } from '../scripts/bambu-import/discover';
 // @ts-expect-error - plain ESM script (the local dry run), no types
-import { fixtureBundle, judge, parseArgs, refuseCredentials, runChild, runRowSql, storeAnswer, standInPng, FIXTURE_HANDLES } from '../scripts/e2e-bambu-import.mjs';
+import { fixtureBundle, judge, localOnlyCount, parseArgs, refuseCredentials, runChild, runRowSql, storeAnswer, storeHitFailures, standInPng, FIXTURE_HANDLES, IMPORT_UA } from '../scripts/e2e-bambu-import.mjs';
+import { USER_AGENT } from '../scripts/bambu-import/fetch';
 
 const SNAPSHOT = {
   format: 'levonis-bambu-snapshot/1',
@@ -193,4 +194,24 @@ test('the dry run: the importer runs beside the store stand-in — the child rea
   } finally {
     server.close();
   }
+});
+
+test('the dry run: the store stand-in\'s hits — the importer\'s carry its User-Agent, pages 11 s apart; the Worker\'s CDN fetches are not the importer\'s', () => {
+  assert.equal(IMPORT_UA, USER_AGENT);
+  const bot = 'Mozilla/5.0 (compatible; LevonisBot/1.0; +https://levonis-iq.com)';
+  const hits = [
+    { path: '/robots.txt', ua: IMPORT_UA, at: 0 },
+    { path: '/sitemap_products_1.xml', ua: IMPORT_UA, at: 11_000 },
+    { path: '/products/filament-buffer', ua: IMPORT_UA, at: 22_000 },
+    // The Worker's media fetches through CATALOG_IMPORT_MEDIA_ORIGIN, under its own User-Agent, between the pages.
+    { path: '/s7/files/filamentsbuffer-1.png', ua: bot, at: 30_000 },
+    { path: '/cdn/shop/files/x.webp', ua: bot, at: 30_400 },
+    { path: '/products/ams-2-pro', ua: IMPORT_UA, at: 95_000 },
+  ];
+  assert.deepEqual(storeHitFailures(hits), []);
+  assert.deepEqual(storeHitFailures([...hits, { path: '/products/ams-2-pro', ua: IMPORT_UA, at: 100_000 }]), ['/products/ams-2-pro: 5000 ms after /products/ams-2-pro']);
+  assert.deepEqual(storeHitFailures([{ path: '/robots.txt', ua: bot, at: 0 }]), [`/robots.txt: User-Agent ${JSON.stringify(bot)}`]);
+  assert.deepEqual(storeHitFailures([{ path: '/sitemap.xml', ua: '', at: 0 }]), ['/sitemap.xml: User-Agent (none)']);
+  assert.equal(localOnlyCount('[import] job end: 2 complete this job; more no; blocked no\n[import] local dry run: 5 requests to a host other than 127.0.0.1 refused, never sent\n'), 5);
+  assert.equal(localOnlyCount('[import] job end: 0 complete this job; more no; blocked no\n'), null, 'no line: the guard was not in force');
 });

@@ -29,7 +29,12 @@
  *     `--images real` (the runner) lets the local Worker fetch the real CDN.
  *   - LOCAL ONLY for the browser: every request to a host other than
  *     127.0.0.1 is aborted and counted, and the run fails unless that count
- *     is 0 and no page error was thrown.
+ *     is 0 and no page error was thrown. The importer too: with a local site
+ *     origin its own requests reach 127.0.0.1 only (run.ts localOnlyFetch:
+ *     a document check, a tracker or a wiki page is refused unsent and
+ *     counted), and every job must log that count.
+ *   - The importer runs as a child that does not block this process
+ *     (runChild): the stand-in is served from here. One log per job.
  *   - No Cloudflare credential: the script refuses to start when one is in its
  *     environment.
  *
@@ -190,8 +195,36 @@ export function storeAnswer(path, pages) {
   if (path === '/sitemap_collections_1.xml') return { status: 200, type: 'application/xml', body: '<?xml version="1.0"?><urlset></urlset>' };
   const m = /^\/products\/([a-z0-9-]+)$/.exec(path);
   if (m && pages[m[1]]) return { status: 200, type: 'text/html; charset=utf-8', body: pages[m[1]] };
-  if (/^\/(?:s\d+|cdn|files)\//.test(path) || /\.(png|jpe?g|webp|media)$/i.test(path)) return { status: 200, type: 'image/png', body: standInPng(path) };
+  if (isCdnPath(path)) return { status: 200, type: 'image/png', body: standInPng(path) };
   return { status: 404, type: 'text/plain', body: 'not found' };
+}
+
+/** A store.bblcdn.com path the stand-in serves: what the WORKER fetches through CATALOG_IMPORT_MEDIA_ORIGIN (§C.4). */
+export const isCdnPath = (path) => /^\/(?:s\d+|cdn|files)\//.test(path) || /\.(png|jpe?g|webp|media)$/i.test(path);
+
+export const IMPORT_UA = 'Mozilla/5.0 (compatible; LevonisCatalogImport/1.0; +https://levonis-iq.com)';
+
+/**
+ * The stand-in's hits, judged (pure): the importer's own (pages, robots.txt, sitemaps) carry the import's
+ * User-Agent and its product pages are at least 11 s apart. The CDN paths are the Worker's media fetches, under
+ * the Worker's own User-Agent: not the importer's requests, so not judged by its rules.
+ */
+export function storeHitFailures(hits) {
+  const failures = [];
+  const importer = hits.filter((h) => !isCdnPath(h.path));
+  for (const h of importer) if (h.ua !== IMPORT_UA) failures.push(`${h.path}: User-Agent ${h.ua ? JSON.stringify(h.ua.slice(0, 80)) : '(none)'}`);
+  const pages = importer.filter((h) => h.path.startsWith('/products/'));
+  for (let i = 1; i < pages.length; i++) {
+    const gap = pages[i].at - pages[i - 1].at;
+    if (gap < 11_000) failures.push(`${pages[i].path}: ${gap} ms after ${pages[i - 1].path}`);
+  }
+  return failures;
+}
+
+/** The importer's own end-of-job line in a local dry run (run.ts main(), localOnlyFetch): its count, or null. */
+export function localOnlyCount(log) {
+  const m = /local dry run: (\d+) requests to a host other than 127\.0\.0\.1 refused, never sent/.exec(log);
+  return m ? Number(m[1]) : null;
 }
 
 /** What the database must show after the run (pure over query results). */
@@ -340,6 +373,7 @@ async function run() {
 
     // 4. The importer: open, then run until the queue is empty, then a full re-run.
     const seal = args.seal || (await import('./bambu-import/seal.mjs')).generateSealKeys().publicKey;
+    const jobs = [];
     const importer = async (mode, tokenFile) => {
       const outputs = join(WORK, `outputs-${mode}-${randomBytes(3).toString('hex')}`);
       writeFileSync(outputs, '');
@@ -368,7 +402,9 @@ async function run() {
           CHROMIUM_PATH: process.env.CHROMIUM_PATH ?? '',
         },
       });
-      writeFileSync(join(WORK, `importer-${mode}.log`), `${result.stdout}\n${result.stderr}`);
+      // One log per job (a re-run must not write over the run it re-runs).
+      jobs.push({ mode, refused: localOnlyCount(result.stdout) });
+      writeFileSync(join(WORK, `importer-${jobs.length}-${mode}.log`), `${result.stdout}\n${result.stderr}`);
       return { status: result.status, outputs: readFileSync(outputs, 'utf8') };
     };
     const opened = await importer('open', first.file);
@@ -408,8 +444,9 @@ async function run() {
     r.close();
     const failures = judge({ items, products, refs, guardEvents, rerunWrites });
     check(`every fixture item COMPLETE (${items.length}/${FIXTURE_HANDLES.length}), no money, stock not configured, no guard hit, re-run writes 0`, failures.length === 0 && items.length === FIXTURE_HANDLES.length, failures);
-    const spacing = storeHits.filter((h) => h.path.startsWith('/products/')).map((h) => h.at);
-    check('store pages at least 11 s apart, with the import User-Agent', spacing.every((t, i) => i === 0 || t - spacing[i - 1] >= 11_000) && storeHits.every((h) => h.ua === 'Mozilla/5.0 (compatible; LevonisCatalogImport/1.0; +https://levonis-iq.com)'));
+    const hitFailures = storeHitFailures(storeHits);
+    check('store pages at least 11 s apart, with the import User-Agent', hitFailures.length === 0, hitFailures.slice(0, 10));
+    check('the importer sent nothing off 127.0.0.1 (every job held to it, its refusals counted)', jobs.every((j) => j.refused !== null), jobs);
 
     // 6. The pages in ar / en / ckb, phone and desktop, light and dark.
     const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE || '/opt/node22/lib/node_modules/playwright/index.js');
