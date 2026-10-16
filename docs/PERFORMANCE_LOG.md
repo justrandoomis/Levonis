@@ -2021,3 +2021,69 @@ forced-colours `.lv-button` line and switch knob/fill rules, `scroll-padding-bot
 `border-gold/40`, and the forced-colours Highlight frame on the chosen gallery picture. Removed — the
 `focus-visible:ring-gold`, `focus-within:ring-gold`, `peer-focus-visible:ring-gold` and `ring-gold/70` focus
 utilities (their `ring-focus` twins were already in the sheet, or are now) and `hover:bg-gold/15`.
+
+## 2026-10-16 — speed audit, the category lane: the category pages' reads in parallel, the explorer's photographs on the map, the grids' first screen
+
+The owner: the site is slow to display on Iraqi phones — «loading all products at once is wrong; holding the page
+until every image has loaded is wrong». The audit's category findings (every one verified twice on the live site):
+the category pages were the slowest of the audit (phone LCP 5.98 s on `/categories/printer-accessories` and
+`/categories/printing-materials/fdm-materials`, 4.10 s on `/categories`, live medians) because each read waited for
+the one before it; the explorer's first banner photograph (its LCP) waited for a 50-product pool; `/products`
+downloaded 16 of its 26 card pictures before any scroll while two visible cards were lazy and faded in; the
+category banners took the 800 copy where 640 covers the drawn box.
+
+What changed (branch `perf/cats`, seven commits before this entry):
+
+| | Change |
+|---|---|
+| sizes | `cropBanner` follows the drawn row banner (205–223 px on a phone): `(max-width: 375px) 213px, 224px`; the compact hero's photo `195px`; the full hero keeps its value (279 px drawn; the truthful 280 px would take 1080 on DPR 3). `tests/categoryImageSizes.test.ts` |
+| grids | the first screen eager and never faded (six cards on `/products`, four on a listing), `fetchpriority=high` only for the lead row's two, the rest held until within 300 px of the screen **in their scroller** (`#main-scroll-container`; `src/lib/nearViewport.ts`). `tests/gridImageLoading.test.ts` (real SafeImage in Chromium) |
+| reads | every category URL's first reads start with the entry script and on the press of a link (`src/lib/bootFetch.ts categoryOpeningPaths`); the listing is asked for by slug, beside the map; a listing department names its list on its headers (`X-Catalog-Listing`); the loaders take the early request. `tests/categoryOpeningReads.test.ts` |
+| map photos | `GET /api/catalog/tree` carries one photograph per section (off the card; available now, priced, shop order; never a sibling's); the explorer reads the pool only for a section without one. `tests/categoryTreePhotos.test.ts` |
+| explorer extras | `GET /api/home/graded` (count + one photograph) instead of the whole `/api/home`; both extra banners after the map. `tests/explorerGradedSummary.test.ts` |
+| related tiles | the map's photographs; the 3 KB map (not the 27 KB pool) only when the row nears the screen. `tests/relatedCategoriesPhotos.test.ts` |
+
+### Method
+
+A local lab (`scratchpad/perf/cats-lab`): the base build (`0d8ed43b`) and the branch build each served over
+HTTPS/HTTP2 as `https://levonis-iq.com` (Chromium's host mapped to a loopback address), assets from the build with
+brotli, the document as the Worker serves it (`/products` rewritten with `chunkPreloads`/`injectDocumentPreloads`,
+category documents plain, as live). `/api` and `/files` replayed from ONE recording of anonymous live GETs, each
+after a fixed 120 ms server delay; for the branch arm the recorded answers carry what the lane's Worker changes add
+(the map's photographs, `/api/home/graded`, `X-Catalog-Listing`) — those are unit-tested on the real router.
+Playwright Chromium 360×800 at DPR 3, CPU ×4, Slow-4G (150 ms, 1.6 Mbit/s down), a cold context per visit, arms
+alternated, one unmeasured warm-up visit each, median of 5. An A/A control (the base build on both slots, 8 pairs)
+read +62 ms LCP for the second slot and ±300 ms per pair: differences under ~150 ms are noise. The machine was shared
+with other test runs (load average 4–21).
+
+| Route | LCP before → after | First screen complete | Pictures before scroll | Page API bytes | Page data ready |
+|---|--:|--:|--:|--:|--:|
+| `/categories` | 3,168 → **2,944** ms | 3,986 → 3,531 ms | 6 / 189 KB → 6 / 135 KB | 33.7 → **2.6 KB** | 2,663 → 1,898 ms |
+| `/categories/printer-accessories` | 3,820 → 3,728 ms | 3,781 → 3,733 ms | 4 / 85 → 4 / 67 KB | 5.3 → 5.3 KB | 3,307 → **2,098** ms |
+| `/categories/printing-materials` | 4,716 → **4,228** ms | — | 14 / 247 → 9 / 169 KB | 32.7 → **8.9 KB** | 2,990 → 1,915 ms |
+| `/categories/printing-materials/fdm-materials` | 4,892 → **3,716** ms | 5,259 → **3,797** ms | 14 / 223 → 8 / 122 KB | 18.5 → 19.4 KB | 3,513 → **2,016** ms |
+| `/products` | 2,844 → 3,068 ms (noise: 8-pair run 2,952 → 2,972) | 4,347 → **3,575** ms | 16 / 245 → **8 / 116 KB** | unchanged | unchanged |
+
+An earlier full run of the same arms (before the bundle trim) read `/categories` 3,440 → 2,992, printer-accessories
+3,888 → 3,500, printing-materials 4,440 → 4,232, fdm-materials 4,920 → 3,940 and `/products` 2,996 → 3,044 ms. A tap
+from `/categories` on the printer-accessories banner (4 runs): its list request leaves 325–470 ms after the press instead of
+975–1,170 ms, and the new page's first screen is complete 1,542 ms after the press instead of 1,811.
+
+What is left on these pages is the JavaScript: with the data ready at ~1.9–2.1 s, the route chunks (26–28 for the
+category routes) still finish at ~3 s on Slow-4G. The document head start (inline resolve, route modulepreloads for
+`/categories*`) is the next lever and belongs to the shell's lane (`worker/index.ts mainOpening`).
+
+### Bytes of code (gzip −9; `vite build`, tests/bundleBudget.test.ts 16/16, no budget raised)
+
+| | base `0d8ed43b` | after | gate |
+|---|--:|--:|--:|
+| entry chunk | 63,699 B | 64,481 B (+782: the category opening reads, the near-screen observer, SafeImage's two props) | 72 KB |
+| initial payload (4 files) | 183,132 B | 183,914 B | 200 KB |
+| a store page's fixed app weight | 231.8 KB | 232.5 KB | 234 KB |
+| `CategoriesExplorer` beyond the initial payload | 24,822 B | 25,387 B | — |
+| `CategoryPage` beyond the initial payload | 66,202 B | 66,929 B | — |
+| `CategoryListing` beyond the initial payload | 60,382 B | 60,918 B | — |
+| `Products` beyond the initial payload | 27,221 B | 27,321 B | — |
+
+A new guard in tests/bundleBudget.test.ts keeps the listing grammar (`discovery`), `ListingView` and `listingQuery`
+out of the explorer's static closure: an intermediate build of this lane had put the grammar there (+3.1 KB).
