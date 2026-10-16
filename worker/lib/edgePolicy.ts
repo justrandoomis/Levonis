@@ -434,6 +434,35 @@ export async function edgeServe(c: Context<AppContext>, opts: EdgeServeOptions, 
 }
 
 /**
+ * THE GUEST'S COPY OF `path` THIS COLO WOULD SERVE RIGHT NOW, as JSON — or
+ * null: none, past its window, retired by a purge, of another projection, or
+ * unreadable. Never builds and never refreshes. For a document that wants to
+ * know what its page will read (worker/lib/productOpeningLead.ts): a copy
+ * this function returns is exactly what a guest's request for `path` is
+ * answered with.
+ */
+export async function peekAnonymousCopy(c: Context<AppContext>, path: string, lifetime: EdgeLifetime = ANONYMOUS_LIFETIME): Promise<unknown | null> {
+  const cache = edgeCache();
+  if (!cache) return null;
+  try {
+    const key = canonicalKey(new URL(path, c.req.url).toString(), [], c.req.header('Host'));
+    const [hit, purged] = await Promise.all([cache.match(key), purgedAt(key)]);
+    if (!hit || hit.headers.get(PROJECTION_HEADER) !== PUBLIC_PROJECTION_REVISION) return null;
+    const storedAt = Number(hit.headers.get(STORED_AT_HEADER));
+    if (!(Number.isFinite(storedAt) && storedAt > 0)) return null;
+    const state = freshnessOf(Date.now() - storedAt, lifetime);
+    // Exactly what `edgeServe` would do: a stale copy is served only where it can be refreshed.
+    if ((purged !== null && storedAt <= purged) || state === 'expired' || (state === 'stale' && !refreshDispatcher)) {
+      await hit.body?.cancel().catch(() => undefined);
+      return null;
+    }
+    return await hit.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Serve `build()`'s answer under the anonymous policy — from the colo's cache
  * when it holds it — or, for a request that carries a session, run `build()`
  * as it always ran and mark the answer private.

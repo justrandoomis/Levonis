@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, Env } from './lib/types';
-import { noStoreUnlessSet, purgeCatalogueFromJob, setEdgeRefreshDispatcher } from './lib/edgePolicy';
+import { noStoreUnlessSet, peekAnonymousCopy, purgeCatalogueFromJob, setEdgeRefreshDispatcher } from './lib/edgePolicy';
+import { openingLeadFromDetail } from './lib/productOpeningLead';
 import { securityEventsDoor } from './lib/securityEvents';
 import { HttpError, originCheck, requireMainHost, securityHeaders } from './lib/http';
 import { loadSessionUser, sessionFreePublicGet } from './lib/session';
@@ -14,7 +15,7 @@ import {
   framedByStore,
   heroCoverFrom,
   injectDocumentPreloads,
-  productImagePreload,
+  leadImagePreloads,
   storeImagePreload,
   injectSocialPreview,
   mainOpeningFor,
@@ -933,11 +934,19 @@ async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
     // The reads that do not depend on each other leave together: the product
     // card, the store card a store host always needs, the manifest (memoised),
     // and the anonymous resolve answer. One wave, not four.
-    const [product, storeOnHost, manifest, resolve] = await Promise.all([
+    const url = new URL(c.req.url);
+    const routeKey = routeModuleFor(url.pathname, onStore);
+    const productPage = routeKey === 'src/pages/Product.tsx';
+    const detailPath = productPage && slug ? `/api/products/${encodeURIComponent(slug)}` : null;
+    // …and, on a catalogue product page, the guest's copy of the answer the page
+    // itself will read, when this colo holds one (no build, no D1): what the
+    // page opens on is read from it (worker/lib/productOpeningLead.ts).
+    const [product, storeOnHost, manifest, resolve, detail] = await Promise.all([
       slug ? resolveProductPreview(c.env.DB, slug, origin, scope) : null,
       onStore ? resolveStorePreview(c.env.DB, origin, scope) : null,
       viteManifest(c),
       anonymousResolve(c),
+      detailPath ? peekAnonymousCopy(c, detailPath) : null,
     ]);
     // On a store's own host the store IS the site: its name heads every card,
     // its line and logo stand in for what a product lacks, and a link there
@@ -949,7 +958,6 @@ async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
     const card = product ? framedByStore(product, onStore ? store : null) : store;
     if (!card) return asset;
 
-    const url = new URL(c.req.url);
     let html = injectSocialPreview(await asset.text(), {
       ...card,
       // The URL the crawler was given, not the canonical one — query string
@@ -961,23 +969,28 @@ async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
       url: `${origin}${url.pathname}${url.search}`,
     });
 
-    // Catalogue OG and the opening gallery can differ (saved theme or a
-    // server-selected shelf). Only preload a lead whose identity is certain.
-    // A store home keeps its cover and merchant/bundle behaviour is unchanged.
-    const routeKey = routeModuleFor(url.pathname, onStore);
+    // Catalogue OG and the opening gallery can differ (a server-selected
+    // shelf, the import's defaults, the theme). Only a lead whose identity is
+    // certain is preloaded — once per theme, each under its own `media`, so
+    // the bytes are the same for every visitor (socialPreview.ts
+    // `leadImagePreloads`). A store home keeps its cover and merchant/bundle
+    // behaviour is unchanged.
     const chunks = manifest && routeKey ? chunkPreloads(manifest, routeKey) : { scripts: [], styles: [] };
-    const image = product
-      ? preloadImagePath(routeKey === 'src/pages/Product.tsx' && product.preloadImage !== undefined ? product.preloadImage : product.image)
-      : storeHome ? heroCoverFrom(resolve) : null;
+    const lead = productPage && product
+      ? product.lead !== undefined
+        ? (product.lead ?? openingLeadFromDetail(detail, url.search))
+        : { dark: { url: product.image, width: null, height: null }, light: null }
+      : null;
+    const image = productPage ? null : product ? preloadImagePath(product.image) : storeHome ? heroCoverFrom(resolve) : null;
     // The lead picture is preloaded as the page will ask for it: the same
     // small copies (`imagesrcset`) and the same `sizes` as its <img>
     // (packages/contracts/src/imageSizing.ts), or the preload is a second
     // download instead of a head start.
     html = injectDocumentPreloads(html, {
       ...chunks, image, resolve,
-      ...(routeKey === 'src/pages/Product.tsx' ? {
-        ...productImagePreload(image, product?.preloadMedia),
-        fetches: [`/api/products/${encodeURIComponent(slug!)}`],
+      ...(productPage ? {
+        images: leadImagePreloads(lead),
+        fetches: [detailPath!],
       } : routeKey === 'src/pages/StorefrontProduct.tsx' ? storeImagePreload(image, 'gallery')
         : !product && storeHome ? storeImagePreload(image, 'hero') : {}),
     });
