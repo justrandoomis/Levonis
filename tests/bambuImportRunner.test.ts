@@ -1065,22 +1065,58 @@ test('/complete fenced out (409: the item moved under the call): the runner re-r
   }
 });
 
-test('/withdraw fenced out (409: the item is no longer BLOCKED SOURCE_WITHDRAWN): the status is read, the call is never sent again', async () => {
-  const w = new World({
-    handles: ['filament-buffer'],
-    items: { '6945416380552': { state: 'RETRYING', last_completed: 'EXTRACTING', blocker_code: '' } },
-    storePage: () => new Response('gone', { status: 410 }),
-    sitemapExclude: ['filament-buffer'],
-  });
+test('/withdraw refused by the door (409): the item moved, its evidence is refused, or the batch was fenced out — the status is read, nothing is sent again', async () => {
+  const gone = { storePage: () => new Response('gone', { status: 410 }), sitemapExclude: ['filament-buffer'] };
+  // The item moved since the owner looked: the real door answers IMPORT_WITHDRAW_REFUSED (permanent, runOps.ts).
+  assert.equal(classify(409, 'IMPORT_WITHDRAW_REFUSED'), 'permanent');
+  const w = new World({ handles: ['filament-buffer'], items: { '6945416380552': { state: 'RETRYING', last_completed: 'EXTRACTING', blocker_code: '' } }, ...gone });
   try {
     assert.equal(await w.importer({ mode: 'withdraw', item: '6945416380552' }).main(), 1);
     const withdraws = callsTo(w, /\/withdraw$/);
     assert.equal(withdraws.length, 1);
     assert.ok(w.calls.some((c) => c.seq > withdraws[0].seq && c.path === '/run/status'), 'where the item is now is read');
-    assert.ok(w.logLines.some((l) => /withdraw refused: the item is no longer BLOCKED SOURCE_WITHDRAWN \(now RETRYING\)/.test(l)), w.logLines.join('\n'));
+    assert.ok(
+      w.logLines.some((l) => /withdraw refused \(IMPORT_WITHDRAW_REFUSED; the item is RETRYING now\): the door withdraws only an item BLOCKED SOURCE_WITHDRAWN whose second fetch is at least 24 h after the block; nothing is sent again/.test(l)),
+      w.logLines.join('\n')
+    );
+    assert.ok(!w.logLines.some((l) => /ops withdraw:/.test(l)), 'a refusal it reports, not an ops error');
     assert.equal(w.item('filament-buffer').state, 'RETRYING');
   } finally {
     w.dispose();
+  }
+  // Still BLOCKED SOURCE_WITHDRAWN, but the door refuses the evidence (a second fetch less than 24 h after the block):
+  // the same words, which never claim the item moved.
+  const early = new World({ handles: ['filament-buffer'], items: { '6945416380552': { state: 'BLOCKED', last_completed: '', blocker_code: 'SOURCE_WITHDRAWN' } }, ...gone });
+  try {
+    early.inject(/\/withdraw$/, 1, () => json(409, { code: 'IMPORT_WITHDRAW_REFUSED', message: 'withdraw' }));
+    assert.equal(await early.importer({ mode: 'withdraw', item: '6945416380552' }).main(), 1);
+    assert.equal(callsTo(early, /\/withdraw$/).length, 1);
+    assert.ok(early.logLines.some((l) => /withdraw refused \(IMPORT_WITHDRAW_REFUSED; the item is BLOCKED now\)/.test(l)), early.logLines.join('\n'));
+    assert.ok(!early.logLines.some((l) => /no longer/.test(l)));
+    assert.equal(early.item('filament-buffer').state, 'BLOCKED');
+  } finally {
+    early.dispose();
+  }
+  // The batch fenced out (the item moved under the call): stale, reported the same way.
+  const fenced = new World({ handles: ['filament-buffer'], items: { '6945416380552': { state: 'BLOCKED', last_completed: '', blocker_code: 'SOURCE_WITHDRAWN' } }, ...gone });
+  try {
+    fenced.inject(/\/withdraw$/, 1, () => json(409, { code: 'IMPORT_ILLEGAL_TRANSITION', message: 'withdraw' }));
+    assert.equal(await fenced.importer({ mode: 'withdraw', item: '6945416380552' }).main(), 1);
+    assert.equal(callsTo(fenced, /\/withdraw$/).length, 1);
+    assert.ok(fenced.logLines.some((l) => /withdraw refused \(IMPORT_ILLEGAL_TRANSITION; the item is BLOCKED now\)/.test(l)), fenced.logLines.join('\n'));
+  } finally {
+    fenced.dispose();
+  }
+  // The run status names another item (or none): the refusal is reported without a state it does not have.
+  const unseen = new World({ handles: ['filament-buffer'], items: { '6945416380552': { state: 'BLOCKED', last_completed: '', blocker_code: 'SOURCE_WITHDRAWN' } }, ...gone });
+  try {
+    unseen.inject(/\/withdraw$/, 1, () => json(409, { code: 'IMPORT_WITHDRAW_REFUSED', message: 'withdraw' }));
+    unseen.inject(/\/run\/status$/, 1, () => json(200, { run: { id: RUN_ID, state: 'blocked' }, counts: {}, current: null, next: null, held: [], last_verified_url: '' }));
+    assert.equal(await unseen.importer({ mode: 'withdraw', item: '6945416380552' }).main(), 1);
+    assert.ok(unseen.logLines.some((l) => /withdraw refused \(IMPORT_WITHDRAW_REFUSED; the run status does not name the item\)/.test(l)), unseen.logLines.join('\n'));
+    assert.ok(!unseen.logLines.some((l) => l.includes('[?]')));
+  } finally {
+    unseen.dispose();
   }
 });
 

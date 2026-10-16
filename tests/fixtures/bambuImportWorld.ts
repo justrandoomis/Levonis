@@ -438,7 +438,9 @@ export class World {
     }
     if (action === 'readback') return json(200, { ok: true, mismatches: 0, ...(planted ? { names: planted } : {}) });
     if (action === 'withdraw') {
-      if (i.state !== 'BLOCKED' || i.blocker_code !== 'SOURCE_WITHDRAWN' || typeof body?.approval_ref !== 'string') return json(409, { code: 'IMPORT_ILLEGAL_TRANSITION', message: 'withdraw' });
+      // The Worker's withdrawItem (runOps.ts): an item not BLOCKED SOURCE_WITHDRAWN, or evidence it does not take, is
+      // refused with IMPORT_WITHDRAW_REFUSED (permanent); only a fence miss under the batch answers IMPORT_ILLEGAL_TRANSITION.
+      if (i.state !== 'BLOCKED' || i.blocker_code !== 'SOURCE_WITHDRAWN' || typeof body?.approval_ref !== 'string') return json(409, { code: 'IMPORT_WITHDRAW_REFUSED', message: 'withdraw' });
       i.state = 'WITHDRAWN_AT_SOURCE';
       this.events.push({ seq: ++this.seq, sid: i.sid, state: 'WITHDRAWN_AT_SOURCE', outcome: 'withdrawn', code: 'SOURCE_WITHDRAWN', release: false, retry_at: '' });
       return json(200, { state: planted || i.state });

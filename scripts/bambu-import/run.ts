@@ -1450,12 +1450,16 @@ export class Importer {
     try {
       a = await this.ops.withdraw(row.source_product_id, approval, { second_fetch: second, sitemap_absent: absent });
     } catch (err) {
-      // The withdrawal is fenced on BLOCKED SOURCE_WITHDRAWN: a 409 means the item moved since the owner looked.
-      // Read where it is now and report it; an irreversible, owner-approved step is never sent again on a guess.
-      if (!(err instanceof OpsError) || err.kind !== 'stale') throw err;
+      // The door refuses a withdrawal with a 409: IMPORT_WITHDRAW_REFUSED (permanent) when the item is not BLOCKED
+      // SOURCE_WITHDRAWN or its evidence does not hold (a second fetch less than 24 h after the block, an approval it
+      // does not take), IMPORT_ILLEGAL_TRANSITION (stale) when the item moved under the batch. The runner cannot tell
+      // which from the code: it reads where the item is and reports it in words that do not guess; an irreversible,
+      // owner-approved step is never sent again on a guess.
+      if (!(err instanceof OpsError) || (err.kind !== 'stale' && err.code !== 'IMPORT_WITHDRAW_REFUSED')) throw err;
       this.status = await this.ops.status().catch(() => this.status);
-      const now = this.status?.current?.source_product_id === row.source_product_id ? this.status.current.state : '';
-      this.log.item(row.queue_position, row.handle, 'WITHDRAW', 'withdraw_refused', { state: now });
+      const ref = [this.status?.current, this.status?.next].find((r) => r?.source_product_id === row.source_product_id);
+      if (ref) this.log.item(row.queue_position, row.handle, 'WITHDRAW', 'withdraw_refused', { code: err.code, state: ref.state });
+      else this.log.item(row.queue_position, row.handle, 'WITHDRAW', 'withdraw_refused_unseen', { code: err.code });
       return 1;
     }
     this.log.item(row.queue_position, row.handle, 'WITHDRAW', 'withdrawn', { state: a.state });
