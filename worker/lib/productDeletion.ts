@@ -396,6 +396,20 @@ export const FROZEN_HISTORY: FrozenTable[] = [
       '0195. The import ledger keeps the history of a deleted product by id: a conflict row is part of the run report, ' +
       'NOT NULL DEFAULT \'\', and outlives the product it was raised on.',
   },
+  /**
+   * 0196 — THE TRANSLATION MEMORY'S REFS ARE EXEMPT. A ref says which product shows which committed string
+   * (docs/bambu-import/I18N-DESIGN.md §A.2) and carries no content: it is written by the loader from the
+   * committed part, whose ledger loads a part once. Kept by id, a deleted product that the import creates
+   * again under the same deterministic id shows its translations again without a reload; while the product
+   * is gone, nothing reads the row (every read joins a product it was asked about).
+   */
+  {
+    table: 'catalog_translation_refs',
+    columns: ['product_id'],
+    why:
+      '0196. A ref of the translation memory keyed by product id and string hash, written from a committed part ' +
+      'the ledger loads once; NOT NULL, no foreign key by design, and read only beside a product that exists.',
+  },
   {
     table: 'order_items',
     columns: ['option_id', 'color_id'],

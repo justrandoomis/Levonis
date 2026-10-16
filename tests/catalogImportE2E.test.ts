@@ -341,7 +341,7 @@ test('the eight samples through the real app with the runner\'s client: COMPLETE
   // open (run.ts `open`)
   const hello = await client.hello();
   assert.equal(hello.protocol, 2);
-  assert.deepEqual(hello.migrations_present, { '0193': true, '0194': true, '0195': true });
+  assert.deepEqual(hello.migrations_present, { '0193': true, '0194': true, '0195': true, '0196': true });
   const local: Record<string, string> = {};
   for (const [file, text] of Object.entries({
     'manifest.json': texts.manifest, 'taxonomy-map.json': texts.taxonomyMap, 'existing-matches.json': texts.existingMatches, 'compat-targets.json': texts.compatTargets,
