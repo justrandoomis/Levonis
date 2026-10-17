@@ -22,7 +22,11 @@
  *     its own short policy and nothing at the copy's address;
  *   - the upload warm-up and the sweep make the top rung the same way, and no
  *     large photo is marked unreadable for it;
- *   - a browser that takes no WebP never gets a WebP from the AVIF place.
+ *   - what is kept never depends on one asker's Accept header: an AVIF-only
+ *     asker gets the WebP kept in the AVIF place (every AVIF browser decodes
+ *     WebP) and cannot leave the original in a data centre for everyone after
+ *     it; an asker that names neither (a crawler's catch-all) gets the WebP
+ *     copy kept in its own place, not a second cut.
  *
  * Run: node --import tsx --test tests/imageVariantFallback.test.ts
  */
@@ -45,9 +49,10 @@ function ceilingBinding() {
   return images;
 }
 
-function setup(opts: { images?: ReturnType<typeof imagesDouble>; cache?: MemCache } = {}) {
-  const bucket = new R2Double();
-  bucket.seed(KEY, ORIGINAL, { contentType: 'image/webp', cacheControl: 'public, max-age=31536000, immutable' });
+/** One data centre (`cache`: its edge); `bucket`: the R2 another data centre already wrote to. */
+function setup(opts: { images?: ReturnType<typeof imagesDouble>; cache?: MemCache; bucket?: R2Double } = {}) {
+  const bucket = opts.bucket ?? new R2Double();
+  if (!opts.bucket) bucket.seed(KEY, ORIGINAL, { contentType: 'image/webp', cacheControl: 'public, max-age=31536000, immutable' });
   const images = opts.images ?? ceilingBinding();
   const app = stubApp(asD1(freshDb()), null, (a) => a.route('/files', fileRoutes), {
     env: { BUCKET: bucket, R2_PUBLIC: bucket, R2_PRIVATE: bucket, IMAGES: images.binding },
@@ -156,6 +161,58 @@ test('when no copy can be had, the original goes out as before — and this data
   assert.equal(images.calls.length, callsAfterFirst, 'the binding is not asked again for every request');
 });
 
+test('an asker that names AVIF but not WebP gets the WebP kept in the AVIF place — every AVIF browser decodes WebP (speed lane review)', async () => {
+  const { bucket, images, fetchIt } = setup();
+  await fetchIt(`/files/${KEY}?w=1280`, AVIF);
+  assert.equal(bucket.objects.get(variantObjectKey(KEY, 1280, 'avif'))!.custom!.fmt, 'webp');
+  const calls = images.calls.length;
+  for (const w of [1280, 1600]) {
+    const res = await fetchIt(`/files/${KEY}?w=${w}`, { Accept: 'image/avif' });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('X-Variant-Source'), 'r2', `?w=${w}: the kept copy, never the original`);
+    assert.equal(res.headers.get('Content-Type'), 'image/webp');
+    assert.deepEqual(dimsOf(new Uint8Array(await res.arrayBuffer())), { format: 'image/webp', width: 1254, height: 1254 });
+  }
+  assert.equal(images.calls.length, calls, 'the binding is not asked again');
+});
+
+test('ONE ODD ACCEPT HEADER NEVER DECIDES A DATA CENTRE\'S COPY: an AVIF-only asker first, then every browser gets the copy — kept or cut (speed lane review)', async () => {
+  // A copy kept in R2 by another data centre; this one's edge is empty.
+  const elsewhere = setup();
+  await elsewhere.fetchIt(`/files/${KEY}?w=1280`, AVIF);
+  const viaColo = setup({ bucket: elsewhere.bucket, images: elsewhere.images, cache: new MemCache() });
+  const odd = await viaColo.fetchIt(`/files/${KEY}?w=1280`, { Accept: 'image/avif' });
+  assert.notEqual(odd.headers.get('X-Variant-Source'), 'original');
+  const chrome = await viaColo.fetchIt(`/files/${KEY}?w=1280`, AVIF);
+  assert.equal(chrome.headers.get('X-Variant-Source'), 'edge');
+  assert.equal(chrome.headers.get('Content-Type'), 'image/webp');
+  assert.ok(new Uint8Array(await chrome.arrayBuffer()).byteLength < ORIGINAL.byteLength, 'the copy, not the original, for every browser after it');
+
+  // Nothing kept anywhere yet: the AVIF-only asker's cut falls back to WebP like anyone's, and is kept.
+  const fresh = new MemCache();
+  const first = setup({ cache: fresh });
+  const cut = await first.fetchIt(`/files/${KEY}?w=1280`, { Accept: 'image/avif' });
+  assert.equal(cut.headers.get('X-Variant-Source'), 'render');
+  assert.equal(cut.headers.get('Content-Type'), 'image/webp');
+  assert.equal(first.bucket.objects.get(variantObjectKey(KEY, 1280, 'avif'))!.custom!.fmt, 'webp', 'kept in the AVIF place');
+  const after = await first.fetchIt(`/files/${KEY}?w=1280`, AVIF);
+  assert.equal(after.headers.get('X-Variant-Source'), 'edge');
+  assert.ok(new Uint8Array(await after.arrayBuffer()).byteLength < ORIGINAL.byteLength);
+  for (const [url, entry] of fresh.store) assert.notEqual(new Map(entry.headers).get('x-variant-source'), 'original', url);
+});
+
+test('a WebP copy in its own WebP place is served to an asker that names neither AVIF nor WebP (`*/*`, a crawler) — no second cut (speed lane review)', async () => {
+  const { images, fetchIt } = setup();
+  await fetchIt(`/files/${KEY}?w=640`, { Accept: 'image/webp,*/*' });
+  const calls = images.calls.length;
+  for (const accept of ['*/*', '']) {
+    const res = await fetchIt(`/files/${KEY}?w=640`, accept ? { Accept: accept } : {});
+    assert.equal(res.headers.get('X-Variant-Source'), 'r2', `Accept ${JSON.stringify(accept)}`);
+    assert.equal(res.headers.get('Content-Type'), 'image/webp');
+  }
+  assert.equal(images.calls.length, calls, 'the binding is not asked for a copy that is kept');
+});
+
 test('A FIXED-NAME PICTURE WHOSE CUT FAILS keeps its own short policy and no copy at the edge: the owner\'s replacement shows as soon as it would have (speed lane review)', async () => {
   const LOGO = 'brands/acme/logo.webp';
   const cache = new MemCache();
@@ -186,28 +243,17 @@ test('A FIXED-NAME PICTURE WHOSE CUT FAILS keeps its own short policy and no cop
   assert.equal((await fetchIt(`/files/${KEY}?w=640`, AVIF)).headers.get('X-Variant-Source'), 'edge');
 });
 
-test('a browser that takes no WebP never gets the WebP kept in the AVIF place', async () => {
-  const { bucket, fetchIt } = setup();
-  await fetchIt(`/files/${KEY}?w=1280`, AVIF);
-  assert.equal(bucket.objects.get(variantObjectKey(KEY, 1280, 'avif'))!.custom!.fmt, 'webp');
-  const res = await fetchIt(`/files/${KEY}?w=1280`, { Accept: 'image/avif' });
-  assert.equal(res.status, 200);
-  assert.equal(res.headers.get('X-Variant-Source'), 'original', 'the original, exactly as /files/<key> sends it — never the WebP copy');
-  assert.deepEqual(new Uint8Array(await res.arrayBuffer()), ORIGINAL);
-  assert.equal(bucket.objects.get(variantObjectKey(KEY, 1280, 'avif'))!.custom!.fmt, 'webp', 'and the kept copy is left as it was');
-});
-
 test('only an answer in the wrong format is retried in WebP: a refusal or a throw is the picture\'s or the binding\'s', async () => {
   const source = async () => new Blob([ORIGINAL as unknown as BlobPart]);
   const ceiling = ceilingBinding();
-  const fell = await cutVariant({ IMAGES: ceiling.binding } as never, source, { width: 1280, format: 'image/avif', sourceWidth: 1254 }, { webpFallback: true });
+  const fell = await cutVariant({ IMAGES: ceiling.binding } as never, source, { width: 1280, format: 'image/avif', sourceWidth: 1254 });
   assert.equal(fell.attempts, 2);
   assert.ok(fell.outcome.ok && fell.outcome.mime === 'image/webp');
-  const noFallback = await cutVariant({ IMAGES: ceilingBinding().binding } as never, source, { width: 1280, format: 'image/avif', sourceWidth: 1254 }, { webpFallback: false });
-  assert.equal(noFallback.attempts, 1);
-  assert.equal(noFallback.outcome.ok, false);
+  const webpAsked = await cutVariant({ IMAGES: imagesDouble('wrongFormat').binding } as never, source, { width: 1280, format: 'image/webp', sourceWidth: 1254 });
+  assert.equal(webpAsked.attempts, 1, 'a WebP the binding will not give has nothing to fall back to');
+  assert.equal(webpAsked.outcome.ok, false);
   for (const mode of ['http500', 'throw9422'] as const) {
-    const r = await cutVariant({ IMAGES: imagesDouble(mode).binding } as never, source, { width: 1280, format: 'image/avif', sourceWidth: 1254 }, { webpFallback: true });
+    const r = await cutVariant({ IMAGES: imagesDouble(mode).binding } as never, source, { width: 1280, format: 'image/avif', sourceWidth: 1254 });
     assert.equal(r.attempts, 1, mode);
   }
 });

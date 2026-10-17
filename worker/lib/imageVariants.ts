@@ -147,7 +147,9 @@ export function clampRung(asked: ImageVariantWidth, sourceWidth: number | null |
  * Now that rung is cut in WebP at its full size — only the codec changes, never
  * the pixels the visitor gets — and kept in the AVIF place (`fmt: webp` and its
  * own Content-Type), so no request and no sweep asks the binding for it again.
- * `webpFallback` only when the asker takes WebP (every AVIF browser does).
+ * Whoever asked: every browser that decodes AVIF decodes WebP, and the copy is
+ * shared by everyone the format was negotiated to (speed lane review: an
+ * AVIF-only `Accept` once left the original in a data centre for an hour).
  *
  * `source` is called once per attempt: a Blob is read afresh, a stream is
  * fetched again (the route re-reads the original from its edge copy).
@@ -155,14 +157,13 @@ export function clampRung(asked: ImageVariantWidth, sourceWidth: number | null |
 export async function cutVariant(
   env: Pick<Env, 'IMAGES'>,
   source: () => Promise<Blob | Uint8Array | ReadableStream<Uint8Array> | null>,
-  variant: { width: ImageVariantWidth; format: ImageVariantFormat; sourceWidth?: number | null },
-  options: { webpFallback?: boolean } = {}
+  variant: { width: ImageVariantWidth; format: ImageVariantFormat; sourceWidth?: number | null }
 ): Promise<{ outcome: VariantOutcome; attempts: number }> {
   const first = await source();
   if (!first) return { outcome: { ok: false, reason: 'failed', detail: 'the original is gone' }, attempts: 0 };
   const outcome = await renderImageVariant(env, first, variant);
   // Only an answer in the wrong format: a refusal, an HTTP error or a throw (9412, 9422) is the picture's or the binding's.
-  if (outcome.ok || outcome.reason !== 'failed' || !outcome.unencodable || variant.format !== 'image/avif' || !options.webpFallback) return { outcome, attempts: 1 };
+  if (outcome.ok || outcome.reason !== 'failed' || !outcome.unencodable || variant.format !== 'image/avif') return { outcome, attempts: 1 };
   const again = await source();
   if (!again) return { outcome, attempts: 1 };
   const webp = await renderImageVariant(env, again, { ...variant, format: 'image/webp' });
@@ -327,7 +328,7 @@ export async function warmImageVariants(env: VariantEnv, input: VariantWarmInput
     const worker = async (most = Infinity) => {
       for (let n = 0; n < most && queue.length; n++) {
         const rung = queue.shift()!;
-        const { outcome: out } = await cutVariant(env, async () => source, { width: rung, format: 'image/avif', sourceWidth: width }, { webpFallback: true });
+        const { outcome: out } = await cutVariant(env, async () => source, { width: rung, format: 'image/avif', sourceWidth: width });
         if (!out.ok) {
           report.failed += 1;
           console.warn('image_variant_warm_failed', JSON.stringify({ reason: out.reason, w: rung }));
@@ -597,7 +598,7 @@ export async function sweepImageVariants(
               // A rung the binding cannot cut in AVIF is cut in WebP (`cutVariant`): only a picture it can
               // cut in NEITHER is the picture's failure — before, the top rung of every large photo marked
               // the whole picture unreadable and was never made.
-              const { outcome: out, attempts } = await cutVariant(env, async () => blob, { width: rung, format: 'image/avif', sourceWidth: width }, { webpFallback: true });
+              const { outcome: out, attempts } = await cutVariant(env, async () => blob, { width: rung, format: 'image/avif', sourceWidth: width });
               report.transforms += Math.max(0, attempts - 1);
               if (!out.ok) {
                 console.warn('image_variant_sweep_failed', JSON.stringify({ reason: out.reason, w: rung }));

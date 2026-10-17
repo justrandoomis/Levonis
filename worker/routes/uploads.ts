@@ -921,7 +921,7 @@ async function cutAndKeepCopy(
   const sourceEtag = bareEtag(obj.httpEtag);
   if (!sourceEtag) return;
   const policy = publicMediaCacheControl(key, obj.httpMetadata?.cacheControl);
-  const { outcome: out } = await cutVariant(c.env, async () => blob, { width, format }, { webpFallback: /image\/webp/i.test(c.req.header('Accept') ?? '') });
+  const { outcome: out } = await cutVariant(c.env, async () => blob, { width, format });
   if (!out.ok) {
     console.warn('image_variant_failed', JSON.stringify({ reason: out.reason, w: width, fmt: format.slice('image/'.length) }));
     return;
@@ -964,6 +964,12 @@ async function cutAndKeepCopy(
  * centre keeps that answer under the copy's address for an hour
  * (X-Variant-Source: original), instead of asking the binding again; a key
  * rewritten in place keeps its own short policy and nothing at that address.
+ *
+ * WHAT IS KEPT NEVER DEPENDS ON ONE ASKER'S `Accept`: the edge entry is shared
+ * by everyone the format was negotiated to, so a WebP kept in the AVIF place is
+ * every AVIF asker's copy (every browser that decodes AVIF decodes WebP), and
+ * any AVIF cut falls back to WebP — an odd header (curl, a bot) can neither be
+ * refused the kept copy nor leave the original in a data centre for an hour.
  */
 async function serveImageVariant(
   c: Context<AppContext>,
@@ -1001,8 +1007,6 @@ async function serveImageVariant(
     cachePut(kept);
     return kept;
   };
-  /** The asker takes this format (a WebP kept in an AVIF place is only for a browser that takes WebP). */
-  const acceptsWebp = (f: ImageVariantFormat): boolean => f !== 'image/webp' || /image\/webp/i.test(c.req.header('Accept') ?? '');
 
   // 1. The edge.
   if (cache) {
@@ -1019,10 +1023,7 @@ async function serveImageVariant(
 
   // 2. The copy kept in R2.
   let stale = false;
-  const inR2 = await readStoredVariant(c.env, key, width, format);
-  // A WebP kept in the AVIF place, for a browser that takes no WebP: not this asker's copy (and not stale).
-  const stored = inR2 && acceptsWebp(storedVariantFormat(inR2, format)) ? inR2 : null;
-  if (inR2 && !stored) void inR2.body.cancel().catch(() => undefined);
+  const stored = await readStoredVariant(c.env, key, width, format);
   if (stored) {
     const sourceEtag = stored.customMetadata?.src_etag ?? '';
     // A rung the binding could not cut in AVIF is kept in WebP in the AVIF place (`cutVariant`): served as what it is.
@@ -1121,7 +1122,7 @@ async function serveImageVariant(
   if (rung !== width) {
     const kept = await readStoredVariant(c.env, key, rung, format);
     const keptFormat = kept ? storedVariantFormat(kept, format) : format;
-    if (kept && kept.customMetadata?.src_etag === sourceEtag && acceptsWebp(keptFormat) && !isRewritableMediaKey(key)) {
+    if (kept && kept.customMetadata?.src_etag === sourceEtag && !isRewritableMediaKey(key)) {
       void peeked.stream.cancel().catch(() => undefined);
       const keptHeaders = variantHeaders(keptFormat, variantEtag(sourceEtag, rung, keptFormat), policy);
       keptHeaders.set('Content-Length', String(kept.size));
@@ -1142,8 +1143,7 @@ async function serveImageVariant(
   const { outcome: rendered } = await cutVariant(
     c.env,
     async () => (reads++ === 0 ? peeked.stream : ((await loadPublicOriginal(c, key, cache))?.body as ReadableStream<Uint8Array> | null) ?? null),
-    { width: rung, format, sourceWidth },
-    { webpFallback: acceptsWebp('image/webp') }
+    { width: rung, format, sourceWidth }
   );
   if (!rendered.ok) {
     // The picture defeated the converter (or the binding is gone mid-flight):
