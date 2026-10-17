@@ -53,6 +53,8 @@ import {
   isV2State,
   loadEngineStates,
   loadV2ResultsOf,
+  costFirstIds,
+  shelfSigsOf,
   pricesUnchanged,
   pricesUnchangedV2,
   priceSourceOf,
@@ -67,6 +69,7 @@ import {
 import { loadV2Store, type V2Store } from './v2/store';
 import { evaluateV2Write, storedDesired, type V2Evaluation } from './v2/evaluate';
 import { v2WriteStatements } from './v2/write';
+import { loadShelves, shelfReads, type ProductShelf } from './v2/shelf';
 import { engineWriteStatements, evaluateEngineWrite, loadEngineControl, loadStoredSkuCosts, priceImagesOf, type EngineEvaluation } from './engineWrite';
 
 /** What an owner act moves. */
@@ -192,7 +195,7 @@ export interface RatePreviewResult {
 
 // loadProducts' reads per chunk of 50 (autoReprice.ts PRODUCT_CHUNK / READS_PER_CHUNK, the SKU rung's read included — FX-7).
 /** The automatic run's own reads before it writes (autoReprice.ts steps 1-2), with the run record and the bell. */
-const RUN_READS = (n: number) => 1 + 3 + 1 + 1 + READS_PER_CHUNK * Math.ceil(n / PRODUCT_CHUNK) + 5 + 1 + 2;
+const RUN_READS = (n: number, shelf = 0) => 1 + 3 + 1 + 1 + shelf + READS_PER_CHUNK * Math.ceil(n / PRODUCT_CHUNK) + 5 + 1 + 2;
 /** A blocked product's record and its bell (autoReprice.ts `block`). */
 const BLOCK_COST = 8;
 
@@ -226,7 +229,13 @@ export async function previewRateAct(db: D1Database, move: RateMove, rates: Pric
   // rate move does to price-first products, which never moved with the rate before.
   const v2Results = await loadV2ResultsOf(db, states);
   if (states.some(isV2State)) statements += 1;
-  const stale = staleEngineProducts(states, costs, after, v2Results);
+  // Row 244: the run the act starts also reprices the shelves that moved — the preview reads them as it will.
+  const shelfColumn = states.some((s) => s.shelf_sig !== undefined);
+  const stale = staleEngineProducts(states, costs, after, v2Results, await shelfSigsOf(states));
+  const shelfIds = costFirstIds(stale);
+  const shelfCost = shelfReads(shelfIds.length);
+  const shelves: Map<string, ProductShelf> = await loadShelves(db, shelfIds);
+  statements += shelfCost;
   const ids = stale.map((p) => p.state.product_id);
   const rows: RatePreviewRow[] = [];
   const blocked: RatePreviewBlocked[] = [];
@@ -255,14 +264,29 @@ export async function previewRateAct(db: D1Database, move: RateMove, rates: Pric
         let v2: V2Evaluation;
         try {
           const desired = storedDesired(v2Store);
-          v2 = await evaluateV2Write({ loaded: product, stored, v2: v2Store, ctx, rates: after, control, method: stored.state.pricing_method, points: desired.points, discounts: desired.discounts, inputWrites: [], ruleWrites: [], image: images.get(pid) ?? '', auto: true });
+          v2 = await evaluateV2Write({
+            loaded: product,
+            stored,
+            v2: v2Store,
+            ctx,
+            rates: after,
+            control,
+            method: stored.state.pricing_method,
+            points: desired.points,
+            discounts: desired.discounts,
+            inputWrites: [],
+            ruleWrites: [],
+            image: images.get(pid) ?? '',
+            auto: true,
+            shelf: shelves.get(pid) ?? null,
+          });
         } catch {
           blocked.push({ product_id: pid, ...productNames, code: 'REPRICE_BLOCKED' });
           evaluated.push({ pid, hash: null, code: 'REPRICE_BLOCKED' });
           continue;
         }
         // The run the act starts holds what it would hold (an owner act: the unreviewed data save only).
-        const hold = v2.kind === 'v2_reprice' && v2.complete && v2.hash && v2.needs_write ? v2AutoHoldCode(p.state, v2, 'owner_rate') : null;
+        const hold = v2.kind === 'v2_reprice' && v2.complete && v2.hash && v2.needs_write ? v2AutoHoldCode(p.state, v2, 'owner_rate', p.reasons) : null;
         if (v2.kind !== 'v2_reprice' || !v2.complete || !v2.hash || !v2.needs_write || hold) {
           const code = hold ?? blockCodeOf(v2.codes);
           blocked.push({ product_id: pid, ...productNames, code });
@@ -277,6 +301,7 @@ export async function previewRateAct(db: D1Database, move: RateMove, rates: Pric
           idempotencyKey: `preview:${pid}`,
           auto: { priceSource: priceSourceOf(p.reasons), pricesUnchanged: pricesUnchangedV2(v2), trigger: 'owner_rate', reasons: p.reasons },
           stockGate,
+          shelfSig: shelfColumn,
         });
         ready.push({ ev: { product_id: pid, rows: v2.rows }, deficit: deficitOfV2(v2), cost: batch.length });
         for (const r of v2.rows) {
@@ -362,7 +387,7 @@ export async function previewRateAct(db: D1Database, move: RateMove, rates: Pric
   // Deficit first, as the run writes them; what the request's budget cannot cover follows on the sweep.
   ready.sort((a, b) => b.deficit - a.deficit || (a.ev.product_id < b.ev.product_id ? -1 : a.ev.product_id > b.ev.product_id ? 1 : 0));
   // The act's request spends the preview's reads again before it commits: they come out of the run's room too.
-  let left = budgetLeft - statements - RUN_READS(ready.length + blocked.length) - BLOCK_COST * blocked.length;
+  let left = budgetLeft - statements - RUN_READS(ready.length + blocked.length, shelfCost) - BLOCK_COST * blocked.length;
   let follows = 0;
   for (const r of ready) {
     if (follows === 0 && r.cost <= left) left -= r.cost;

@@ -348,8 +348,8 @@ test('several products: rows in deficit order, a product the engine cannot price
   assert.equal(none.preview.follows, 3, 'no room: all three follow within 15 minutes');
   assert.equal(tight.preview.preview_hash, roomy.preview.preview_hash, 'the budget never changes the hash');
   // Constant in the number of products (chunked by PRODUCT_CHUNK); the V2 store's reads are part of it since every
-  // engine product is a V2 product.
-  assert.ok(roomy.statements <= 20 + V2_STORE_READS, `the preview reads in a constant number of statements (${roomy.statements})`);
+  // engine product is a V2 product, and so is the shelves' one read of the cost-first ones (DECISIONS row 244).
+  assert.ok(roomy.statements <= 20 + V2_STORE_READS + 1, `the preview reads in a constant number of statements (${roomy.statements})`);
 });
 
 // ------------------------------------------------------------- the keys

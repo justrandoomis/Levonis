@@ -47,6 +47,14 @@
  * others. It is tried again when a rate changes again, when the owner saves
  * it (the writer clears the code), or after 24 hours.
  *
+ * THE SHELF (DECISIONS row 244). A cost-first product is also stale when its
+ * shelf moved ('STOCK': a batch received, a sale, an adjustment or a return
+ * changed a model's costliest batch on the shelf or emptied it — v2/shelf.ts).
+ * It goes through this same run: evaluated with the shelf as it is, held by the
+ * same 15% / 30% rule, written by the same writer. A shelf that moved without
+ * moving a price only records its new signature (one statement). A model left
+ * sold out with no supplier price is not sold, and the owner's bell rings.
+ *
  * THE PURGE. One targeted purge after the run: the pages and APIs of the
  * products whose customer price moved (edgePolicy.purgeCatalogueFromJob, the
  * same seam the FX run uses). Nothing moved → nothing purged.
@@ -66,6 +74,7 @@ import { loadProductsPricing, pricingAuditStatement } from './store';
 import { isMissingV2Schema } from '../productOverlay';
 import { loadV2Store, type StoredV2Result, type V2Store } from './v2/store';
 import { loadStoredV2Results, staleReasonsV2 } from './v2/stale';
+import { loadShelves, shelfItemsHaveUnits, shelfItemsSql, shelfReads, shelfSignatureOfItems, type ProductShelf } from './v2/shelf';
 import { evaluateV2Write, storedDesired, type V2Evaluation } from './v2/evaluate';
 import { v2WriteStatements } from './v2/write';
 import { loadPricingRates, type PricingRates } from './rates';
@@ -126,12 +135,19 @@ export interface EngineStateRow {
   rates_at: string | null;
   /** Pricing V2 (spec C-1): the product's method — set on a V2 product, null on V1 (and on a database without 0189). */
   pricing_method?: 'cost' | 'usd' | null;
+  /** Row 244: the shelf signature its prices were written at; undefined on a database without 0198. */
+  shelf_sig?: string | null;
+  /** Row 244 (with 0198): its inventory mode and today's shelf as signature items (`shelfItemsSql`), cost-first only. */
+  shelf_mode?: string | null;
+  shelf_now?: string | null;
 }
 
 // The clean start (DECISIONS row 222, spec addendum A.6): only V2 products are repriced. A V1 engine
 // product is hidden until it is priced in dollars, and repricing it would write `price_history` rows that
 // price protection reads as engine observations — an old dinar price published by the back door.
-const engineStatesSql = () => `SELECT s.product_id, p.slug, s.inputs_seq, s.priced_inputs_seq, s.write_seq, s.reprice_blocked_code, s.reprice_blocked_at, s.pricing_method,
+const engineStatesSql = (shelf = true) => `SELECT s.product_id, p.slug, s.inputs_seq, s.priced_inputs_seq, s.write_seq, s.reprice_blocked_code, s.reprice_blocked_at, s.pricing_method,${
+  shelf ? ` s.shelf_sig, p.inventory_mode AS shelf_mode, CASE WHEN s.pricing_method = 'cost' THEN ${shelfItemsSql('s.product_id')} END AS shelf_now,` : ''
+}
        MAX(COALESCE((SELECT MAX(updated_at) FROM pricing_fx_rates), ''), COALESCE((SELECT MAX(updated_at) FROM pricing_shipping_rates), '')) AS rates_at
   FROM product_pricing_state s JOIN products p ON p.id = s.product_id
  WHERE s.mode = 'engine' AND s.pricing_method IS NOT NULL AND COALESCE(p.composition, '') = ''
@@ -144,12 +160,20 @@ const engineStatesSql = () => `SELECT s.product_id, p.slug, s.inputs_seq, s.pric
  */
 export async function loadEngineStates(db: D1Database, opts: { spent?: (n: number) => void } = {}): Promise<EngineStateRow[]> {
   let rows: EngineStateRow[];
+  let shelf = true;
   try {
-    rows = (await db.prepare(engineStatesSql()).all<EngineStateRow>()).results ?? [];
+    try {
+      rows = (await db.prepare(engineStatesSql()).all<EngineStateRow>()).results ?? [];
+    } catch (e) {
+      // A database without 0198 (row 244): no shelf signature — read again without it.
+      if (!/no such column: s\.shelf_sig/i.test(e instanceof Error ? e.message : String(e))) throw e;
+      opts.spent?.(1);
+      shelf = false;
+      rows = (await db.prepare(engineStatesSql(false)).all<EngineStateRow>()).results ?? [];
+    }
   } catch (e) {
     // A database without 0189 has no V2 product: nothing to reprice (the clean start reprices V2 only).
     if (!isMissingV2Schema(e)) throw e;
-    void opts;
     return [];
   }
   return rows.map((r) => ({
@@ -162,8 +186,25 @@ export async function loadEngineStates(db: D1Database, opts: { spent?: (n: numbe
     reprice_blocked_at: r.reprice_blocked_at ?? null,
     rates_at: r.rates_at ? String(r.rates_at) : null,
     pricing_method: r.pricing_method === 'cost' || r.pricing_method === 'usd' ? r.pricing_method : null,
+    ...(shelf
+      ? {
+          shelf_sig: typeof r.shelf_sig === 'string' ? r.shelf_sig : null,
+          shelf_mode: typeof r.shelf_mode === 'string' ? r.shelf_mode : null,
+          shelf_now: typeof r.shelf_now === 'string' ? r.shelf_now : null,
+        }
+      : {}),
   }));
 }
+
+/** Row 244: today's shelf signature of each cost-first V2 product, from the states read (with 0198; none without). */
+export async function shelfSigsOf(states: readonly EngineStateRow[]): Promise<Map<string, string | null>> {
+  const sigs = new Map<string, string | null>();
+  for (const s of states) if (s.pricing_method === 'cost' && s.shelf_sig !== undefined) sigs.set(s.product_id, await shelfSignatureOfItems(s.shelf_mode, s.shelf_now));
+  return sigs;
+}
+
+/** Row 244: the cost-first V2 products of a due list — their shelves are read before they are evaluated. */
+export const costFirstIds = (due: ReadonlyArray<{ state: EngineStateRow }>): string[] => due.filter((p) => p.state.pricing_method === 'cost').map((p) => p.state.product_id);
 
 export interface StaleEngineProduct {
   state: EngineStateRow;
@@ -182,12 +223,22 @@ export const isV2State = (s: Pick<EngineStateRow, 'pricing_method'>): boolean =>
  * changed — V1's from `pricing_sku_costs` exactly as before, a V2 product's from its V2 results
  * (`staleReasonsV2`: U for every one, the supplier currency and shipping only cost-first).
  */
-export function staleEngineProducts(states: readonly EngineStateRow[], costs: readonly StoredSkuCost[], rates: PricingRates, v2Results: readonly StoredV2Result[] = []): StaleEngineProduct[] {
+export function staleEngineProducts(
+  states: readonly EngineStateRow[],
+  costs: readonly StoredSkuCost[],
+  rates: PricingRates,
+  v2Results: readonly StoredV2Result[] = [],
+  shelfSigs: ReadonlyMap<string, string | null> = new Map()
+): StaleEngineProduct[] {
   const out: StaleEngineProduct[] = [];
   for (const state of states) {
     if (isV2State(state)) {
       const v2Rows = v2Results.filter((r) => r.product_id === state.product_id);
-      const reasons = staleReasonsV2(v2Rows, rates);
+      // Row 244: a cost-first product's shelf, against the one its prices were written at.
+      const shelf = state.pricing_method === 'cost' && state.shelf_sig !== undefined && shelfSigs.has(state.product_id)
+        ? { stored: state.shelf_sig ?? null, current: shelfSigs.get(state.product_id) ?? null }
+        : undefined;
+      const reasons = staleReasonsV2(v2Rows, rates, shelf);
       if (reasons.length) out.push({ state, reasons, rows: [], v2_rows: v2Rows });
       continue;
     }
@@ -204,9 +255,14 @@ export async function loadV2ResultsOf(db: D1Database, states: readonly EngineSta
   return ids.length ? loadStoredV2Results(db, ids) : [];
 }
 
-/** A blocked product waits 24 hours, unless a central rate moved after it was blocked (or the owner saved it, which clears the code). */
-export function blockedAndWaiting(s: Pick<EngineStateRow, 'reprice_blocked_code' | 'reprice_blocked_at' | 'rates_at'>, now: Date): boolean {
+/**
+ * A blocked product waits 24 hours, unless a central rate moved after it was blocked (or the owner saved it, which
+ * clears the code) — or, held because every model sold out with no supplier price (row 244), stock is back on its
+ * shelf: it is priced from it on the next tick, never sold at the old price.
+ */
+export function blockedAndWaiting(s: Pick<EngineStateRow, 'reprice_blocked_code' | 'reprice_blocked_at' | 'rates_at' | 'shelf_now'>, now: Date): boolean {
   if (!s.reprice_blocked_code || !s.reprice_blocked_at) return false;
+  if (s.reprice_blocked_code === 'V2_STOCK_SOLD_OUT' && shelfItemsHaveUnits(s.shelf_now)) return false;
   const at = Date.parse(s.reprice_blocked_at);
   if (!Number.isFinite(at) || now.getTime() - at >= BLOCK_RETRY_MS) return false;
   if (s.rates_at && s.rates_at > s.reprice_blocked_at) return false;
@@ -242,14 +298,23 @@ export function blockCodeOf(codes: readonly string[]): string {
  *   - PRICING_V2_LARGE_CHANGE: a change above 15% (or a drop above 30%) nobody previewed. An owner rate or
  *     shipping act carries the owner's own preview and tick of these flags (adminPricing.ts), so only the
  *     unattended triggers (the FX fetch, the sweep) hold it.
+ *     The shelf (row 244, `reasons` holding STOCK): a price the shelf RAISES is never held — holding it would
+ *     sell units below their cost + the minimum profit, the very thing the owner's rule forbids — so only a
+ *     large fall waits for the owner (the higher price meanwhile is safe).
  */
 export function v2AutoHoldCode(
   state: Pick<EngineStateRow, 'inputs_seq' | 'priced_inputs_seq'>,
-  ev: Pick<V2Evaluation, 'large_change' | 'drop_flag'>,
-  trigger: AutoRepriceTrigger
+  ev: Pick<V2Evaluation, 'large_change' | 'drop_flag'> & { rows?: V2Evaluation['rows'] },
+  trigger: AutoRepriceTrigger,
+  reasons: readonly string[] = []
 ): string | null {
   if ((state.priced_inputs_seq ?? null) !== state.inputs_seq) return 'PRICING_V2_UNREVIEWED';
-  if ((ev.large_change || ev.drop_flag) && (trigger === 'fx' || trigger === 'sweep')) return 'PRICING_V2_LARGE_CHANGE';
+  if (!(trigger === 'fx' || trigger === 'sweep')) return null;
+  if (reasons.includes('STOCK')) {
+    const largeFall = (ev.rows ?? []).some((r) => r.large && r.old_iqd !== null && r.new_iqd !== null && r.new_iqd < r.old_iqd);
+    return ev.drop_flag || largeFall ? 'PRICING_V2_LARGE_CHANGE' : null;
+  }
+  if (ev.large_change || ev.drop_flag) return 'PRICING_V2_LARGE_CHANGE';
   return null;
 }
 
@@ -272,13 +337,22 @@ export function pricesUnchanged(ev: Pick<EngineEvaluation, 'rows'>): boolean {
 
 const SHIPPING = new Set<string>(SHIPPING_PROFILES);
 
-/** `engine_fx` when only exchange rates moved; a shipping rate is the owner's cost change (decision 6: it counts). */
-export const priceSourceOf = (reasons: readonly string[]): 'engine_fx' | 'engine_owner' => (reasons.some((r) => SHIPPING.has(r)) ? 'engine_owner' : 'engine_fx');
+/**
+ * `engine_fx` when only exchange rates moved; a shipping rate is the owner's cost change (decision 6: it counts),
+ * and so is the shelf's cost (row 244: a costlier batch, the costliest sold out) — a real price move, not FX.
+ */
+export const priceSourceOf = (reasons: readonly string[]): 'engine_fx' | 'engine_owner' => (reasons.some((r) => SHIPPING.has(r) || r === 'STOCK') ? 'engine_owner' : 'engine_fx');
 
 /** One product the bell rings for, with its event key (once per product and write). */
 export interface BlockedNotice {
   product_id: string;
   key: string;
+  /**
+   * Row 244: what the bell says when the shelf is why — `stock_sold_out`: a model's shelf is sold out and
+   * it has no supplier price, so it is not sold until priced; `stock_review`: the shelf moved its price and
+   * the product waits for the owner. Absent: a rate moved (FX-5's notice).
+   */
+  reason?: 'stock_sold_out' | 'stock_review';
 }
 
 export interface AutoRepriceOptions {
@@ -345,7 +419,10 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
     const v2Results = hasV2 ? await loadV2ResultsOf(db, states) : [];
     // A derived rate out of step with its pairs prices nothing (every writer refuses FX_DERIVED_STALE).
     if (rates.derived_stale) return finish('DERIVED_STALE');
-    const stale = staleEngineProducts(states, costs, rates, v2Results);
+    // Row 244: a cost-first product's shelf against the one its prices were written at — from the states read.
+    const sigs = await shelfSigsOf(states);
+    const shelfColumn = states.some((s) => s.shelf_sig !== undefined);
+    const stale = staleEngineProducts(states, costs, rates, v2Results, sigs);
     report.stale = stale.length;
     let due = stale.filter((p) => !blockedAndWaiting(p.state, now));
     if (!due.length) return finish('NOTHING_STALE');
@@ -387,7 +464,9 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
     const ids = due.map((p) => p.state.product_id);
     // Pricing V2: the due V2 products' stores (method, points, discounts, results) — one batch of four.
     const v2Ids = due.filter((p) => isV2State(p.state)).map((p) => p.state.product_id);
-    if (!budget.spend(candidateReads(ids.length) + (v2Ids.length ? V2_STORE_READS : 0))) return finish('BUDGET');
+    // Row 244: every due cost-first product is evaluated with its shelf as it is now.
+    const shelfIds = costFirstIds(due);
+    if (!budget.spend(candidateReads(ids.length) + (v2Ids.length ? V2_STORE_READS : 0) + shelfReads(shelfIds.length))) return finish('BUDGET');
     const control = await loadEngineControl(db);
     if (control.paused) return finish('PAUSED');
     let images: Map<string, string>;
@@ -401,10 +480,13 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
     }
     const [loaded, stores, ctx] = await Promise.all([loadProducts(db, ids), loadProductsPricing(db, ids), loadPreviewContext(db)]);
     const v2Stores: Map<string, V2Store | null> = v2Ids.length ? await loadV2Store(db, v2Ids) : new Map();
+    const shelves: Map<string, ProductShelf> = await loadShelves(db, shelfIds);
 
     // 3. The writer's own evaluation of each: plan, the exact resolver check, the six figures.
     const ready: Array<{ p: StaleEngineProduct; ev: EngineEvaluation; deficit: number } | { p: StaleEngineProduct; v2: V2Evaluation; deficit: number }> = [];
     const failing: Array<{ p: StaleEngineProduct; code: string }> = [];
+    // Row 244: a shelf that moved without moving a price only records its new signature.
+    const shelfOnly: Array<{ p: StaleEngineProduct; sig: string | null }> = [];
     for (const p of due) {
       const pid = p.state.product_id;
       const product = loaded.get(pid);
@@ -418,7 +500,22 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
         let v2: V2Evaluation;
         try {
           const desired = storedDesired(v2Store);
-          v2 = await evaluateV2Write({ loaded: product, stored, v2: v2Store, ctx, rates, control, method: stored.state.pricing_method, points: desired.points, discounts: desired.discounts, inputWrites: [], ruleWrites: [], image: images.get(pid) ?? '', auto: true });
+          v2 = await evaluateV2Write({
+            loaded: product,
+            stored,
+            v2: v2Store,
+            ctx,
+            rates,
+            control,
+            method: stored.state.pricing_method,
+            points: desired.points,
+            discounts: desired.discounts,
+            inputWrites: [],
+            ruleWrites: [],
+            image: images.get(pid) ?? '',
+            auto: true,
+            shelf: shelves.get(pid) ?? null,
+          });
         } catch (e) {
           if (product.view?.sku_prices_unread) {
             console.error('auto reprice: SKU prices unreadable, retried next tick:', pid);
@@ -428,11 +525,15 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
           failing.push({ p, code: 'REPRICE_BLOCKED' });
           continue;
         }
+        if (v2.kind === 'v2_reprice' && v2.complete && !v2.needs_write && p.reasons.includes('STOCK') && shelfColumn) {
+          shelfOnly.push({ p, sig: v2.shelf_sig ?? null });
+          continue;
+        }
         if (v2.kind !== 'v2_reprice' || !v2.complete || !v2.hash || !v2.needs_write) {
           failing.push({ p, code: blockCodeOf(v2.codes) });
           continue;
         }
-        const hold = v2AutoHoldCode(p.state, v2, opts.trigger);
+        const hold = v2AutoHoldCode(p.state, v2, opts.trigger, p.reasons);
         if (hold) {
           failing.push({ p, code: hold });
           continue;
@@ -508,13 +609,20 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
       budget.spend(statements.length);
       try {
         await db.batch(statements);
-        notices.push({ product_id: pid, key: `reprice_blocked:${pid}:${p.state.write_seq}` });
+        notices.push({ product_id: pid, key: `reprice_blocked:${pid}:${p.state.write_seq}`, ...stockReasonOf(p.reasons, code) });
       } catch (e) {
         // The product moved meanwhile (its fence missed): the next tick judges it afresh.
         if (!fenceMissed(e)) console.error('auto reprice: block not recorded:', pid, e instanceof Error ? e.name : 'unknown');
       }
     };
     for (const f of failing) await block(f.p, f.code);
+    for (const f of shelfOnly) {
+      if (!budget.spend(1)) break;
+      await db
+        .prepare("UPDATE product_pricing_state SET shelf_sig = ? WHERE product_id = ? AND mode = 'engine' AND write_seq = ?")
+        .bind(f.sig, f.p.state.product_id, f.p.state.write_seq)
+        .run();
+    }
 
     // 5. Deficit first: one atomic, fenced, idempotent, audited batch per product, while the budget lasts.
     // No import stock gate here (v2/write.ts step 0; Bambu import spec §B.10): the stale list is made of V2 RESULTS
@@ -536,7 +644,7 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
         idempotencyKey: `auto:${pid}:${'v2' in item ? item.v2.hash : item.ev.hash}`,
         auto: { priceSource: priceSourceOf(p.reasons), pricesUnchanged: unchanged, trigger: opts.trigger, reasons: p.reasons },
       };
-      const statements = 'v2' in item ? await v2WriteStatements(db, item.v2, { ...write, stockGate }) : await engineWriteStatements(db, item.ev, [], [], write);
+      const statements = 'v2' in item ? await v2WriteStatements(db, item.v2, { ...write, stockGate, shelfSig: shelfColumn }) : await engineWriteStatements(db, item.ev, [], [], write);
       if (statements.length > AUTO_REPRICE_STATEMENT_CAP) {
         await block(p, 'PRICING_SET_TOO_LARGE');
         continue;
@@ -560,6 +668,8 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
         continue;
       }
       report.repriced.push(pid);
+      // Row 244: a model this write leaves unsold (sold out, no supplier price) that was on sale before — the bell.
+      if ('v2' in item && newlyUnpriced(item.v2, p.v2_rows ?? [])) notices.push({ product_id: pid, key: `stock_sold_out:${pid}:${p.state.write_seq + 1}`, reason: 'stock_sold_out' });
       if (!unchanged) {
         report.changed.push(pid);
         if (p.state.slug) slugs.push(p.state.slug);
@@ -600,6 +710,17 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
     console.error('auto reprice: run failed:', e instanceof Error ? e.name : 'unknown');
     return finish('ERROR');
   }
+}
+
+/** Row 244: the bell's wording when the shelf is why a product waits (none when a rate moved). */
+function stockReasonOf(reasons: readonly string[], code: string): Pick<BlockedNotice, 'reason'> {
+  if (code === 'V2_STOCK_SOLD_OUT') return { reason: 'stock_sold_out' };
+  return reasons.length && reasons.every((r) => r === 'STOCK') ? { reason: 'stock_review' } : {};
+}
+
+/** Row 244: does this write leave unsold a SKU that the stored results still sold direct? */
+export function newlyUnpriced(ev: Pick<V2Evaluation, 'stock_unpriced'>, stored: readonly StoredV2Result[]): boolean {
+  return ev.stock_unpriced.some((combo) => stored.some((r) => r.combo_key === combo && r.channel === 'direct_sale'));
 }
 
 // ------------------------------------------------------------ the owner's status line
@@ -661,11 +782,12 @@ export async function autoRepriceStatus(db: D1Database, rates?: PricingRates | n
       lastAutoRun(db),
     ]);
     if (!r) return null;
-    // Pricing V2: V2 products count here (spec §3.5): stale through their V2 results.
+    // Pricing V2: V2 products count here (spec §3.5): stale through their V2 results — and their shelf (row 244).
     const v2Results = await loadV2ResultsOf(db, states);
+    const sigs = await shelfSigsOf(states);
     return {
       engine_products: states.length,
-      stale: staleEngineProducts(states, costs, r, v2Results).length,
+      stale: staleEngineProducts(states, costs, r, v2Results, sigs).length,
       blocked: states.filter((s) => s.reprice_blocked_code !== null).length,
       paused: control.paused,
       derived_stale: r.derived_stale,

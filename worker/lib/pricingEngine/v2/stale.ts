@@ -11,6 +11,10 @@
  *              stock route and each pre-order route's own profile).
  * A price-first product's optional cost never makes it stale: its price does
  * not depend on it.
+ *   - 'STOCK' — the shelf moved (DECISIONS row 244, shelf.ts): a cost-first
+ *              product's shelf signature is not the one its prices were
+ *              written at — a costlier batch arrived, the costliest sold out,
+ *              a shelf emptied or refilled.
  *
  * Codes only, never a rate (the reasons ride in pricing_audit summaries and
  * audit_log details).
@@ -29,9 +33,13 @@ const same = (a: string | null | undefined, b: string | null | undefined): boole
   }
 };
 
-/** What moved since the stored V2 results were computed (sorted codes; empty = current). */
-export function staleReasonsV2(rows: readonly StoredV2Result[], rates: PricingRates): string[] {
+/**
+ * What moved since the stored V2 results were computed (sorted codes; empty = current). `shelf`: the
+ * product's stored shelf signature and today's (row 244), read only for a cost-first product.
+ */
+export function staleReasonsV2(rows: readonly StoredV2Result[], rates: PricingRates, shelf?: { stored: string | null; current: string | null }): string[] {
   const out = new Set<string>();
+  if (shelf && rows.length && rows.every((r) => r.method === 'cost') && (shelf.stored ?? null) !== (shelf.current ?? null)) out.add('STOCK');
   for (const r of rows) {
     if (!same(r.usd_iqd_rate, rates.usd_iqd)) out.add('USD');
     if (r.method !== 'cost') continue;
