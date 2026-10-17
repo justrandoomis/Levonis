@@ -200,7 +200,7 @@ test('Q2: the owner sends dollars, method and cost; a price editor sends dollars
     product_usd: '1093.75',
     min_profit_usd: '120',
     cost: { ...base.cost, supplier_amount: '450', supplier_currency: 'EUR' },
-    models: { m2: { price: 'delta', usd: '-43.21', discount: 'exception', discount_usd: '13.79', supplier_amount: '', supplier_currency: '', weight_g: null, box: null } },
+    models: { m2: { price: 'delta', usd: '-43.21', discount: 'exception', discount_usd: '13.79', supplier_amount: '', supplier_currency: '', weight_g: null, box: null, profit: 'follow', profit_usd: '' } },
   };
   const dollars = { points: stored.editor_usd!.points, discounts: stored.editor_usd!.discounts };
   const ownerWire = draftWire(base, typed, dollars, LIVE, { needsMethod: false, cost: true, money: true });

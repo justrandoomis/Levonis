@@ -116,7 +116,7 @@ are always both shown (fixes P4/P15).
 | Level | Choices (one selector) | Effect on D (P follows through Δ) |
 |---|---|---|
 | Product | method + inputs (1.2) | base D |
-| Model | «يتبع المنتج» · «تكلفة مختلفة» (cost-first, owner: own supplier cost and weight or box) · «فرق في السعر ± $» · «سعر خاص $» | replaces or adjusts D |
+| Model | «يتبع المنتج» · «تكلفة مختلفة» (cost-first, owner: own supplier cost + the option's packaged weight and box from «أبعاد الخيار» + an optional minimum-profit exception, row 247) · «فرق في السعر ± $» · «سعر خاص $» | replaces or adjusts D |
 | Colour | «يتبع الموديل» · «± $ فوق الموديل» (Decision C) | adds to every model's D for that colour |
 | SKU (model × colour) | in «التفاصيل» only: «سعر خاص $» | replaces D for that SKU |
 
@@ -125,6 +125,14 @@ are always both shown (fixes P4/P15).
   happen.
 - «كل الألوان بسعر واحد» is the default: colours follow the model. The colour list also has a
   bulk action, «طبّق على الألوان المحددة».
+- «تكلفة مختلفة» (DECISIONS row 247) is three things, each inherited from the product until set:
+  the model's own supplier price (an amount typed with the currency at «يتبع المنتج» names the
+  product's currency); its weight and box, which ARE the option's packaged dimensions of
+  «أبعاد الخيار» (one source: the panel edits those same fields; the `pricing_inputs` option row is
+  a mirror the save writes in the same batch; net weight is never used; an option that inherits its
+  package leaves the product's pricing measure); and its minimum profit «يتبع المنتج: $X | استثناء»,
+  an option-scope `target_profit` rule (migration 0181, no new column). «رجوع للموروث» clears the
+  own cost and sends the model's minimum profit back to INHERIT.
 
 ### 1.5 Rounding (one rule, one place)
 
@@ -332,15 +340,18 @@ four-cell bar plus the pre-order cell. The per-model table becomes one card per 
 │ │ الألوان       ● Black   ● White   ● Red (+$2)                                       │
 │ └────────────────────────────────────────────────────────────────────────────────────┘
 │ ┌ Combo ─────────────────────────────────────────────────────────────────────────────┐
-│ │ السعر         [ تكلفة مختلفة ▾ ]  المورد [ 650.00 ][EUR]  الوزن [ 30 ] كغ          │
-│ │                                                مباشر 1,815,000 · مسبق 1,778,000     │
+│ │ السعر         [ تكلفة مختلفة ▾ ]  المورد [ 650.00 ][يتبع المنتج: EUR]              │
+│ │               الوزن [ 30 ] كغ  الصندوق [56][54][43] سم  (من «أبعاد الخيار»)          │
+│ │               الحد الأدنى للربح [ يتبع المنتج: $318.00 ▾ | استثناء ]                │
+│ │                              مباشر 1,815,000 · بري 1,777,500 (بعد خصم $25.00)       │
 │ │ خصم المسبق    [ استثناء ▾ ] [ 25.00 ] $   (المنتج: 50$)   [رجوع للموروث]            │
 │ │ يُباع         [✓] بيع مباشر · المخزون 2   [✓] طلب مسبق: [✓] بري                     │
 │ └────────────────────────────────────────────────────────────────────────────────────┘
 │ الألوان   [☐ تحديد عدة ألوان → «طبّق نفس السعر على المحدد»]
 │ ┌ Red ───────────────────────────────────────────┐
 │ │ السعر   [ ± فوق الموديل ▾ ] [ +2.00 ] $         │
-│ │         Standard 1,503,000 · Combo 1,818,000    │
+│ │  Standard: مباشر 1,503,000 · بري 1,428,000      │
+│ │  Combo: مباشر 1,818,000 · بري 1,780,500         │
 │ │ يظهر مع [✓] Standard [✓] Combo · المخزون حسب الموديل │
 │ └─────────────────────────────────────────────────┘
 ╰──
@@ -363,13 +374,21 @@ four-cell bar plus the pre-order cell. The per-model table becomes one card per 
 │   خصم المسبق [ يتبع: 50$ ▾ ]
 │   يُباع [✓] مباشر  [✓] مسبق: بري
 │ ▸ Combo · تكلفة مختلفة · خصم 25$
-│   1,815,000 / 1,778,000
+│   1,815,000 / بري 1,777,500 (بعد خصم $25.00)
 │ الألوان: Black · White · Red +$2  [تحرير]
 ╰──
 ```
 
 Each model card is one accordion row whose summary carries the result. The 5,364-px-tall page
 from the survey becomes one screen per open model.
+
+Every model and colour card (row 247) shows the server's figures with their reasons, to the owner:
+the discount taken («بعد خصم $35.00», only when the pre-order is below the direct price), «من
+المخزون: …» when the direct price comes from the shelf (and, on «تكلفة مختلفة», that the supplier
+cost prices the model once the shelf is empty), and the same notes as the result bar — the discount
+withdrawn, a route stopped or unavailable, lifted to the minimum profit. A blocked route reads «لا
+سعر بعد», never a bare «—». The card has its own «يجري حساب الأسعار…» / failure line. A model with no
+colour-less SKU shows a colour that follows it, and names that colour.
 
 ### 2.6 Save and review
 
@@ -848,13 +867,12 @@ price it is «يحتاج تسعيرًا» — not sold — and the owner's bell 
 re-expressed through a rate:
 
     E_D = R_shelf + T × U + (Σ option ± + colour ±) × U      never below R_shelf + T × U
-    D   = round(E_D)   (the engine's one rounding, roundPriceIqd, row 245)  so D − R_shelf ≥ T × U at publication
+    D   = roundPriceIqd(E_D)   (the engine's one rounding, row 245)  so D − R_shelf ≥ T × U at publication
 
 A fixed price (SKU or model) on a cost-first product is floored at R_shelf + T × U as at §1.3. A
 change of U moves the profit and the differences only (the `USD` reason, as today). The owner's
 example: A1 Combo's batches at 685,831 / 689,581 / 690,062 IQD, T = $40, U = 1,500 → D =
-round(690,062 + 60,000) = 750,250 (row 245: above 1,000 up to the next 250); when the 690,062 batch
-sells out, 749,750.
+roundPriceIqd(690,062 + 60,000) = 750,250; when the 690,062 batch sells out, 749,750.
 
 **Which batches are a SKU's shelf** — the cart's own stock rule (`resolveStock`) under the product's
 CURRENT inventory mode: BASE the product's batches; OPTION the batches of each option value the SKU
@@ -862,13 +880,22 @@ selects (its model — two stocked options add their costs, the units are the fe
 colour's; VARIANT_COMBINATION the variant's. A batch with no known cost never sets the price (the
 highest KNOWN cost does); a shelf of unknown costs only is priced from the supplier.
 
-**Pre-order is not the shelf.** A route keeps the supplier calculation: P_r = round(E_D,sup −
-Δ × U), E_D,sup being the direct price the supplier cost would give, with the route floors of §1.3
-measured against it — so the shelf never moves a pre-order price. It is capped at the direct price on
-sale (P ≤ D); it is stopped while the shelf sells below the route's own cost
-(`V2_ROUTE_SHELF_CHEAPER`); with no supplier price it is unavailable while the shelf sells
-(`V2_ROUTE_NO_SUPPLIER`) — no error on the direct price. These blocks are temporary: the route row
-stays on, the SKU simply has no row on it, and nothing needs the owner's preview.
+**Pre-order follows the direct price on the shelf too (row 247, amending row 244's detail).** As for
+every SKU (B1): P_r = roundPriceIqd(E_D − Δ × U), E_D being the exact direct price the SKU sells at —
+the shelf's. A costlier or cheaper batch moves the direct price and the pre-order together, and the
+discount between them stays Δ. The route floors of §1.3 are measured against the route's OWN supplier
+cost R_r (the model's own cost if typed, else the product's), with three outcomes:
+- P_r > roundPriceIqd(R_r): the route sells at P_r, the discount shown;
+- P_r ≤ roundPriceIqd(R_r) < D: the discount is withdrawn — the route sells at D with the owner's
+  warning (`V2_DISCOUNT_WITHDRAWN`);
+- roundPriceIqd(R_r) ≥ D: stopped while the shelf sells below the route's own cost
+  (`V2_ROUTE_SHELF_CHEAPER`).
+With no supplier price the route is unavailable while the shelf sells (`V2_ROUTE_NO_SUPPLIER`) — no
+error on the direct price. There is no silent cap: P ≤ D holds by construction, and a pre-order equal
+to the direct price always carries its reason. While the shelf sells, a model's own supplier cost no
+longer moves either price — it decides only whether a route's discount is withdrawn or the route is
+stopped, and prices the model once the shelf is empty. The blocks are temporary: the route row stays
+on, the SKU simply has no row on it, and nothing needs the owner's preview.
 
 **Recomputed by the existing queue.** Every V2 write stores the shelf it priced at as a hash
 (`product_pricing_state.shelf_sig`, migration 0198: each shelf identity's highest known cost,

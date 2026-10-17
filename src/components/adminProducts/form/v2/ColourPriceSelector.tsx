@@ -5,14 +5,18 @@
  *   «السعر [يتبع الموديل | ± $ فوق الموديل]» — one dollar difference added to
  *   EVERY model's price for that colour, so «Red +$2» never erases a model's
  *   premium (C1);
- *   the result per model it shows with — «Standard 1,503,000 · Combo 1,818,000»;
+ *   the result per model it shows with — «Standard: مباشر 1,503,000 · بري
+ *   1,450,500 (بعد خصم $35.00)», each figure labelled by its channel (a
+ *   pre-order-only SKU names its route), and the owner's reasons under it
+ *   (`lineNotes`, row 247);
  *   «حدّد» ticks it for «طبّق على الألوان المحددة» (ColourBulkBar).
  * The default is «كل الألوان بسعر واحد»: colours follow their model.
  */
-import { FOLLOW_COLOUR, colourLines, iqdText, nameIn, type ColourDraft, type V2TableRow } from './v2Model';
+import { FOLLOW_COLOUR, colourLines, firstPreorder, iqdText, nameIn, preorderOffOf, usdText, type ColourDraft, type V2TableRow } from './v2Model';
 import { useV2 } from './useV2Pricing';
 import { Select } from '../formUi';
-import { Chip, UsdInput, useV2Lang, useV2Strings, V2Field } from './v2Ui';
+import { lineNotes } from './ResultBar';
+import { channelName, Chip, UsdInput, useV2Lang, useV2Strings, V2Field } from './v2Ui';
 
 export default function ColourPriceSelector({ id, table }: { id: string; table: readonly V2TableRow[] }) {
   const v2 = useV2();
@@ -22,15 +26,51 @@ export default function ColourPriceSelector({ id, table }: { id: string; table: 
   const d = v2.draft;
   const c: ColourDraft = d?.colours[id] ?? FOLLOW_COLOUR;
   const lines = colourLines(table, id);
+  const owner = v2.owner;
+  const fig = (row: V2TableRow) =>
+    row.blocked ? (
+      <span className="font-bold text-text-primary">{s.noPriceYet}</span>
+    ) : (
+      <span dir="ltr" className="font-bold tabular-nums text-text-primary">
+        {iqdText(row.price_iqd)}
+      </span>
+    );
+  const notes = owner ? [...new Set(lines.flatMap((l) => lineNotes(l, s)))] : [];
   const result = lines.length ? (
-    <p className="text-[11px] text-text-secondary" dir="auto" data-v2-colour-result={id}>
-      {lines.map((l, i) => (
-        <span key={l.combo_key}>
-          {i ? ' · ' : ''}
-          {nameIn(l.names, lang)} <span dir="ltr" className="font-bold tabular-nums text-text-primary">{iqdText(l.channels.direct_sale?.price_iqd ?? Object.values(l.channels)[0]?.price_iqd)}</span>
-        </span>
-      ))}
-    </p>
+    <div className="grid min-w-0 gap-0.5">
+      <ul className="grid gap-0.5 text-[11px] text-text-secondary" dir="auto" data-v2-colour-result={id}>
+        {lines.map((l) => {
+          const direct = l.channels.direct_sale ?? null;
+          const pre = firstPreorder(l);
+          const off = owner ? preorderOffOf(pre, direct) : null;
+          return (
+            <li key={l.combo_key} className="min-w-0">
+              <span className="font-bold">{nameIn(l.names, lang)}:</span>{' '}
+              {direct ? (
+                <>
+                  {s.direct} {fig(direct)}
+                </>
+              ) : null}
+              {direct && pre ? ' · ' : null}
+              {/* A pre-order-only SKU is labelled with its route, never shown as an unlabelled figure. */}
+              {pre ? (
+                <>
+                  {channelName(pre.channel, lang)} {fig(pre)}
+                  {off ? ` (${s.preorderAfterOff(usdText(off))})` : null}
+                </>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+      {notes.length ? (
+        <ul className="grid gap-0.5 text-[11px] text-amber-300" data-v2-colour-notes={id}>
+          {notes.map((n) => (
+            <li key={n}>{n}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   ) : null;
   if (!d || !v2.money) {
     return result ? <div className="mt-2 border-t border-border-subtle pt-2 min-w-0" data-v2-colour={id}>{result}</div> : null;

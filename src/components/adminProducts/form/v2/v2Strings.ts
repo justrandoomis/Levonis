@@ -176,6 +176,16 @@ export interface V2Strings {
   routeNoSupplierNote: string;
   routeShelfCheaperNote: string;
   stockSoldOutNote: string;
+  /** DECISIONS row 247 — «تكلفة مختلفة»: the weight and the box ARE the option's packaged dimensions (one source). */
+  optionMeasureFrom: string;
+  /** An own-cost model whose option inherits its package: the product's pricing measure it falls back to. */
+  inheritsProductMeasure: Fill;
+  /** A legacy own-cost measure stored in pricing only (the option's dimensions empty): kept, never cleared silently. */
+  savedPricingOnly: string;
+  /** The pre-order's discount beside its price on a model or colour card (the owner's): «بعد خصم $35.00». */
+  preorderAfterOff: Fill;
+  /** «تكلفة مختلفة» on a model with stock: the shelf prices the direct sale; this cost prices it once the shelf is empty. */
+  shelfOwnCostNote: string;
 }
 
 const AR: V2Strings = {
@@ -326,6 +336,11 @@ const AR: V2Strings = {
   stockSoldOut: 'يحتاج تسعيرًا: نفد المخزون',
   routeNoSupplierNote: 'الطلب المسبق غير متاح لهذا الموديل حتى يُدخَل سعر المورّد؛ البيع المباشر من المخزون.',
   stockSoldOutNote: 'نفد مخزون هذا الموديل ولا يوجد سعر مورّد — لا يُباع حتى تُسعّره.',
+  optionMeasureFrom: 'الوزن والصندوق من «أبعاد الخيار» (الوزن مع الصندوق) — تعديلهما هنا يعدّل تلك الأبعاد',
+  inheritsProductMeasure: (v) => `يرث من المنتج: ${v}`,
+  savedPricingOnly: 'محفوظ في التسعير فقط — اكتبه في أبعاد الخيار',
+  preorderAfterOff: (usd) => `بعد خصم ${usd}`,
+  shelfOwnCostNote: 'ما دام للموديل قطع على الرف فسعر البيع المباشر من المخزون؛ تكلفة المورّد هنا تُسعّره حين ينفد الرف، وتحدّد هل يغطي الطلب المسبق بعد الخصم تكلفته',
 };
 
 const EN: V2Strings = {
@@ -475,6 +490,12 @@ const EN: V2Strings = {
   stockSoldOut: 'Needs pricing: sold out',
   routeNoSupplierNote: 'Pre-order is unavailable for this model until a supplier price is entered; the direct sale is priced from stock.',
   stockSoldOutNote: 'This model is sold out and has no supplier price — it is not sold until you price it.',
+  optionMeasureFrom: "Weight and box are the option's packaged dimensions («Option dimensions») — editing them here edits those",
+  inheritsProductMeasure: (v) => `Inherits the product: ${v}`,
+  savedPricingOnly: "Saved in pricing only — enter it in the option's dimensions",
+  preorderAfterOff: (usd) => `after ${usd} off`,
+  shelfOwnCostNote:
+    'While this model has units on the shelf its direct price comes from stock; this supplier cost prices it once the shelf is empty, and decides whether the discounted pre-order clears its cost',
 };
 
 const CKB: V2Strings = {
@@ -624,6 +645,12 @@ const CKB: V2Strings = {
   stockSoldOut: 'پێویستی بە نرخدانانە: کۆگا نەماوە',
   routeNoSupplierNote: 'تا نرخی دابینکەر نەنووسرێت پێشداواکردن بۆ ئەم مۆدێلە بەردەست نییە؛ فرۆشتنی ڕاستەوخۆ لە کۆگاوە نرخی بۆ دادەنرێت.',
   stockSoldOutNote: 'کۆگای ئەم مۆدێلە نەماوە و نرخی دابینکەری نییە — تا نرخی بۆ دانەنێیت نافرۆشرێت.',
+  optionMeasureFrom: 'کێش و سندوق ڕەهەندە پاکێجکراوەکانی هەڵبژاردەکەن («ڕەهەندەکانی هەڵبژاردە») — گۆڕینیان لێرە ئەوانیش دەگۆڕێت',
+  inheritsProductMeasure: (v) => `لە بەرهەمەکەوە وەردەگیرێت: ${v}`,
+  savedPricingOnly: 'تەنها لە نرخداناندا پاشەکەوت کراوە — لە ڕەهەندەکانی هەڵبژاردەدا بینووسە',
+  preorderAfterOff: (usd) => `دوای کەمکردنەوەی ${usd}`,
+  shelfOwnCostNote:
+    'تا ئەم مۆدێلە دانەی لەسەر ڕەفە هەبێت نرخی فرۆشتنی ڕاستەوخۆ لە کۆگاوە دێت؛ ئەم تێچووی دابینکەرە کاتێک ڕەفەکە بەتاڵ بوو نرخی بۆ دادەنێت، و دیاری دەکات ئایا پێشداواکردن دوای داشکاندن تێچووەکەی دادەپۆشێت',
 };
 
 export const V2_STRINGS: Readonly<Record<'ar' | 'en' | 'ckb', V2Strings>> = { ar: AR, en: EN, ckb: CKB };

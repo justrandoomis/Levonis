@@ -8,14 +8,18 @@
  * nothing («—», «ما ينقص: …»). Proves, through the real V2 writer, the real
  * quarter-hour sweep and the real routes:
  *   - the max-of-shelf rule, per model: Combo's direct cost is 690,062, A1's
- *     500,346, D = ceil_1000(cost + T × U), stored with its R;
+ *     500,346, D = round(cost + T × U) by the one rounding rule
+ *     (`roundPriceIqd`, row 245), stored with its R;
  *   - selling a unit that leaves the costliest batch, or receiving a cheaper
  *     one, moves nothing (not even stale); the costliest sold out reprices DOWN
  *     to the next max, a costlier batch received reprices UP — through the
  *     sweep (reason STOCK, `engine_owner` in the history);
- *   - pre-order keeps the supplier calculation: unavailable while there is no
- *     supplier price (no error for the direct price), and, with one, its price
- *     never moves with the shelf;
+ *   - pre-order follows the direct price on the shelf too (row 247, B1):
+ *     P = round(E_D − Δ × U), so a batch that moves D moves P with it and
+ *     D − P stays Δ; unavailable while there is no supplier price (no error
+ *     for the direct price); withdrawn to D when the discounted price does not
+ *     clear the route's own supplier cost; stopped while the shelf sells below
+ *     that cost;
  *   - the shelf sold out → the supplier price; sold out with no supplier price
  *     → the model is not sold («يحتاج تسعيرًا») and the owner's bell rings;
  *     restocked → priced from the shelf again; every model sold out → the
@@ -53,7 +57,7 @@ const TU = 60_000;
 /** The engine's own rounding (never a step written here): every expected price goes through it. */
 const D = (iqd: number) => roundPriceIqd(iqd);
 /** The owner's figures: A1 Combo from its costliest batch, A1 from its one. */
-const COMBO_D = D(690_062 + TU); // 750,250 (row 245: above 1,000 up to the next 250)
+const COMBO_D = D(690_062 + TU); // 750,250
 const A1_D = D(500_346 + TU); // 560,500
 const sql = (v: unknown): string => (v === null || v === undefined ? 'NULL' : typeof v === 'number' ? String(v) : `'${String(v).replace(/'/g, "''")}'`);
 
@@ -70,7 +74,7 @@ function lot(raw: DatabaseSync, model: string, qty: number, unitCost: number | n
 const take = (raw: DatabaseSync, id: string, qty: number) => raw.exec(`UPDATE inventory_lots SET qty_remaining = qty_remaining - ${qty} WHERE id = ${sql(id)}`);
 
 /** The owner's A1: two models, OPTION stock, each sold direct and by land pre-order; the shelf of the screenshots. */
-async function world(o: { supplier?: boolean } = {}) {
+async function world(o: { supplier?: boolean; discountUsd?: string } = {}) {
   lotSeq = 0;
   const raw = freshDb();
   raw.exec(OWNER_ROW_SQL);
@@ -109,6 +113,7 @@ async function world(o: { supplier?: boolean } = {}) {
   const ev = await writeV2(db, PID, {
     method: 'cost',
     minimumProfitUsd: '40',
+    ...(o.discountUsd ? { discounts: [{ scope: 'product' as const, scope_id: '', usd: o.discountUsd }] } : {}),
     // A supplier price at USD 450 by Germany land, 2.5 kg: R = 450 × 1,500 + 2.5 × 3,200 = 683,000 on every route.
     ...(o.supplier ? { inputs: { supplier_cost_amount: '450', supplier_cost_currency: 'USD' as const, shipping_profile: 'GERMANY_LAND' as const, shipping_weight_g: 2500 } } : {}),
   });
@@ -138,7 +143,7 @@ test('the max-of-shelf rule, per model: A1 Combo 685,831 / 689,581 / 690,062 →
   assert.deepEqual(shelfOfSku(shelf, { option_value_ids: [COMBO], color_id: null, combo_key: `o:${COMBO}` }), { state: 'on_shelf', cost_iqd: 690_062, units: 6 });
   assert.deepEqual(shelfOfSku(shelf, { option_value_ids: [A1], color_id: null, combo_key: `o:${A1}` }), { state: 'on_shelf', cost_iqd: 500_346, units: 3 });
 
-  // Complete, and published: D = ceil_1000(max + T × U) per model.
+  // Complete, and published: D = round(max + T × U) per model.
   assert.equal(w.ev.complete, true, w.ev.codes.join(','));
   assert.deepEqual(w.ev.missing, []);
   assert.equal((await directOf(w, COMBO)).prepaid, COMBO_D);
@@ -163,7 +168,7 @@ test('the max-of-shelf rule, per model: A1 Combo 685,831 / 689,581 / 690,062 →
   assert.equal(row<{ e: number }>(w.raw, 'SELECT enabled AS e FROM product_option_transports WHERE id = ?', `${COMBO}_p_land`)!.e, 1);
 });
 
-test('the engine, pure: the shelf prices the direct sale only, in dinars as paid; differences add at U; an unknown-cost batch never sets it', () => {
+test('the engine, pure: the shelf prices the direct sale in dinars as paid, the pre-order follows it by Δ (row 247); differences add at U; an unknown-cost batch never sets it', () => {
   const rates = {
     fx: { USD: { rate: '1500', version: 1, confirmed: true }, EUR: { rate: '1650', version: 1, confirmed: true }, CNY: { rate: '210', version: 1, confirmed: true } },
     shipping: { GERMANY_LAND: { rate: '3200', version: 1, confirmed: true }, CHINA_AIR: { rate: '20000', version: 1, confirmed: true }, CHINA_SEA: { rate: '400000', version: 1, confirmed: true } },
@@ -191,20 +196,33 @@ test('the engine, pure: the shelf prices the direct sale only, in dinars as paid
   assert.equal(direct.replacement, null);
   assert.deepEqual(onShelf.issues.filter((i) => i.severity === 'error').map((i) => i.code), ['V2_ROUTE_NO_SUPPLIER']);
 
-  // Pre-order keeps the supplier calculation: the same land price whatever the shelf holds…
+  // Pre-order follows the direct price on the shelf too (row 247, B1): P = round(E_D − Δ × U), so a batch that
+  // moves D moves the land price with it and D − P stays Δ ($20 = 30,000)…
   const supDirect = D(683_000 + TU); // 743,000: R = 450 × 1,500 + 2.5 × 3,200
-  const landAt = (shelf: V2Sku['shelf']) => price(sku(shelf, supplier), [], [{ scope: 'product', scope_id: '', usd: '20' }]).channels.find((c) => c.channel === 'pre_order_land')!;
-  const land = D(683_000 + TU - 30_000);
-  assert.equal(landAt(null).price_iqd, land);
-  assert.equal(landAt({ state: 'on_shelf', cost_iqd: 690_062, units: 6 }).price_iqd, land);
-  assert.equal(landAt({ state: 'on_shelf', cost_iqd: 720_000, units: 1 }).price_iqd, land);
-  // …capped only so it never costs more than the shelf sells today (P ≤ D)…
-  const cheapShelf = price(sku({ state: 'on_shelf', cost_iqd: 640_000, units: 1 }, supplier));
+  const off20 = [{ scope: 'product' as const, scope_id: '', usd: '20' }];
+  const both = (shelf: V2Sku['shelf']) => {
+    const r = price(sku(shelf, supplier), [], off20);
+    return { r, direct: r.channels.find((c) => c.channel === 'direct_sale'), land: r.channels.find((c) => c.channel === 'pre_order_land') };
+  };
+  assert.equal(both(null).land!.price_iqd, D(683_000 + TU - 30_000));
+  for (const cost of [690_062, 720_000, 750_000]) {
+    const at = both({ state: 'on_shelf', cost_iqd: cost, units: 1 });
+    assert.equal(at.direct!.price_iqd, D(cost + TU), `shelf ${cost}: direct`);
+    assert.equal(at.land!.price_iqd, D(cost + TU - 30_000), `shelf ${cost}: land = D − Δ`);
+    assert.equal(at.land!.floor, 'none');
+    assert.equal(at.land!.discount_usd, '20');
+    assert.equal(at.land!.replacement!.replacement_cost_iqd, 683_000, 'the route still knows its own supplier cost');
+  }
+  // …the discount withdrawn (the route sells at D, with the owner's warning) when the discounted price does not clear
+  // the route's own supplier cost (640,000 + 60,000 − 30,000 = 670,000 ≤ 683,000) — never capped silently…
+  const withdrawn = both({ state: 'on_shelf', cost_iqd: 640_000, units: 1 });
   const cheapD = D(640_000 + TU);
-  assert.equal(cheapShelf.channels.find((c) => c.channel === 'direct_sale')!.price_iqd, cheapD);
-  assert.equal(cheapShelf.channels.find((c) => c.channel === 'pre_order_land')!.price_iqd, cheapD);
+  assert.equal(withdrawn.direct!.price_iqd, cheapD);
+  assert.equal(withdrawn.land!.price_iqd, cheapD);
+  assert.equal(withdrawn.land!.floor, 'discount_withdrawn');
+  assert.ok(withdrawn.r.issues.some((i) => i.code === 'V2_DISCOUNT_WITHDRAWN' && i.channel === 'pre_order_land'));
   // …and stopped while the shelf sells below the route's own cost (683,000), never sold at a loss.
-  const cheaper = price(sku({ state: 'on_shelf', cost_iqd: 600_000, units: 1 }, supplier));
+  const cheaper = price(sku({ state: 'on_shelf', cost_iqd: 600_000, units: 1 }, supplier), [], off20);
   assert.equal(cheaper.channels.find((c) => c.channel === 'direct_sale')!.price_iqd, D(600_000 + TU));
   assert.equal(cheaper.channels.find((c) => c.channel === 'pre_order_land'), undefined);
   assert.deepEqual(cheaper.issues.filter((i) => i.severity === 'error').map((i) => i.code), ['V2_ROUTE_SHELF_CHEAPER']);
@@ -291,18 +309,25 @@ test('a rise from the shelf is never held (no unit below cost + minimum profit);
   assert.deepEqual(bell.map((b) => [JSON.parse(b.meta).reason, b.title_ar]), [['stock_review', STOCK_REVIEW_NOTICE.title.ar]]);
 });
 
-test('pre-order keeps the supplier calculation: with a supplier price its land price never moves with the shelf', async () => {
-  const w = await world({ supplier: true });
-  const supDirect = D(683_000 + TU); // 743,000
+test('pre-order follows the direct price on the shelf (row 247): a batch that moves D moves the land price by the same, D − P = Δ', async () => {
+  const w = await world({ supplier: true, discountUsd: '20' });
+  const OFF = 30_000; // $20 × 1,500
   assert.equal((await directOf(w, COMBO)).prepaid, COMBO_D, 'the shelf prices the direct sale');
-  assert.equal((await landOf(w, COMBO)).prepaid, supDirect, 'the land route: the supplier calculation');
+  assert.equal((await landOf(w, COMBO)).prepaid, D(690_062 + TU - OFF), 'the land route: the shelf direct price less the discount');
+  assert.equal(COMBO_D - (await landOf(w, COMBO)).prepaid!, OFF);
   // A1's shelf sells at 560,500, below the land route's own cost (683,000): its pre-order is stopped while it sells.
   assert.equal((await landOf(w, A1)).ok, false);
   assert.equal(w.ev.rows.find((r) => r.combo_key === `o:${A1}` && r.channel === 'pre_order_land')!.blocked_code, 'V2_ROUTE_SHELF_CHEAPER');
+  // The costliest batch sells out: D falls to the next max and the land price falls with it.
   take(w.raw, w.lots.c3, 2);
   await sweep(w);
   assert.equal((await directOf(w, COMBO)).prepaid, D(689_581 + TU));
-  assert.equal((await landOf(w, COMBO)).prepaid, supDirect, 'unaffected by the shelf');
+  assert.equal((await landOf(w, COMBO)).prepaid, D(689_581 + TU - OFF), 'moved with the direct price');
+  // A costlier batch arrives: both rise, the discount between them unchanged.
+  lot(w.raw, COMBO, 1, 720_000);
+  await sweep(w);
+  assert.equal((await directOf(w, COMBO)).prepaid, D(720_000 + TU));
+  assert.equal((await landOf(w, COMBO)).prepaid, D(720_000 + TU - OFF));
 });
 
 test('the shelf sold out: back to the supplier price (and to the shelf when stock returns)', async () => {

@@ -6,25 +6,61 @@
  *   «خصم المسبق [يتبع المنتج: 50$ | استثناء]»
  * The inherited value is shown in grey; an override carries the chip
  * «استثناء» and «رجوع للموروث»; the result line «مباشر · مسبق» is the
- * server's answer for the model's first SKU. «تكلفة مختلفة» (its own supplier
- * price and weight) is the owner's and exists from cost only. A price editor
+ * server's answer for the model's SKU (`lineWithOption`). «تكلفة مختلفة» is
+ * the owner's and exists from cost only: its own supplier price (the
+ * product's shown in grey), its weight and box — the option's packaged
+ * «أبعاد الخيار» themselves, one source, edited here or there — and its own
+ * minimum profit «يتبع المنتج: $X | استثناء» (DECISIONS row 247). Under the
+ * result line the owner reads why: the discount taken («بعد خصم $35.00»),
+ * the shelf, a discount withdrawn or a route stopped (`lineNotes`), and the
+ * card's own «يجري الحساب» or failure. A price editor
  * gets the same selectors in dollars on a price-first product (Q2) and the
  * read-only result on a cost-first one. A value of another option group can
  * only carry a difference (the server's scope rule: a fixed price and a
  * discount exception name a model).
  */
 import { Select, TextInput } from '../formUi';
-import { FOLLOW_MODEL, SUPPLIER_CURRENCIES, firstPreorder, iqdText, signedUsd, usdText, type ModelDraft, type ModelPriceMode, type SkuLine, type SupplierCurrency } from './v2Model';
+import { emptyDimensions, type ProductDimensionsV2 } from '../../../../lib/productTypes';
+import {
+  FOLLOW_MODEL,
+  SUPPLIER_CURRENCIES,
+  firstPreorder,
+  iqdText,
+  nameIn,
+  optionPackageBox,
+  optionPackageWeight,
+  preorderOffOf,
+  shelfOf,
+  signedUsd,
+  usdText,
+  type ModelDraft,
+  type ModelPriceMode,
+  type SkuLine,
+  type SupplierCurrency,
+} from './v2Model';
 import { useV2 } from './useV2Pricing';
 import { boxOf, UnitInput } from './CostCard';
+import { lineNotes } from './ResultBar';
 import { useEffect, useState } from 'react';
 import { channelName, Chip, UsdInput, useV2Lang, useV2Strings, V2Field } from './v2Ui';
 
 /** A reset is a real button (44px), not a text link. */
 const RESET = 'inline-flex min-h-11 items-center px-2 text-[11px] font-bold underline underline-offset-2 text-text-secondary';
 
-/** The model's price back to «يتبع المنتج» — its discount exception untouched. */
-export const followPrice = (): Partial<ModelDraft> => ({ price: 'follow', usd: '', supplier_amount: '', supplier_currency: '', weight_g: null, box: null });
+/**
+ * The model's price back to «يتبع المنتج» — its discount exception untouched. Its own cost and its own minimum
+ * profit go (the save clears them: INHERIT); the weight and box are the option's dimensions, which stay.
+ */
+export const followPrice = (): Partial<ModelDraft> => ({
+  price: 'follow',
+  usd: '',
+  supplier_amount: '',
+  supplier_currency: '',
+  weight_g: null,
+  box: null,
+  profit: 'follow',
+  profit_usd: '',
+});
 /** The model's discount back to the product's — its price untouched. */
 export const followDiscount = (): Partial<ModelDraft> => ({ discount: 'follow', discount_usd: '' });
 
@@ -32,7 +68,7 @@ export const followDiscount = (): Partial<ModelDraft> => ({ discount: 'follow', 
  * A model's box as TYPED: a partly typed box stays on screen; the draft carries it only once all three axes are
  * set (the box is one unit), so no keystroke starts from an empty box.
  */
-function ModelBoxInputs({ fid, model, stored, onBox }: { fid: string; model: string; stored: [number, number, number] | null; onBox: (box: [number, number, number] | null) => void }) {
+function ModelBoxInputs({ fid, model, stored, onBox }: { fid: string; model: string; stored: [number, number, number] | null; onBox: (box: [number, number, number] | null, cleared: boolean) => void }) {
   const s = useV2Strings();
   const [axes, setAxes] = useState<Array<number | null>>(() => [...(stored ?? [null, null, null])]);
   const key = stored ? stored.join(',') : '';
@@ -44,7 +80,7 @@ function ModelBoxInputs({ fid, model, stored, onBox }: { fid: string; model: str
     const next = [...axes];
     next[i] = v;
     setAxes(next);
-    onBox(boxOf(next));
+    onBox(boxOf(next), next.every((x) => x === null));
   };
   return (
     <div className="grid min-w-0 gap-1.5 [grid-template-columns:repeat(3,minmax(0,1fr))]" dir="ltr">
@@ -55,25 +91,71 @@ function ModelBoxInputs({ fid, model, stored, onBox }: { fid: string; model: str
   );
 }
 
-export default function ModelPriceSelector({ id, isModel, line }: { id: string; isModel: boolean; line: SkuLine | null }) {
+/** A measure as the placeholder shows it: «6.24» kg, «56 × 54 × 43» cm. */
+const kgText = (g: number | null) => (g === null ? null : String(Number((g / 1000).toFixed(3))));
+const cmBoxText = (box: [number, number, number] | null) => (box ? box.map((mm) => String(Number((mm / 10).toFixed(1)))).join(' × ') : null);
+
+/** The option's «أبعاد الخيار» and its patcher: «تكلفة مختلفة» shows and edits the same packaged weight and box. */
+export interface ModelMeasure {
+  dims: ProductDimensionsV2 | null;
+  onDims: (dimensions: ProductDimensionsV2) => void;
+}
+
+export default function ModelPriceSelector({ id, isModel, line, measure }: { id: string; isModel: boolean; line: SkuLine | null; measure: ModelMeasure }) {
   const v2 = useV2();
   const s = useV2Strings();
   const lang = useV2Lang();
   if (!v2 || !v2.mode) return null;
   const d = v2.draft;
   const m: ModelDraft = d?.models[id] ?? FOLLOW_MODEL;
+  const owner = v2.owner;
   const direct = line?.channels.direct_sale ?? null;
   const pre = firstPreorder(line);
+  // Row 247: the discount the server took, beside the pre-order price — the owner's alone.
+  const off = owner ? preorderOffOf(pre, direct) : null;
+  const shelf = owner ? shelfOf(line) : null;
+  const notes = owner ? lineNotes(line, s) : [];
   const result = (
-    <p className="text-[11px] text-text-secondary" dir="auto" data-v2-model-result={id}>
-      {s.direct} <span dir="ltr" className="font-bold tabular-nums text-text-primary">{iqdText(direct?.price_iqd)}</span>
-      {pre ? (
-        <>
-          {' · '}
-          {channelName(pre.channel, lang)} <span dir="ltr" className="font-bold tabular-nums text-text-primary">{iqdText(pre.price_iqd)}</span>
-        </>
+    <div className="grid min-w-0 gap-0.5" data-v2-model-result-block={id}>
+      <p className="text-[11px] text-text-secondary" dir="auto" data-v2-model-result={id}>
+        {/* A model without a colour-less SKU shows one of its colours: the card names it. */}
+        {line?.color_id ? <span className="font-bold">{nameIn(line.names, lang)}: </span> : null}
+        {s.direct} <span dir="ltr" className="font-bold tabular-nums text-text-primary">{iqdText(direct?.price_iqd)}</span>
+        {pre ? (
+          <>
+            {' · '}
+            {channelName(pre.channel, lang)}{' '}
+            {pre.blocked ? (
+              <span className="font-bold text-text-primary">{s.noPriceYet}</span>
+            ) : (
+              <span dir="ltr" className="font-bold tabular-nums text-text-primary">{iqdText(pre.price_iqd)}</span>
+            )}
+            {off ? <span data-v2-model-off={id}>{` (${s.preorderAfterOff(usdText(off))})`}</span> : null}
+          </>
+        ) : null}
+      </p>
+      {shelf ? (
+        <p className="text-[11px] font-bold text-text-secondary" dir="auto" data-v2-model-stock={id}>
+          {s.sourceStock(iqdText(shelf.cost_iqd), shelf.units)}
+        </p>
       ) : null}
-    </p>
+      {shelf && m.price === 'own_cost' ? (
+        <p className="text-[11px] text-text-muted" dir="auto" data-v2-model-shelf-note={id}>
+          {s.shelfOwnCostNote}
+        </p>
+      ) : null}
+      {notes.length ? (
+        <ul className="grid gap-0.5 text-[11px] text-amber-300" data-v2-model-notes={id}>
+          {notes.map((n) => (
+            <li key={n}>{n}</li>
+          ))}
+        </ul>
+      ) : null}
+      {/* The card's own state: its figures may be the last answer while the next one is computed, or failed. */}
+      <p className="text-[10px] text-text-muted" aria-live="polite" data-v2-model-status={id}>
+        {v2.previewing ? s.computing : v2.error ? s.previewFailed(v2.error) : ''}
+      </p>
+    </div>
   );
   // A cost-first product's prices are the owner's: an editor reads the result only.
   if (!d || !v2.money) {
@@ -95,6 +177,33 @@ export default function ModelPriceSelector({ id, isModel, line }: { id: string; 
   const price = modes.some((x) => x.value === m.price) ? m.price : 'follow';
 
   const productDiscount = d.discount_usd ? usdText(d.discount_usd) : s.discountNone;
+  // «تكلفة مختلفة»: the product's values every empty field inherits, shown in grey (§2.1 rule 2).
+  const productCost = d.cost.supplier_amount ? `${d.cost.supplier_amount} ${d.cost.supplier_currency || ''}`.trim() : null;
+  const inheritedT = v2.inheritedMinimumProfit;
+  const productT = d.min_profit_usd
+    ? usdText(d.min_profit_usd)
+    : inheritedT?.amount_usd
+      ? usdText(inheritedT.amount_usd)
+      : inheritedT && inheritedT.amount_iqd !== null
+        ? iqdText(inheritedT.amount_iqd)
+        : '—';
+  // The weight and box ARE the option's packaged dimensions (row 247): one value on screen, here and there.
+  const dims = measure.dims ?? emptyDimensions();
+  const ownWeight = optionPackageWeight(measure.dims);
+  const ownBox = optionPackageBox(measure.dims);
+  const weightHint = ownWeight !== null ? s.optionMeasureFrom : m.weight_g !== null ? s.savedPricingOnly : s.inheritsProductMeasure(kgText(d.cost.weight_g) ?? '—');
+  const boxHint = ownBox !== null ? s.optionMeasureFrom : m.box !== null ? s.savedPricingOnly : s.inheritsProductMeasure(cmBoxText(d.cost.box) ?? '—');
+  // Emptied here, the field inherits: the option's own value goes, and so does a value saved in pricing only.
+  const onWeight = (package_weight_g: number | null) => {
+    measure.onDims({ ...dims, package_weight_g });
+    if (package_weight_g === null && m.weight_g !== null) set({ weight_g: null });
+  };
+  const onBox = (box: [number, number, number] | null, cleared: boolean) => {
+    // The box is one unit: a partly typed box stays on screen until its three axes are set; all three cleared, it inherits.
+    if (!box && !cleared) return;
+    measure.onDims({ ...dims, package_depth_mm: box?.[0] ?? null, package_width_mm: box?.[1] ?? null, package_height_mm: box?.[2] ?? null });
+    if (!box && m.box !== null) set({ box: null });
+  };
   return (
     <div className="mt-2 border-t border-border-subtle pt-2 min-w-0 grid gap-2" data-v2-model={id}>
       <div className="grid min-w-0 gap-2 [grid-template-columns:minmax(0,1fr)] sm:[grid-template-columns:minmax(0,1fr)_minmax(0,1fr)]">
@@ -117,15 +226,23 @@ export default function ModelPriceSelector({ id, isModel, line }: { id: string; 
       </div>
       {price === 'own_cost' ? (
         <div className="grid min-w-0 gap-2 [grid-template-columns:minmax(0,1fr)_6rem_minmax(0,1fr)]">
-          <V2Field label={s.supplier}>
+          <V2Field label={s.supplier} hint={productCost ? s.inheritedProduct(productCost) : undefined}>
             {(fid) => (
-              <TextInput id={fid} inputMode="decimal" value={m.supplier_amount} onChange={(e) => set({ supplier_amount: e.target.value.replace(/[^\d.٠-٩٫]/g, '') })} data-v2-field={`model-supplier:${id}`} />
+              <TextInput
+                id={fid}
+                inputMode="decimal"
+                value={m.supplier_amount}
+                placeholder={productCost ?? undefined}
+                onChange={(e) => set({ supplier_amount: e.target.value.replace(/[^\d.٠-٩٫]/g, '') })}
+                data-v2-field={`model-supplier:${id}`}
+              />
             )}
           </V2Field>
           <V2Field label={s.supplierCurrency}>
             {(fid) => (
-              <Select id={fid} value={m.supplier_currency} onChange={(e) => set({ supplier_currency: e.target.value as SupplierCurrency | '' })}>
-                <option value="">—</option>
+              <Select id={fid} value={m.supplier_currency} onChange={(e) => set({ supplier_currency: e.target.value as SupplierCurrency | '' })} data-v2-field={`model-currency:${id}`}>
+                {/* Empty: the product's currency, which the request then names (an amount never travels without one). */}
+                <option value="">{`${s.followsProduct}: ${d.cost.supplier_currency || '—'}`}</option>
                 {SUPPLIER_CURRENCIES.map((c) => (
                   <option key={c} value={c}>
                     {c}
@@ -134,12 +251,34 @@ export default function ModelPriceSelector({ id, isModel, line }: { id: string; 
               </Select>
             )}
           </V2Field>
-          <V2Field label={s.weightKg}>
-            {(fid) => <UnitInput id={fid} stored={m.weight_g} factor={1000} decimals={3} onChange={(weight_g) => set({ weight_g })} data={`model-weight:${id}`} />}
+          <V2Field label={s.weightKg} hint={weightHint}>
+            {(fid) => (
+              <UnitInput id={fid} stored={ownWeight ?? m.weight_g} factor={1000} decimals={3} placeholder={kgText(d.cost.weight_g) ?? undefined} onChange={onWeight} data={`model-weight:${id}`} />
+            )}
           </V2Field>
           {/* §1.4: weight OR box — a model shipped by sea is priced per CBM. */}
           <div className="[grid-column:1/-1]">
-            <V2Field label={s.boxCm}>{(fid) => <ModelBoxInputs fid={fid} model={id} stored={m.box} onBox={(box) => set({ box })} />}</V2Field>
+            <V2Field label={s.boxCm} hint={boxHint}>
+              {(fid) => <ModelBoxInputs fid={fid} model={id} stored={ownBox ?? m.box} onBox={onBox} />}
+            </V2Field>
+          </div>
+          {/* Row 247: the model's own minimum profit — the product's by default, shown beside it. */}
+          <div className="[grid-column:1/-1] grid min-w-0 gap-2 [grid-template-columns:minmax(0,1fr)] sm:[grid-template-columns:minmax(0,1fr)_minmax(0,1fr)]">
+            <V2Field label={s.minProfit}>
+              {(fid) => (
+                <Select id={fid} value={m.profit} onChange={(e) => set({ profit: e.target.value === 'exception' ? 'exception' : 'follow' })} data-v2-field={`model-profit:${id}`}>
+                  <option value="follow">{`${s.followsProduct}: ${productT}`}</option>
+                  <option value="exception">{s.exception}</option>
+                </Select>
+              )}
+            </V2Field>
+            {m.profit === 'exception' ? (
+              <V2Field label={s.minProfit} hint={s.inheritedProduct(productT)}>
+                {(fid) => (
+                  <UsdInput id={fid} value={m.profit_usd} placeholder={d.min_profit_usd || inheritedT?.amount_usd || undefined} onChange={(profit_usd) => set({ profit_usd })} data={`model-profit-usd:${id}`} />
+                )}
+              </V2Field>
+            ) : null}
           </div>
         </div>
       ) : null}

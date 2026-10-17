@@ -56,7 +56,7 @@ import ColourPriceSelector, { ColourBulkBar } from './form/v2/ColourPriceSelecto
 import { comboKeyOf, docWithoutLegacyMoney, iqdText, isContentOnlySave, lineWithOption, lowestPrice, previewOf, sectionOf as refusalSection, skuLines, withoutLegacyMoney, type V2LiveIds } from './form/v2/v2Model';
 import { headerStatusText, v2Strings } from './form/v2/v2Strings';
 import { emptyDimensions } from '../../lib/productTypes';
-import type { BrandV2, CatalogV2 } from '../../lib/productTypes';
+import type { BrandV2, CatalogV2, ProductDimensionsV2 } from '../../lib/productTypes';
 import {
   blankDoc,
   defaultProductDeliveryOptions,
@@ -677,6 +677,12 @@ export default function ProductForm({
       colours: new Set(rel.colors.filter((c) => c.active !== false).map((c) => c.id)),
     };
   }, [rel.groups, rel.colors]);
+  // Row 247: each model's own «أبعاد الخيار» — an own-cost model's weight and box are its packaged ones.
+  const optionPackagesKey = JSON.stringify((rel.groups[0]?.values ?? []).map((v) => [v.id, v.dimensions ?? null]));
+  const optionPackages = useMemo(
+    () => Object.fromEntries((JSON.parse(optionPackagesKey) as Array<[string, ProductDimensionsV2 | null]>).map(([id, d]) => [id, d])),
+    [optionPackagesKey]
+  );
   const v2 = useV2Pricing({
     // Every product this form edits is priced by V2 (a bundle never opens here: its editor is the bundles panel).
     enabled: true,
@@ -688,6 +694,7 @@ export default function ProductForm({
     structureDirty: baseline !== '' && structureKey !== savedStructureKey,
     live,
     packageDims: doc.dimensions ?? null,
+    optionPackages,
   });
   const modelNames = useCallback(
     (id: string) => {
@@ -1804,7 +1811,14 @@ export default function ProductForm({
           pricingV2={
             v2.mode
               ? {
-                  model: (v, isModel) => <ModelPriceSelector id={v.id} isModel={isModel} line={lineWithOption(v2.answer?.table ?? [], v.id)} />,
+                  model: (v, isModel, onDims) => (
+                    <ModelPriceSelector
+                      id={v.id}
+                      isModel={isModel}
+                      line={lineWithOption(v2.answer?.table ?? [], v.id, v2.draft?.colours)}
+                      measure={{ dims: v.dimensions ?? null, onDims }}
+                    />
+                  ),
                   colour: (c) => <ColourPriceSelector id={c.id} table={v2.answer?.table ?? []} />,
                   combo: (combo) => {
                     const key = comboKeyOf(combo.option_value_ids, combo.color_id);

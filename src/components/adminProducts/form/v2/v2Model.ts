@@ -69,12 +69,23 @@ export interface WireInput {
   shipping_height_mm?: number | null;
   additional_cost_iqd?: number | null;
 }
+/**
+ * One minimum-profit rule row (api.ts `minimumProfitRules`): the product's, or a model's own (DECISIONS
+ * row 247). An empty amount is INHERIT; a target the request does not name is untouched.
+ */
+export interface WireRule {
+  kind: 'target_profit';
+  scope: 'product' | 'option';
+  scope_id?: string;
+  amount_usd: string;
+}
 /** The request's `pricing` block (§4.2 `V2DraftWire`). */
 export interface V2DraftWire {
   method?: V2Method;
   points?: WirePoint[];
   discounts?: WireDiscount[];
-  cost?: { inputs?: WireInput[]; minimum_profit?: string | null };
+  /** `minimum_profit`: the product's alone as text (null: inherit), or the changed rule rows once a model's changed. */
+  cost?: { inputs?: WireInput[]; minimum_profit?: string | null | WireRule[] };
 }
 
 /** `stock` (the owner's alone, DECISIONS row 244): the direct price is read from the costliest batch on the shelf. */
@@ -268,9 +279,13 @@ export interface ModelDraft {
   /** «تكلفة مختلفة»: the model's own supplier price, its currency, its weight and its box (§1.4: weight OR box). */
   supplier_amount: string;
   supplier_currency: SupplierCurrency | '';
+  /** The option's packaged weight and box («أبعاد الخيار», `withOptionMeasure`) — the pricing row mirrors them. */
   weight_g: number | null;
   /** L × W × H in mm — one unit (a model shipped by sea is priced per CBM). */
   box: [number, number, number] | null;
+  /** «تكلفة مختلفة» only (DECISIONS row 247): the model's own minimum profit, or the product's. */
+  profit: 'follow' | 'exception';
+  profit_usd: string;
 }
 export interface ColourDraft {
   price: 'follow' | 'delta';
@@ -301,7 +316,18 @@ export interface PriceDraft {
 }
 
 export const EMPTY_COST: CostDraft = { supplier_amount: '', supplier_currency: '', route: '', weight_g: null, box: null, extras_iqd: null };
-export const FOLLOW_MODEL: ModelDraft = { price: 'follow', usd: '', discount: 'follow', discount_usd: '', supplier_amount: '', supplier_currency: '', weight_g: null, box: null };
+export const FOLLOW_MODEL: ModelDraft = {
+  price: 'follow',
+  usd: '',
+  discount: 'follow',
+  discount_usd: '',
+  supplier_amount: '',
+  supplier_currency: '',
+  weight_g: null,
+  box: null,
+  profit: 'follow',
+  profit_usd: '',
+};
 export const FOLLOW_COLOUR: ColourDraft = { price: 'follow', usd: '' };
 export const NO_SKU: SkuDraft = { fixed_usd: '', discount_usd: '' };
 
@@ -331,6 +357,11 @@ export function draftOf(answer: V2Answer | null, fallbackMethod: V2Method = 'cos
       weight_g: r.shipping_weight_g,
       box: boxOf(r),
     });
+  }
+  // Row 247: a model's own minimum profit is an «تكلفة مختلفة» choice (a point below still decides the price mode).
+  for (const r of answer?.v2_cost_inputs?.minimum_profit ?? []) {
+    if (r.scope !== 'option' || !r.scope_id || r.state !== 'ACTIVE' || !r.amount_usd) continue;
+    Object.assign(model(r.scope_id), { price: 'own_cost', profit: 'exception', profit_usd: r.amount_usd });
   }
   for (const p of points) if (p.scope === 'option') Object.assign(model(p.id), { price: p.kind, usd: p.usd });
   for (const d of discounts) if (d.scope === 'option') Object.assign(model(d.id), { discount: 'exception', discount_usd: d.usd });
@@ -373,6 +404,41 @@ export function withPackageMeasure(cost: CostDraft, dims: ProductDimensionsV2 | 
   const h = dims.package_height_mm;
   const box = cost.box ?? (typeof l === 'number' && typeof w === 'number' && typeof h === 'number' && l > 0 && w > 0 && h > 0 ? ([l, w, h] as [number, number, number]) : null);
   return weight === cost.weight_g && box === cost.box ? cost : { ...cost, weight_g: weight, box };
+}
+
+/** An option's OWN packaged weight (grams), or null when it inherits the product's. */
+export const optionPackageWeight = (dims: ProductDimensionsV2 | null | undefined): number | null =>
+  typeof dims?.package_weight_g === 'number' && dims.package_weight_g > 0 ? dims.package_weight_g : null;
+
+/** An option's OWN packaged box [L, W, H] = [depth, width, height] in mm (as `withPackageMeasure`), or null. */
+export function optionPackageBox(dims: ProductDimensionsV2 | null | undefined): [number, number, number] | null {
+  const l = dims?.package_depth_mm;
+  const w = dims?.package_width_mm;
+  const h = dims?.package_height_mm;
+  return typeof l === 'number' && typeof w === 'number' && typeof h === 'number' && l > 0 && w > 0 && h > 0 ? [l, w, h] : null;
+}
+
+/**
+ * «تكلفة مختلفة»'s weight and box ARE the option's packaged dimensions («أبعاد الخيار», DECISIONS row 247):
+ * one source. For each own-cost model whose option has its own package weight, that weight replaces the
+ * draft's; whose option has its own full box, that box replaces the draft's — so the pricing row
+ * (`pricing_inputs`, scope option) is a mirror the save writes in the same batch as the dimensions. An
+ * option that inherits its package leaves the model's measure as it is: null (the engine inherits the
+ * product's pricing measure), or a legacy value stored in pricing only — never cleared silently. Net
+ * weight is never used. The same object comes back when nothing changes.
+ */
+export function withOptionMeasure(models: Record<string, ModelDraft>, optionPackages: Readonly<Record<string, ProductDimensionsV2 | null | undefined>>): Record<string, ModelDraft> {
+  let out: Record<string, ModelDraft> | null = null;
+  for (const [id, m] of Object.entries(models)) {
+    if (m.price !== 'own_cost') continue;
+    const weight = optionPackageWeight(optionPackages[id]) ?? m.weight_g;
+    const own = optionPackageBox(optionPackages[id]);
+    const box = own && !same(own, m.box) ? own : m.box;
+    if (weight === m.weight_g && box === m.box) continue;
+    out ??= { ...models };
+    out[id] = { ...m, weight_g: weight, box };
+  }
+  return out ?? models;
 }
 
 /** The ids each scope may name on the product as the form holds it (the server's `scopeIdsOf`). */
@@ -473,17 +539,25 @@ export function cleanUsdAmount(text: string): string | null {
   return t;
 }
 
-const modelCostFields = (m: ModelDraft | undefined): Partial<WireInput> =>
+/**
+ * A model's own cost fields. A supplier amount typed with the currency left at «يتبع المنتج» carries the
+ * product's currency explicitly: the server refuses an amount without one (productInputs.ts).
+ */
+export const modelCostFields = (m: ModelDraft | undefined, productCurrency: SupplierCurrency | '' = ''): Partial<WireInput> =>
   m && m.price === 'own_cost'
     ? {
         supplier_cost_amount: cleanUsdAmount(m.supplier_amount),
-        supplier_cost_currency: m.supplier_currency || null,
+        supplier_cost_currency: m.supplier_currency || (cleanUsdAmount(m.supplier_amount) !== null ? productCurrency || null : null),
         shipping_weight_g: m.weight_g,
         shipping_length_mm: m.box?.[0] ?? null,
         shipping_width_mm: m.box?.[1] ?? null,
         shipping_height_mm: m.box?.[2] ?? null,
       }
     : { supplier_cost_amount: null, shipping_weight_g: null, shipping_length_mm: null, shipping_width_mm: null, shipping_height_mm: null };
+
+/** A model's own minimum profit as the request states it (row 247): its exception, from «تكلفة مختلفة» only; else null. */
+export const modelProfitRule = (m: ModelDraft | undefined): string | null =>
+  m && m.price === 'own_cost' && m.profit === 'exception' ? cleanUsd(m.profit_usd) : null;
 
 /**
  * The request block: what differs from the stored draft (`base`), the stored
@@ -526,7 +600,8 @@ export function draftWire(
   const storedPoints = stored.points.filter((p) => liveRow(live, p.scope, p.id, p.kind));
   const storedDiscounts = stored.discounts.filter((d) => liveRow(live, d.scope, d.id, 'discount'));
   let points = storedPoints.filter((p) => !scopes.has(scopeKey(p.scope, p.id)));
-  let discounts = storedDiscounts.filter((d) => !scopes.has(scopeKey(d.scope, d.id)));
+  // A colour's discount is a row this form cannot draw: an edit of the colour's difference keeps it (row 247).
+  let discounts = storedDiscounts.filter((d) => d.scope === 'color' || !scopes.has(scopeKey(d.scope, d.id)));
   for (const { scope, id } of scopes.values()) {
     if (!liveRow(live, scope, id, 'delta')) continue;
     const rows = draftRows(draft, scope, id);
@@ -545,18 +620,26 @@ export function draftWire(
   const inputs: WireInput[] = [];
   const baseEntry = costEntry('base', '', baseFields(draft.cost), baseFields(base.cost));
   if (baseEntry) inputs.push(baseEntry);
+  // A model's own minimum profit (row 247): only the rows that changed — a target left out is untouched.
+  const profitRows: WireRule[] = [];
   for (const id of new Set([...Object.keys(draft.models), ...Object.keys(base.models)])) {
     if (!live.models.has(id)) continue;
     // «تكلفة مختلفة» is a cost-first choice: a price-first save never touches a model's own cost.
-    const now = draft.method === 'cost' ? modelCostFields(draft.models[id]) : modelCostFields(base.models[id]);
-    const entry = costEntry('option', id, now, modelCostFields(base.models[id]));
+    const mine = draft.method === 'cost' ? draft.models[id] : base.models[id];
+    const now = modelCostFields(mine, draft.cost.supplier_currency);
+    const entry = costEntry('option', id, now, modelCostFields(base.models[id], base.cost.supplier_currency));
     if (entry) inputs.push(entry);
+    const profit = modelProfitRule(mine);
+    if (profit !== modelProfitRule(base.models[id])) profitRows.push({ kind: 'target_profit', scope: 'option', scope_id: id, amount_usd: profit ?? '' });
   }
   const minimum = draft.min_profit_usd !== base.min_profit_usd;
-  if (inputs.length || minimum) {
+  if (inputs.length || minimum || profitRows.length) {
     wire.cost = {};
     if (inputs.length) wire.cost.inputs = inputs;
-    if (minimum) wire.cost.minimum_profit = cleanUsd(draft.min_profit_usd);
+    // The product's alone keeps the text form; with a model's, the changed rows (the product's first).
+    if (profitRows.length) {
+      wire.cost.minimum_profit = [...(minimum ? [{ kind: 'target_profit' as const, scope: 'product' as const, amount_usd: cleanUsd(draft.min_profit_usd) ?? '' }] : []), ...profitRows];
+    } else if (minimum) wire.cost.minimum_profit = cleanUsd(draft.min_profit_usd);
   }
   return wire;
 }
@@ -672,10 +755,22 @@ export function firstLineOf(table: readonly V2TableRow[], modelId: string | null
   return skuLines(table).find((l) => (l.model_id ?? null) === modelId) ?? null;
 }
 
-/** The first SKU line a model (or any option value) sells in: its own line, else its first combination. */
-export function lineWithOption(table: readonly V2TableRow[], optionId: string): SkuLine | null {
-  const lines = skuLines(table);
-  return lines.find((l) => l.model_id === optionId && l.color_id === null) ?? lines.find((l) => l.option_value_ids.includes(optionId)) ?? null;
+/**
+ * The SKU line a model's (or any option value's) card shows: its own colour-less line, else a colour-less
+ * line it is in, else a combination whose colour follows its model (no colour difference — `colours`, the
+ * draft's, when given; else the server's source), else its first combination. The card names the colour
+ * when the line has one, so a colour's price is never read as the model's.
+ */
+export function lineWithOption(table: readonly V2TableRow[], optionId: string, colours?: Readonly<Record<string, ColourDraft>>): SkuLine | null {
+  const lines = skuLines(table).filter((l) => l.option_value_ids.includes(optionId));
+  const follows = (l: SkuLine) => (colours ? (colours[l.color_id ?? '']?.price ?? 'follow') !== 'delta' : l.source !== 'colour_delta');
+  return (
+    lines.find((l) => l.model_id === optionId && l.color_id === null) ??
+    lines.find((l) => l.color_id === null) ??
+    lines.find(follows) ??
+    lines[0] ??
+    null
+  );
 }
 
 /** The SKU lines a colour takes, one per model it shows with. */
@@ -695,6 +790,17 @@ export const nameIn = (n: V2Names | null | undefined, lang: V2Lang): string => (
 
 /** Whole dinars, grouped («1,500,000»). */
 export const iqdText = (n: number | null | undefined): string => (n === null || n === undefined ? '—' : new Intl.NumberFormat('en-US').format(n));
+
+/**
+ * The pre-order's discount the owner sees beside its price («بعد خصم $35.00», row 247): the dollars the server
+ * says it took, when the route is priced below the direct price and the discount was not withdrawn; else null.
+ */
+export function preorderOffOf(pre: V2TableRow | null | undefined, direct: V2TableRow | null | undefined): string | null {
+  const o = pre?.owner;
+  if (!pre || pre.blocked || !o || o.v2_floor === 'discount_withdrawn' || !o.v2_discount_usd || Number(o.v2_discount_usd) <= 0) return null;
+  if (pre.price_iqd === null || !direct || direct.price_iqd === null || pre.price_iqd >= direct.price_iqd) return null;
+  return o.v2_discount_usd;
+}
 
 /** Row 244 (the owner's answer only): the shelf an SKU's direct price is read from, or null. */
 export const shelfOf = (line: SkuLine | null | undefined): { cost_iqd: number; units: number } | null => line?.channels.direct_sale?.owner?.v2_shelf ?? null;

@@ -23,7 +23,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError } from '../../../../lib/api';
 import type { ProductDimensionsV2 } from '../../../../lib/productTypes';
-import { dollarsOf, draftOf, draftWire, withPackageMeasure, wireIsEmpty, type PriceDraft, type V2Answer, type V2DraftWire, type V2LiveIds } from './v2Model';
+import { dollarsOf, draftOf, draftWire, withOptionMeasure, withPackageMeasure, wireIsEmpty, type PriceDraft, type V2Answer, type V2DraftWire, type V2LiveIds } from './v2Model';
 
 export interface V2FormInput {
   /** The form edits an ordinary product (a bundle is never V2-priced). */
@@ -44,6 +44,8 @@ export interface V2FormInput {
   live: Omit<V2LiveIds, 'skus'>;
   /** «الأبعاد والوزن»: fills an empty pricing measure of a cost-first product. */
   packageDims: ProductDimensionsV2 | null;
+  /** Each model's own «أبعاد الخيار» (by option value id): an own-cost model's weight and box ARE its packaged ones (row 247). */
+  optionPackages: Readonly<Record<string, ProductDimensionsV2 | null | undefined>>;
 }
 
 export interface V2Review {
@@ -89,6 +91,8 @@ export interface V2PricingState {
   /** After a save: the stored answer is read again and the draft starts over from it. */
   afterSave: () => void;
   review: V2Review | null;
+  /** §2.1 rule 2 (the owner's): what the product's minimum profit inherits when its own field is empty. */
+  inheritedMinimumProfit?: { amount_usd: string | null; amount_iqd: number | null } | null;
   openReview: (preview: V2Answer, status: 'draft' | 'active') => void;
   reviewError: (error: string, reauth?: boolean) => void;
   closeReview: () => void;
@@ -105,7 +109,7 @@ export const useV2 = (): V2PricingState | null => useContext(V2Context);
 const failure = (e: unknown): string => (e instanceof ApiError ? e.message : e instanceof Error ? e.message : String(e));
 
 export function useV2Pricing(input: V2FormInput): V2PricingState {
-  const { enabled, productId, draftId, ownerHint, structureOf, structureKey, structureDirty, live, packageDims } = input;
+  const { enabled, productId, draftId, ownerHint, structureOf, structureKey, structureDirty, live, packageDims, optionPackages } = input;
   const mode: V2PricingState['mode'] = !enabled ? null : productId ? 'stored' : 'new';
   const [stored, setStored] = useState<V2Answer | null>(null);
   const [answer, setAnswer] = useState<V2Answer | null>(null);
@@ -175,11 +179,13 @@ export function useV2Pricing(input: V2FormInput): V2PricingState {
     adopt(null);
   }, [mode, draftId, adopt]);
 
-  // The pricing measure falls back to the package measure (cost-first, an empty pricing measure only).
+  // The pricing measure falls back to the package measure (cost-first, an empty pricing measure only), and an
+  // own-cost model's weight and box ARE its option's packaged ones (row 247: the pricing row mirrors them).
   // Applied to the stored draft too, so the fill alone is not «typed» — it still travels with the save.
   const withDims = useCallback(
-    (d: PriceDraft | null) => (d && d.method === 'cost' && owner ? { ...d, cost: withPackageMeasure(d.cost, packageDims) } : d),
-    [owner, packageDims]
+    (d: PriceDraft | null) =>
+      d && d.method === 'cost' && owner ? { ...d, cost: withPackageMeasure(d.cost, packageDims), models: withOptionMeasure(d.models, optionPackages) } : d,
+    [owner, packageDims, optionPackages]
   );
   const draftShown = useMemo(() => withDims(draft), [withDims, draft]);
   const baseShown = useMemo(() => withDims(base), [withDims, base]);
@@ -321,6 +327,7 @@ export function useV2Pricing(input: V2FormInput): V2PricingState {
     saveBlock,
     afterSave,
     review,
+    inheritedMinimumProfit: shown?.v2_cost_inputs?.inherited_minimum_profit ?? null,
     openReview,
     reviewError,
     closeReview,

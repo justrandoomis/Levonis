@@ -70,8 +70,11 @@ import { DimensionsSection } from './DimensionsSection';
  * exact-stock row, and the colours' bulk bar.
  */
 export interface OptionsPricingV2 {
-  /** `isModel`: the value belongs to the model group (the first group) — a fixed price and a discount name a model only. */
-  model: (value: FormValue, isModel: boolean) => React.ReactNode;
+  /**
+   * `isModel`: the value belongs to the model group (the first group) — a fixed price and a discount name a model only.
+   * `onDims`: the «أبعاد الخيار» patcher of the value — «تكلفة مختلفة» edits the same weight and box (row 247).
+   */
+  model: (value: FormValue, isModel: boolean, onDims: (dimensions: ProductDimensionsV2) => void) => React.ReactNode;
   colour: (color: FormColor) => React.ReactNode;
   combo?: (combo: { option_value_ids: string[]; color_id: string | null }) => React.ReactNode;
   colourBar?: React.ReactNode;
@@ -487,7 +490,7 @@ export function OptionsSection({
                   </div>
                   {errors[`value:${v.id}`] && <p className="mt-1 text-[11px] text-danger">{errors[`value:${v.id}`]}</p>}
                   {/* The model's price — one dollar selector (Pricing V2, spec §5.4). */}
-                  {pricingV2?.model(v, groupIndex === 0)}
+                  {pricingV2?.model(v, groupIndex === 0, (dimensions) => patchValue(g.id, v.id, { dimensions }))}
                   <FulfillmentEditor
                     value={v}
                     onChange={(fulfillments) => patchValue(g.id, v.id, { fulfillments })}

@@ -23,7 +23,7 @@ import { cleanUsdAmount, STOCK_ROUTES, SUPPLIER_CURRENCIES, iqdText, type CostDr
 import { useV2Lang, useV2Strings, V2Field } from './v2Ui';
 
 /** A number typed in one unit and stored in another (kg → g, cm → mm): the text stays as typed while it is typed. */
-export function UnitInput({ id, stored, factor, decimals, onChange, label, data }: {
+export function UnitInput({ id, stored, factor, decimals, onChange, label, data, placeholder }: {
   id: string;
   stored: number | null;
   factor: number;
@@ -31,6 +31,8 @@ export function UnitInput({ id, stored, factor, decimals, onChange, label, data 
   onChange: (next: number | null) => void;
   label?: string;
   data?: string;
+  /** The inherited value, in grey (§2.1 rule 2). */
+  placeholder?: string;
 }) {
   const shown = (v: number | null) => (v === null ? '' : String(Number((v / factor).toFixed(decimals))));
   const [text, setText] = useState(() => shown(stored));
@@ -52,6 +54,7 @@ export function UnitInput({ id, stored, factor, decimals, onChange, label, data 
       aria-label={label}
       data-v2-field={data}
       value={text}
+      placeholder={placeholder}
       onChange={(e) => {
         const t = e.target.value.replace(/[^\d.٠-٩٫]/g, '');
         setText(t);

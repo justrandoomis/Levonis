@@ -17,6 +17,31 @@ import { firstPreorder, iqdText, nameIn, shelfOf, usdText, type SkuLine, type V2
 import { channelName, Readout, useV2Lang, useV2Strings } from './v2Ui';
 import type { V2Strings } from './v2Strings';
 
+/**
+ * The owner's reasons under one SKU line, codes turned into words (never a figure): the discount withdrawn
+ * on a route, a route blocked (below its cost, no supplier price, the shelf cheaper), sold out, below cost
+ * + the minimum profit, below cost, lifted to the minimum profit. Shared by the result bar and the model
+ * and colour cards of section ٥ (row 247): a pre-order equal to the direct price always says why.
+ */
+export function lineNotes(
+  line: SkuLine | null | undefined,
+  s: Pick<V2Strings, 'discountTooBig' | 'routeBlocked' | 'routeNoSupplierNote' | 'routeShelfCheaperNote' | 'stockSoldOutNote' | 'belowMinProfit' | 'belowCost' | 'floorMinProfit'>
+): string[] {
+  if (!line) return [];
+  const rows = Object.values(line.channels);
+  const blockedBy = (code: string) => rows.some((r) => r?.blocked && (r.v2_blocked ?? 'V2_ROUTE_BELOW_COST') === code);
+  return [
+    ...(rows.some((r) => r?.owner?.v2_floor === 'discount_withdrawn') ? [s.discountTooBig] : []),
+    ...(blockedBy('V2_ROUTE_BELOW_COST') ? [s.routeBlocked] : []),
+    ...(blockedBy('V2_ROUTE_NO_SUPPLIER') ? [s.routeNoSupplierNote] : []),
+    ...(blockedBy('V2_ROUTE_SHELF_CHEAPER') ? [s.routeShelfCheaperNote] : []),
+    ...(blockedBy('V2_STOCK_SOLD_OUT') ? [s.stockSoldOutNote] : []),
+    ...(rows.some((r) => r?.owner?.v2_below_min_profit) ? [s.belowMinProfit] : []),
+    ...(rows.some((r) => r?.owner?.v2_below_cost) ? [s.belowCost] : []),
+    ...(rows.some((r) => r?.owner?.v2_floor === 'direct_min_profit') ? [s.floorMinProfit] : []),
+  ];
+}
+
 /** «النتيجة (Pro)» for a model; «النتيجة» alone for a product without options (never «النتيجة (—)»). */
 export function resultTitle(name: string, s: Pick<V2Strings, 'result'>): string {
   const n = name.trim();
@@ -32,19 +57,7 @@ export default function ResultBar({ line, owner, title }: { line: SkuLine | null
   const o = direct?.owner ?? null;
   const priceFirst = direct?.editor_usd_price !== undefined;
   const shelf = owner ? shelfOf(line) : null;
-  const blockedBy = (code: string | undefined) => Object.values(line.channels).some((r) => r?.blocked && (r.v2_blocked ?? 'V2_ROUTE_BELOW_COST') === code);
-  const warnings = owner
-    ? [
-        ...Object.values(line.channels).some((r) => r?.owner?.v2_floor === 'discount_withdrawn') ? [s.discountTooBig] : [],
-        ...blockedBy('V2_ROUTE_BELOW_COST') ? [s.routeBlocked] : [],
-        ...blockedBy('V2_ROUTE_NO_SUPPLIER') ? [s.routeNoSupplierNote] : [],
-        ...blockedBy('V2_ROUTE_SHELF_CHEAPER') ? [s.routeShelfCheaperNote] : [],
-        ...blockedBy('V2_STOCK_SOLD_OUT') ? [s.stockSoldOutNote] : [],
-        ...Object.values(line.channels).some((r) => r?.owner?.v2_below_min_profit) ? [s.belowMinProfit] : [],
-        ...Object.values(line.channels).some((r) => r?.owner?.v2_below_cost) ? [s.belowCost] : [],
-        ...Object.values(line.channels).some((r) => r?.owner?.v2_floor === 'direct_min_profit') ? [s.floorMinProfit] : [],
-      ]
-    : [];
+  const warnings = owner ? lineNotes(line, s) : [];
   return (
     <section className="min-w-0 mb-3" data-v2-result>
       <p className="mb-1.5 truncate text-[12px] font-bold text-text-secondary" dir="auto">
