@@ -11,7 +11,8 @@
  *   - merge into a V2-published product: fingerprints before = after, the V2
  *     results byte-identical, still published, images appended through the value
  *     map, an empty sub-category filled, a non-empty category kept;
- *   - a colour-model merge: images bound by color_id, product_colors untouched;
+ *   - a colour-model merge: images bound by color_id, product_colors untouched; the colour and SKU codes of the
+ *     colours it mapped stored at product scope and indexed, an unmapped colour's left out (the live PLA Basic block);
  *   - the fences: a lost lease, an item not WRITING, a changed payload, a lease
  *     that lapses between the plan and the batch — nothing written;
  *   - the guard triggers: a money write in the batch aborts it whole;
@@ -92,7 +93,7 @@ import { OpsRefusal, type ImportRun } from '../worker/lib/catalogImport/auth';
 import { IMPORT_INVOCATION_LIMIT } from '../worker/lib/catalogImport/budget';
 import { GUARDED_ROW_TABLES, IMPORT_GUARD_ID } from '../worker/lib/catalogImport/protectedTables';
 import { payloadSha256, parseReviewedBundle, emptyReviewedTexts, resolveTaxonomy } from '../worker/lib/catalogImport/reviewed';
-import { INDEX_STAMP } from '../worker/lib/search/store';
+import { INDEX_STAMP, searchProducts } from '../worker/lib/search/store';
 import { busFor, configureEventBus, resetEventBus } from '../worker/lib/eventBus';
 
 const one = <T = Record<string, unknown>>(w: World, sql: string, ...p: unknown[]) => ({ ...(w.raw.prepare(sql).get(...(p as never[])) as object) }) as T;
@@ -429,10 +430,14 @@ test('a merge into a printer with a legacy warranty plan and a pre-order route w
   }
 });
 
-test('a colour-model merge binds colour images by color_id and leaves product_colors untouched', async () => {
+/**
+ * An existing PLA sold by colour (two product_colors rows, no option group), and the store's PLA Basic merged into
+ * it through a reviewed value_map that names those colours only — the shape of the live
+ * `bambu-lab-pla-basic-filament` merge (every one of its 43 variants `{color_id}`), cut to two colours.
+ */
+function colourModelMerge() {
   const w = newWorld();
   const x = sample('pla-basic-filament');
-  // An existing PLA sold by colour: two product_colors rows, no option group.
   w.raw.exec(`
     INSERT INTO products (id, slug, name, name_ar, name_ku, status, price_iqd, inventory_mode, category_id, sub_category_id, options, colors, images)
       VALUES ('p_pla', 'pla-basic', 'PLA Basic', 'PLA Basic', 'PLA Basic', 'active', 25000, 'COLOR', 'cat_materials', NULL, '[]', '[]', '[]');
@@ -449,6 +454,11 @@ test('a colour-model merge binds colour images by color_id and leaves product_co
     if (v.value_ids.includes(black.id)) map[v.source_id] = { color_id: 'c_black' };
   }
   w.matches.push({ source_product_id: x.sourceProductId, source_handle: x.handle, levonis_product_id: 'p_pla', decision: 'merge', value_map: map, reason: 'same_model', reviewed_by: 't', reviewed_at: 'd' });
+  return { w, built, white, black };
+}
+
+test('a colour-model merge binds colour images by color_id and leaves product_colors untouched', async () => {
+  const { w } = colourModelMerge();
   const colours = rows(w, 'SELECT * FROM product_colors WHERE product_id = ? ORDER BY id', 'p_pla');
   const s = stage(w, 'pla-basic-filament', { writeMode: 'merge', mergeProductId: 'p_pla' });
   const { result } = await write(w, s);
@@ -464,6 +474,41 @@ test('a colour-model merge binds colour images by color_id and leaves product_co
   const fields = JSON.parse(String(one(w, 'SELECT spec_fields FROM products WHERE id = ?', 'p_pla').spec_fields)) as Record<string, string>;
   assert.equal(fields.spool_type, 'Refill | With spool');
   assert.ok(fields.color_name?.includes('white'));
+});
+
+test('a colour-model merge keeps the colour codes and SKU codes of the colours it mapped, and the product is found by them', async () => {
+  // THE LIVE BLOCK (2026-10-17): the PLA Basic merge stored none of its 72 searchable ids. Every one is scoped to a
+  // colour value or a variant, and both map to a product_colors colour, which no 0194 scope can name — so mapScope
+  // dropped them all, the index got no alias, and VERIFY's search for «10100» found only the Gradient (its own
+  // «10900», one edit away). A code the product carries is kept at product scope; an unmapped colour's is not.
+  const { w, built, white, black } = colourModelMerge();
+  const s = stage(w, 'pla-basic-filament', { writeMode: 'merge', mergeProductId: 'p_pla' });
+  await write(w, s);
+  const mappedVariants = new Set(built.payload.variants.filter((v) => v.value_ids.includes(white.id) || v.value_ids.includes(black.id)).map((v) => v.id));
+  const searchable = built.payload.external_ids.filter((e) => e.searchable);
+  const expected = searchable.filter((e) => (e.scope_kind === 'option_value' ? [white.id, black.id].includes(e.scope_id) : mappedVariants.has(e.scope_id)));
+  const codes = expected.filter((e) => e.id_type === 'color_code').map((e) => e.value).sort();
+  assert.deepEqual(codes, ['10100', '10101'], 'precondition: the two mapped colours carry their codes');
+  assert.ok(expected.some((e) => e.id_type === 'bambu_sku_code'), 'precondition: the mapped variants carry SKU codes');
+  const stored = rows<{ scope_kind: string; scope_id: string; value: string }>(
+    w,
+    'SELECT scope_kind, scope_id, value FROM product_external_ids WHERE product_id = ? AND searchable = 1 ORDER BY value',
+    'p_pla'
+  );
+  assert.deepEqual(stored.map((r) => r.value), [...new Set(expected.map((e) => e.value))].sort(), 'every code of a mapped colour, and nothing of an unmapped one');
+  assert.ok(stored.every((r) => r.scope_kind === 'product' && r.scope_id === ''), 'a product_colors colour has no 0194 scope: the product carries the code');
+  const unmapped = searchable.find((e) => e.id_type === 'color_code' && !codes.includes(e.value))!;
+  assert.ok(unmapped, 'precondition: the store sells colours the product does not');
+  // The aliases are indexed in the same batch, so the product answers its codes — and only its own.
+  const tokens = new Set(rows<{ token: string }>(w, 'SELECT token FROM search_tokens WHERE product_id = ?', 'p_pla').map((r) => r.token));
+  for (const t of ['10100', '10101', 'splfree']) assert.ok(tokens.has(t), t);
+  assert.ok(!tokens.has(unmapped.value), unmapped.value);
+  for (const code of [...codes, ...expected.filter((e) => e.id_type === 'bambu_sku_code').map((e) => e.value)]) {
+    assert.ok((await searchProducts(asD1(w.raw), code)).ids.includes('p_pla'), code);
+  }
+  // The Worker's own recompute before COMPLETE agrees: every stored alias is in the index.
+  const checks = await recomputeD1Checks(w.db, { bundle: w.bundle, runId: RUN_ID, itemId: s.itemId, media: w.media as never });
+  assert.equal(checks.checks.search_tokens, true, JSON.stringify(checks.failed));
 });
 
 test('a merge into a hidden product needs merge_publish; merge_publish publishes it; a legacy-only structure is refused', async () => {

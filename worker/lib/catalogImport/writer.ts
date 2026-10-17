@@ -723,6 +723,11 @@ interface MergeMapping {
   /** payload variant id → the existing variant, value or colour it maps to. */
   variants: Map<string, { variantId?: string; optionValueId?: string; colorId?: string }>;
   unmappedVariants: string[];
+  /**
+   * The payload variants the reviewed value_map maps (to ids the product has), and the values every one of whose
+   * variants it maps: the selections this product sells, whether or not one row of it stands for them alone.
+   */
+  merged: { values: Set<string>; variants: Set<string> };
 }
 
 function mergeMapping(payload: ImportPayload, match: ExistingMatch, rel: RelationsResponse): MergeMapping {
@@ -749,10 +754,12 @@ function mergeMapping(payload: ImportPayload, match: ExistingMatch, rel: Relatio
     else if (e.color_id && !(e.option_value_ids ?? []).length) variants.set(vid, { colorId: e.color_id });
   }
   const values: MergeMapping['values'] = new Map();
+  const mergedValues = new Set<string>();
   for (const g of payload.groups) {
     for (const val of g.values) {
       const entries = payload.variants.filter((v) => v.value_ids.includes(val.id)).map((v) => entryOf.get(v.id));
       if (!entries.length || entries.some((e) => !e)) continue;
+      mergedValues.add(val.id);
       let common: string[] | null = null;
       for (const e of entries) {
         const ids = e!.option_value_ids ?? [];
@@ -766,7 +773,7 @@ function mergeMapping(payload: ImportPayload, match: ExistingMatch, rel: Relatio
       if (colours.size === 1 && [...colours][0]) values.set(val.id, { colorId: [...colours][0] });
     }
   }
-  return { values, variants, unmappedVariants: unmapped };
+  return { values, variants, unmappedVariants: unmapped, merged: { values: mergedValues, variants: new Set(entryOf.keys()) } };
 }
 
 // ---------------------------------------------------------------- the plan
@@ -991,9 +998,26 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
     });
   }
 
+  /**
+   * AN ID THE PRODUCT CARRIES IS KEPT, at the row it names or, when no row names it alone, at product scope.
+   *
+   * A merge's colour code (scoped to a colour value) and SKU code (scoped to a variant) used to go through
+   * `mapScope` alone, which knows option values and variants only. A value_map that maps a variant to a
+   * `product_colors` colour — every colour-model filament, PLA Basic's 43 variants all `{color_id}` — therefore
+   * dropped every one of them: the live PLA Basic merge stored none of its 72 searchable ids, the index got no
+   * alias (step 11 reads this list), and VERIFY's search for «10100» found only PLA Basic Gradient, whose own
+   * «10900» is one edit away. 0194 has no colour scope, so the product carries the code; a variant or value the
+   * reviewed map does not merge (variant_not_merged) is still not the product's, and its codes stay out.
+   */
+  const idScope = (kind: string, id: string): ReturnType<typeof mapScope> => {
+    const scope = mapScope(kind, id);
+    if (scope || !mapping) return scope;
+    const merged = kind === 'option_value' ? mapping.merged.values : kind === 'variant' ? mapping.merged.variants : null;
+    return merged?.has(id) ? { kind: 'product', id: '' } : null;
+  };
   const externalIds: ImportPayload['external_ids'] = [];
   for (const e of payload.external_ids) {
-    const scope = mapScope(e.scope_kind, e.scope_id);
+    const scope = idScope(e.scope_kind, e.scope_id);
     if (!scope) continue;
     externalIds.push({ ...e, scope_kind: scope.kind, scope_id: scope.id });
   }

@@ -872,3 +872,30 @@ test('RENAMING A HASHTAG across a wide catalogue does not exceed the parameter l
     'and the index learned the new tag'
   );
 });
+
+test('an exact code reaches EVERY product that carries it; a code nobody carries falls to a one-edit neighbour', async () => {
+  // The live «10100» answer (2026-10-17) was the second line, not a short-circuit: no product's index held 10100
+  // (the PLA Basic merge had stored none of its codes), so the typo tolerance offered PLA Basic Gradient's own
+  // «10900». Once a product carries the code, the exact hit ends the search — every carrier, and no neighbour.
+  const build = async (withCarriers: boolean) => {
+    const raw = freshDb();
+    const db = asD1(raw);
+    const add = async (id: string, name: string, over: Partial<Parameters<typeof toSearchDoc>[0]>) => {
+      raw.prepare(`INSERT INTO products (id, slug, name, description, price_iqd, status) VALUES (?, ?, ?, '', 1000, 'active')`).run(id, id, name);
+      await db.batch(planSearchIndex(db, toSearchDoc({ id, name, ...over })));
+    };
+    await add('p_gradient', 'Bambu Lab PLA Basic Gradient Filament', { variantNames: ['Arctic Whisper (10900)', 'Solar Breeze (10901)'] });
+    if (withCarriers) {
+      await add('p_basic', 'Bambu Lab PLA Basic Filament 1kg', { aliases: ['10100', 'A00-W1-1.75-1000-SPLFREE'] });
+      await add('p_trial', 'Bambu Lab PLA Basic Colour Trial Set', { aliases: ['10100'] });
+    }
+    return raw;
+  };
+  const shopWith = await build(true);
+  assert.deepEqual((await ids(shopWith, '10100')).sort(), ['p_basic', 'p_trial'], 'both carriers, and not the Gradient');
+  assert.deepEqual(await ids(shopWith, '10100 '), (await ids(shopWith, '10100')), 'a finished word answers the same');
+  assert.deepEqual(await ids(shopWith, '10900'), ['p_gradient'], 'the Gradient keeps its own code');
+  assert.equal((await ids(shopWith, 'A00-W1-1.75-1000-SPLFREE'))[0], 'p_basic');
+  const shopWithout = await build(false);
+  assert.deepEqual(await ids(shopWithout, '10100'), ['p_gradient'], 'no carrier: the typo tolerance answers with 10900');
+});
