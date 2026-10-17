@@ -23,10 +23,14 @@
  *   4. two reads (the rows and refs already there), then ONE atomic batch: the
  *      new or changed rows (upserts, ≤ 98 parameters a statement), the new
  *      refs (`INSERT OR IGNORE`, 50 a statement), the ledger row;
- *   5. the products whose shown text changed — the products of a changed row
- *      and of a new ref, at most 60 — are purged from the colo's cache (the
- *      page body, its knowledge, its public v1 record); every other colo ages
- *      out within the answers' s-maxage + stale-while-revalidate (≤ 15 min).
+ *   5. the products whose shown text changed — every product a changed row is
+ *      linked to (the row's list AND the refs the database already holds: a
+ *      product dropped from a later version of the row still shows it) and the
+ *      product of every new ref — are read once for the ones that exist; at
+ *      most 60 of THOSE are purged from the colo's cache (the page body, its
+ *      knowledge, its public v1 record), so an id not written yet never takes a
+ *      live page's place; every other colo ages out within the answers'
+ *      s-maxage + stale-while-revalidate (≤ 15 min).
  *
  * The loader never deletes: a row is withdrawn by committing it again as
  * `needs_review` (stored, never shown). Nothing here is money: the 0195 guard
@@ -117,8 +121,16 @@ export interface TranslationLoadResult {
   updated: number;
   unchanged: number;
   refs_added: number;
+  /** The existing products purged (≤ PURGE_MAX, by id). */
   purge_ids: string[];
+  /** More existing products were affected than PURGE_MAX: the rest age out. */
   purge_truncated: boolean;
+}
+
+/** A product to purge: its id and the slug its cached answers are keyed by. */
+export interface PurgeTarget {
+  id: string;
+  slug: string;
 }
 
 const IDENTITY: ReadonlySet<string> = new Set(IDENTITY_TERMS);
@@ -136,7 +148,7 @@ export async function loadTranslationPart(
   part: string,
   text: string,
   counter?: InvocationCounter
-): Promise<TranslationLoadResult> {
+): Promise<TranslationLoadResult & { purge_targets: PurgeTarget[] }> {
   const index = bundledTranslationsIndex();
   const entry = PART_NAME.test(part) ? index.parts[part] : undefined;
   if (!entry) throw new OpsRefusal(409, 'TRANSLATIONS_PART_UNKNOWN', PART_NAME.test(part) ? [part] : []);
@@ -150,7 +162,7 @@ export async function loadTranslationPart(
     if (isMissing0196(e)) throw new OpsRefusal(409, 'TRANSLATIONS_SCHEMA_MISSING');
     throw e;
   }
-  const none = { part, rows: entry.rows, inserted: 0, updated: 0, unchanged: 0, refs_added: 0, purge_ids: [], purge_truncated: false };
+  const none = { part, rows: entry.rows, inserted: 0, updated: 0, unchanged: 0, refs_added: 0, purge_ids: [], purge_truncated: false, purge_targets: [] };
   if (ledger && ledger.sha256 === entry.sha256) return { ...none, skipped: true };
 
   // Every row, re-proved before anything is written. One bad row refuses the part.
@@ -178,6 +190,13 @@ export async function loadTranslationPart(
   ]);
   const existing = new Map((have.results ?? []).map((r) => [r.h, r]));
   const refSet = new Set((haveRefs.results ?? []).map((r) => `${r.product_id}\u0000${r.h}`));
+  /** Every product the database already links to a string: a changed row's words leave all their cached copies. */
+  const linked = new Map<string, string[]>();
+  for (const r of haveRefs.results ?? []) {
+    const list = linked.get(r.h);
+    if (list) list.push(r.product_id);
+    else linked.set(r.h, [r.product_id]);
+  }
 
   const upserts: unknown[][] = [];
   const newRefs: unknown[][] = [];
@@ -194,6 +213,7 @@ export async function loadTranslationPart(
     if (changed) {
       upserts.push([r.h, r.en, r.ar, r.ckb, r.kind, r.status, part]);
       for (const p of r.products) affected.add(p);
+      for (const p of linked.get(r.h) ?? []) affected.add(p);
     }
     for (const p of r.products) {
       if (refSet.has(`${p}\u0000${r.h}`)) continue;
@@ -225,7 +245,9 @@ export async function loadTranslationPart(
   if (counter && counter.count + statements.length + 1 > IMPORT_INVOCATION_LIMIT) throw new OpsRefusal(409, 'PLAN_TOO_LARGE', [part]);
   await db.batch(statements);
 
-  const ids = [...affected].sort();
+  // The affected products that exist (a create the import has not written yet has no page): the cap counts these.
+  const targets = await existingTargets(db, [...affected]);
+  const purge = targets.slice(0, PURGE_MAX);
   return {
     part,
     skipped: false,
@@ -234,32 +256,43 @@ export async function loadTranslationPart(
     updated,
     unchanged,
     refs_added: newRefs.length,
-    purge_ids: ids.slice(0, PURGE_MAX),
-    purge_truncated: ids.length > PURGE_MAX,
+    purge_ids: purge.map((t) => t.id),
+    purge_truncated: targets.length > PURGE_MAX,
+    purge_targets: purge,
   };
 }
 
-/**
- * Drops the colo's cached answers of the products a load changed: the page body, its knowledge answer and its
- * public v1 record, on the request's origin and the root domain. No listing, home or section path: a card
- * carries no memory text (I18N-DESIGN D9). Best effort, never throws; answers what it purged.
- */
-export async function purgeTranslatedProducts(
-  env: Pick<Env, 'DB' | 'STORE_ROOT_DOMAIN' | 'APP_ORIGIN'>,
-  requestUrl: string,
-  productIds: readonly string[]
-): Promise<{ products: number; paths: number; keys: number }> {
-  if (!productIds.length) return { products: 0, paths: 0, keys: 0 };
-  let slugs: string[] = [];
+/** The products of `ids` that exist, with their slugs, by id. One statement, one parameter; best effort (the rows are written). */
+async function existingTargets(db: D1Database, ids: readonly string[]): Promise<PurgeTarget[]> {
+  if (!ids.length) return [];
   try {
-    const { results } = await env.DB.prepare('SELECT id, slug FROM products WHERE id IN (SELECT value FROM json_each(?))')
-      .bind(JSON.stringify([...productIds]))
+    const { results } = await db
+      .prepare('SELECT id, slug FROM products WHERE id IN (SELECT value FROM json_each(?1))')
+      .bind(JSON.stringify([...new Set(ids)].sort()))
       .all<{ id: string; slug: string }>();
-    slugs = [...new Set((results ?? []).map((r) => String(r.slug ?? '')).filter(Boolean))].sort();
+    return (results ?? [])
+      .map((r) => ({ id: String(r.id ?? ''), slug: String(r.slug ?? '') }))
+      .filter((t) => t.id && t.slug)
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   } catch (e) {
     console.error('catalog_translations_purge_failed', JSON.stringify({ code: 'IMPORT_PURGE_FAILED', name: e instanceof Error ? e.name : typeof e }));
-    return { products: 0, paths: 0, keys: 0 };
+    return [];
   }
+}
+
+/**
+ * Drops the colo's cached answers of the products a load changed (`loadTranslationPart`'s `purge_targets`, read
+ * there): the page body, its knowledge answer and its public v1 record, on the request's origin and the root
+ * domain. No listing, home or section path: a card carries no memory text (I18N-DESIGN D9). Best effort, never
+ * throws; answers what it purged.
+ */
+export async function purgeTranslatedProducts(
+  env: Pick<Env, 'STORE_ROOT_DOMAIN' | 'APP_ORIGIN'>,
+  requestUrl: string,
+  targets: readonly PurgeTarget[]
+): Promise<{ products: number; paths: number; keys: number }> {
+  const slugs = [...new Set(targets.map((t) => t.slug).filter(Boolean))].sort();
+  if (!slugs.length) return { products: 0, paths: 0, keys: 0 };
   const paths = slugs.flatMap((s) => [`/api/products/${s}`, `/api/products/${s}/knowledge`, `/api/public/v1/products/${encodeURIComponent(s)}`]);
   let keys = 0;
   for (const origin of purgeOrigins(env, requestUrl)) {

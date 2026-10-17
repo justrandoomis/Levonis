@@ -78,6 +78,38 @@ test('namesOnly: a statement of names and connectors is names; one more word is 
   assert.equal(namesOnly('٢٤', names), false, 'no Latin word: nothing was matched');
 });
 
+test('namesOnly: no name removed is never «only names»; the connectors are the design\'s list (review: connector-only English)', () => {
+  // I18N-DESIGN §C.3: and or & / , ; + with series printers compatible compatibility — nothing else.
+  assert.equal(namesOnly('Compatible with all printers', []), false, 'connectors alone: no name was matched');
+  assert.equal(namesOnly('Compatible with all printers', ['AMS Hub']), false);
+  assert.equal(namesOnly('Compatible with printers', ['AMS Hub']), false, 'only connectors, but no name: says something');
+  assert.equal(namesOnly('For the AMS', ['AMS']), false, '«for» and «the» are words, not connectors');
+  assert.equal(namesOnly('Compatible with all X1 Series printers', ['X1 Series']), false, '«all» is a word');
+  assert.equal(namesOnly('X1C printer', ['X1C']), false, '«printer» (singular) is not in the list');
+  assert.equal(namesOnly('Compatibility: X1 Series, P1P', ['X1 Series', 'P1P']), true, 'names and the design\'s connectors');
+  assert.equal(namesOnly('X1 Series + P1 Series', ['X1 Series', 'P1 Series']), true);
+});
+
+test('translateLines with the stored slot: a line the memory misses keeps the stored line (review: one hit wiped the slot)', () => {
+  const en = 'Smooth filament path.\nColor: Gray\nAn untranslated line.';
+  const base = { ar: 'مسار سلس قديم\nاللون: رمادي\nAn untranslated line.', ckb: 'ڕێڕەوی کۆن\nڕەنگ: خۆڵەمێشی\nAn untranslated line.' };
+  const t = translateLines(en, lookup, base);
+  assert.equal(t.hit, 1);
+  assert.equal(t.ar, 'مسار خيط سلس.\nاللون: رمادي\nAn untranslated line.', 'the dictionary\'s line survives');
+  assert.equal(t.ckb, 'ڕێڕەوی فیلامێنتی نەرم.\nڕەنگ: خۆڵەمێشی\nAn untranslated line.');
+  // A table row: a missed cell keeps the stored cell when the stored row has the same cells.
+  const cells = translateLines('Weight | Strong | Gray', lookup, { ar: 'الوزن | قوي | رمادي', ckb: 'کێش | بەهێز | خۆڵەمێشی' });
+  assert.equal(cells.ar, 'الوزن | قوي | رمادي');
+  assert.equal(cells.ckb, 'کێش | بەهێز | خۆڵەمێشی');
+  // A stored slot cut into other lines than the English is not aligned: a missed line keeps its English.
+  const off = translateLines(en, lookup, { ar: 'سطر واحد', ckb: 'یەک دێڕ' });
+  assert.equal(off.ar, 'مسار خيط سلس.\nColor: Gray\nAn untranslated line.');
+  // Without a stored slot: exactly as before.
+  assert.equal(translateLines(en, lookup).ar, 'مسار خيط سلس.\nColor: Gray\nAn untranslated line.');
+  // A stored line that is blank or a copy of another language never stands in for a translation the memory has.
+  assert.equal(translateLines(en, lookup, { ar: '', ckb: '' }).ar, 'مسار خيط سلس.\nColor: Gray\nAn untranslated line.');
+});
+
 const IDENTITY = new Set(IDENTITY_TERMS);
 
 function row(en: string, ar: string, ckb: string, over: Partial<TranslationRow> & Record<string, unknown> = {}): Record<string, unknown> {
@@ -125,6 +157,13 @@ test('validateTranslationRow: every refusal code, one failing example each', () 
     ['MONEY_ADDED', row('Gray', 'رمادي بسعر خاص', 'خۆڵەمێشی', { kind: 'spec_value_text' })],
     ['MONEY_ADDED', row('Gray', 'رمادي', 'خۆڵەمێشی بە نرخی تایبەت', { kind: 'spec_value_text' })],
     ['MONEY_ADDED', row('Gray', 'رمادي - الشحن خلال يومين', 'خۆڵەمێشی', { kind: 'spec_value_text' })],
+    ['MONEY_ADDED', row('Gray', 'رمادي', 'نرخی خۆڵەمێشی', { kind: 'spec_value_text' })],
+    ['MONEY_ADDED', row('Gray', 'رمادي', 'خۆڵەمێشی (نرخەکەی)', { kind: 'spec_value_text' })],
+    // A cost the English never states (the house rule: no price, cost, stock or shipping time is ever added).
+    ['MONEY_ADDED', row('Gray', 'رمادي منخفض التكلفة', 'خۆڵەمێشی', { kind: 'spec_value_text' })],
+    ['MONEY_ADDED', row('Gray', 'رمادي', 'خۆڵەمێشی بە تێچووی کەم', { kind: 'spec_value_text' })],
+    ['KEEP', row('Bambu PET-CF/TPU 95A', 'Bambu PET-CF/TPU 95A', 'Bambu PET-CF', { status: 'keep' })],
+    ['KEEP', row('Windows', 'ويندوز', 'Windows', { status: 'keep' })],
     ['PRODUCTS', { ...GOOD, products: [] }],
     ['PRODUCTS', { ...GOOD, products: ['p_b', 'p_a'] }],
     ['PRODUCTS', { ...GOOD, products: ['p_a', 'p_a'] }],
@@ -135,12 +174,32 @@ test('validateTranslationRow: every refusal code, one failing example each', () 
   assert.equal(code(row('Holds 2 spools', 'يحمل 2 بكرة', 'دوو بکرە هەڵدەگرێت 2', { kind: 'short_description' })), 'ok');
   assert.equal(code(row('Connector (SA011)', 'الموصل (SA011)', 'گەیەنەر (SA011)', { kind: 'short_description' })), 'ok');
   assert.equal(code({ ...GOOD, ar: 'أقل من 10 mA ', ckb: 'کەمتر لە 10mA' }), 'NOT_NORMALIZED');
-  assert.equal(code(row('24 V input', 'دخل 24 V', 'تێچوونی 24 V', { kind: 'short_description' })), 'ok', 'a unit with or without the space');
+  assert.equal(code(row('24 V input', 'دخل 24 V', 'چوونەژوورەوەی 24 V', { kind: 'short_description' })), 'ok', 'a unit with or without the space');
   assert.equal(code(row('1st layer', 'الطبقة 1st', 'چینی 1st', { kind: 'short_description' })), 'ok');
   assert.equal(code({ ...GOOD, ckb: 'کەمتر' }), 'DIGITS');
   assert.equal(code({ ...GOOD, ckb: 'ە 10mA' }), 'ok', 'one Sorani word is enough');
   assert.equal(code(row('Full list', 'قائمة كاملة', 'لیست کامل', { kind: 'doc_title' })), 'CKB_SCRIPT', 'two Arabic-script words without a Sorani letter');
   assert.equal(code(row('Full list', 'قائمة كاملة', 'لیستی تەواو', { kind: 'doc_title' })), 'ok');
+  // «بەنرخ» is «valuable», not a price (review: the money check refused an honest Sorani line).
+  assert.equal(code(row('Save valuable time.', 'وفّر وقتك الثمين.', 'کاتی بەنرخی خۆت بپارێزە.', { kind: 'short_description' })), 'ok');
+  assert.equal(code(row('Priceless', 'لا يُقدَّر', 'بێنرخ نییە', { kind: 'short_description' })), 'ok');
+  // …but a cost the English states is the English's own fact, faithfully carried.
+  assert.equal(code(row('Low cost and exotic materials', 'مواد منخفضة التكلفة وأخرى غير مألوفة', 'کەرەستەی تێچوو کەم و دەگمەن', { kind: 'short_description' })), 'ok');
+  // A numbered heading or a sentence glued to the next by the source («3.Spool», «ports.When») is words, not a
+  // code: the translation writes «3. …» (review of batch 023: 96 honest headings refused as TOKEN_LOST).
+  assert.equal(code(row('3.Spool Compatibility & Setup', '3. توافق البكرة والإعداد', '3. گونجاویی ماسوورە و ڕێکخستن', { kind: 'block_title' })), 'ok');
+  assert.equal(code(row('10.What accessories are needed?', '10. ما الملحقات اللازمة؟', '10. چ پێداویستییەک پێویستە؟', { kind: 'faq_q' })), 'ok');
+  assert.equal(code(row('4.Is H2D compatible with AMS?', '4. هل H2D متوافقة مع AMS؟', '4. ئایا H2D لەگەڵ AMS گونجاوە؟', { kind: 'faq_q' })), 'ok');
+  assert.equal(code(row('3.AMS Compatibility Warning', '3. تحذير بشأن التوافق مع AMS', '3. ئاگاداری دەربارەی گونجاوی لەگەڵ AMS', { kind: 'block_title' })), 'ok');
+  assert.equal(code(row('6.Z-Axis Strength', '6. المتانة على محور Z', '6. بەهێزی لەسەر تەوەری Z', { kind: 'block_title' })), 'ok');
+  const glued = 'The output is 20W, shared between both ports.When one device is connected, it gets the full 20W.';
+  assert.equal(code(row(glued, 'الخرج 20W، يتقاسمه المنفذان. عند توصيل جهاز واحد يحصل على كامل 20W.', 'دەرچوون 20W ـە، لە نێوان هەردوو دەرچەکەدا. کاتێک یەک ئامێر پەیوەست بێت هەموو 20W وەردەگرێت.', { kind: 'block_line' })), 'ok');
+  // …while the code inside the glue is still kept verbatim.
+  assert.equal(code(row(glued, 'الخرج 20 واط، يتقاسمه المنفذان. عند توصيل جهاز واحد يحصل على كامل 20 واط.', 'دەرچوون 20W ـە، لە نێوان هەردوو دەرچەکەدا. کاتێک یەک ئامێر پەیوەست بێت هەموو 20W وەردەگرێت.', { kind: 'block_line' })), 'TOKEN_LOST');
+  assert.equal(code(row('Use M3.Screws', 'استخدم براغي M3', 'بورغی M3 بەکاربهێنە', { kind: 'block_line' })), 'ok', 'M3 survives; «Screws» is a word');
+  // A `keep` row: the reviewers decided the English stays (names, codes, filenames) — its ar and ckb are the English.
+  assert.equal(code(row('Bambu PET-CF/TPU 95A', 'Bambu PET-CF/TPU 95A', 'Bambu PET-CF/TPU 95A', { status: 'keep' })), 'ok');
+  assert.equal(code(row('MacOS, Windows', 'MacOS, Windows', 'MacOS, Windows', { status: 'keep' })), 'ok');
 });
 
 test('a part file is one row per line, keys in the committed order, LF and a trailing newline', () => {

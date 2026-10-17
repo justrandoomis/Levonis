@@ -11,7 +11,9 @@
 --                              bambuImport/i18n.ts). `reviewed` and `machine` rows
 --                              are shown; `needs_review` is stored and never shown
 --                              — it is also how a row is withdrawn (the loader
---                              never deletes).
+--                              never deletes); `keep` records the reviewers'
+--                              decision that the English stays (a name, a code):
+--                              its ar and ckb are the English, never shown.
 --   catalog_translation_refs   which product shows which string: one indexed join
 --                              per product serves every surface.
 --   catalog_translation_parts  the loader's ledger: a committed part, by the
@@ -30,7 +32,7 @@ CREATE TABLE IF NOT EXISTS catalog_translations (
   ar TEXT NOT NULL CHECK (length(ar) BETWEEN 1 AND 8000),
   ckb TEXT NOT NULL CHECK (length(ckb) BETWEEN 1 AND 8000),
   kind TEXT NOT NULL DEFAULT '' CHECK (length(kind) <= 40),
-  status TEXT NOT NULL CHECK (status IN ('reviewed','machine','needs_review')),
+  status TEXT NOT NULL CHECK (status IN ('reviewed','machine','needs_review','keep')),
   part TEXT NOT NULL DEFAULT '' CHECK (length(part) <= 40),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))

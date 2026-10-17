@@ -26,20 +26,32 @@
  *
  * EXCLUDED, each with its counter: owner-only rows; registry-authored strings
  * (their translations exist: a content block's BLOCK_TITLES heading is listed
- * under `authored` with the registry's own ar/ckb for the assembler);
+ * under `authored` with the registry's own ar/ckb for the assembler — unless
+ * the same English is offered as a value elsewhere, when that one row serves
+ * every product: a string is in one part only);
  * names (a manifest title, a compat-targets label, compound or requirement
- * target, a registry model, «Bambu Lab» — or only names and connectors);
+ * target, a registry model, «Bambu Lab» — or only names and the design's
+ * connectors, §C.3 — and, for one product, its OWN option and colour value
+ * names: English on that product's every surface, mandate §3/§7);
  * neutral strings (numbers, ranges, symbol units, codes, upper-case identity
- * terms, URLs and punctuation only); strings already in Arabic script; with
- * `--existing`, strings already committed; and English over 4,000 characters.
+ * terms, a creator's handle, a one-token identifier, URLs and punctuation
+ * only); strings already in Arabic script; and English over 4,000 characters.
+ *
+ * A LATER ROUND (`--existing data/bambu-import/translations`): a string already
+ * committed is not offered again, but every product that uses it is listed
+ * under `linked` with the part that holds it, so the assembler adds the
+ * products to that committed row (their refs: a product first seen in this
+ * round shows the translation too). The batches are numbered after the
+ * highest committed part, so a round never overwrites another's part.
  *
  * OUTPUT: `strings.json` (every unique string by its key, with its kinds,
- * products, handles, a context and the local dictionary's seed), the batches
- * `batches/batch-NNN.json` (~250 strings; every page string before every api
- * string; a product's strings together; a string in the batch of its first
- * product), `glossary.json` (the app's existing vocabulary in three
- * languages), `names.json` (the names a translation keeps verbatim) and
- * `RULES.md` (the translators' rules). Byte-identical for the same inputs.
+ * products, handles, a context and the local dictionary's seed; `authored`;
+ * `linked`), the batches `batches/batch-NNN.json` (~250 strings; every page
+ * string before every api string; a product's strings together; a string in
+ * the batch of its first product), `glossary.json` (the app's existing
+ * vocabulary in three languages), `names.json` (the names a translation keeps
+ * verbatim) and `RULES.md` (the translators' rules). Byte-identical for the
+ * same inputs.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -114,6 +126,15 @@ export interface AuthoredEntry {
   products: string[];
 }
 
+/** A string an earlier round committed, and every product of this round that uses it (`--existing`). */
+export interface LinkedEntry {
+  h: string;
+  en: string;
+  /** The committed part that holds its row. */
+  part: string;
+  products: string[];
+}
+
 export interface ExcludedCounts {
   owner_only: number;
   registry: number;
@@ -148,6 +169,7 @@ export interface StringsFile {
   };
   strings: StringEntry[];
   authored: AuthoredEntry[];
+  linked: LinkedEntry[];
 }
 
 export interface BatchFile {
@@ -163,6 +185,8 @@ const IDENTITY = new Set(IDENTITY_TERMS);
 /** The dictionary's units that are symbols, not English words («hours», «pack», «spool» are translated). */
 const WORD_UNITS = new Set(['in', 'inch', 'inches', 'micron', 'microns', 'watt', 'watts', 'volt', 'volts', 'amp', 'amps', 'ampere', 'amperes', 'pcs', 'pc', 'pack', 'roll', 'rolls', 'spool', 'spools', 'set', 'sets', 'hour', 'hours', 'month', 'months', 'year', 'years', 'day', 'days', 'week', 'weeks']);
 const SYMBOL_UNITS = new Set(Object.keys(UNITS).filter((u) => !WORD_UNITS.has(u) && !/\s/.test(u)));
+/** Symbol units the dictionary does not list, read only right after a number (2.45mW, 16.4ft, 13.56MHz, 25rpm). */
+const ATTACHED_UNITS = new Set(['mw', 'ft', 'mhz', 'ghz', 'khz', 'kgf', 'lm', 'kpa', 'dba', 'rpm', 'mah', 'ma', 'ua', 'μa', 'µa', 'nm', 'kn']);
 const MODEL_CODE_RE = /^[A-Za-z]{0,3}\d+[A-Za-z0-9-]*$|^[A-Z]{1,6}\d[A-Za-z0-9-]*$/;
 const ARABIC = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 
@@ -171,23 +195,37 @@ function neutralToken(tok: string): boolean {
   if (!tok) return true;
   if (/^[±~≤≥<>+-]?[\d.,]+(?:[-–~/][\d.,]+)*%?$/.test(tok)) return true;
   if (/^[x×*·°]$/i.test(tok)) return true;
-  const lower = tok.toLowerCase();
+  // A comparison sign before a code or a measurement (≥60HRC) and a square or cube on a unit (mm², g/cm³).
+  const bare = tok.replace(/^[±~≤≥<>+]+/, '').replace(/[²³°]+$/u, '');
+  if (!bare) return true;
+  const lower = bare.toLowerCase();
   if (SYMBOL_UNITS.has(lower)) return true;
-  if (MODEL_CODE_RE.test(tok) || /^[A-Z]{2,}\d/.test(tok)) return true;
+  if (MODEL_CODE_RE.test(bare) || /^[A-Z]{2,}\d/.test(bare)) return true;
   // An identity term as it is written in a spec sheet (PLA, PETG-CF, USB-C, 3MF), never a lower-case English word («step»).
-  if (IDENTITY.has(lower) && (tok === tok.toUpperCase() || /[\d+-]/.test(tok))) return true;
-  if (/^\d/.test(tok) && SYMBOL_UNITS.has(lower.replace(/^[\d.,]+/, ''))) return true;
+  if (IDENTITY.has(lower) && (bare === bare.toUpperCase() || /[\d+-]/.test(bare))) return true;
+  const unit = lower.replace(/^[\d.,]+/, '');
+  if (/^\d/.test(bare) && (SYMBOL_UNITS.has(unit) || ATTACHED_UNITS.has(unit))) return true;
   return false;
 }
 
-/** Nothing but numbers, ranges, symbol units, codes, identity terms, URLs and punctuation: no Latin word of 2+ letters. */
+/**
+ * Nothing but numbers, ranges, symbol units, codes, identity terms, URLs and punctuation — no Latin word of 2+
+ * letters — or a name that is no words at all: a creator's handle («@storm879») or one token of letters and digits
+ * («Makerize3D», «W.drop2027»; never a glued numbered heading such as «4.Printability»).
+ */
 export function isNeutral(en: string): boolean {
   const text = en.replace(/https?:\/\/\S+/gi, ' ');
-  for (const raw of text.split(/[\s,;:()[\]{}"“”‘’!?|&]+/)) {
+  const one = text.trim();
+  if (/^@[A-Za-z0-9._-]+$/.test(one)) return true;
+  if (/^(?=[A-Za-z0-9._-]*\d)(?=[A-Za-z0-9._-]*[A-Za-z])[A-Za-z0-9._-]+$/.test(one) && !/^\d+\.[A-Za-z]/.test(one)) return true;
+  // A multiplication sign or a ± between numbers (300*285, 4.0x1.7mm, 85±5mm) separates measurements.
+  const spaced = text.replace(/(?<=[\d.)])\s*[x×*±@]\s*(?=[\d.(])/gi, ' ');
+  for (const raw of spaced.split(/[\s,;:()[\]{}"“”‘’!?|&]+/)) {
     const tok = raw.replace(/^[^\p{L}\p{N}±~≤≥<>+-]+|[^\p{L}\p{N}%°]+$/gu, '');
     if (!tok || neutralToken(tok)) continue;
-    // A hyphenated or slashed token is neutral when each of its parts is (PLA-CF, 220-240V, A1/A1 mini …).
-    const parts = tok.split(/[-/–]+/).filter(Boolean);
+    // A hyphenated, slashed or starred token is neutral when each of its parts is (PLA-CF, 220-240V, A1/A1 mini,
+    // 127.1mm*78.8mm, 2.45mW@3.3V …).
+    const parts = tok.split(/[-/–*@]+/).filter(Boolean);
     if (parts.length > 1 && parts.every((p) => neutralToken(p) || !/[A-Za-z]{2,}/.test(p))) continue;
     if (/[A-Za-z]{2,}/.test(tok)) return false;
   }
@@ -394,11 +432,11 @@ export interface CollectContext {
   /** Exact names (labelKey) and the forms for «only names» (nameForms). */
   nameKeys: ReadonlySet<string>;
   nameForms: readonly string[];
-  /** Normalized English already committed (`--existing`). */
-  existing: ReadonlySet<string>;
+  /** Normalized English already committed (`--existing`) → the part that holds it. */
+  existing: ReadonlyMap<string, string>;
 }
 
-export function collectContext(bundle: ReviewedBundle, existing: ReadonlySet<string> = new Set()): CollectContext {
+export function collectContext(bundle: ReviewedBundle, existing: ReadonlyMap<string, string> = new Map()): CollectContext {
   const names = new Set<string>(translationNames(bundle));
   for (const r of bundle.rows) if (r.title) names.add(String(r.title));
   for (const m of MODELS) for (const f of m.forms) names.add(f);
@@ -420,16 +458,25 @@ const REGISTRY_TRI: ReadonlyMap<string, { ar: string; ckb: string }> = new Map(
 );
 const REGISTRY_EN: ReadonlySet<string> = new Set(REGISTRY_TRI.keys());
 
-/** Why a string is not offered for translation, or null when it is. */
-export function exclusionOf(en: string, kind: TmKind, ctx: CollectContext): keyof ExcludedCounts | null {
+/**
+ * Why a string is not offered for translation, or null when it is. `own` is the product's own option and colour
+ * value names (labelKey): on that product such a string is a name (mandate §3/§7), whatever else it is elsewhere.
+ */
+export function exclusionOf(en: string, kind: TmKind, ctx: CollectContext, own: ReadonlySet<string> = new Set()): keyof ExcludedCounts | null {
   if (en.length > EN_MAX) return 'too_long';
   if (ARABIC.test(en)) return 'arabic';
   if (isNeutral(en)) return 'neutral';
   // A name before the registry: «AMS» is a model, never a label to translate.
-  if (ctx.nameKeys.has(labelKey(en)) || (en.length <= 300 && namesOnlyIn(en, ctx.nameForms))) return 'name';
+  const key = labelKey(en);
+  if (ctx.nameKeys.has(key) || own.has(key) || (en.length <= 300 && namesOnlyIn(en, ctx.nameForms))) return 'name';
   if (REGISTRY_EN.has(en) && kind !== 'spec_value_text' && kind !== 'spec_list_item' && kind !== 'box_item') return 'registry';
   if (ctx.existing.has(en)) return 'existing';
   return null;
+}
+
+/** A payload's own option and colour value names, as `labelKey`s. */
+export function ownValueNames(p: Pick<ImportPayload, 'groups'>): Set<string> {
+  return new Set(p.groups.flatMap((g) => g.values.map((v) => labelKey(String(v.name_en ?? '')))).filter(Boolean));
 }
 
 /** The local dictionary's seed: both languages fully covered, the Sorani its own (row 183). */
@@ -457,40 +504,70 @@ export interface ExtractResult {
   batches: BatchFile[];
 }
 
-/** Normalized English of every row already committed under `dir`. */
-export function existingEnglish(dir: string | undefined): Set<string> {
-  const out = new Set<string>();
+/** Normalized English of every row already committed under `dir` → the part that holds it. */
+export function existingEnglish(dir: string | undefined): Map<string, string> {
+  const out = new Map<string, string>();
   if (!dir || !existsSync(dir)) return out;
   for (const f of readdirSync(dir).filter((x) => /^p[0-9]{3,}\.json$/.test(x)).sort()) {
-    for (const r of JSON.parse(readFileSync(join(dir, f), 'utf8')) as Array<{ en: string }>) if (typeof r.en === 'string') out.add(r.en);
+    for (const r of JSON.parse(readFileSync(join(dir, f), 'utf8')) as Array<{ en: string }>) if (typeof r.en === 'string' && !out.has(r.en)) out.set(r.en, f.replace(/\.json$/, ''));
   }
   return out;
+}
+
+/** The first batch number of a new round: one after the highest committed batch part (p000, the authored part, aside). */
+export function nextBatchNumber(dir: string | undefined): number {
+  if (!dir || !existsSync(dir)) return 1;
+  const nums = readdirSync(dir)
+    .map((f) => /^p([0-9]{3,})\.json$/.exec(f))
+    .filter((m): m is RegExpExecArray => !!m)
+    .map((m) => Number(m[1]))
+    .filter((n) => n > 0);
+  return nums.length ? Math.max(...nums) + 1 : 1;
 }
 
 /** strings.json and the batches from built products (pure: tests hand it payloads directly). */
 export function collectStrings(
   products: readonly BuiltProduct[],
   ctx: CollectContext,
-  meta: { generatedAt: string; corpus: string; codeCommit: string; bundleSha256: string; failed?: BuildOutcome['failed']; withdrawn?: string[]; batchSize?: number }
+  meta: {
+    generatedAt: string;
+    corpus: string;
+    codeCommit: string;
+    bundleSha256: string;
+    failed?: BuildOutcome['failed'];
+    withdrawn?: string[];
+    batchSize?: number;
+    /** The first batch's number (a later round: `nextBatchNumber` of the committed directory). */
+    firstBatch?: number;
+  }
 ): ExtractResult {
   const excluded: ExcludedCounts = { owner_only: 0, registry: 0, name: 0, neutral: 0, arabic: 0, existing: 0, too_long: 0 };
   const byEn = new Map<string, StringEntry & { order: [number, number] }>();
-  const authored = new Map<string, AuthoredEntry>();
+  const authored = new Map<string, AuthoredEntry & { occ: Array<{ kind: TmKind; handle: string }> }>();
+  const linked = new Map<string, LinkedEntry>();
   const firstOf = new Map<string, number>();
   products.forEach(({ row, payload }, pi) => {
     const counts = { owner_only: 0 };
     const occ = occurrencesOf(payload, counts);
+    const own = ownValueNames(payload);
     excluded.owner_only += counts.owner_only;
     occ.forEach((o, fi) => {
-      const why = exclusionOf(o.en, o.kind, ctx);
+      const why = exclusionOf(o.en, o.kind, ctx, own);
       if (why) {
         excluded[why] += 1;
         // A registry-authored string the overlay still looks up (a section's heading inside a content block): its own words.
         const tri = why === 'registry' ? REGISTRY_TRI.get(o.en) : undefined;
         if (tri) {
-          const a = authored.get(o.en) ?? { h: sourceHash(o.en), en: o.en, ar: tri.ar, ckb: tri.ckb, kind: o.kind, products: [] };
+          const a = authored.get(o.en) ?? { h: sourceHash(o.en), en: o.en, ar: tri.ar, ckb: tri.ckb, kind: o.kind, products: [], occ: [] };
           if (!a.products.includes(payload.product_id)) a.products.push(payload.product_id);
+          a.occ.push({ kind: o.kind, handle: row.handle });
           authored.set(o.en, a);
+        }
+        // Committed by an earlier round: this product is linked to that row (its ref), never offered again.
+        if (why === 'existing') {
+          const l = linked.get(o.en) ?? { h: sourceHash(o.en), en: o.en, part: ctx.existing.get(o.en)!, products: [] };
+          if (!l.products.includes(payload.product_id)) l.products.push(payload.product_id);
+          linked.set(o.en, l);
         }
         return;
       }
@@ -519,6 +596,20 @@ export function collectStrings(
       if (!e.handles.includes(row.handle)) e.handles.push(row.handle);
     });
   });
+  // A registry string ALSO offered as a value (a box item «Hotend» and a table cell «Hotend»): one row serves every
+  // product — the offered one — so the same key never sits in two parts.
+  for (const [en, a] of authored) {
+    const e = byEn.get(en);
+    if (!e) continue;
+    for (const p of a.products) if (!e.products.includes(p)) e.products.push(p);
+    for (const o of a.occ) {
+      e.kinds[o.kind] = (e.kinds[o.kind] ?? 0) + 1;
+      e.freq += 1;
+      if (!e.handles.includes(o.handle)) e.handles.push(o.handle);
+    }
+    excluded.registry -= a.occ.length;
+    authored.delete(en);
+  }
   const entries = [...byEn.values()].sort((a, b) => a.order[0] - b.order[0] || a.order[1] - b.order[1]);
   for (const e of entries) {
     e.products.sort();
@@ -543,6 +634,7 @@ export function collectStrings(
 
   // Batches: every page string first, then api; a product's strings together; a string in its first product's batch.
   const size = Math.max(1, meta.batchSize ?? 250);
+  const first = Math.max(1, Math.floor(meta.firstBatch ?? 1));
   const batches: BatchFile[] = [];
   for (const surface of ['page', 'api'] as const) {
     const byProduct = new Map<number, StringEntry[]>();
@@ -558,7 +650,7 @@ export function collectStrings(
     const flush = () => {
       if (!cur.length) return;
       batches.push({
-        batch: batches.length + 1,
+        batch: first + batches.length,
         surface,
         handles,
         strings: cur.map((e) => ({ h: e.h, en: e.en, kind: e.kind, freq: e.freq, context: e.context, dict: e.dict })),
@@ -598,7 +690,10 @@ export function collectStrings(
         batches: { page: batches.filter((b) => b.surface === 'page').length, api: batches.filter((b) => b.surface === 'api').length },
       },
       strings,
-      authored: [...authored.values()].map((a) => ({ ...a, products: [...a.products].sort() })).sort((a, b) => (a.en < b.en ? -1 : a.en > b.en ? 1 : 0)),
+      authored: [...authored.values()]
+        .map(({ occ: _occ, ...a }) => ({ ...a, products: [...a.products].sort() }))
+        .sort((a, b) => (a.en < b.en ? -1 : a.en > b.en ? 1 : 0)),
+      linked: [...linked.values()].map((l) => ({ ...l, products: [...l.products].sort() })).sort((a, b) => (a.en < b.en ? -1 : a.en > b.en ? 1 : 0)),
     },
     batches,
   };
@@ -649,10 +744,12 @@ docs/bambu-import/I18N-DESIGN.md; DECISIONS rows 2 and 183. These rules bind eve
 ## What you write
 For each batch \`batches/batch-NNN.json\`, write \`batches/batch-NNN.out.json\`:
 
-    [ { "h": "<the string's h>", "ar": "<Arabic>", "ckb": "<Sorani>", "status": "reviewed" | "needs_review" } ]
+    [ { "h": "<the string's h>", "ar": "<Arabic>", "ckb": "<Sorani>", "status": "reviewed" | "needs_review" | "keep" } ]
 
 One object per string you translate, \`h\` copied exactly. Leave a string out rather than guess: it stays English.
-\`needs_review\` is stored and never shown. A reviewer signs off before \`reviewed\` is committed.
+\`needs_review\` is stored and never shown. A reviewer signs off before \`reviewed\` is committed. \`keep\` records that
+the English stays (a name, a code, a file name): its \`ar\` and \`ckb\` are the English itself, and a later round does not
+offer it again. Any other status (or none) is refused: the string stays English.
 
 ## The house rules
 1. Product NAMES are never translated: product, option and colour names stay English (see names.json). A name inside a sentence is copied verbatim.
@@ -714,6 +811,7 @@ export function extractStrings(opts: ExtractOptions & { root?: string }): Extrac
   const built = buildFromCorpus(opts.corpus, opts.dataDir, bundle);
   const ctx = collectContext(bundle, existingEnglish(opts.existingDir));
   const result = collectStrings(built.built, ctx, {
+    firstBatch: nextBatchNumber(opts.existingDir),
     generatedAt: opts.generatedAt ?? newestMtime(opts.corpus),
     corpus: opts.corpus,
     codeCommit: opts.codeCommit ?? gitHead(opts.root ?? process.cwd()),

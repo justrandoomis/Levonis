@@ -15,7 +15,10 @@
  *      and purges its products' page, knowledge and v1 record; the answer is
  *      counts, never text;
  *   3. the same part again → `skipped`: no write, no purge;
- *   4. a changed row → `updated`, and only its products are purged;
+ *   4. a changed row → `updated`, and only its products are purged — every
+ *      product the database links to it, one dropped from the row's list
+ *      included; the cap of 60 counts products that exist (an id not written
+ *      yet never takes a live page's place); a `keep` row is stored, never shown;
  *   5. every statement binds ≤ 100 parameters; a 250-row part costs well under
  *      the invocation budget; no token → the uniform 404;
  *   6. the committed index is the empty index, and a malformed index knows no part.
@@ -170,8 +173,8 @@ test('a first load writes rows, refs and the ledger in one batch and purges its 
     { skipped: a.skipped, rows: a.rows, inserted: a.inserted, updated: a.updated, unchanged: a.unchanged, refs_added: a.refs_added, purge_truncated: a.purge_truncated },
     { skipped: false, rows: 3, inserted: 3, updated: 0, unchanged: 0, refs_added: 5, purge_truncated: false }
   );
-  assert.deepEqual(a.purge_ids, [P.H2D, P.A1, P.X2D, 'p_not_imported_yet'].sort());
-  assert.equal(a.purged_products, 3, 'a product not imported yet has no page to purge');
+  assert.deepEqual(a.purge_ids, [P.H2D, P.A1, P.X2D].sort(), 'the products purged: a product not imported yet has no page to purge');
+  assert.equal(a.purged_products, 3);
   assert.ok(!firstText.includes('رمادي') && !firstText.includes('Gray'), 'counts, never text');
   assert.equal(count(w, 'SELECT COUNT(*) AS n FROM catalog_translations'), 3);
   assert.equal(count(w, 'SELECT COUNT(*) AS n FROM catalog_translation_refs'), 5);
@@ -211,6 +214,60 @@ test('a first load writes rows, refs and the ledger in one batch and purges its 
   assert.equal(d.updated, 1);
   assert.equal((w.raw.prepare('SELECT status FROM catalog_translations WHERE h = ?').get(sourceHash('Below 10mA')) as { status: string }).status, 'needs_review');
   assert.equal(count(w, 'SELECT COUNT(*) AS n FROM catalog_translations'), 3);
+});
+
+test('a changed row purges every product the database links to it — one dropped from the row\'s list too (review: stale colo copies)', async () => {
+  const w = world();
+  const purges = cacheDouble();
+  const v1 = serializeTranslationPart(ROWS);
+  indexParts({ p001: v1 });
+  assert.equal((await load(w, 'p001', v1)).status, 200);
+  // Version 2 corrects «Gray» and lists only the H2D: the A1 still holds its ref, so its cached copy goes too.
+  purges.deleted.length = 0;
+  const v2 = serializeTranslationPart([ROWS[0], { ...ROWS[1], ar: 'رمادي فاتح', ckb: 'خۆڵەمێشی کاڵ', products: [P.H2D] }, ROWS[2]]);
+  indexParts({ p001: v2 });
+  const c = await answer(await load(w, 'p001', v2));
+  assert.equal(c.updated, 1);
+  assert.deepEqual(c.purge_ids, [P.H2D, P.A1].sort());
+  assert.ok(paths(purges).includes(`/api/products/${A1.slug}`), 'the A1 shows the corrected words at once');
+  assert.ok(paths(purges).includes(`/api/products/${A1.slug}/knowledge`));
+  assert.equal(count(w, `SELECT COUNT(*) AS n FROM catalog_translation_refs WHERE h = '${sourceHash('Gray')}'`), 2, 'refs are never deleted');
+  // A withdrawal whose list shrank: the withdrawn words leave every linked product's cached copy.
+  purges.deleted.length = 0;
+  const v3 = serializeTranslationPart([ROWS[0], { ...ROWS[1], ar: 'رمادي فاتح', ckb: 'خۆڵەمێشی کاڵ', products: [P.H2D], status: 'needs_review' }, ROWS[2]]);
+  indexParts({ p001: v3 });
+  const d = await answer(await load(w, 'p001', v3));
+  assert.deepEqual(d.purge_ids, [P.H2D, P.A1].sort());
+});
+
+test('the purge cap counts products that exist: ids not written yet never crowd out a live page (review: p_ sorts before prd_)', async () => {
+  const w = world();
+  const purges = cacheDouble();
+  const notYet = Array.from({ length: 70 }, (_, i) => `p_new_${String(i).padStart(3, '0')}`);
+  const text = serializeTranslationPart([row('Gray', 'رمادي', 'خۆڵەمێشی', [...notYet, P.H2D, P.A1])]);
+  indexParts({ p001: text });
+  const a = await answer(await load(w, 'p001', text));
+  assert.deepEqual(a.purge_ids, [P.H2D, P.A1].sort(), 'the live products are purged');
+  assert.equal(a.purge_truncated, false, 'every existing product fit under the cap');
+  assert.ok(paths(purges).includes(`/api/products/${H2D.slug}`));
+  assert.ok(paths(purges).includes(`/api/products/${A1.slug}`));
+});
+
+test('a `keep` row (the English stays) loads and is stored, never shown; a reviewed row turned `keep` is withdrawn', async () => {
+  const w = world();
+  cacheDouble();
+  const keep = row('MacOS, Windows', 'MacOS, Windows', 'MacOS, Windows', [P.H2D], { status: 'keep' });
+  const v1 = serializeTranslationPart([ROWS[1], keep]);
+  indexParts({ p001: v1 });
+  const a = await answer(await load(w, 'p001', v1));
+  assert.equal(a.inserted, 2, JSON.stringify(a));
+  assert.equal((w.raw.prepare('SELECT status FROM catalog_translations WHERE h = ?').get(keep.h) as { status: string }).status, 'keep');
+  const v2 = serializeTranslationPart([{ ...ROWS[1], ar: 'Gray', ckb: 'Gray', status: 'keep' }, keep]);
+  indexParts({ p001: v2 });
+  const b = await answer(await load(w, 'p001', v2));
+  assert.equal(b.updated, 1);
+  const shown = w.raw.prepare("SELECT COUNT(*) AS n FROM catalog_translations WHERE status IN ('reviewed','machine')").get() as { n: number };
+  assert.equal(shown.n, 0, 'nothing of a keep row is shown as a translation');
 });
 
 test('a 250-row part: every statement ≤ 100 parameters, well under the invocation budget; no token is the uniform 404', async () => {

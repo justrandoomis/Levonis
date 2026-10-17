@@ -51,6 +51,9 @@ test('the CHECKs refuse a bad key, status, English and part', () => {
   const ins = (h: string, en: string, status: string) =>
     raw.prepare('INSERT INTO catalog_translations (h, en, ar, ckb, kind, status, part) VALUES (?, ?, ?, ?, ?, ?, ?)').run(h, en, 'عربي', 'کوردی', 'spec_value_text', status, 'p001');
   ins(H, 'Gray', 'reviewed');
+  // `keep`: the reviewers decided the English stays (a name, a code); stored, never shown (the reads ask for
+  // reviewed and machine only).
+  ins('f'.repeat(64), 'MacOS', 'keep');
   assert.throws(() => ins('A'.repeat(64), 'Grey', 'reviewed'), /CHECK/, 'upper-case hex');
   assert.throws(() => ins('b'.repeat(63), 'Grey', 'reviewed'), /CHECK/, '63 characters');
   assert.throws(() => ins('g'.repeat(64), 'Grey', 'reviewed'), /CHECK/, 'not hex');

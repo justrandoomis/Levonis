@@ -19,7 +19,9 @@
  *
  * APPLY (`overlayImportedText`): on the OUTGOING product body only — never a
  * stored row — line by line through the shared segmentation
- * (packages/catalog/src/bambuImport/i18n.ts `translateLines`). It touches the
+ * (packages/catalog/src/bambuImport/i18n.ts `translateLines`): a line the
+ * memory covers is its words, every other line keeps what the stored slot said
+ * (the writer's dictionary line, or the English). It touches the
  * prose slots alone: the description, «طريقة الاستخدام», the usage steps, the
  * content blocks' bodies and the official spec group's values — never a name,
  * an option or colour name (mandate §3/§7), a lead time, a warranty or a label.
@@ -170,15 +172,29 @@ export function translationOf(tm: TranslationMap | undefined, text: unknown): Tr
 
 // ---------------------------------------------------------------- the overlay
 
+/** The spec group only the import writes (worker/lib/catalogImport/writer.ts `OFFICIAL_SPEC_GROUP`). */
+export const IMPORT_SPEC_GROUP_ID = 'sg_bambu_official';
+
 /**
- * True when the import wrote some prose slot of this product (step 10 of the
- * writer marks each one `imported`): only then does the product page read the
- * memory. An ordinary product pays nothing.
+ * True when the import wrote this product: only then does the product page
+ * read the memory. An ordinary product pays nothing.
+ *
+ * The import's writer (worker/lib/catalogImport/writer.ts step 10) marks each
+ * slot it wrote `{ ar: imported, ckb: imported }` and never an `en` entry. The
+ * admin form (worker/routes/adminProducts.ts, every saved product) and the
+ * template import (worker/lib/template.ts) write `imported` too, but always
+ * with `en` beside it — so `imported` alone is not the import's mark (it would
+ * read the memory for nearly every product). An imported product the owner
+ * later saves in the form gains `en` on its name and description only; its
+ * other slots keep the writer's mark, and its official spec group (written by
+ * the import alone) marks it as well.
  */
-export function importedSlots(meta: TranslationMeta | null | undefined): boolean {
+export function importedSlots(meta: TranslationMeta | null | undefined, specGroups?: ReadonlyArray<{ id?: unknown } | null> | null): boolean {
+  if (Array.isArray(specGroups) && specGroups.some((g) => g?.id === IMPORT_SPEC_GROUP_ID)) return true;
   if (!meta || typeof meta !== 'object') return false;
   for (const entry of Object.values(meta)) {
-    if (entry?.ar?.status === 'imported' || entry?.ckb?.status === 'imported') return true;
+    if (!entry || typeof entry !== 'object' || 'en' in entry) continue;
+    if (entry.ar?.status === 'imported' || entry.ckb?.status === 'imported') return true;
   }
   return false;
 }
@@ -208,7 +224,8 @@ export function overlayImportedText(product: Record<string, unknown>, tm: Transl
   let changed = 0;
   for (const slot of localizableSlots(product)) {
     if (!isOverlaySlot(slot.key) || !slot.en.trim()) continue;
-    const t = translateLines(slot.en, lookup);
+    // A line the memory misses keeps what the slot already says (the writer's dictionary line, §A.6).
+    const t = translateLines(slot.en, lookup, { ar: slot.ar, ckb: slot.ckb });
     if (t.hit === 0) continue;
     const m = meta?.[slot.key];
     for (const lang of ['ar', 'ckb'] as const) {

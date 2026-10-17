@@ -3988,7 +3988,7 @@ export async function catalogProductDetail(
     maintenancePromise,
     // The catalogue translation memory (0196, docs/bambu-import/I18N-DESIGN.md §A.5): only for a product the
     // import wrote prose for — an ordinary product pays nothing. Empty without 0196; never fails the page.
-    importedSlots(parsed.translation_meta) ? loadProductTranslationMap(db, productId) : Promise.resolve(EMPTY_TRANSLATIONS),
+    importedSlots(parsed.translation_meta, parsed.spec_groups) ? loadProductTranslationMap(db, productId) : Promise.resolve(EMPTY_TRANSLATIONS),
   ]);
   /**
    * The linked new product's live price, when this listing is a used copy.

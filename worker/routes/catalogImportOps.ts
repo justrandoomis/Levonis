@@ -222,8 +222,8 @@ catalogImportOpsRoutes.post(
     const part = typeof body.part === 'string' ? body.part : '';
     const text = typeof body.text === 'string' ? body.text : null;
     if (!PART_NAME.test(part) || part.length > 40 || text === null) throw new OpsRefusal(400, 'IMPORT_BAD_REQUEST');
-    const r = await loadTranslationPart(c.env.DB, c.get('importRun'), part, text, c.get('opsCounter'));
-    const purged = r.skipped ? { products: 0, paths: 0, keys: 0 } : await purgeTranslatedProducts(c.env, c.req.url, r.purge_ids);
+    const { purge_targets: targets, ...r } = await loadTranslationPart(c.env.DB, c.get('importRun'), part, text, c.get('opsCounter'));
+    const purged = r.skipped ? { products: 0, paths: 0, keys: 0 } : await purgeTranslatedProducts(c.env, c.req.url, targets);
     return c.json({ ...r, purged_products: purged.products });
   })
 );

@@ -276,7 +276,14 @@ test('an imported product page reads its translation memory in the existing wave
   const body = (await (await get(stubApp(w.db, null, mount, { env: ENV }), path)).json()) as { product: Record<string, unknown> };
   assert.equal(body.product.description_ar, 'يُنعّم المخزن المؤقت مسار الخيط.');
   assert.equal(body.product.description_ckb, 'بافەرەکە ڕێڕەوی فیلامێنتەکە نەرم دەکات.');
-  // An ordinary product reads no memory at all.
+  // An ordinary product reads no memory at all…
   const plain = await w.measure(`/api/products/${LIVE_PRODUCTS.find((p) => p.id === P.A1)!.slug}`);
   assert.equal(plain.sqls.filter((q) => q.includes('catalog_translation')).length, 0, 'an ordinary product pays nothing');
+  // …nor does one the admin form saved: the form marks name and description `imported` with `en` beside them
+  // (worker/routes/adminProducts.ts), which is not the import's mark.
+  const formMark = { en: { status: 'imported', src_rev: 1 }, ar: { status: 'imported', src_rev: 1 }, ckb: { status: 'imported', src_rev: 1 } };
+  w.raw.prepare('UPDATE products SET translation_meta = ? WHERE id = ?').run(JSON.stringify({ name: formMark, description: formMark }), P.A1);
+  const saved = await w.measure(`/api/products/${LIVE_PRODUCTS.find((p) => p.id === P.A1)!.slug}`);
+  assert.equal(saved.sqls.filter((q) => q.includes('catalog_translation')).length, 0, 'a product saved in the admin form pays nothing');
+  assert.ok(saved.prepares <= 23, `${saved.prepares} prepares`);
 });

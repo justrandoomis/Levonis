@@ -36,7 +36,8 @@ import { fetchPublished } from './fixtures/autoPublish';
 import { productRoutes } from '../worker/routes/products';
 import worker from '../worker/index';
 import { sourceHash } from '../packages/catalog/src/bambuImport/i18n';
-import { forgetTranslationSchema } from '../worker/lib/translate/memory';
+import { forgetTranslationSchema, IMPORT_SPEC_GROUP_ID, importedSlots, overlayImportedText } from '../worker/lib/translate/memory';
+import { OFFICIAL_SPEC_GROUP } from '../worker/lib/catalogImport/writer';
 import { knowledgeCellsFor } from '../worker/lib/knowledge/compareKeys';
 import { compareProducts, type KnowledgeCell } from '../worker/lib/compareSpecs';
 
@@ -210,6 +211,50 @@ test('the page body of an imported product: line by line in Arabic and Sorani �
   assert.equal(priced.body.price_status, 'priced');
   assertPageTranslated(priced.body.product, 'priced');
   assert.ok(!priced.text.includes('catalog_translation') && !priced.text.includes('"part"'), 'no memory bookkeeping reaches a customer');
+});
+
+test('a line the memory misses keeps what the stored slot said — the writer\'s dictionary line survives (§A.6)', async () => {
+  const raw = freshDb();
+  seedLiveCatalog(raw);
+  seedImported(raw);
+  // The writer's dictionary put line 2 into Arabic and Sorani; the memory has line 1 only.
+  const storedAr = `مخزن مؤقت قديم.\nالتوافق: X1 Series, P1P`;
+  const storedCkb = `بافەرێکی کۆن.\nگونجاوی: X1 Series, P1P`;
+  raw.prepare('UPDATE products SET description_ar = ?, description_ku = ? WHERE id = ?').run(storedAr, storedCkb, P.H2D);
+  const { status, text, body } = await page(raw);
+  assert.equal(status, 200, text);
+  assert.equal(body.product.description_ar, `${tr(EN.desc1, 'ar')}\nالتوافق: X1 Series, P1P`, 'the covered line is the memory\'s, the other the stored one');
+  assert.equal(body.product.description_ckb, `${tr(EN.desc1, 'ckb')}\nگونجاوی: X1 Series, P1P`);
+  // The pure overlay, the reviewer's case: one translated line never sends the rest of the slot back to English.
+  const product: Record<string, unknown> = {
+    description_en: 'The buffer smooths the filament path.\nColor: Gray',
+    description_ar: 'نص قديم\nاللون: رمادي',
+    description_ckb: 'دەقی کۆن\nڕەنگ: خۆڵەمێشی',
+  };
+  const tm = new Map([['The buffer smooths the filament path.', { ar: 'يُنعّم المخزن المؤقت مسار الخيط.', ckb: 'بافەرەکە ڕێڕەوی فیلامێنتەکە نەرم دەکات.' }]]);
+  assert.equal(overlayImportedText(product, tm, { description: imported } as never), 2);
+  assert.equal(product.description_ar, 'يُنعّم المخزن المؤقت مسار الخيط.\nاللون: رمادي');
+  assert.equal(product.description_ckb, 'بافەرەکە ڕێڕەوی فیلامێنتەکە نەرم دەکات.\nڕەنگ: خۆڵەمێشی');
+});
+
+test('only a product the import wrote reads the memory: the admin form\'s and the template import\'s marks do not count', () => {
+  // worker/lib/catalogImport/writer.ts step 10 marks ar and ckb `imported` and never `en`.
+  assert.equal(importedSlots({ description: imported } as never), true);
+  assert.equal(importedSlots({ 'option:v_1:name': imported, description: { en: { status: 'imported', src_rev: 2 }, ...imported } } as never), true);
+  // worker/routes/adminProducts.ts (every saved product) writes en beside ar and ckb; worker/lib/template.ts writes en and ckb.
+  assert.equal(importedSlots({ name: { en: { status: 'imported', src_rev: 1 }, ...imported }, description: { en: { status: 'imported', src_rev: 1 }, ...imported } } as never), false);
+  assert.equal(importedSlots({ description: { en: { status: 'imported', src_rev: 1 }, ckb: { status: 'imported', src_rev: 1 } } } as never), false);
+  assert.equal(importedSlots({ description: { ar: { status: 'approved', src_rev: 1 }, ckb: { status: 'review_needed', src_rev: 1 } } } as never), false);
+  assert.equal(importedSlots(null), false);
+  assert.equal(importedSlots({} as never), false);
+  // An imported product the owner later saved in the admin form: its description now carries `en`, but the
+  // official spec group only the import writes (writer.ts OFFICIAL_SPEC_GROUP) still marks it.
+  const adminSaved = { name: { en: { status: 'imported', src_rev: 2 }, ...imported }, description: { en: { status: 'imported', src_rev: 2 }, ...imported } } as never;
+  assert.equal(IMPORT_SPEC_GROUP_ID, OFFICIAL_SPEC_GROUP.id, 'the mark is the writer\'s own group');
+  assert.equal(importedSlots(adminSaved, [{ id: 'sg_bambu_official' }]), true);
+  assert.equal(importedSlots(adminSaved, [{ id: 'sg_1' }, { id: 'sg_2' }]), false);
+  assert.equal(importedSlots(null, [{ id: 'sg_bambu_official' }]), true);
+  assert.equal(importedSlots(null, null), false);
 });
 
 test('public API v1 carries the same Arabic and Sorani: description, usage guide, content, specifications', async () => {
