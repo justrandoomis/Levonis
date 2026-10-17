@@ -242,10 +242,12 @@ function schedule(c: Context<AppContext>, work: Promise<unknown>): Promise<void>
 //
 // THE REFRESH IS A GUEST'S OWN REQUEST, REPLAYED. It is dispatched through the
 // whole Worker (`setEdgeRefreshDispatcher`, registered by worker/index.ts) as
-// a cookie-less GET of the canonical URL with the visitor's Host, language and
-// address, so it runs every middleware and the route exactly as a guest's miss
-// would — never the finished request's own Hono context, whose response has
-// already left (its headers would leak into the copy). One refresh per key per
+// a cookie-less GET of the canonical URL with the visitor's Host and language —
+// never the visitor's address — so it runs the route exactly as a guest's miss
+// would; never the finished request's own Hono context, whose response has
+// already left (its headers would leak into the copy). The deception gate lets
+// it through untouched (`isEdgeRefresh`): the visitor's own request that caused
+// it was gated already, and the replay is nobody's. One refresh per key per
 // isolate at a time. A refresh answered 404/410 (the product was hidden) drops
 // the copy; any other failure leaves it to age out. Without a dispatcher (a unit
 // test of one router) nothing is served stale: a late copy is a miss, as before.
@@ -285,6 +287,13 @@ export function setEdgeRefreshDispatcher(dispatch: RefreshDispatcher | null): vo
 }
 /** The refresh requests this isolate made: they skip the lookup and store inline. Unforgeable from outside. */
 const refreshRequests = new WeakSet<Request>();
+/**
+ * Is this request one of this isolate's own background refreshes? Only an object
+ * `scheduleRefresh` built answers yes: no header, URL or body can pass for one.
+ */
+export function isEdgeRefresh(request: Request): boolean {
+  return refreshRequests.has(request);
+}
 /** One refresh per key per isolate at a time. */
 const refreshing = new Map<string, Promise<void>>();
 
@@ -307,8 +316,13 @@ function scheduleRefresh(c: Context<AppContext>, cache: Cache, key: Request): bo
   const dispatch = refreshDispatcher;
   if (!dispatch) return false;
   if (refreshing.has(key.url)) return true;
+  // NOT the visitor's address (speed lane review, «NEVER FRAMED»): with no Sec-Fetch-*
+  // header the replay would be, to the deception layer, a TOOL presenting the visitor's
+  // URL — a planted link's trap data — from the visitor's network: a block on a carrier's
+  // shared address and a call to the owner. It carries nobody's address, and the gate
+  // lets it through untouched.
   const headers = new Headers();
-  for (const name of ['Host', 'Accept-Language', 'CF-Connecting-IP', 'X-Forwarded-Proto']) {
+  for (const name of ['Host', 'Accept-Language', 'X-Forwarded-Proto']) {
     const v = c.req.header(name);
     if (v) headers.set(name, v);
   }

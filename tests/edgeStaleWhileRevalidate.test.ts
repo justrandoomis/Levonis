@@ -35,6 +35,7 @@ import {
   PURGE_MARKER_CACHE,
   STORED_AT_HEADER,
   freshnessOf,
+  isEdgeRefresh,
   purgeAnonymousCache,
   setEdgeRefreshDispatcher,
   storedCacheControl,
@@ -129,15 +130,17 @@ function world(opts: { dispatcher?: boolean } = {}) {
   const guest = stubApp(db, null, mount);
   const member = stubApp(db, MEMBER, mount);
   const refreshes: string[] = [];
+  const replays: Request[] = [];
   if (opts.dispatcher !== false) {
     setEdgeRefreshDispatcher((request, env, ctx) => {
       refreshes.push(`${new URL(request.url).pathname}${new URL(request.url).search}`);
+      replays.push(request);
       assert.equal(request.headers.get('Cookie'), null, 'a refresh is a guest request: no cookie');
       return guest.fetch(request, env, ctx as never);
     });
   }
   const rename = (name: string) => raw.prepare('UPDATE products SET name = ? WHERE id = ?').run(name, ID);
-  return { raw, db, guest, member, refreshes, rename };
+  return { raw, db, guest, member, refreshes, replays, rename };
 }
 
 const nameIn = async (res: Response) => {
@@ -321,6 +324,28 @@ test('a refresh that answers 404 (the product was hidden) drops the copy: one st
     await settle();
     assert.equal(answers.store.size, 0, 'the refresh saw 404 and dropped it');
     assert.equal((await get(w.guest, path)).status, 404);
+  });
+});
+
+test("the refresh is the Worker's own request: no visitor's address, no cookie, and known as a refresh — nothing outside can pass for one", async () => {
+  await withCaches(async () => {
+    const w = world();
+    const path = '/api/products?search=bambu&limit=6';
+    assert.equal((await get(w.guest, path, { 'CF-Connecting-IP': '198.51.100.77', 'Accept-Language': 'ckb' })).status, 200);
+    await settle();
+    advance(90);
+    await get(w.guest, path, { 'CF-Connecting-IP': '198.51.100.77', 'Accept-Language': 'ckb' });
+    await settle();
+    assert.equal(w.replays.length, 1);
+    const [replay] = w.replays;
+    // The visitor's own request was gated already; the replay is nobody's (worker/lib/deception/gate.ts
+    // lets it through untouched), so it carries no address a block or an incident could land on.
+    assert.equal(replay.headers.get('CF-Connecting-IP'), null, "never the visitor's address");
+    assert.equal(replay.headers.get('Cookie'), null);
+    assert.equal(replay.headers.get('Accept-Language'), 'ckb', 'the language still picks the same answer');
+    assert.equal(isEdgeRefresh(replay), true);
+    // A request from outside with the very same URL and headers is not one.
+    assert.equal(isEdgeRefresh(new Request(replay.url, { headers: replay.headers })), false);
   });
 });
 
