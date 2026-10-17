@@ -21,7 +21,11 @@
  *      yet never takes a live page's place); a `keep` row is stored, never shown;
  *   5. every statement binds ≤ 100 parameters; a 250-row part costs well under
  *      the invocation budget; no token → the uniform 404;
- *   6. the committed index is the empty index, and a malformed index knows no part.
+ *   6. the bundled index is the committed one, and a malformed index knows no
+ *      part; EVERY committed part loads through the real Worker on a fully
+ *      migrated database — re-validated row by row, ≤ 100 parameters a
+ *      statement, under the invocation budget — and loading them all again is
+ *      `skipped` for each.
  *
  * Run: node --import tsx --test tests/catalogTranslationsLoader.test.ts
  */
@@ -297,13 +301,49 @@ test('a 250-row part: every statement ≤ 100 parameters, well under the invocat
   assert.deepEqual(await answer(anon), { error: 'Not found' });
 });
 
-test('the committed index is the empty index the code release lands with; a malformed index knows no part', () => {
+test('the bundled index is the committed one; a malformed index knows no part', () => {
   useTranslationsIndexForTests(null);
   const committed = readFileSync(join(ROOT, 'data', 'bambu-import', 'translations', 'index.json'), 'utf8');
   assert.deepEqual(parseTranslationsIndex(committed), parseTranslationsIndex(JSON.parse(committed)));
   assert.deepEqual(bundledTranslationsIndex(), parseTranslationsIndex(committed));
   for (const bad of ['', '{', '[]', '{"version":2,"parts":{}}', '{"version":1,"parts":{"x1":{"sha256":"' + 'a'.repeat(64) + '","rows":1,"bytes":1}}}', '{"version":1,"parts":{"p001":{"sha256":"A","rows":1,"bytes":1}}}']) {
     assert.deepEqual(parseTranslationsIndex(bad), { version: 1, parts: {} }, bad);
+  }
+});
+
+test('every committed part loads through the real Worker: each row re-proved, within D1\'s limits and the budget; again → skipped', async () => {
+  useTranslationsIndexForTests(null);
+  const w = world();
+  cacheDouble();
+  const counted = countingD1(w.env.DB as D1Database);
+  w.env.DB = counted.db;
+  const dir = join(ROOT, 'data', 'bambu-import', 'translations');
+  const parts = Object.keys(bundledTranslationsIndex().parts).sort();
+  assert.ok(parts.length > 0, 'the reviewed translations are committed');
+  const startViolations = violations.length;
+  let rows = 0;
+  let most = 0;
+  for (const part of parts) {
+    const text = readFileSync(join(dir, `${part}.json`), 'utf8');
+    const before = counted.counter.count;
+    const res = await load(w, part, text);
+    const a = await answer(res);
+    assert.equal(res.status, 200, `${part}: ${JSON.stringify(a)}`);
+    assert.equal(a.inserted + a.updated + a.unchanged, a.rows, part);
+    rows += a.rows;
+    most = Math.max(most, counted.counter.count - before);
+  }
+  assert.deepEqual(violations.slice(startViolations), [], 'no statement over D1\'s limits');
+  assert.ok(most <= 120, `the largest part spent ${most} statements (the invocation budget is 900)`);
+  assert.equal(count(w, 'SELECT COUNT(*) AS n FROM catalog_translations'), rows);
+  assert.equal(count(w, 'SELECT COUNT(*) AS n FROM catalog_translation_parts'), parts.length);
+  // `keep` and `needs_review` rows are stored, never shown; the Sorani is never the Arabic in what is shown.
+  assert.equal(count(w, "SELECT COUNT(*) AS n FROM catalog_translations WHERE status IN ('reviewed','machine') AND ckb = ar"), 0);
+  assert.equal(count(w, "SELECT COUNT(*) AS n FROM catalog_translations WHERE status = 'keep' AND (ar <> en OR ckb <> en)"), 0);
+  // The same parts again: each one skipped, nothing written.
+  for (const part of parts) {
+    const a = await answer(await load(w, part, readFileSync(join(dir, `${part}.json`), 'utf8')));
+    assert.equal(a.skipped, true, part);
   }
 });
 

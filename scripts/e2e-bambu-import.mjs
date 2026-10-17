@@ -158,21 +158,23 @@ export function fixtureBundle({ p0Dir = join(ROOT, 'docs', 'bambu-import', 'p0')
   }
   text['curated/index.json'] = `${JSON.stringify({ files: curatedIndex }, null, 2)}\n`;
   // The translation memory's bundled index (docs/bambu-import/I18N-DESIGN.md §A.3): the Worker imports it, so the
-  // dry run's tree carries it — empty, as the code release lands it (no part is loaded in a dry run).
-  text['translations/index.json'] = `${JSON.stringify({ version: 1, parts: {} }, null, 2)}\n`;
+  // dry run's tree carries the committed one, byte for byte (no part is loaded in a dry run).
+  text['translations/index.json'] = readFileSync(join(ROOT, 'data', 'bambu-import', 'translations', 'index.json'), 'utf8');
   return { rows, text };
 }
 
 /**
  * The REAL reviewed bundle: every file under data/bambu-import/ exactly as committed (path relative to it →
- * contents), and the manifest rows in queue order. Nothing is rewritten, so the Worker and the runner hash the
- * committed bytes.
+ * contents) — the translation parts aside (only their index is the Worker's) — and the manifest rows in queue
+ * order. Nothing is rewritten, so the Worker and the runner hash the committed bytes.
  */
 export function repoBundle({ dataDir = join(ROOT, 'data', 'bambu-import') } = {}) {
   const text = {};
   const walk = (dir, rel = '') => {
     for (const name of readdirSync(dir, { withFileTypes: true })) {
       if (name.isDirectory()) walk(join(dir, name.name), `${rel}${name.name}/`);
+      // A translation part is neither a reviewed file nor bundled (only its index is): the runner posts it, never the dry run.
+      else if (rel === 'translations/' && /^p[0-9]{3,}\.json$/.test(name.name)) continue;
       else if (name.name.endsWith('.json')) text[`${rel}${name.name}`] = readFileSync(join(dir, name.name), 'utf8');
     }
   };
