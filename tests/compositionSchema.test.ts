@@ -37,7 +37,9 @@ import { planProductSave, saveProductAtomic } from '../worker/lib/productPersist
  * is an invariant a later migration escapes silently.
  */
 const FEATURE_FILES = readdirSync(join(ROOT, 'migrations'))
-  .filter((f) => /^00(5[89]|6[0-3])_/.test(f))
+  // 0197 adds `offer_usd_prices` (the product discount's dollar sale prices, docs/ux/PRODUCT-DISCOUNT.md):
+  // an `offer_` table, so it is walked by the same no-inventory invariants as the feature's own.
+  .filter((f) => /^00(5[89]|6[0-3])_/.test(f) || f === '0197_offer_usd_prices.sql')
   .sort();
 
 const sqlOf = (f: string) => readFileSync(join(ROOT, 'migrations', f), 'utf8').replace(/--[^\n]*/g, '');

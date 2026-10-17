@@ -210,6 +210,9 @@ export default {
         'GET /:productId': 'op',
         'POST /': 'op',
         'PUT /:productId': 'op',
+        // The discount card's preview (docs/ux/PRODUCT-DISCOUNT.md §5.2): writes nothing; the owner-only
+        // below-cost warning is computed for the viewer, so a non-owner's answer carries no cost.
+        'POST /:productId/preview': 'op',
         'DELETE /:productId': 'op',
       },
     },
