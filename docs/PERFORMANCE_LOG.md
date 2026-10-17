@@ -2294,7 +2294,8 @@ or migration changed.
   parameterised listings and searches included, which before lived on 120 s even there.
 - **The head start for the category map and the community home** (`mainOpeningFor`, `run_worker_first`):
   `/categories`, `/categories/<slug>`, `/categories/<a>/<b>` carry the main host's resolve answer, their page's
-  chunk closure and a `preload as=fetch` of the page's first read (`/api/catalog/tree`, `/api/catalog/<slug>`);
+  chunk closure (since the review: the page's own chunk only, at low priority — below) and a `preload as=fetch`
+  of the page's first read (`/api/catalog/tree`, `/api/catalog/<slug>`);
   `/community` carries the resolve and `/api/community/access` (not the 32-file page closure: while the
   community is shut the gate never renders it — measured +0.19 s LCP with it, below).
 - **The lead photo in both themes** (`leadImagePreloads`, `worker/lib/productOpeningLead.ts`): once per theme
@@ -2304,7 +2305,7 @@ or migration changed.
 - **Large rungs** (`clampRung`, `cutVariant`): `?w=1600` of a 1254 px picture is its `?w=1280` copy; a rung the
   binding will not encode in AVIF is cut in WebP at full size and kept in the AVIF place; the sweep no longer
   marks large photos unreadable; when no copy can be had the colo keeps the original under the copy's address
-  for an hour instead of failing per request.
+  for an hour instead of failing per request (since the review: never for a fixed-name picture — below).
 - **The search dictionary** once per isolate for 30 s (`synonymsFor`), forgotten by its writers.
 
 ### Lab — the Worker in place (`wrangler dev --local` on the built dist, the catalogue seeded by `scripts/lib/e2e-catalog-only-seed.ts` with 1254 px main and light-theme photos and colour-bound pictures on half the products; Playwright 360×800 DPR 3, CPU ×4, Slow-4G 150 ms / 1.6 Mbps, light scheme, a cold context per visit with the HTTP cache on, median of 5; before = `0d8ed43b`, after = this lane)
@@ -2321,7 +2322,7 @@ or migration changed.
 No picture was downloaded twice (with the HTTP cache off — not how a phone loads — a preloaded picture was
 sometimes fetched again; the skeptics saw the same harness artefact). The shell paints 36–236 ms later on the
 category routes: their 24 modulepreloads share the link with the entry (the trade P2b measured and kept for
-the product page). Locally D1 answers in milliseconds, so the lab shows only the removed round trips; on the
+the product page). Fixed by the review below: the category documents now paint earlier than before. Locally D1 answers in milliseconds, so the lab shows only the removed round trips; on the
 live site each removed step also carries its server time (resolve 0.2–1.1 s, the catalogue read 0.3–1.0 s on
 a miss), which is where the audit's A/B measured −1.0 to −1.4 s on these category pages.
 
@@ -2350,6 +2351,50 @@ public for its declared window), `tests/fixtures/imageDoubles.ts` (the binding's
 - The listing read of `/categories/<a>/<b>` is not preloaded: its URL needs the section id, a D1 lookup on the
   document's own path (the skeptics measured 0–0.26 s for it). The `/categories` photo pool is not preloaded
   either: the category lane may stop the banner waiting on it, and an unused preload costs 27 KB on the link.
-- The chunk cap stays 24 (CategoryPage's closure is 28, CategoryListing's 26): the shell already paints later.
+- The chunk cap stays 24 (CategoryPage's closure is 28, CategoryListing's 26). The category documents no longer
+  name the closure at all (review fixes below).
 - Search answers are not trimmed here (the slim card is the payload lane's), and the vocabulary and postings
   reads are not merged (a one-letter prefix range is about a tenth of the index at 1,115 products).
+
+### Review fixes (2026-10-17)
+
+Six findings of the lane's review, each upheld by two skeptics, each fixed with a test that fails without it.
+
+- **The background refresh never frames a visitor** (high). The replay carried the visitor's
+  `CF-Connecting-IP` and no `Sec-Fetch-*` header, so the deception gate read it as a TOOL presenting the
+  visitor's URL: a planted link with trap data, kept at the edge, got the next visitor's carrier address a
+  24 h network block, a device block and an owner alert on every refresh. The replay now carries no address
+  and the gate lets this isolate's own refresh requests (`isEdgeRefresh`, a WeakSet nothing outside can
+  forge) through untouched; the visitor's request that caused it was gated already. Pinned in
+  `tests/deceptionCanary.test.ts` («NEVER FRAMED, WITH THE EDGE CACHE») and `tests/edgeStaleWhileRevalidate.test.ts`.
+- **One odd `Accept` header no longer decides a colo's copy** (medium, and the low «`*/*` re-cut»). An asker
+  naming AVIF but not WebP was refused the WebP kept in the AVIF place, cut without the WebP fallback, failed,
+  and left the ORIGINAL under the shared AVIF edge address for an hour for every browser in that colo; a
+  `*/*` asker (a crawler) was refused a WebP copy in its own WebP place and cut it again. Every browser that
+  decodes AVIF decodes WebP and the edge entry is shared by format, so the kept copy is now every asker's and
+  every AVIF cut may fall back to WebP (`cutVariant` lost its `webpFallback` switch).
+- **A fixed-name picture whose cut fails keeps its own five minutes** (medium). The original kept under the
+  copy's address for an hour also applied to brands/, ui/, services/ and link cards, which are rewritten in
+  place with nothing purging the copy's address: a replaced logo stayed old for up to an hour instead of
+  5 min. Such a key leaves with its own `public, max-age=300, must-revalidate` and nothing is kept at the
+  copy's address. Not changed: an immutable picture whose cut fails still keeps the original an hour per colo
+  (a transient binding error cannot be told from the picture's own — both are an HTTP error or a throw —
+  and an immutable key risks no staleness, only the original's weight for that hour).
+- **The category documents name their page's own chunk only, at low priority** (low: «category pages paint
+  their first frame up to 236 ms later»). The closure's 24 modulepreloads shared the Slow-4G link with the
+  entry. Named alone at default priority the page's chunk still painted `/categories/printers` 64 and 116 ms later
+  than before in two of three runs; at `fetchpriority="low"` it yields the link to the entry and the first read, and every
+  route paints both earlier than before. `/products` keeps its whole closure at default priority (P2b).
+- **Two behaviours got their tests** (low): the tree purge marker (`purgeCatalogTreeCache` retires a rebuild
+  that read the map before a taxonomy write) and `prepareTaxonomy`'s `forgetSearchSynonyms` (the import's
+  words are found on the next search in its isolate, not after 30 s).
+
+Lab (same set-up as above; interleaved, one `wrangler dev` per arm, the order rotated each run). Medians of
+14 (two quiet runs of 7); «closure» is the lane before the review, from a third run of 7 against its own
+«before» (2132 / 2064 / 2144 FCP there):
+
+| route | FCP before → closure → own chunk → **own chunk, low** | LCP before → own chunk → **own chunk, low** | first read done before → after |
+|---|---|---|---|
+| `/categories` | 2084 → 2172 → 2014 → **2004** | 3212 → 3190 → **3114** | 2855 → 993 |
+| `/categories/printers` | 2108 → 2316 → 2064 → **2026** | 4248 → 3930 → **3756** | 3481 → 1091 |
+| `/categories/printers/fdm-printers` | 2064 → 2284 → 2002 → **1958** | 4276 → 4046 → **3942** | 3321 → 990 |

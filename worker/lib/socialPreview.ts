@@ -680,6 +680,13 @@ export function routeModuleFor(path: string, onStore: boolean): string | null {
 /** What one main-host opening document starts before React: its page module (a manifest key, or none) and its first reads. */
 export interface MainOpening {
   route: string | null;
+  /**
+   * `own`: only the page's own chunk is named, at low priority, not its
+   * closure — the browser finds the rest when that chunk runs
+   * (`openingChunkPreloads`). Absent: the whole closure, as /products has had
+   * since P2b.
+   */
+  chunks?: 'own';
   fetches: string[];
 }
 
@@ -697,10 +704,10 @@ function segmentForApi(raw: string): string | null {
  * THE MAIN HOST'S OPENING DOCUMENTS (speed audit 2026-10-16, findings «category
  * pages get no head start» and «the 5-step serial waterfall»). Each one is
  * written with the main host's resolve answer (no database read) so the app
- * renders on its first frame, the modulepreloads of its page's chunk closure,
- * and a `preload as=fetch` of the FIRST read its page makes — exactly the URL
- * the page asks for, so the browser hands the page that response instead of
- * the page starting it after its code has arrived:
+ * renders on its first frame, the modulepreload of its page's chunk (the
+ * listing: its whole closure), and a `preload as=fetch` of the FIRST read its
+ * page makes — exactly the URL the page asks for, so the browser hands the page
+ * that response instead of the page starting it after its code has arrived:
  *
  *   /                          /api/home (Home is in the entry)
  *   /products                  the listing the page opens on (src/lib/bootFetch.ts's own path)
@@ -710,6 +717,14 @@ function segmentForApi(raw: string): string | null {
  *                              section id the tree answers, so it stays one step behind)
  *   /community                 /api/community/access, the gate's question (no page code:
  *                              the gate decides whether Community renders at all)
+ *
+ * THE CATEGORY PAGES NAME THEIR OWN CHUNK ONLY, AT LOW PRIORITY (speed lane
+ * review): their whole closure (24 modulepreloads, the cap) shared the Slow-4G
+ * link with the entry and painted the shell 40–250 ms LATER than the bare
+ * document did. With the page's chunk alone, behind the entry and the first read,
+ * the shell paints 80–110 ms earlier than the bare document and the largest
+ * paint comes 0.1–0.5 s sooner (local phone lab, interleaved, medians of 14;
+ * docs/PERFORMANCE_LOG.md).
  *
  * Mirrors src/App.tsx's routes and the pages' own reads; tests/documentPreloads.test.ts
  * holds the two together, so a renamed page or a changed read fails a test, not a visitor.
@@ -729,14 +744,14 @@ export function mainOpeningFor(pathname: string, search = ''): MainOpening | nul
     return { route: 'src/pages/Products.tsx', fetches: [`/api/products?${params}`] };
   }
   const path = pathname.replace(/\/+$/, '') || '/';
-  if (path === '/categories') return { route: 'src/pages/CategoriesExplorer.tsx', fetches: ['/api/catalog/tree'] };
+  if (path === '/categories') return { route: 'src/pages/CategoriesExplorer.tsx', chunks: 'own', fetches: ['/api/catalog/tree'] };
   const page = /^\/categories\/([^/]+)$/.exec(path);
   if (page) {
     // Written back as the page writes it (never a SQL value: this file binds every slug it reads).
     const section = segmentForApi(page[1]);
-    return { route: 'src/pages/CategoryPage.tsx', fetches: section ? [`/api/catalog/${section}`] : [] };
+    return { route: 'src/pages/CategoryPage.tsx', chunks: 'own', fetches: section ? [`/api/catalog/${section}`] : [] };
   }
-  if (/^\/categories\/[^/]+\/[^/]+$/.test(path)) return { route: 'src/pages/CategoryListing.tsx', fetches: ['/api/catalog/tree'] };
+  if (/^\/categories\/[^/]+\/[^/]+$/.test(path)) return { route: 'src/pages/CategoryListing.tsx', chunks: 'own', fetches: ['/api/catalog/tree'] };
   // The gate's question only, not the page's code: while the community is shut (live today) the
   // gate draws «تحت الصيانة» and the 32-file Community closure is never asked for — naming it in the
   // document cost the notice ≈0.2 s of a Slow-4G link (local lab, 2026-10-16).
@@ -800,6 +815,21 @@ export function chunkPreloads(
     for (const css of chunk.css ?? []) if (styles.length < cap && !styles.includes(`/${css}`)) styles.push(`/${css}`);
   }
   return { scripts, styles };
+}
+
+/**
+ * The modulepreloads and stylesheets one opening document names: none without a
+ * page module; for `chunks: 'own'` the page's own chunk at low priority (and its
+ * closure's stylesheets), so it yields the link to the entry and the first read;
+ * else the whole closure (`chunkPreloads`).
+ */
+export function openingChunkPreloads(
+  manifest: ViteManifest | null,
+  opening: MainOpening
+): Pick<DocumentPreloads, 'scripts' | 'styles' | 'scriptPriority'> {
+  if (!manifest || !opening.route) return { scripts: [], styles: [] };
+  const all = chunkPreloads(manifest, opening.route);
+  return opening.chunks === 'own' ? { scripts: all.scripts.slice(0, 1), styles: all.styles, scriptPriority: 'low' } : all;
 }
 
 /** The entry's stylesheets (`/assets/index-<hash>.css`), for the Early Hints line. */
@@ -886,6 +916,8 @@ export interface DocumentPreloads {
   fetches?: string[];
   /** `/assets/<chunk>.js` files for `<link rel="modulepreload">`. */
   scripts: string[];
+  /** `low`: those modulepreloads yield the link to the entry and the first read (`openingChunkPreloads`). */
+  scriptPriority?: 'low';
   /** `/assets/<chunk>.css` files for `<link rel="preload" as="style">`. */
   styles: string[];
   /** The one image preloaded at high priority, or null. */
@@ -989,7 +1021,8 @@ export function injectDocumentPreloads(html: string, p: DocumentPreloads): strin
     if (!href.startsWith('/api/') || href.startsWith('//')) continue;
     lines.push(`<link rel="preload" as="fetch" crossorigin href="${escapeAttribute(href)}">`);
   }
-  for (const href of p.scripts) lines.push(`<link rel="modulepreload" crossorigin href="${escapeAttribute(href)}">`);
+  const scriptPriority = p.scriptPriority === 'low' ? ' fetchpriority="low"' : '';
+  for (const href of p.scripts) lines.push(`<link rel="modulepreload"${scriptPriority} crossorigin href="${escapeAttribute(href)}">`);
   for (const href of p.styles) lines.push(`<link rel="preload" as="style" crossorigin href="${escapeAttribute(href)}">`);
   const images: LeadImagePreload[] = p.images ?? (p.image ? [{ href: p.image, imageSrcSet: p.imageSrcSet, imageSizes: p.imageSizes }] : []);
   for (const img of images) {

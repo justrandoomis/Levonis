@@ -10,9 +10,13 @@
  * trips one after another (live phone LCP ≈6.0 s on a category page against
  * 3.3 s on /products). Proved here on the real Worker with a fake asset layer:
  *
- *   - each document carries the main host's resolve answer, the modulepreloads
- *     of its page's closure and a `preload as=fetch` of exactly the URL its
+ *   - each document carries the main host's resolve answer, the modulepreload
+ *     of its page's own chunk and a `preload as=fetch` of exactly the URL its
  *     page reads first (the page's own code is read to prove it);
+ *   - a category document names its page's chunk ONLY, at low priority, never
+ *     the closure: the closure's 24 modulepreloads shared the link with the
+ *     entry and painted the shell later than the bare document did (speed lane
+ *     review);
  *   - the document stays shareable (no session read, no price, a fresh ETag
  *     and a 304), and a store host's same paths pass through untouched;
  *   - every path is in `run_worker_first` in all three environments.
@@ -32,6 +36,7 @@ import {
   INLINE_RESOLVE_ID,
   MANIFEST_PATH,
   mainOpeningFor,
+  openingChunkPreloads,
   type ViteManifest,
 } from '../worker/lib/socialPreview';
 import { DOCUMENT_CACHE_CONTROL } from '../worker/lib/securityPolicy';
@@ -98,11 +103,11 @@ const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
 // ------------------------------------------------------------------- the map
 
 test('the opening map: each document, its page module and the first read that page makes', () => {
-  assert.deepEqual(mainOpeningFor('/categories'), { route: 'src/pages/CategoriesExplorer.tsx', fetches: ['/api/catalog/tree'] });
+  assert.deepEqual(mainOpeningFor('/categories'), { route: 'src/pages/CategoriesExplorer.tsx', chunks: 'own', fetches: ['/api/catalog/tree'] });
   assert.deepEqual(mainOpeningFor('/categories/'), mainOpeningFor('/categories'));
-  assert.deepEqual(mainOpeningFor('/categories/printer-accessories'), { route: 'src/pages/CategoryPage.tsx', fetches: ['/api/catalog/printer-accessories'] });
-  assert.deepEqual(mainOpeningFor('/categories/printing-materials/fdm-materials'), { route: 'src/pages/CategoryListing.tsx', fetches: ['/api/catalog/tree'] });
-  assert.deepEqual(mainOpeningFor('/categories/printers/all'), { route: 'src/pages/CategoryListing.tsx', fetches: ['/api/catalog/tree'] });
+  assert.deepEqual(mainOpeningFor('/categories/printer-accessories'), { route: 'src/pages/CategoryPage.tsx', chunks: 'own', fetches: ['/api/catalog/printer-accessories'] });
+  assert.deepEqual(mainOpeningFor('/categories/printing-materials/fdm-materials'), { route: 'src/pages/CategoryListing.tsx', chunks: 'own', fetches: ['/api/catalog/tree'] });
+  assert.deepEqual(mainOpeningFor('/categories/printers/all'), { route: 'src/pages/CategoryListing.tsx', chunks: 'own', fetches: ['/api/catalog/tree'] });
   assert.deepEqual(mainOpeningFor('/community'), { route: null, fetches: ['/api/community/access'] }, 'the gate decides whether the page code is needed at all');
   // The two that had it already keep exactly what they had.
   assert.deepEqual(mainOpeningFor('/'), { route: null, fetches: ['/api/home'] });
@@ -167,8 +172,8 @@ test('a category page carries its page code, its first read and the resolve answ
   assert.deepEqual(fetches(html), ['/api/catalog/printer-accessories']);
   assert.deepEqual(
     links(html, 'modulepreload'),
-    ['/assets/vendor-react-r1.js', '/assets/CategoryPage-p1.js', '/assets/catalog-c1.js', '/assets/listing-l1.js'],
-    "the shell's own, then the page's closure beyond the entry"
+    ['/assets/vendor-react-r1.js', '/assets/CategoryPage-p1.js'],
+    "the shell's own, then the page's own chunk — never its closure, which painted the shell later (speed lane review)"
   );
   assert.deepEqual(links(html, 'preload').filter((h) => h.endsWith('.css')), ['/assets/catalog-c1.css']);
   assert.equal(statements.length, 0, 'no database read on the document');
@@ -196,6 +201,31 @@ test('the explorer, a listing and the community home each name their own page an
     assert.deepEqual(fetches(html), reads, path);
     assert.equal(inline(html)?.kind, 'main', path);
   }
+});
+
+test('ONLY THE PAGE\'S OWN CHUNK, AT LOW PRIORITY, on a category document — the listing keeps its whole closure, a page with no module names none (speed lane review)', async () => {
+  for (const path of ['/categories', '/categories/printer-accessories', '/categories/printers/all']) {
+    const opening = mainOpeningFor(path)!;
+    const { scripts, scriptPriority } = openingChunkPreloads(MANIFEST, opening);
+    assert.deepEqual(scripts, [`/${MANIFEST[opening.route!].file}`], path);
+    assert.equal(scriptPriority, 'low', `${path}: behind the entry and the first read`);
+  }
+  const listing = openingChunkPreloads(MANIFEST, mainOpeningFor('/products')!);
+  assert.deepEqual(listing.scripts, ['/assets/Products-x1.js', '/assets/listing-l1.js', '/assets/catalog-c1.js'], 'P2b: the listing\'s whole closure');
+  assert.equal(listing.scriptPriority, undefined, 'at its default priority, as measured');
+  assert.deepEqual(openingChunkPreloads(MANIFEST, mainOpeningFor('/community')!), { scripts: [], styles: [] });
+  assert.deepEqual(openingChunkPreloads(null, mainOpeningFor('/categories')!), { scripts: [], styles: [] }, 'no manifest, nothing named');
+  // In place, on the real Worker: one page chunk beyond the shell's own on each category document, at low priority.
+  const { call } = realWorker();
+  for (const path of ['/categories', '/categories/printer-accessories', '/categories/printing-materials/fdm-materials']) {
+    const html = await (await call(APEX, path)).text();
+    assert.equal(links(html, 'modulepreload').length, 2, `${path}: ${links(html, 'modulepreload').join(' ')}`);
+    const page = `/${MANIFEST[mainOpeningFor(path)!.route!].file}`;
+    assert.ok(html.includes(`<link rel="modulepreload" fetchpriority="low" crossorigin href="${page}">`), `${path}: ${page} at low priority`);
+    assert.ok(html.includes('<link rel="modulepreload" crossorigin href="/assets/vendor-react-r1.js">'), "the shell's own keeps its priority");
+  }
+  const products = await (await call(APEX, '/products')).text();
+  assert.equal(products.includes('fetchpriority="low"'), false, 'the listing\'s closure keeps its priority');
 });
 
 test('a session cookie changes nothing: the document reads no session and stays one shareable body', async () => {

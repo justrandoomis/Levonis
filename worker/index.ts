@@ -19,6 +19,7 @@ import {
   storeImagePreload,
   injectSocialPreview,
   mainOpeningFor,
+  openingChunkPreloads,
   MANIFEST_PATH,
   preloadImagePath,
   previewStoreRef,
@@ -895,8 +896,9 @@ async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
   const storeHome = onStore ? c.req.path === '/' : homeRef !== null;
   // THE MAIN HOST'S OPENING DOCUMENTS (worker/lib/socialPreview.ts `mainOpeningFor`):
   // the home, the listing, the category map and its pages, the community — each with
-  // the main host's resolve answer (no database read), its page's chunk closure and its
-  // first read started by the preload scanner instead of after React has mounted.
+  // the main host's resolve answer (no database read), its page's chunk (the listing: its
+  // whole closure) and its first read started by the preload scanner instead of after
+  // React has mounted.
   const opening = host.kind === 'main' ? mainOpeningFor(c.req.path, new URL(c.req.url).search) : null;
   if (opening && asset.ok && /^text\/html\b/i.test(asset.headers.get('Content-Type') || '')) {
     try {
@@ -905,7 +907,7 @@ async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
       // rather than after the entry bundle has downloaded and React mounted.
       const resolve = { success: true, kind: host.kind, store: null, root_domain: rootDomainFrom(c.env) };
       const manifest = opening.route ? await viteManifest(c) : null;
-      const chunks = manifest && opening.route ? chunkPreloads(manifest, opening.route) : { scripts: [], styles: [] };
+      const chunks = openingChunkPreloads(manifest, opening);
       const html = injectDocumentPreloads(await asset.clone().text(), { ...chunks, image: null, resolve, fetches: opening.fetches });
       const headers = new Headers(asset.headers);
       headers.delete('Content-Length');
