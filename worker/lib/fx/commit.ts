@@ -187,6 +187,10 @@ export function planPairBatch(changes: readonly PairChange[], allRows: readonly 
     const usdChange = changes.find((ch) => ch.pair === 'USD_IQD');
     displayRateChanged = !!usdChange && has(usdChange.set, 'effective_rate') && usdChange.set.effective_rate !== usdChange.row.effective_rate;
   }
+  // The provider's FIRST validated USD/IQD reading: the public figure turns from the rate the owner
+  // typed (or none) to the market sell, credited (DECISIONS row 246) — whether or not a rate moved.
+  const usdFirst = changes.find((ch) => ch.pair === 'USD_IQD');
+  if (usdFirst && usdFirst.row.market_rate === null && typeof usdFirst.set.market_rate === 'string') displayRateChanged = true;
   const cost = statements.reduce((n, s) => n + (s.kind === 'fence' ? 2 : 1), 0) + audits.length;
   return { statements, audits, derived, displayRateChanged, cost };
 }

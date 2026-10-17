@@ -339,9 +339,13 @@ async function commitAct(c: Context<AppContext>, planned: PlannedAct, rows: read
     throw e;
   }
   // The public settings carry the USD rate AND whether it is the provider's figure or one the owner
-  // typed (`displayUsdRateAttributed`, FX-1 review #10): a change of either purges them.
+  // typed (`displayUsdRateAttributed`, FX-1 review #10): a change of either purges them. With no
+  // market figure the reading is the rate he types, on MANUAL only (DECISIONS row 246): a typed rate
+  // moves the rate (`displayRateChanged`), and a mode change publishes or withdraws it.
   const usdSourceChanged = planned.changes.some(
-    (ch) => ch.pair === 'USD_IQD' && ch.set.effective_source !== undefined && ch.set.effective_source !== ch.row.effective_source
+    (ch) =>
+      ch.pair === 'USD_IQD' &&
+      ((ch.set.effective_source !== undefined && ch.set.effective_source !== ch.row.effective_source) || (ch.set.mode !== undefined && ch.set.mode !== ch.row.mode))
   );
   if (plan.displayRateChanged || usdSourceChanged) await purgeCatalogueFromJob(c.env, [], { settings: true, origin: originOf(c) });
   if (planned.attention.length) await notifyOwnerFx(c.env, planned.attention);

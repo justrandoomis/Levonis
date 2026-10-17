@@ -2357,8 +2357,9 @@ adminProductsRoutes.put('/:id/catalogs', async (c) => {
  * asks (DECISIONS row 220): the OWNER reads the APPLIED USD/IQD the prices are
  * built at (`getAppliedUsdRate` — market + his adjustment, or the rate he
  * typed), so the dollar figure is the dollar price he set, as it always was;
- * every other admin reads the PUBLIC market figure customers read dollars at
- * (`getDisplayUsdRate`) — beside it the applied rate would be the adjustment.
+ * every other admin reads the PUBLIC figure customers read dollars at
+ * (`getDisplayUsdRate`: the market figure — beside it the applied rate would
+ * be the adjustment — or, with none, the rate the owner typed, row 246).
  * Before the owner approves a first USD/IQD value `usd_preview` is null.
  * `tier` may be supplied to preview what a member of that tier would pay
  * (server data only otherwise).

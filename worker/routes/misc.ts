@@ -42,10 +42,11 @@ miscRoutes.get('/health', async (c) => {
  * colo caches it under the anonymous policy (P2a); the settings PUT purges it.
  *
  * `displayUsdRate` (FX programme plan §8, §13; DECISIONS row 220): the USD/IQD
- * the dollar reading converts at — the provider's market sell to the whole
- * dinar, never the owner's adjusted rate (worker/lib/fx/displayRate.ts) — as
+ * the dollar reading converts at — the provider's market sell, never the
+ * owner's adjusted rate, or, with no market figure, the rate the owner typed
+ * on MANUAL (DECISIONS row 246; worker/lib/fx/displayRate.ts) — as
  * decimal text — the ONE public FX figure, read beside the settings in the
- * same wave — or null until the owner approves the first value (and on a
+ * same wave — or null with no shop rate (and on a
  * database without migration 0179) — with `displayUsdRateAttributed`, whether
  * that figure is the provider's (credited to IQWealth) or one the owner typed.
  * Nothing else from FX is public. A changed rate or source purges this answer (worker/lib/fx/scheduler.ts, purgeCatalogueFromJob).

@@ -13,7 +13,8 @@
  *   → decide (pure, decide.ts) → planFxCommit (pure, commit.ts) → one batch,
  *     with one re-plan after a fence miss (no second fetch) and, after any
  *     other refusal, each pair alone, then COMMIT_REFUSED (critiques H1, M10)
- *   → the public display rate's caches purged when the USD rate moved (L4)
+ *   → the public display rate's caches purged when the USD rate moved (L4),
+ *     and on the first USD market reading (typed → market, DECISIONS row 246)
  *   → the owner's bell for a review or a long failure (never a figure)
  *   → FX-5: the engine products the committed rates left stale repriced at
  *     once, deficit first, with whatever is left of the run's statement

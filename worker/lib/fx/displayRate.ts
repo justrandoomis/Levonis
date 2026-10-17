@@ -31,22 +31,41 @@
  * rate and an adjustment saved on MANUAL write none either — the public
  * figure stays the market it was. With no such row yet (a typed rate before
  * any market reading was ever applied) it is the provider's last validated
- * reading, `fx_rate_pairs.market_rate`, and with neither, null.
+ * reading, `fx_rate_pairs.market_rate`.
  *
- * Beside it, one flag and no figure: `displayUsdRateAttributed` — true
- * whenever a figure is published, since every figure published is IQWealth's
- * own (the customer menu and Settings credit IQWealth, «based on IQWealth
- * data»). Prices are dinars and are built at the APPLIED rate
- * (`pricing_fx_rates`); this only converts them for reading, so no price
- * anyone pays moves — a dollar reading is the dinar price at the market rate.
+ * WITH NO MARKET FIGURE AT ALL, THE RATE THE OWNER TYPES (owner 2026-10-17,
+ * DECISIONS row 246, amending row 220 for this one figure). A shop on MANUAL
+ * whose provider was never configured has no market reading and no rate ever
+ * built from one; it used to publish null, and a customer who chose dollars
+ * read every price in dinars, silently. The owner's rule: the dollar prices a
+ * customer reads are converted at the rate he sets in «التسعير والشحن» — the
+ * APPLIED USD/IQD (`pricing_fx_rates.rate_iqd`, the rate every engine price is
+ * built at), published only on MANUAL, where it IS the `manual_rate` he
+ * typed (the table's CHECK) and carries no adjustment. It is the shop's own
+ * figure, never IQWealth's. Only this one figure: no market figure exists to
+ * subtract it from, the adjustment saved on MANUAL is no part of it, and
+ * nothing else from FX is published. Back on AUTO with still no market
+ * figure, `manual_rate` is cleared and nothing is published: an adjustment
+ * saved there shifts the rate in force, and its step from the typed rate
+ * would be the adjustment.
  *
- * Null until the owner approves the first USD/IQD value (no applied rate, no
- * public rate), and null on a database without migration 0179: the client then
- * reads prices in dinars, never at the wallet's `exchangeRate` (owner decision
- * 9 — the wallet's 1 USD = 1,400 IQD is its own rate, not a market reading).
- * Never throws. One statement, read in the same wave as the settings.
+ * Beside it, one flag and no figure: `displayUsdRateAttributed` — true when
+ * the figure is IQWealth's own market sell (the customer menu and Settings
+ * credit IQWealth, «based on IQWealth data»), false when it is the rate the
+ * owner typed («a rate set by the shop», no credit). Prices are dinars and
+ * are built at the APPLIED rate (`pricing_fx_rates`); this only converts them
+ * for reading, so no price anyone pays moves.
+ *
+ * Null until the owner approves or types the first USD/IQD value (no applied
+ * rate, no public rate), and null on a database without migration 0179: the
+ * client then reads prices in dinars and says so, never at the wallet's
+ * `exchangeRate` (owner decision 9 — the wallet's 1 USD = 1,400 IQD is its own
+ * rate, not a market reading). Never throws. One statement, read in the same
+ * wave as the settings. A typed rate moves `pricing_fx_rates` and so purges
+ * every cached answer that carries this figure (adminPricing.ts `commitAct`,
+ * `displayRateChanged`), as the provider's first reading does (commit.ts).
  */
-import { rebaseOnAdjustment } from '@levonis/pricing/fxChain';
+import { rebaseOnAdjustment, sameRate } from '@levonis/pricing/fxChain';
 
 const DECIMAL = /^[0-9]+(\.[0-9]+)?$/;
 const SIGNED = /^[+-]?[0-9]+(\.[0-9]+)?$/;
@@ -65,6 +84,7 @@ export async function getPublicDisplayRate(db: D1Database): Promise<PublicDispla
       .prepare(
         `SELECT r.rate_iqd,
                 (SELECT market_rate FROM fx_rate_pairs WHERE pair = 'USD_IQD') AS last_market,
+                (SELECT manual_rate FROM fx_rate_pairs WHERE pair = 'USD_IQD') AS typed_rate,
                 l.effective_after AS built_rate,
                 l.market_adjustment_iqd AS built_adjustment
            FROM pricing_fx_rates r
@@ -75,7 +95,7 @@ export async function getPublicDisplayRate(db: D1Database): Promise<PublicDispla
                        ORDER BY created_at DESC, rowid DESC LIMIT 1) l ON 1 = 1
           WHERE r.currency = 'USD'`
       )
-      .first<{ rate_iqd: unknown; last_market: unknown; built_rate: unknown; built_adjustment: unknown }>();
+      .first<{ rate_iqd: unknown; last_market: unknown; typed_rate: unknown; built_rate: unknown; built_adjustment: unknown }>();
     // No applied rate yet: nothing is published (the first value waits for the owner).
     if (!row || !usable(row.rate_iqd)) return none;
     let market: string | null = null;
@@ -84,7 +104,13 @@ export async function getPublicDisplayRate(db: D1Database): Promise<PublicDispla
     } else if (usable(row.last_market)) {
       market = row.last_market;
     }
-    return market !== null && usable(market) ? { displayUsdRate: market, displayUsdRateAttributed: true } : none;
+    if (market !== null) return usable(market) ? { displayUsdRate: market, displayUsdRateAttributed: true } : none;
+    // No market figure at all: the rate the owner typed, as the shop's own (DECISIONS row 246) — on
+    // MANUAL, where the rate in force IS `manual_rate` (the table's CHECK). Back on AUTO `manual_rate`
+    // is null: an adjustment there shifts the rate in force, and that rate is never published.
+    return usable(row.typed_rate) && sameRate(row.rate_iqd, row.typed_rate)
+      ? { displayUsdRate: row.rate_iqd, displayUsdRateAttributed: false }
+      : none;
   } catch {
     return none;
   }

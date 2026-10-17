@@ -30,8 +30,12 @@
  *
  * FIXED (DECISIONS row 220, verification pass): the public figure is read
  * from the FX log — the market sell of the newest rate built as market +
- * adjustment — so a rate the owner types is never published; the reading
- * stays IQWealth's sell (worker/lib/fx/displayRate.ts).
+ * adjustment — so beside a market figure a rate the owner types is never
+ * published; the reading stays IQWealth's sell (worker/lib/fx/displayRate.ts).
+ * With NO market figure at all (MANUAL, the provider never configured) there
+ * is no public sell to subtract it from, and the owner ruled the typed rate
+ * IS the reading, credited to the shop (DECISIONS row 246,
+ * tests/fxManualDisplayRate.test.ts) — this scenario keeps its market figure.
  *
  * LOCAL ONLY: in-memory SQLite, the real admin pricing and misc routers, the
  * stub owner session of tests/fixtures/app.ts. No network.

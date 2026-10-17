@@ -362,7 +362,7 @@ test('#9: the panel shows a rejection only while it is remembered — 24 hours',
 
 // ------------------------------------------------------------- correctness #10
 
-test('#10: the public settings credit IQWealth for the provider\'s rate; a rate the owner types is never published (DECISIONS row 220)', async () => {
+test('#10: the public settings credit IQWealth for the provider\'s rate; beside a market figure a rate the owner types is never published (DECISIONS row 220; with none, row 246 publishes it as the shop\'s — tests/fxManualDisplayRate.test.ts)', async () => {
   const raw = freshDb();
   raw.exec(OWNER_ROW_SQL);
   const pub = stubApp(asD1(raw), null, (a) => {
