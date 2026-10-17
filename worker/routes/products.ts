@@ -3637,7 +3637,9 @@ export async function listCatalogProducts(
   opts: { withTotal?: boolean } = {}
 ): Promise<CatalogListing> {
   const search = str(q.search, 'search', { max: 100, required: false });
-  const category = str(q.category, 'category', { max: 60, required: false });
+  // A slug as long as /api/catalog/:slug takes (80): the admin's taxonomy
+  // slugs reach 63 (slugify's 60 + uniqueSlug's "-2"…"-50").
+  const category = str(q.category, 'category', { max: 80, required: false });
   const type = str(q.type, 'type', { max: 20, required: false }); // 'bundle' | 'discounted' | 'featured'
   const limit = int(q.limit, 'limit', { min: 1, max: 50, def: 20 });
   const offset = int(q.offset, 'offset', { min: 0, max: 10_000, def: 0 });

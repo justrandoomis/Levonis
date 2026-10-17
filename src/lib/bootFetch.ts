@@ -124,6 +124,27 @@ export const CATALOG_TREE_PATH = '/api/catalog/tree';
 const MAIN_HOSTS = ['levonis-iq.com', 'www.levonis-iq.com'];
 export const CATALOG_LISTING_HEADER = 'X-Catalog-Listing';
 
+/**
+ * THE LONGEST SLUG A LIST IS ASKED FOR BY. /api/products took a `category` of
+ * at most 60 characters (80 now, as /api/catalog/:slug), while the admin's
+ * slugs reach 63 (slugify's 60 + uniqueSlug's "-2"…"-50") and its quick-create
+ * 127. A section with a longer slug is asked for by its id — after the map has
+ * named it, as before the list left beside the map — and nothing starts it
+ * early by its slug. worker/routes/catalog.ts `listingCategoryKey` names the
+ * same request on X-Catalog-Listing (a test holds the two equal).
+ */
+export const LISTING_SLUG_MAX = 60;
+
+/** Whether a section's list may be asked for by this slug. */
+export function listsBySlug(slug: string): boolean {
+  return slug.length > 0 && slug.length <= LISTING_SLUG_MAX;
+}
+
+/** What a page hands its listing as `category`: the section's slug, or its id when the slug is too long to ask by. */
+export function listingCategory(node: { id: string; slug: string }): string {
+  return listsBySlug(node.slug ?? '') ? node.slug : node.id;
+}
+
 /** What src/components/listing/useListing.ts asks first for a category's default list (a test holds them equal). */
 export function categoryListingPath(slug: string): string {
   return `/api/products?category=${encodeURIComponent(slug).replace(/%2C/gi, ',')}&facets=1&limit=24`;
@@ -150,7 +171,8 @@ export function categoryOpeningPaths(pathname: string, search = ''): string[] {
   const sub = segment(m[2]);
   if (!sub) return [];
   const plain = new URLSearchParams(search).toString() === '';
-  return plain ? [CATALOG_TREE_PATH, categoryListingPath(sub === 'all' ? cat : sub)] : [CATALOG_TREE_PATH];
+  const list = sub === 'all' ? cat : sub;
+  return plain && listsBySlug(list) ? [CATALOG_TREE_PATH, categoryListingPath(list)] : [CATALOG_TREE_PATH];
 }
 
 /** Start a category URL's first reads, and a listing department's list on its answer's headers. */
@@ -162,7 +184,7 @@ export function primeCategoryOpening(pathname: string, search = '', start: (path
     department
       .then((res) => {
         const slug = segment(res.headers.get(CATALOG_LISTING_HEADER) ?? undefined);
-        if (slug) start(categoryListingPath(slug));
+        if (slug && listsBySlug(slug)) start(categoryListingPath(slug));
       })
       .catch(() => undefined);
   }

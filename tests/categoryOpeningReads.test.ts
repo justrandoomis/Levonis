@@ -26,10 +26,12 @@ import {
   AUTH_ME_PATH,
   CATALOG_LISTING_HEADER,
   CATALOG_TREE_PATH,
+  LISTING_SLUG_MAX,
   bootRequests,
   categoryListingPath,
   categoryOpeningPaths,
   clearPrimedRequests,
+  listingCategory,
   navigationCategoryOpening,
   primeCategoryOpening,
   primeGet,
@@ -38,7 +40,8 @@ import {
 import { DEFAULT_LISTING, listingFirstPagePath, parseListing } from '../src/lib/catalog/listingQuery';
 import { loadCategory, loadTree } from '../src/lib/catalog/data';
 import { clearPageCache } from '../src/lib/pageCache';
-import { catalogRoutes, CATALOG_LISTING_HEADER as WORKER_LISTING_HEADER } from '../worker/routes/catalog';
+import { catalogRoutes, CATALOG_LISTING_HEADER as WORKER_LISTING_HEADER, LISTING_SLUG_MAX as WORKER_LISTING_SLUG_MAX, listingCategoryKey } from '../worker/routes/catalog';
+import { slugify } from '../worker/routes/adminTaxonomy';
 import { productRoutes } from '../worker/routes/products';
 
 const src = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
@@ -81,10 +84,10 @@ test('the list started early is the very request the listing makes', () => {
   assert.match(hook, /const path = useMemo\(\(\) => listingFirstPagePath\(state, category\), \[state, category\]\);/);
   assert.match(hook, /\(takePrimedJson<ProductsListResponse>\(path\) \?\? api\.get<ProductsListResponse>\(path, \{ signal: ctrl\.signal \}\)\)/);
   assert.match(hook, /if \(ctrl\.signal\.aborted\) return;/, 'an early answer for a list the page has left is dropped');
-  // Both pages hand the listing the section's slug.
-  assert.match(src('src/pages/CategoryListing.tsx'), /category: node\.slug,/);
-  assert.match(src('src/pages/CategoryPage.tsx'), /category: node\.slug,/);
-  assert.match(src('src/pages/CategoryListing.tsx'), /if \(!tree && listSlug\) primeGet\(listPath\);/, 'beside the map, not after it');
+  // Both pages hand the listing the section's slug (its id when the slug is too long to ask by).
+  assert.match(src('src/pages/CategoryListing.tsx'), /category: listingCategory\(node\),/);
+  assert.match(src('src/pages/CategoryPage.tsx'), /category: listingCategory\(node\),/);
+  assert.match(src('src/pages/CategoryListing.tsx'), /if \(!tree && listSlug && listsBySlug\(listSlug\)\) primeGet\(listPath\);/, 'beside the map, not after it');
 });
 
 test('a cold load of a category URL starts its reads before React, on the main site only', () => {
@@ -186,4 +189,80 @@ test('the listing by slug is the listing by id: the same cards, total and facets
     assert.deepEqual(bySlug.facets, byId.facets, slug);
     assert.equal(bySlug.category?.id, id, slug);
   }
+});
+
+// ------------------------------------------------------- a slug longer than 60 characters
+//
+// Review of the category lane: /api/products refused a `category` longer than 60 characters, while the
+// admin's slugs reach 63 (slugify keeps 60, uniqueSlug then appends "-2" … "-50") and its quick-create
+// 127 (slugToken keeps 120). Asked for BY SLUG, such a section's list answered 400 where, by id, it
+// listed. A long slug is asked for by id again — after the map, as before the lane — and the Worker
+// answers a slug as long as /api/catalog/:slug accepts.
+
+const LONG_NAME = 'Bambu Lab X1 Carbon and P1S Hotend Replacement Parts and Nozzle Kits';
+
+test('the storefront asks a section with a slug longer than 60 characters for its list by id, and starts nothing early by slug', () => {
+  assert.equal(LISTING_SLUG_MAX, 60);
+  assert.equal(WORKER_LISTING_SLUG_MAX, LISTING_SLUG_MAX, 'one bound on both sides');
+  const second = `${slugify(LONG_NAME, 'x')}-2`; // uniqueSlug's next candidate
+  assert.equal(second.length, 62);
+  for (const node of [{ id: 'cat_pacc', slug: second }, { id: 'cat_q', slug: 'q'.repeat(127) }, { id: 'cat_e', slug: '' }]) {
+    assert.equal(listingCategory(node), node.id, node.slug);
+    assert.equal(listingCategoryKey(node), node.id, `the Worker names the same request: ${node.slug}`);
+  }
+  for (const slug of ['fdm-materials', 'طابعات', 'x'.repeat(60)]) {
+    assert.equal(listingCategory({ id: 'cat_x', slug }), slug);
+    assert.equal(listingCategoryKey({ id: 'cat_x', slug }), slug);
+  }
+  // The URL holds only the slug: the list waits for the map to name the id, as it did before the lane.
+  assert.deepEqual(categoryOpeningPaths(`/categories/printer-accessories/${second}`), [CATALOG_TREE_PATH]);
+  assert.deepEqual(categoryOpeningPaths(`/categories/${second}/all`), [CATALOG_TREE_PATH]);
+  assert.deepEqual(categoryOpeningPaths(`/categories/printer-accessories/${'x'.repeat(60)}`), [CATALOG_TREE_PATH, categoryListingPath('x'.repeat(60))]);
+  // Both pages and the page beside its map use the same rule (the test above); so does a door's prefetch.
+  assert.match(src('src/lib/catalog/prefetch.ts'), /if \(slug && listsBySlug\(slug\) && new URLSearchParams\(search\)\.toString\(\) === ''\) primeGet\(categoryListingPath\(slug\)\);/);
+});
+
+test('a long slug on a department\'s headers (an older Worker\'s) starts nothing; its id does', async () => {
+  browser();
+  const second = `${slugify(LONG_NAME, 'x')}-2`;
+  const asked: string[] = [];
+  let named = second;
+  globalThis.fetch = ((path: string) => {
+    asked.push(path);
+    const headers = new Headers({ 'content-type': 'application/json', [CATALOG_LISTING_HEADER]: encodeURIComponent(named) });
+    return Promise.resolve(new Response(JSON.stringify({ success: true }), { headers }));
+  }) as typeof fetch;
+  primeCategoryOpening(`/categories/${second}`);
+  await tick();
+  await tick();
+  assert.deepEqual(asked, [`/api/catalog/${second}`]);
+  clearPrimedRequests();
+  asked.length = 0;
+  named = 'cat_pacc';
+  primeCategoryOpening(`/categories/${second}`);
+  await tick();
+  await tick();
+  assert.deepEqual(asked, [`/api/catalog/${second}`, categoryListingPath('cat_pacc')]);
+});
+
+test('the Worker lists a section by a 62-character slug, and names its id on a listing department\'s headers', async () => {
+  const { raw, app } = world();
+  const second = `${slugify(LONG_NAME, 'x')}-2`;
+  raw.prepare('UPDATE catalogs SET slug = ? WHERE id = ?').run(second, 'cat_pacc');
+  const bySlug = await get(app, categoryListingPath(second));
+  assert.equal(bySlug.status, 200, 'refused before: category is too long (max 60 characters)');
+  const byId = await json(await get(app, categoryListingPath('cat_pacc')));
+  const ids = (b: Record<string, unknown>) => (b.products as Array<{ id: string }>).map((p) => p.id);
+  const slugBody = await json(bySlug);
+  assert.ok(ids(byId).length > 0);
+  assert.deepEqual(ids(slugBody), ids(byId));
+  assert.equal(slugBody.category?.id, 'cat_pacc');
+  // An id is what the storefront asks such a section's list by; the department names that request.
+  const dept = await get(app, `/api/catalog/${second}`);
+  assert.equal(dept.status, 200);
+  assert.equal((await json(dept)).layout, 'listing');
+  assert.equal(dept.headers.get(WORKER_LISTING_HEADER), 'cat_pacc');
+  assert.equal(dept.headers.get(WORKER_LISTING_HEADER), listingCategory({ id: 'cat_pacc', slug: second }));
+  // Beyond what /api/catalog/:slug accepts, the list is still refused by slug (its id answers it).
+  assert.equal((await get(app, categoryListingPath('q'.repeat(81)))).status, 400);
 });

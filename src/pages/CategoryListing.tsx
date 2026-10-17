@@ -11,7 +11,7 @@ import { useBannerPhotos } from '../components/catalog/useBannerPhotos';
 import { cachedTree, loadCategory, loadTree } from '../lib/catalog/data';
 import { resolveListingRoute } from '../lib/catalog/listingModel';
 import { listingFirstPagePath, parseListing } from '../lib/catalog/listingQuery';
-import { primeGet } from '../lib/bootFetch';
+import { listingCategory, listsBySlug, primeGet } from '../lib/bootFetch';
 import { nodeDescription, nodeName } from '../lib/catalog/categoryPageModel';
 import { nounKindFor } from '../lib/catalog/copy';
 import { bannerRows } from '../lib/catalog/explorerModel';
@@ -61,7 +61,7 @@ export default function CategoryListing() {
   const listSlug = subCategorySlug === 'all' ? categorySlug : subCategorySlug;
   const listPath = listingFirstPagePath(parseListing(location.search), listSlug);
   useEffect(() => {
-    if (!tree && listSlug) primeGet(listPath);
+    if (!tree && listSlug && listsBySlug(listSlug)) primeGet(listPath);
   }, [tree, listPath, listSlug]);
 
   const load = useCallback(() => {
@@ -144,8 +144,9 @@ export default function CategoryListing() {
   }
 
   const scope: ListingScope = {
-    // By slug: the request that left beside the map is this one.
-    category: node.slug,
+    // By slug: the request that left beside the map is this one (by id when
+    // the slug is too long to ask by, and nothing left early).
+    category: listingCategory(node),
     title: nodeName(node, lang),
     description: nodeDescription(node, lang),
     kind: nounKindFor(node.product_type, node.is_printer_catalog),

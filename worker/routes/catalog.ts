@@ -51,6 +51,18 @@ export const catalogRoutes = new Hono<AppContext>();
 export const CATALOG_LISTING_HEADER = 'X-Catalog-Listing';
 
 /**
+ * src/lib/bootFetch.ts LISTING_SLUG_MAX and `listingCategory` (a test holds
+ * them equal): the storefront asks a section's list by its slug up to 60
+ * characters — what every Worker's /api/products has accepted — and by its id
+ * beyond, so the header names that same request.
+ */
+export const LISTING_SLUG_MAX = 60;
+export function listingCategoryKey(node: { id: string; slug: string }): string {
+  const slug = node.slug ?? '';
+  return slug.length > 0 && slug.length <= LISTING_SLUG_MAX ? slug : node.id;
+}
+
+/**
  * How many products the tree resolves to count «متوفرة الآن». Availability is
  * proved over each product's option graph (the card's `direct_stock_available`),
  * which is not a column; past this many the count is reported as `null` —
@@ -427,9 +439,10 @@ catalogRoutes.get('/:slug', async (c) => {
      * &limit=24`, src/lib/bootFetch.ts `primeCategoryOpening`) the moment these
      * headers arrive, instead of after the page has parsed this answer and
      * rendered (speed audit 2026-10-16). The canonical slug, URI-encoded (a
-     * slug may be Arabic). Cached with the answer, so a hit says it too.
+     * slug may be Arabic) — the id for a slug too long to ask by
+     * (`listingCategoryKey`). Cached with the answer, so a hit says it too.
      */
-    if (plan.layout === 'listing') res.headers.set(CATALOG_LISTING_HEADER, encodeURIComponent(node.slug));
+    if (plan.layout === 'listing') res.headers.set(CATALOG_LISTING_HEADER, encodeURIComponent(listingCategoryKey(node)));
     return res;
   };
 

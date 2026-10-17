@@ -12,7 +12,7 @@
  * swallowed — the page will simply fetch (and report) on its own.
  */
 import { cachedCategory, cachedTree, loadCategory, loadTree } from './data';
-import { categoryListingPath, primeGet } from '../bootFetch';
+import { categoryListingPath, listsBySlug, primeGet } from '../bootFetch';
 
 const started = new Set<string>();
 
@@ -44,8 +44,9 @@ export function prefetchListing(slug = '', search = ''): void {
   // The default list only: its URL needs no listing grammar, which would
   // otherwise ride in every page that has a door (the explorer has none). A
   // filtered door (`…/all?avail=1`) starts its list beside the map when the
-  // page mounts (src/pages/CategoryListing.tsx).
-  if (slug && new URLSearchParams(search).toString() === '') primeGet(categoryListingPath(slug));
+  // page mounts (src/pages/CategoryListing.tsx). A slug too long to ask by is
+  // asked for by id, after the map (bootFetch `listsBySlug`).
+  if (slug && listsBySlug(slug) && new URLSearchParams(search).toString() === '') primeGet(categoryListingPath(slug));
 }
 
 /** `/categories` — the explorer chunk and the tree. */

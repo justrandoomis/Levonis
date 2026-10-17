@@ -18,6 +18,7 @@ import { useBannerPhotos } from '../components/catalog/useBannerPhotos';
 import { useScrolledPast } from '../components/catalog/useScrolledPast';
 import ListingView from '../components/listing/ListingView';
 import { cachedCategory, loadCategory } from '../lib/catalog/data';
+import { listingCategory } from '../lib/bootFetch';
 import {
   categoryRedirect,
   heroPhoto,
@@ -156,8 +157,9 @@ export default function CategoryPage() {
           sections={rows.length ? <CategoryRowBanners rows={rows} heading={sectionsHeading} label={sectionsHeading} /> : undefined}
           scope={{
             // By slug, as the Worker names it on this answer's headers
-            // (X-Catalog-Listing): the list may already be on its way.
-            category: node.slug,
+            // (X-Catalog-Listing): the list may already be on its way. By id
+            // when the slug is too long to ask by — the header names the id then.
+            category: listingCategory(node),
             title: name,
             description: nodeDescription(node, lang),
             kind,
