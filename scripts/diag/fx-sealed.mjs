@@ -16,6 +16,8 @@ import { join, resolve } from 'node:path';
 import { parsePublicKey, sealBuffer } from '../bambu-import/seal.mjs';
 
 const DATABASE = 'levonis-db-staging';
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** [key, sql] — every one a SELECT. */
 const QUERIES = [
   ['migrations_last', `SELECT id, name, applied_at FROM d1_migrations ORDER BY id DESC LIMIT 5`],
