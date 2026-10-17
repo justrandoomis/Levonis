@@ -78,6 +78,38 @@ test('namesOnly: a statement of names and connectors is names; one more word is 
   assert.equal(namesOnly('٢٤', names), false, 'no Latin word: nothing was matched');
 });
 
+test('namesOnly: no name removed is never «only names»; the connectors are the design\'s list (review: connector-only English)', () => {
+  // I18N-DESIGN §C.3: and or & / , ; + with series printers compatible compatibility — nothing else.
+  assert.equal(namesOnly('Compatible with all printers', []), false, 'connectors alone: no name was matched');
+  assert.equal(namesOnly('Compatible with all printers', ['AMS Hub']), false);
+  assert.equal(namesOnly('Compatible with printers', ['AMS Hub']), false, 'only connectors, but no name: says something');
+  assert.equal(namesOnly('For the AMS', ['AMS']), false, '«for» and «the» are words, not connectors');
+  assert.equal(namesOnly('Compatible with all X1 Series printers', ['X1 Series']), false, '«all» is a word');
+  assert.equal(namesOnly('X1C printer', ['X1C']), false, '«printer» (singular) is not in the list');
+  assert.equal(namesOnly('Compatibility: X1 Series, P1P', ['X1 Series', 'P1P']), true, 'names and the design\'s connectors');
+  assert.equal(namesOnly('X1 Series + P1 Series', ['X1 Series', 'P1 Series']), true);
+});
+
+test('translateLines with the stored slot: a line the memory misses keeps the stored line (review: one hit wiped the slot)', () => {
+  const en = 'Smooth filament path.\nColor: Gray\nAn untranslated line.';
+  const base = { ar: 'مسار سلس قديم\nاللون: رمادي\nAn untranslated line.', ckb: 'ڕێڕەوی کۆن\nڕەنگ: خۆڵەمێشی\nAn untranslated line.' };
+  const t = translateLines(en, lookup, base);
+  assert.equal(t.hit, 1);
+  assert.equal(t.ar, 'مسار خيط سلس.\nاللون: رمادي\nAn untranslated line.', 'the dictionary\'s line survives');
+  assert.equal(t.ckb, 'ڕێڕەوی فیلامێنتی نەرم.\nڕەنگ: خۆڵەمێشی\nAn untranslated line.');
+  // A table row: a missed cell keeps the stored cell when the stored row has the same cells.
+  const cells = translateLines('Weight | Strong | Gray', lookup, { ar: 'الوزن | قوي | رمادي', ckb: 'کێش | بەهێز | خۆڵەمێشی' });
+  assert.equal(cells.ar, 'الوزن | قوي | رمادي');
+  assert.equal(cells.ckb, 'کێش | بەهێز | خۆڵەمێشی');
+  // A stored slot cut into other lines than the English is not aligned: a missed line keeps its English.
+  const off = translateLines(en, lookup, { ar: 'سطر واحد', ckb: 'یەک دێڕ' });
+  assert.equal(off.ar, 'مسار خيط سلس.\nColor: Gray\nAn untranslated line.');
+  // Without a stored slot: exactly as before.
+  assert.equal(translateLines(en, lookup).ar, 'مسار خيط سلس.\nColor: Gray\nAn untranslated line.');
+  // A stored line that is blank or a copy of another language never stands in for a translation the memory has.
+  assert.equal(translateLines(en, lookup, { ar: '', ckb: '' }).ar, 'مسار خيط سلس.\nColor: Gray\nAn untranslated line.');
+});
+
 const IDENTITY = new Set(IDENTITY_TERMS);
 
 function row(en: string, ar: string, ckb: string, over: Partial<TranslationRow> & Record<string, unknown> = {}): Record<string, unknown> {
@@ -125,6 +157,10 @@ test('validateTranslationRow: every refusal code, one failing example each', () 
     ['MONEY_ADDED', row('Gray', 'رمادي بسعر خاص', 'خۆڵەمێشی', { kind: 'spec_value_text' })],
     ['MONEY_ADDED', row('Gray', 'رمادي', 'خۆڵەمێشی بە نرخی تایبەت', { kind: 'spec_value_text' })],
     ['MONEY_ADDED', row('Gray', 'رمادي - الشحن خلال يومين', 'خۆڵەمێشی', { kind: 'spec_value_text' })],
+    ['MONEY_ADDED', row('Gray', 'رمادي', 'نرخی خۆڵەمێشی', { kind: 'spec_value_text' })],
+    ['MONEY_ADDED', row('Gray', 'رمادي', 'خۆڵەمێشی (نرخەکەی)', { kind: 'spec_value_text' })],
+    ['KEEP', row('Bambu PET-CF/TPU 95A', 'Bambu PET-CF/TPU 95A', 'Bambu PET-CF', { status: 'keep' })],
+    ['KEEP', row('Windows', 'ويندوز', 'Windows', { status: 'keep' })],
     ['PRODUCTS', { ...GOOD, products: [] }],
     ['PRODUCTS', { ...GOOD, products: ['p_b', 'p_a'] }],
     ['PRODUCTS', { ...GOOD, products: ['p_a', 'p_a'] }],
@@ -141,6 +177,12 @@ test('validateTranslationRow: every refusal code, one failing example each', () 
   assert.equal(code({ ...GOOD, ckb: 'ە 10mA' }), 'ok', 'one Sorani word is enough');
   assert.equal(code(row('Full list', 'قائمة كاملة', 'لیست کامل', { kind: 'doc_title' })), 'CKB_SCRIPT', 'two Arabic-script words without a Sorani letter');
   assert.equal(code(row('Full list', 'قائمة كاملة', 'لیستی تەواو', { kind: 'doc_title' })), 'ok');
+  // «بەنرخ» is «valuable», not a price (review: the money check refused an honest Sorani line).
+  assert.equal(code(row('Save valuable time.', 'وفّر وقتك الثمين.', 'کاتی بەنرخی خۆت بپارێزە.', { kind: 'short_description' })), 'ok');
+  assert.equal(code(row('Priceless', 'لا يُقدَّر', 'بێنرخ نییە', { kind: 'short_description' })), 'ok');
+  // A `keep` row: the reviewers decided the English stays (names, codes, filenames) — its ar and ckb are the English.
+  assert.equal(code(row('Bambu PET-CF/TPU 95A', 'Bambu PET-CF/TPU 95A', 'Bambu PET-CF/TPU 95A', { status: 'keep' })), 'ok');
+  assert.equal(code(row('MacOS, Windows', 'MacOS, Windows', 'MacOS, Windows', { status: 'keep' })), 'ok');
 });
 
 test('a part file is one row per line, keys in the committed order, LF and a trailing newline', () => {

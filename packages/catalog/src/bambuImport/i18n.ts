@@ -16,7 +16,8 @@
  *   - how a multi-line slot is cut into translatable segments
  *     (`translateLines`: a bullet prefix is kept verbatim, a content-block
  *     table row is split into its `' | '` cells, a line without a translation
- *     keeps its English) and how a whole value is looked up (`translateWhole`);
+ *     keeps what the slot already said — the stored line when it lines up,
+ *     else its English) and how a whole value is looked up (`translateWhole`);
  *   - what a valid row is (`validateTranslationRow`) — the same function for
  *     the assembler, the CI data test and the loader;
  *   - when a text is nothing but names (`namesOnly`): a compatibility statement
@@ -94,55 +95,74 @@ export function slotSegments(text: string): string[] {
   return out;
 }
 
+/** A slot's stored Arabic and Sorani (the writer's local dictionary): a missed line keeps its stored line. */
+export interface StoredSlot {
+  ar?: string | null;
+  ckb?: string | null;
+}
+
 /**
  * A multi-line slot in Arabic and in Sorani: each line rebuilt as its bullet
  * prefix plus its translated segment (or its cells joined by `' | '`). A
- * segment the lookup misses keeps its English, in that language too. `hit` is
- * how many segments were translated, `total` how many there are; with
- * `hit === 0` the caller leaves the slot untouched.
+ * segment the lookup misses keeps what the slot already said in that
+ * language — the `stored` line (the writer's dictionary output, §A.6: the
+ * overlay replaces only the lines the memory covers) when the stored slot is
+ * cut into the same lines (and a table row into the same cells), else its
+ * English. `hit` is how many segments were translated, `total` how many there
+ * are; with `hit === 0` the caller leaves the slot untouched.
  */
-export function translateLines(text: string, lookup: (normEn: string) => Tr | null): { ar: string; ckb: string; hit: number; total: number } {
-  const ar: string[] = [];
-  const ckb: string[] = [];
+export function translateLines(
+  text: string,
+  lookup: (normEn: string) => Tr | null,
+  stored?: StoredSlot | null
+): { ar: string; ckb: string; hit: number; total: number } {
+  const lines = String(text ?? '').split('\n');
+  /** The stored slot's lines in one language, when they line up with the English's. */
+  const aligned = (v: string | null | undefined): string[] | null => {
+    if (typeof v !== 'string' || !v.trim()) return null;
+    const ls = v.split('\n');
+    return ls.length === lines.length ? ls : null;
+  };
+  const base = { ar: aligned(stored?.ar), ckb: aligned(stored?.ckb) };
+  const out = { ar: [] as string[], ckb: [] as string[] };
   let hit = 0;
   let total = 0;
-  for (const line of String(text ?? '').split('\n')) {
+  lines.forEach((line, li) => {
     const parts = lineParts(line);
-    const segAr: string[] = [];
-    const segCkb: string[] = [];
-    let lineHit = 0;
+    const found: Array<Tr | null> = [];
     for (const seg of parts.segments) {
       const n = normalizeSource(seg);
       if (!n) {
-        segAr.push(seg);
-        segCkb.push(seg);
+        found.push(null);
         continue;
       }
       total += 1;
       const t = lookup(n);
-      if (t && t.ar && t.ckb) {
-        hit += 1;
-        lineHit += 1;
+      found.push(t && t.ar && t.ckb ? t : null);
+    }
+    const lineHit = found.filter(Boolean).length;
+    hit += lineHit;
+    for (const lang of ['ar', 'ckb'] as const) {
+      const storedLine = base[lang]?.[li];
+      if (lineHit === 0) {
+        out[lang].push(storedLine ?? line);
+        continue;
+      }
+      // A missed cell keeps the stored row's cell when that row has the same prefix and cells; else its English.
+      const storedParts = storedLine !== undefined ? lineParts(storedLine) : null;
+      const storedSegs = storedParts && storedParts.cells === parts.cells && storedParts.segments.length === parts.segments.length ? storedParts.segments : null;
+      const segs = parts.segments.map((seg, j) => {
+        const t = found[j];
+        if (!t) return storedSegs ? storedSegs[j] : seg;
         // A cell keeps the spaces around it inside the table row; a whole line is the translation alone.
         const lead = parts.cells ? /^\s*/.exec(seg)![0] : '';
         const trail = parts.cells ? /\s*$/.exec(seg)![0] : '';
-        segAr.push(`${lead}${t.ar}${trail}`);
-        segCkb.push(`${lead}${t.ckb}${trail}`);
-      } else {
-        segAr.push(seg);
-        segCkb.push(seg);
-      }
+        return `${lead}${t[lang]}${trail}`;
+      });
+      out[lang].push(`${parts.prefix}${segs.join(parts.cells ? CELL_SEP : '')}`);
     }
-    if (lineHit === 0) {
-      ar.push(line);
-      ckb.push(line);
-      continue;
-    }
-    const join = parts.cells ? CELL_SEP : '';
-    ar.push(`${parts.prefix}${segAr.join(join)}`);
-    ckb.push(`${parts.prefix}${segCkb.join(join)}`);
-  }
-  return { ar: ar.join('\n'), ckb: ckb.join('\n'), hit, total };
+  });
+  return { ar: out.ar.join('\n'), ckb: out.ckb.join('\n'), hit, total };
 }
 
 /** One whole value (a spec value, a list item, a box item, a label, a title): normalized, then looked up. */
@@ -155,15 +175,21 @@ export function translateWhole(text: string, lookup: (normEn: string) => Tr | nu
 
 // ---------------------------------------------------------------- names
 
-/** The words that join names in a statement («X1 Series and P1 Series», «A1 / A1 mini»). */
-const CONNECTORS = new Set(['and', 'or', 'with', 'series', 'printers', 'printer', 'compatible', 'compatibility', 'for', 'the', 'all']);
+/**
+ * The words that join names in a statement («X1 Series and P1 Series», «A1 / A1 mini»): exactly the design's list
+ * (§C.3: `and or & / , ; + with series printers compatible compatibility` — the symbols are gone after `labelKey`).
+ * Nothing else: «for the AMS», «all printers», «X1C printer» say something.
+ */
+const CONNECTORS = new Set(['and', 'or', 'with', 'series', 'printers', 'compatible', 'compatibility']);
 
 /**
  * True when `text` says nothing beyond the `names`: remove every name
  * (`labelKey`, longest first, word-bounded) and the connectors
- * (`and or & / , ; + with series printers compatible compatibility`); if no
- * Latin word of two or more letters is left, the text is only names. A text
- * with no Latin word at all is not "only names" (there was nothing to match).
+ * (`and or & / , ; + with series printers compatible compatibility`); if at
+ * least one name was removed and no Latin word of two or more letters is
+ * left, the text is only names. A text in which no name was found is never
+ * "only names" («Compatible with all printers» says something), nor is a
+ * text with no Latin word at all (there was nothing to match).
  */
 export function namesOnly(text: string, names: Iterable<string>): boolean {
   return namesOnlyIn(text, nameForms(names));
@@ -179,10 +205,15 @@ export function namesOnlyIn(text: string, forms: readonly string[]): boolean {
   const key = labelKey(String(text ?? ''));
   if (!/[a-z]{2,}/.test(key)) return false;
   let k = ` ${key} `;
+  let removed = 0;
   for (const f of forms) {
     const needle = ` ${f} `;
-    while (k.includes(needle)) k = k.split(needle).join(' ');
+    while (k.includes(needle)) {
+      k = k.split(needle).join(' ');
+      removed += 1;
+    }
   }
+  if (removed === 0) return false;
   const words = k.split(' ').filter(Boolean);
   return !words.some((w) => /^[a-z][a-z'’-]*$/.test(w) && w.length >= 2 && !CONNECTORS.has(w));
 }
@@ -209,8 +240,14 @@ export const TM_KINDS = [
 ] as const;
 export type TmKind = (typeof TM_KINDS)[number];
 
-/** `reviewed` and `machine` are shown; `needs_review` is stored and never shown (and is how a row is withdrawn). */
-export const TM_STATUSES = ['reviewed', 'machine', 'needs_review'] as const;
+/**
+ * `reviewed` and `machine` are shown; `needs_review` is stored and never shown (and is how a row is withdrawn);
+ * `keep` records the reviewers' decision that the English stays (a name, a code, a file name): its `ar` and `ckb` are
+ * the English itself, it is never shown as a translation (the English is), and a later extraction does not offer it.
+ */
+export const TM_STATUSES = ['reviewed', 'machine', 'needs_review', 'keep'] as const;
+/** The statuses a reader is shown (everything else is stored only). */
+export const SHOWN_STATUSES = ['reviewed', 'machine'] as const;
 export type TmStatus = (typeof TM_STATUSES)[number];
 
 /** One row of a committed part file (§E), keys in this order. */
@@ -242,6 +279,7 @@ export type TranslationRowCode =
   | 'NAME_TRANSLATED'
   | 'BIDI_CONTROL'
   | 'MONEY_ADDED'
+  | 'KEEP'
   | 'PRODUCTS';
 
 export interface ValidateContext {
@@ -280,7 +318,8 @@ const MONEY_MARKERS: ReadonlyArray<{ re: RegExp; unlessEn?: RegExp }> = [
   { re: /\bUSD\b/, unlessEn: /\bUSD\b/ },
   { re: /\bIQD\b/, unlessEn: /\bIQD\b/ },
   { re: /سعر|أسعار/ },
-  { re: /نرخ/ },
+  // Sorani «نرخ» (price) at the start of a word — never inside one: «بەنرخ» is «valuable», «بێنرخ» «worthless».
+  { re: /(^|[^\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF])نرخ/ },
   { re: /(^|[\s،؛.:()«»])(ال)?مخزون/ },
   { re: /(^|[\s،؛.:()«»])کۆگا(کە|ی|دا)?($|[\s،؛.:()«»])/ },
   { re: /الشحن خلال/ },
@@ -344,6 +383,11 @@ export function validateTranslationRow(row: unknown, ctx: ValidateContext = {}):
   const cap = Math.min(TR_MAX, Math.max(3 * en.length, en.length + 200));
   if (en.length > EN_MAX || ar.length > cap || ckb.length > cap) return fail('TOO_LONG');
   if (BIDI_CONTROLS.test(ar) || BIDI_CONTROLS.test(ckb)) return fail('BIDI_CONTROL');
+  if (r.status === 'keep') {
+    // The English stays: no translation to check, only that none slipped in.
+    if (ar !== en || ckb !== en) return fail('KEEP');
+    return productsOf(r.products) ?? { ok: true, row: { h, en, ar, ckb, kind: r.kind as TmKind, status: 'keep', products: r.products as string[] } };
+  }
   if (!ARABIC_LETTER.test(ar) || SORANI_ONLY.test(ar)) return fail('AR_SCRIPT');
   if (ckb === ar) return fail('CKB_COPIES_AR');
   if (!ARABIC_LETTER.test(ckb)) return fail('CKB_SCRIPT');
@@ -358,17 +402,23 @@ export function validateTranslationRow(row: unknown, ctx: ValidateContext = {}):
     if (m.unlessEn && m.unlessEn.test(en)) continue;
     if (m.re.test(ar) || m.re.test(ckb)) return fail('MONEY_ADDED');
   }
-  const products = r.products as unknown[];
-  if (products.length === 0 || products.length > PRODUCTS_MAX) return fail('PRODUCTS');
+  return (
+    productsOf(r.products) ?? {
+      ok: true,
+      row: { h, en, ar, ckb, kind: r.kind as TmKind, status: r.status as TmStatus, products: r.products as string[] },
+    }
+  );
+}
+
+/** A non-empty, sorted, unique list of product ids (≤ PRODUCTS_MAX): null when it is, the refusal otherwise. */
+function productsOf(products: unknown[]): { ok: false; code: TranslationRowCode } | null {
+  if (products.length === 0 || products.length > PRODUCTS_MAX) return { ok: false, code: 'PRODUCTS' };
   for (let i = 0; i < products.length; i++) {
     const p = products[i];
-    if (typeof p !== 'string' || !PRODUCT_ID.test(p)) return fail('PRODUCTS');
-    if (i > 0 && !((products[i - 1] as string) < p)) return fail('PRODUCTS');
+    if (typeof p !== 'string' || !PRODUCT_ID.test(p)) return { ok: false, code: 'PRODUCTS' };
+    if (i > 0 && !((products[i - 1] as string) < p)) return { ok: false, code: 'PRODUCTS' };
   }
-  return {
-    ok: true,
-    row: { h, en, ar, ckb, kind: r.kind as TmKind, status: r.status as TmStatus, products: products as string[] },
-  };
+  return null;
 }
 
 /** A row as one line of a part file: keys in the committed order. */
