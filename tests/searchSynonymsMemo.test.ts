@@ -10,7 +10,8 @@
  *
  *   - a warm isolate answers a search in one wave fewer, without the read;
  *   - the owner's vocabulary door forgets the memo in its isolate at once, so a
- *     word they add finds its product on the next keystroke;
+ *     word they add finds its product on the next keystroke; the import's
+ *     taxonomy step (`prepareTaxonomy`) does the same for the words it adds;
  *   - elsewhere it is re-read after 30 s; a second database never shares it;
  *     a failed read is not kept.
  *
@@ -24,6 +25,8 @@ import { seedLiveCatalog } from './fixtures/liveCatalog';
 import { productRoutes } from '../worker/routes/products';
 import { adminTaxonomyRoutes } from '../worker/routes/adminTaxonomy';
 import { SYNONYMS_TTL_MS, forgetSearchSynonyms, planSearchIndex, searchProducts, synonymsFor } from '../worker/lib/search/store';
+import { prepareTaxonomy } from '../worker/lib/catalogImport/runOps';
+import type { ReviewedBundle } from '../worker/lib/catalogImport/reviewed';
 import { toSearchDoc } from '../worker/lib/search/document';
 
 const ADMIN: StubUser = { id: 'boss', role: 'admin', email: 'boss@x.co', admin_scope: 'full' };
@@ -72,6 +75,18 @@ test('the owner\'s vocabulary door forgets it in its isolate: a word they add wo
   const removed = await w.admin.request('/api/admin/taxonomy/search-vocabulary/ماكنه', { method: 'DELETE', headers: { 'CF-Connecting-IP': '1.2.3.4' } });
   assert.equal(removed.status, 200);
   assert.deepEqual((await w.search('ماكنه')).ids, [], 'and a word they delete stops at once');
+});
+
+test('the import\'s taxonomy step forgets it in its isolate too: a synonym the import adds is found on the next search (speed lane review)', async () => {
+  const w = await world();
+  assert.deepEqual((await w.search('ماكينة')).ids, [], 'an unknown word finds nothing (and fills the memo)');
+  // Only what the step reads: no node to create, one reviewed synonym.
+  const bundle = { taxonomy: { create: [] }, synonyms: [{ term: 'ماكينة', canonical: 'h2d', lang: 'ar' }] } as unknown as ReviewedBundle;
+  const done = await prepareTaxonomy(w.db, bundle);
+  assert.equal(done.synonyms_inserted, 1);
+  const after = await w.search('ماكينة');
+  assert.ok(readsDictionary(after.counts.sqls), 're-read at once, not after the memo\'s 30 s');
+  assert.ok(after.ids.length > 0, 'and the import\'s word finds what it means');
 });
 
 test('re-read after the TTL; never shared across databases; a failed read is not kept', async () => {

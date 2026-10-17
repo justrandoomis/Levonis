@@ -28,7 +28,7 @@ import assert from 'node:assert/strict';
 import { asD1, freshDb, get, pending, stubApp, type Mount, type StubUser } from './fixtures/app';
 import { seedLiveCatalog, LIVE_PRODUCTS } from './fixtures/liveCatalog';
 import { homeRoutes, productRoutes } from '../worker/routes/products';
-import { catalogRoutes } from '../worker/routes/catalog';
+import { catalogRoutes, purgeCatalogTreeCache } from '../worker/routes/catalog';
 import {
   ANONYMOUS_CACHE_CONTROL,
   ANONYMOUS_LIFETIME,
@@ -309,6 +309,20 @@ test('a rebuild that read the data before a purge is retired by it, even if it i
     await settle(); // the copy read before the purge is stored now
     const after = await get(w.guest, '/api/home');
     assert.equal(after.headers.get('Age'), null, 'not served: its data predates the purge');
+  });
+});
+
+test('a taxonomy write retires a tree rebuild that read the map before it, even if that rebuild is stored after (speed lane review)', async () => {
+  await withCaches(async () => {
+    const w = world();
+    const built = now;
+    assert.equal((await get(w.guest, '/api/catalog/tree')).status, 200);
+    // The admin's write lands while that build's copy is still on its way to the cache.
+    now = built + 1_000;
+    await purgeCatalogTreeCache('https://localhost/api/admin/catalogs');
+    await settle(); // the copy read before the write is stored now
+    const after = await get(w.guest, '/api/catalog/tree');
+    assert.equal(after.headers.get('Age'), null, 'not served: its map predates the write');
   });
 });
 
