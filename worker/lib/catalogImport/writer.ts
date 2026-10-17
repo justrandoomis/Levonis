@@ -67,6 +67,7 @@ import { canonicalJson } from '@levonis/catalog/bambuImport/fingerprint';
 import { specKey } from '@levonis/catalog/bambuImport/registry/specKeys';
 import { colourFacet } from '@levonis/catalog/bambuImport/registry/colours';
 import { collapseContentDuplicates } from '@levonis/catalog/bambuImport/mediaCollapse';
+import { mergedSelections, storedExternalIds, type MergedSelections } from '@levonis/catalog/bambuImport/merge';
 import { HttpError } from '../http';
 import { auditStatementCount } from '../audit';
 import { comboKey } from '../inventory';
@@ -723,28 +724,16 @@ interface MergeMapping {
   /** payload variant id → the existing variant, value or colour it maps to. */
   variants: Map<string, { variantId?: string; optionValueId?: string; colorId?: string }>;
   unmappedVariants: string[];
-  /**
-   * The payload variants the reviewed value_map maps (to ids the product has), and the values every one of whose
-   * variants it maps: the selections this product sells, whether or not one row of it stands for them alone.
-   */
-  merged: { values: Set<string>; variants: Set<string> };
+  /** The values and variants the reviewed map merges (@levonis/catalog/bambuImport/merge, shared with VERIFY). */
+  merged: MergedSelections;
 }
 
 function mergeMapping(payload: ImportPayload, match: ExistingMatch, rel: RelationsResponse): MergeMapping {
   const existingValues = new Set(rel.values.map((v) => String(v.id)));
   const existingColors = new Set(rel.colors.map((c) => String(c.id)));
   const variantByKey = new Map(rel.variants.map((v) => [String(v.combo_key), String(v.id)]));
-  const entryOf = new Map<string, { option_value_ids?: string[]; color_id?: string }>();
-  const unmapped: string[] = [...match.unmapped_variants];
-  for (const v of payload.variants) {
-    const e = match.value_map[v.source_id];
-    const ok =
-      !!e &&
-      (e.option_value_ids ?? []).every((id) => existingValues.has(id)) &&
-      (!e.color_id || existingColors.has(e.color_id));
-    if (ok) entryOf.set(v.id, e);
-    else if (!unmapped.includes(v.source_id)) unmapped.push(v.source_id);
-  }
+  const merged = mergedSelections(payload, match, { value: (id) => existingValues.has(id), colour: (id) => existingColors.has(id) });
+  const { entryOf } = merged;
   const variants: MergeMapping['variants'] = new Map();
   for (const [vid, e] of entryOf) {
     const key = comboKey({ option_value_ids: e.option_value_ids ?? [], color_id: e.color_id ?? null });
@@ -754,26 +743,24 @@ function mergeMapping(payload: ImportPayload, match: ExistingMatch, rel: Relatio
     else if (e.color_id && !(e.option_value_ids ?? []).length) variants.set(vid, { colorId: e.color_id });
   }
   const values: MergeMapping['values'] = new Map();
-  const mergedValues = new Set<string>();
   for (const g of payload.groups) {
     for (const val of g.values) {
-      const entries = payload.variants.filter((v) => v.value_ids.includes(val.id)).map((v) => entryOf.get(v.id));
-      if (!entries.length || entries.some((e) => !e)) continue;
-      mergedValues.add(val.id);
+      if (!merged.values.has(val.id)) continue;
+      const entries = payload.variants.filter((v) => v.value_ids.includes(val.id)).map((v) => entryOf.get(v.id)!);
       let common: string[] | null = null;
       for (const e of entries) {
-        const ids = e!.option_value_ids ?? [];
+        const ids = e.option_value_ids ?? [];
         common = common === null ? [...ids] : common.filter((id) => ids.includes(id));
       }
       if (common && common.length === 1) {
         values.set(val.id, { optionValueId: common[0] });
         continue;
       }
-      const colours = new Set(entries.map((e) => e!.color_id ?? ''));
+      const colours = new Set(entries.map((e) => e.color_id ?? ''));
       if (colours.size === 1 && [...colours][0]) values.set(val.id, { colorId: [...colours][0] });
     }
   }
-  return { values, variants, unmappedVariants: unmapped, merged: { values: mergedValues, variants: new Set(entryOf.keys()) } };
+  return { values, variants, unmappedVariants: merged.unmapped, merged };
 }
 
 // ---------------------------------------------------------------- the plan
@@ -935,6 +922,8 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
   // 8. The scope ids: a create keeps the payload's; a merge maps through value_map (§E.2).
   let mapping: MergeMapping | null = null;
   let storedRel: RelationsResponse | null = null;
+  /** A merge written again (0199): this import's image rows an earlier write of it already stored. */
+  let alreadyWritten: ImportImageRow[] = [];
   if (merge) {
     storedRel = await loadRelationsResponse(db, productId);
     if (!storedRel) throw new ImportWriteRefused('IMPORT_REVIEWED_SCOPE_REFUSED', 'REVIEWED_SCOPE_REFUSED', 409, 'merge_target_missing');
@@ -953,7 +942,9 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
       throw new ImportWriteRefused('IMPORT_REVIEWED_SCOPE_REFUSED', 'REVIEWED_SCOPE_REFUSED', 409, 'merge_target_legacy_gallery');
     }
     mapping = mergeMapping(payload, match!, storedRel);
-    images = mergeImages(images, mapping, storedRel);
+    const m = mergeImages(images, mapping, storedRel);
+    images = m.rows;
+    alreadyWritten = m.written;
   }
   const mapScope = (kind: string, id: string): { kind: 'product' | 'option_value' | 'variant'; id: string } | null => {
     if (kind === 'product') return { kind: 'product', id: '' };
@@ -999,26 +990,20 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
   }
 
   /**
-   * AN ID THE PRODUCT CARRIES IS KEPT, at the row it names or, when no row names it alone, at product scope.
+   * THE IDS THE PRODUCT CARRIES ARE KEPT (@levonis/catalog/bambuImport/merge `storedExternalIds`, the rule VERIFY
+   * expects by): at the row they name or, when no single row stands for their value or variant, at product scope.
    *
-   * A merge's colour code (scoped to a colour value) and SKU code (scoped to a variant) used to go through
-   * `mapScope` alone, which knows option values and variants only. A value_map that maps a variant to a
+   * A merge's colour code (scoped to a colour value) and SKU code (scoped to a variant) used to be kept only when
+   * `mapScope` found a row, and it knows option values and variants only. A value_map that maps a variant to a
    * `product_colors` colour — every colour-model filament, PLA Basic's 43 variants all `{color_id}` — therefore
    * dropped every one of them: the live PLA Basic merge stored none of its 72 searchable ids, the index got no
    * alias (step 11 reads this list), and VERIFY's search for «10100» found only PLA Basic Gradient, whose own
-   * «10900» is one edit away. 0194 has no colour scope, so the product carries the code; a variant or value the
-   * reviewed map does not merge (variant_not_merged) is still not the product's, and its codes stay out.
+   * «10900» is one edit away. A variant or value the reviewed map does not merge (variant_not_merged) is not the
+   * product's, and its codes stay out.
    */
-  const idScope = (kind: string, id: string): ReturnType<typeof mapScope> => {
-    const scope = mapScope(kind, id);
-    if (scope || !mapping) return scope;
-    const merged = kind === 'option_value' ? mapping.merged.values : kind === 'variant' ? mapping.merged.variants : null;
-    return merged?.has(id) ? { kind: 'product', id: '' } : null;
-  };
   const externalIds: ImportPayload['external_ids'] = [];
-  for (const e of payload.external_ids) {
-    const scope = idScope(e.scope_kind, e.scope_id);
-    if (!scope) continue;
+  for (const e of storedExternalIds(payload.external_ids, mapping?.merged ?? null)) {
+    const scope = mapScope(e.scope_kind, e.scope_id) ?? { kind: 'product' as const, id: '' };
     externalIds.push({ ...e, scope_kind: scope.kind, scope_id: scope.id });
   }
 
@@ -1494,7 +1479,10 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
   }
 
   // (e) The fenced event and the checkpoint.
-  const counts = countsOf({ payload, images, swatches, specs, relations, externalIds, sourceRefs, conflicts: conflictRows.length, boxItems, contentBlocks, translations: translationRows.length, save });
+  // The import's image rows on the product after this write: the ones it appends, and (a merge written again) the
+  // ones an earlier write of it stored — what verifyD1 recounts and what VERIFY's gallery expects.
+  const importImages = [...alreadyWritten, ...images];
+  const counts = countsOf({ payload, images: importImages, swatches, specs, relations, externalIds, sourceRefs, conflicts: conflictRows.length, boxItems, contentBlocks, translations: translationRows.length, save });
   statements.push(
     db
       .prepare(
@@ -1531,7 +1519,7 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
       // a runner resumed after this write, with no /write answer, reads them from /lease (stage_data.images,
       // stage_data.documents_inactive) instead of recomputing them.
       .bind(
-        productId, slug, merge ? 'merged' : 'created', JSON.stringify(counts), JSON.stringify(payloadCounts(payload)), JSON.stringify(writtenImageRows(images)),
+        productId, slug, merge ? 'merged' : 'created', JSON.stringify(counts), JSON.stringify(payloadCounts(payload)), JSON.stringify(writtenImageRows(importImages)),
         input.itemId, runId, input.leaseToken, JSON.stringify(inactiveDocuments), ...(target ? [target] : [])
       )
   );
@@ -1574,7 +1562,7 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
     layout: { before: [beforeStart, beforeEnd], after: [afterStart, afterEnd], probe, fingerprintTables: FINGERPRINT_QUERIES.map((q) => q.table) },
     estimate,
     counts,
-    images,
+    images: importImages,
     searchAliases: aliases,
     warnings,
     conflicts: conflicts.map((c) => ({ kind: c.kind, field: c.field })),
@@ -1617,12 +1605,13 @@ function imageRowOf(img: PayloadImage, key: string): ImportImageRow {
 }
 
 /** A merge's appended images: bound only through value_map (to an option value, a variant, or a colour), else product-level (§E.2). */
-function mergeImages(rows: ImportImageRow[], mapping: MergeMapping, rel: RelationsResponse): ImportImageRow[] {
+function mergeImages(rows: ImportImageRow[], mapping: MergeMapping, rel: RelationsResponse): { rows: ImportImageRow[]; written: ImportImageRow[] } {
   const existingIds = new Set(rel.images.map((i) => String(i.id)));
   const existingBindings = new Set(rel.images.map((i) => `${i.r2_key}|${i.option_value_id ?? ''}|${i.variant_id ?? ''}|${i.color_id ?? ''}`));
   let next = rel.images.reduce((m, i) => Math.max(m, Number(i.sort_order) || 0), -1) + 1;
   const hasPrimary = rel.images.some((i) => Number(i.is_primary) === 1);
   const out: ImportImageRow[] = [];
+  const written: ImportImageRow[] = [];
   const seen = new Set<string>();
   for (const r of [...rows].sort((a, b) => a.sort_order - b.sort_order)) {
     let binding: Pick<ImportImageRow, 'option_value_id' | 'variant_id' | 'color_id'> = { option_value_id: null, variant_id: null, color_id: null };
@@ -1637,22 +1626,31 @@ function mergeImages(rows: ImportImageRow[], mapping: MergeMapping, rel: Relatio
       else if (m?.colorId) binding = { ...binding, color_id: m.colorId };
     }
     const key = `${r.r2_key}|${binding.option_value_id ?? ''}|${binding.variant_id ?? ''}|${binding.color_id ?? ''}`;
-    if (existingIds.has(r.id) || existingBindings.has(key) || seen.has(key)) continue;
-    seen.add(key);
     const bound = !!(binding.option_value_id || binding.variant_id || binding.color_id);
     // A representative names the variant whose hero it shows (0194, R6): the merged product's own variant, through
     // the value map. One that maps to no existing variant (only a value or a colour) is a plain value binding.
     const via = bound && r.binding_rule === 'representative' ? (mapping.variants.get(r.via_variant_id)?.variantId ?? '') : '';
+    const rule = !bound ? 'general' : r.binding_rule === 'representative' && !via ? 'value' : r.binding_rule;
+    // This import's own row, stored by an earlier write of the same merge (ids are deterministic, §B.8): a merge
+    // written again on resume (0199) appends nothing, but it still answers and counts it as it stands.
+    const stored = rel.images.find((i) => String(i.id) === r.id);
+    if (stored && !seen.has(key)) {
+      seen.add(key);
+      written.push({ ...r, ...binding, sort_order: Number(stored.sort_order) || 0, is_primary: Number(stored.is_primary) === 1, binding_rule: rule, via_variant_id: via });
+      continue;
+    }
+    if (existingIds.has(r.id) || existingBindings.has(key) || seen.has(key)) continue;
+    seen.add(key);
     out.push({
       ...r,
       ...binding,
       sort_order: next++,
       is_primary: !hasPrimary && out.length === 0,
-      binding_rule: !bound ? 'general' : r.binding_rule === 'representative' && !via ? 'value' : r.binding_rule,
+      binding_rule: rule,
       via_variant_id: via,
     });
   }
-  return out;
+  return { rows: out, written };
 }
 
 function createRelationsWire(payload: ImportPayload, images: ImportImageRow[], alts: Map<string, { en: string; ar: string; ckb: string; source_url: string }>): Record<string, unknown> {

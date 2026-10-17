@@ -190,6 +190,45 @@ test('the legal moves really happen, and a few named ones are refused', () => {
   assert.equal(tryMove({ state: 'WITHDRAWN_AT_SOURCE', lcs: 'EXTRACTING', blocker: 'SOURCE_WITHDRAWN' }, 'COMPLETE'), 'IMPORT_ILLEGAL_TRANSITION', 'withdrawn is terminal');
 });
 
+test('0199: a MERGE BLOCKED on VERIFY_FAILED* after its write goes back to WRITING, its write undone in the record; nothing else moves back', () => {
+  const db = graphDb();
+  type Rewind = { state?: State; lcs?: Stage; blocker?: string; match?: string; product?: string };
+  const rewind = (o: Rewind, newLcs: string = 'INGESTING_MEDIA') =>
+    inSavepoint(db, () => {
+      const from: From = { state: o.state ?? 'BLOCKED', lcs: o.lcs ?? 'PUBLISHING', blocker: o.blocker ?? 'VERIFY_FAILED_PERSISTENT' };
+      seed(db, 'running', from);
+      db.prepare("UPDATE catalog_import_items SET match_kind = ?, levonis_product_id = ? WHERE id = 'it'").run(o.match ?? 'merged', o.product ?? 'p_1');
+      try {
+        db.prepare("UPDATE catalog_import_items SET processing_state = 'WRITING', last_completed_stage = ? WHERE id = 'it'").run(newLcs);
+        return null;
+      } catch (e) {
+        return String((e as Error).message);
+      }
+    });
+  assert.equal(rewind({}), null, 'the rewrite edge');
+  assert.equal(rewind({ blocker: 'VERIFY_FAILED_SOMETHING' }), null, 'any VERIFY_FAILED* code');
+  const refused = 'IMPORT_ILLEGAL_TRANSITION';
+  assert.equal(rewind({ match: 'created' }), refused, 'a create is never written twice');
+  assert.equal(rewind({ product: '' }), refused, 'no product, nothing to write again');
+  assert.equal(rewind({ blocker: 'PROTECTED_FIELDS_CHANGED' }), refused, 'another block code');
+  assert.equal(rewind({ lcs: 'WRITING' }), refused, 'only after PUBLISHING (a VERIFY failure)');
+  assert.equal(rewind({ state: 'RETRYING' }), refused, 'RETRYING resumes where it was');
+  assert.equal(rewind({}, 'PUBLISHING'), refused, 'the write must be undone in the record');
+  assert.equal(rewind({}, 'VALIDATING'), refused, 'and only one step back');
+  // The record alone never moves back, and the old edge still holds for the same item.
+  const lcsOnly = inSavepoint(db, () => {
+    seed(db, 'running', { state: 'BLOCKED', lcs: 'PUBLISHING', blocker: 'VERIFY_FAILED_PERSISTENT' });
+    db.prepare("UPDATE catalog_import_items SET match_kind = 'merged', levonis_product_id = 'p_1' WHERE id = 'it'").run();
+    try {
+      db.prepare("UPDATE catalog_import_items SET last_completed_stage = 'INGESTING_MEDIA' WHERE id = 'it'").run();
+      return null;
+    } catch (e) {
+      return String((e as Error).message);
+    }
+  });
+  assert.equal(lcsOnly, refused);
+});
+
 test('a rollback goes to the END of the queue only', () => {
   const db = graphDb();
   const rollback = (position: number) =>

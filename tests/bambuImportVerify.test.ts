@@ -40,7 +40,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { assertImportPayload, buildImportPayload, type ImportPayload } from '../packages/catalog/src/bambuImport/payload';
-import { newWorld as newWriterWorld, rebundle as rebundleWriter, RUN_ID as WRITER_RUN, stage as stageForWriter, write as writerWrite, type World as WriterWorld } from './fixtures/catalogImportWorld';
+import { buildFor, newWorld as newWriterWorld, rebundle as rebundleWriter, RUN_ID as WRITER_RUN, stage as stageForWriter, write as writerWrite, type World as WriterWorld } from './fixtures/catalogImportWorld';
 import { extractionFingerprint } from '../packages/catalog/src/bambuImport/fingerprint';
 import { fixtureJson, pageOf, sample, type SampleHandle } from './fixtures/bambu/load';
 import { compareKeysOf, edgeEvidence, expectedKnowledge, knowledgeDiff, knowledgeProjection, Site, verifyPublic, type VerifyContext } from '../scripts/bambu-import/verify';
@@ -52,6 +52,7 @@ import { collapseContentDuplicates, galleryFromWritten, recomputedGallery, writt
 import { pageDefaultSelection } from '../scripts/bambu-import/selection';
 import { CACHE, likeBody, RUN_ID, World } from './fixtures/bambuImportWorld';
 import { modelsInText } from '../packages/catalog/src/bambuImport/registry/models';
+import { mergedSelections, storedExternalIds } from '../packages/catalog/src/bambuImport/merge';
 import { routeKnowledge, type StoredKnowledgeKnobs } from './fixtures/bambuKnowledgeRoute';
 
 const SITE = 'https://levonis-iq.com';
@@ -109,6 +110,8 @@ interface Live {
   unlisted?: boolean;
   /** The search does not find the product yet (a stale cached answer). */
   unsearched?: boolean;
+  /** Searchable ids the Worker never stored: the site's index does not hold them (no typo tolerance here). */
+  notStored?: readonly string[];
 }
 
 /** The name the site shows: a merge keeps the existing product's own (§E.2), a create carries the store title. */
@@ -116,7 +119,12 @@ const shownName = (l: Live) => l.existing?.name ?? l.payload.product.title_en;
 
 /** What the site's search finds the product by: its name, its aliases (the store title), model tokens, searchable ids. */
 const searchText = (l: Live) =>
-  [shownName(l), l.payload.product.title_en, ...modelsInText(l.payload.product.title_en).map((m) => m.token), ...l.payload.external_ids.filter((e) => e.searchable).map((e) => e.value)].join(' \n ').toLowerCase();
+  [
+    shownName(l),
+    l.payload.product.title_en,
+    ...modelsInText(l.payload.product.title_en).map((m) => m.token),
+    ...l.payload.external_ids.filter((e) => e.searchable && !l.notStored?.includes(e.value)).map((e) => e.value),
+  ].join(' \n ').toLowerCase();
 
 const files = (l: Live, id: string) => {
   const m = l.media.get(id);
@@ -322,6 +330,35 @@ test('a MERGE into an existing priced product (§E.2): its own name, money, opti
   const first = payload.images[0].source_media_id;
   const o2 = await verify({ ...l, media: missing }, { media: new Map([...missing].map(([k, v]) => [k, k === first ? { ...v, r2_key: 'products/import/gallery/not-there.webp' } : v])) });
   assert.ok(failed(o2).includes('structure') && failed(o2).includes('v1'));
+});
+
+test('a MERGE expects the searchable ids the writer stores (one rule, merge.ts): an unmerged variant\'s code is not asked; a merged one missing still fails', async () => {
+  // The writer stores a merge's own ids and those of the variants and values the reviewed map merges, nothing of
+  // the rest (variant_not_merged) — bambu-reusable-spool's RSP002, or here every colour but Jade White. VERIFY
+  // used to ask for every payload id, so an unmerged code passed only when the typo tolerance happened to reach a
+  // stored neighbour (RSP002 → RSP001). The fake site holds exactly what the writer stored, and no typo tolerance.
+  // Built as the writer's world builds it (its manifest row carries the SKU codes, one per variant).
+  const { payload } = buildFor(newWriterWorld(), 'pla-basic-filament', { writeMode: 'merge', mergeProductId: 'p_existing_pla_0001' });
+  const white = payload.groups[0].values.find((v) => /^Jade White/.test(v.name_en))!;
+  const value_map: Record<string, { color_id: string }> = {};
+  for (const v of payload.variants) if (v.value_ids.includes(white.id)) value_map[v.source_id] = { color_id: 'c_white' };
+  const mergeMatch = { value_map, unmapped_variants: [] };
+  const stored = new Set(storedExternalIds(payload.external_ids, mergedSelections(payload, mergeMatch)).filter((e) => e.searchable).map((e) => e.value));
+  const notStored = [...new Set(payload.external_ids.filter((e) => e.searchable && !stored.has(e.value)).map((e) => e.value))];
+  assert.ok(stored.has('10100') && [...stored].some((v) => v.startsWith('A00-W1-')), 'precondition: Jade White\'s colour and SKU codes are stored');
+  assert.ok(notStored.includes('10101') && notStored.some((v) => v.startsWith('A00-K0-')), 'precondition: the other colours\' codes and SKU codes are not');
+  const existing = { name: 'Bambu Lab PLA Basic Filament 1kg', priced: true, groups: [], variants: [], images: [{ id: 'pi_existing_pla', url: '/files/products/existing-pla.webp', is_primary: true, option_value_id: null, variant_id: null }] };
+  const l = live('pla-basic-filament', { payload, slug: 'bambu-lab-pla-basic-filament', productId: 'p_existing_pla_0001', sections: ['printing-materials', 'fdm-materials'], existing, notStored });
+  const o = await verify(l, { mergeMatch });
+  assert.ok(!failed(o).includes('search'), JSON.stringify(o.checks.search));
+  assert.equal(o.checks.search.counts?.external_ids, stored.size, 'exactly the stored ids were asked');
+  assert.equal(o.checks.search.counts?.external_id_misses, 0);
+  // Without the reviewed map the runner cannot say what was stored: every payload id is expected (fails closed).
+  assert.ok(failed(await verify(l)).includes('search'));
+  // A merged colour's code the site does not find is still a hard failure.
+  const o3 = await verify({ ...l, notStored: [...notStored, '10100'] }, { mergeMatch });
+  assert.ok(failed(o3).includes('search'));
+  assert.equal(o3.checks.search.counts?.external_id_misses, 1);
 });
 
 test('compare for a MERGE: the candidates are asked by the name the site shows — the existing product\'s, which need not contain the store title', async () => {

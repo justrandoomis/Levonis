@@ -94,6 +94,7 @@ import { IMPORT_INVOCATION_LIMIT } from '../worker/lib/catalogImport/budget';
 import { GUARDED_ROW_TABLES, IMPORT_GUARD_ID } from '../worker/lib/catalogImport/protectedTables';
 import { payloadSha256, parseReviewedBundle, emptyReviewedTexts, resolveTaxonomy } from '../worker/lib/catalogImport/reviewed';
 import { INDEX_STAMP, searchProducts } from '../worker/lib/search/store';
+import { mergedSelections, storedExternalIds } from '../packages/catalog/src/bambuImport/merge';
 import { busFor, configureEventBus, resetEventBus } from '../worker/lib/eventBus';
 
 const one = <T = Record<string, unknown>>(w: World, sql: string, ...p: unknown[]) => ({ ...(w.raw.prepare(sql).get(...(p as never[])) as object) }) as T;
@@ -497,6 +498,10 @@ test('a colour-model merge keeps the colour codes and SKU codes of the colours i
   );
   assert.deepEqual(stored.map((r) => r.value), [...new Set(expected.map((e) => e.value))].sort(), 'every code of a mapped colour, and nothing of an unmapped one');
   assert.ok(stored.every((r) => r.scope_kind === 'product' && r.scope_id === ''), 'a product_colors colour has no 0194 scope: the product carries the code');
+  // VERIFY expects by the same rule, from the reviewed map alone (merge.ts): exactly what D1 holds.
+  const match = w.matches.find((m) => m.levonis_product_id === 'p_pla')!;
+  const expectedByVerify = storedExternalIds(built.payload.external_ids, mergedSelections(built.payload, { value_map: match.value_map as Record<string, { color_id: string }>, unmapped_variants: [] }));
+  assert.deepEqual([...new Set(expectedByVerify.filter((e) => e.searchable).map((e) => e.value))].sort(), stored.map((r) => r.value));
   const unmapped = searchable.find((e) => e.id_type === 'color_code' && !codes.includes(e.value))!;
   assert.ok(unmapped, 'precondition: the store sells colours the product does not');
   // The aliases are indexed in the same batch, so the product answers its codes — and only its own.

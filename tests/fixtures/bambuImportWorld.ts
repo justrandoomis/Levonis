@@ -24,6 +24,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { assertImportPayload, type ImportPayload } from '../../packages/catalog/src/bambuImport/payload';
 import { canonicalJson } from '../../packages/catalog/src/bambuImport/fingerprint';
+import { rewritesOnResume } from '../../packages/catalog/src/bambuImport/merge';
 import { ROOT } from './d1';
 import type { Clock } from '../../scripts/bambu-import/deadline';
 import { routeKnowledge } from './bambuKnowledgeRoute';
@@ -506,7 +507,16 @@ export class World {
     renew();
     if (action === 'event') {
       const to = String(body?.state ?? '');
-      if (!legal(i.state, to, i.last_completed)) return json(409, { code: 'IMPORT_ILLEGAL_TRANSITION', message: `${i.state}->${to}` });
+      // A merge BLOCKED on VERIFY_FAILED* after its write resumes at WRITING (items.ts, the shared merge.ts rule; 0199).
+      const rewrite =
+        i.state === 'BLOCKED' &&
+        body?.outcome === 'resume' &&
+        rewritesOnResume({ blocker_code: i.blocker_code, last_completed_stage: i.last_completed, merge: i.match_kind === 'merged', product_id: i.levonis_product_id });
+      if (rewrite ? to !== 'WRITING' : !legal(i.state, to, i.last_completed)) return json(409, { code: 'IMPORT_ILLEGAL_TRANSITION', message: `${i.state}->${to}` });
+      if (rewrite) {
+        i.last_completed = 'INGESTING_MEDIA';
+        i.stage_attempts = 0;
+      }
       if (i.state === 'DISCOVERED') {
         const other = this.inFlight();
         if (other && other.sid !== i.sid) return json(409, { code: 'IMPORT_ILLEGAL_TRANSITION', message: 'in flight' });

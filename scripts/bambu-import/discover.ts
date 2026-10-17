@@ -64,6 +64,9 @@ export interface MatchEntry {
   levonis_slug?: string;
   decision: 'merge' | 'merge_publish' | 'distinct' | 'not_bambu' | 'hold_owner_hidden';
   reason?: string;
+  /** A merge's reviewed variant map (§E.2): what the Worker's writer maps through, and VERIFY expects by. */
+  value_map?: Record<string, { option_value_ids?: string[]; color_id?: string }>;
+  unmapped_variants?: string[];
 }
 
 export interface ReviewedBundle {

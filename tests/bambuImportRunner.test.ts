@@ -836,8 +836,47 @@ test('a created product BLOCKED at VERIFY (hidden, §A.10) and resumed: /publish
     const firstRead = w.siteRequests.find((r) => r.seq > job2[0].seq)!;
     assert.ok(finish && firstRead && finish.seq < firstRead.seq, 'the purge came before the first public read of the resumed job');
     assert.ok(!w.logLines.slice(lines).some((l) => /a stale answer; purge again and wait/.test(l)), 'round 1 already read the product as it is');
+    assert.equal(writeCalls(w).length, 1, 'a create is never written twice: it resumes at VERIFYING_LIVE');
   } finally {
     w.dispose();
+  }
+});
+
+test('a MERGE BLOCKED VERIFY_FAILED_PERSISTENT after its write is WRITTEN AGAIN on resume (0199); another block code resumes at VERIFY as before', async () => {
+  const matches = [{ source_product_id: '6945416380552', decision: 'merge', levonis_product_id: 'p_existing_buffer_0001' }];
+  const blockAtVerify = (code: string) => {
+    const w = new World({ handles: ['filament-buffer'], matches });
+    w.inject(/\/items\/6945416380552\/complete$/, 1, () => json(409, { code, message: 'a check failed' }));
+    return w;
+  };
+  const w = blockAtVerify('VERIFY_FAILED_PERSISTENT');
+  try {
+    await w.importer().main();
+    assert.equal(w.item('filament-buffer').state, 'BLOCKED');
+    assert.equal(w.item('filament-buffer').blocker_code, 'VERIFY_FAILED_PERSISTENT');
+    assert.equal(w.item('filament-buffer').match_kind, 'merged');
+    assert.equal(writeCalls(w).length, 1);
+    const seen = w.events.length;
+    const lines = w.logLines.length;
+    await w.importer({ resume: true }).main();
+    const job2 = w.events.slice(seen).filter((e) => e.sid === '6945416380552');
+    assert.deepEqual({ state: job2[0].state, outcome: job2[0].outcome }, { state: 'WRITING', outcome: 'resume' }, 'WRITING, not VERIFYING_LIVE');
+    assert.equal(writeCalls(w).length, 2, 'the merge is written again: the write a writer fix applies to');
+    assert.equal(callsTo(w, /\/stage$/).length, 2, 'from a page read again and staged again');
+    assert.equal(w.item('filament-buffer').state, 'COMPLETE', w.logLines.slice(lines).join('\n'));
+  } finally {
+    w.dispose();
+  }
+  const other = blockAtVerify('PROTECTED_FIELDS_CHANGED');
+  try {
+    await other.importer().main();
+    assert.equal(other.item('filament-buffer').blocker_code, 'PROTECTED_FIELDS_CHANGED');
+    const seen = other.events.length;
+    await other.importer({ resume: true }).main();
+    assert.equal(other.events.slice(seen).find((e) => e.outcome === 'resume')?.state, 'VERIFYING_LIVE');
+    assert.equal(writeCalls(other).length, 1, 'no second write');
+  } finally {
+    other.dispose();
   }
 });
 

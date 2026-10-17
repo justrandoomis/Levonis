@@ -47,6 +47,7 @@ import { extractPage, identityCrossCheck, type Extraction } from '@levonis/catal
 import { extractionFingerprint } from '@levonis/catalog/bambuImport/fingerprint';
 import { assertImportPayload, buildImportPayload, ImportPayloadRefused, type BuildResult, type ImportPayload } from '@levonis/catalog/bambuImport/payload';
 import { productTypeOf } from '@levonis/catalog/bambuImport/registry/types';
+import { rewritesOnResume, type MergeMatch } from '@levonis/catalog/bambuImport/merge';
 import { backoff, Deadline, MAX_STAGE_ATTEMPTS, parseDeadlineEpoch, realClock, WORST, type Clock, type WorstKey } from './deadline';
 import {
   bundleDigest,
@@ -703,7 +704,7 @@ export class Importer {
           return { kind: 'blocked', code: blockerCode || 'BLOCKED' };
         }
         this.resumeUsed = true;
-        const target = stageAfter(w.lastCompleted);
+        const target = this.blockedResumeTarget(w, blockerCode);
         if (!target) throw blockedStop('RETRIES_EXHAUSTED', 'nothing to resume');
         await this.transition(w, target, 'resume');
         log(target, 'resumed', { from: 'BLOCKED', stage: target });
@@ -731,6 +732,23 @@ export class Importer {
     } catch (err) {
       return this.stopItem(w, err);
     }
+  }
+
+  /**
+   * Where a BLOCKED item resumes: the stage after the last completed one — or WRITING again for a merge that
+   * VERIFY failed after its write (@levonis/catalog/bambuImport/merge `rewritesOnResume`, the Worker's own rule in
+   * items.ts): writing it again is what applies a writer fix to an item already written.
+   */
+  private blockedResumeTarget(w: ItemWork, blockerCode: string): Stage | null {
+    const merge = writeModeOf(this.deps.bundle, w.sid).mode === 'merge';
+    if (rewritesOnResume({ blocker_code: blockerCode, last_completed_stage: w.lastCompleted, merge, product_id: w.productId })) return 'WRITING';
+    return stageAfter(w.lastCompleted);
+  }
+
+  /** A merge's reviewed match, which the Worker's writer maps through; null without a map (VERIFY then expects every id). */
+  private mergeMatchOf(w: ItemWork): MergeMatch | null {
+    const m = this.deps.bundle.matches.get(w.sid);
+    return m?.value_map ? { value_map: m.value_map, unmapped_variants: m.unmapped_variants ?? [] } : null;
   }
 
   /** Turns a stop into the item's state: BLOCKED (the queue stops), or released at the deadline. */
@@ -1232,6 +1250,7 @@ export class Importer {
       taxonomy: this.deps.bundle.taxonomy,
       modelCodes: modelCodesOf(w.payload!.product.title_en, this.deps.bundle.rows.map((r) => r.title ?? '')),
       merge: isMerge ? this.mergeEvidence(w) : null,
+      mergeMatch: isMerge ? this.mergeMatchOf(w) : null,
       readback: () => this.ops.readback(w.sid),
     };
     const audit = (w.row.audit_classes ?? []).length > 0;

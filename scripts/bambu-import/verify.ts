@@ -88,6 +88,7 @@
  */
 import { canonicalJson, mediaPath, projectionFingerprint, type Projection } from '@levonis/catalog/bambuImport/fingerprint';
 import { modelsInText } from '@levonis/catalog/bambuImport/registry/models';
+import { mergedSelections, storedExternalIds, type MergeMatch } from '@levonis/catalog/bambuImport/merge';
 import type { ImportPayload, PayloadBoxItem, PayloadDocument } from '@levonis/catalog/bambuImport/payload';
 import { assembleKnowledge, isOwnerOnlyKey, type KnowledgeRows, type ProductKnowledge, type SpecValueDbRow } from '../../worker/lib/knowledge/answer';
 import { comparedFields } from '../../worker/lib/knowledge/compareKeys';
@@ -182,6 +183,12 @@ export interface VerifyContext {
   modelCodes: ReadonlyArray<{ code: string; unique: boolean }>;
   /** For a merge: the protected-fields equality and where the runner has it from (run.ts mergeEvidence). */
   merge: { before_fp_equal: boolean | null; source?: string } | null;
+  /**
+   * For a merge: the reviewed match the writer mapped through. The searchable ids expected are the ones the writer
+   * stores (`storedExternalIds`, one rule with writer.ts): an unmerged variant's or value's code is not the product's.
+   * Absent, every payload id is expected (fails closed).
+   */
+  mergeMatch?: MergeMatch | null;
   readback: () => Promise<{ ok: boolean; mismatches: number }>;
 }
 
@@ -789,7 +796,9 @@ export async function verifyPublic(site: Site, ctx: VerifyContext): Promise<Veri
     if (m.unique) hardMisses++;
     else softMisses++;
   }
-  const ids = [...new Set(ctx.payload.external_ids.filter((e) => e.searchable).map((e) => e.value))];
+  // The ids the write STORED (the writer's own rule): a merge's unmerged variants and values carry none.
+  const stored = storedExternalIds(ctx.payload.external_ids, ctx.merge && ctx.mergeMatch ? mergedSelections(ctx.payload, ctx.mergeMatch) : null);
+  const ids = [...new Set(stored.filter((e) => e.searchable).map((e) => e.value))];
   let idMisses = 0;
   for (const value of ids) if (!(await found(value))) idMisses++;
   record('search', {

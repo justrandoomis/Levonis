@@ -26,7 +26,9 @@
  *            same batch (§A.10, ./unpublish.ts) and its pages purged after it
  *   resume   RETRYING or BLOCKED → the stage after last_completed_stage; a product
  *            hidden on block whose item resumes straight into VERIFYING_LIVE is put
- *            back in the same batch (its /publish-finish already ran)
+ *            back in the same batch (its /publish-finish already ran). A merge
+ *            BLOCKED on a VERIFY_FAILED* code after its write resumes at WRITING
+ *            instead, its last completed stage back to INGESTING_MEDIA (0199)
  *   info     no transition: the event alone
  *
  * Each event is one batch: a fence (the item still in the state and lease the
@@ -40,6 +42,7 @@ import { fence, isFenceMiss } from '../operations';
 import { blockerCode, eventCode, LEASE_MS, NOW_SQL, OpsRefusal, RESUME_INSTRUCTION, type ImportRun } from './auth';
 import { refusalOfBatch } from './writer';
 import { republishStatements, unpublishOnBlockStatements } from './unpublish';
+import { rewritesOnResume } from '@levonis/catalog/bambuImport/merge';
 
 export const STAGES = ['EXTRACTING', 'ENRICHING', 'VALIDATING', 'INGESTING_MEDIA', 'WRITING', 'PUBLISHING', 'VERIFYING_LIVE'] as const;
 export type Stage = (typeof STAGES)[number];
@@ -62,6 +65,14 @@ export function stageAfter(lastCompleted: string): Stage | null {
   if (lastCompleted === '') return 'EXTRACTING';
   const at = STAGES.indexOf(lastCompleted as Stage);
   return at >= 0 && at + 1 < STAGES.length ? STAGES[at + 1] : null;
+}
+
+/** A BLOCKED merge that VERIFY failed after its write resumes at WRITING (the shared rule, @levonis/catalog/bambuImport/merge). */
+export function resumeRewrites(item: Pick<ItemRow, 'processing_state' | 'blocker_code' | 'last_completed_stage' | 'match_kind' | 'levonis_product_id'>): boolean {
+  return (
+    item.processing_state === 'BLOCKED' &&
+    rewritesOnResume({ blocker_code: item.blocker_code, last_completed_stage: item.last_completed_stage, merge: item.match_kind === 'merged', product_id: item.levonis_product_id })
+  );
 }
 
 /** The stages an `ok` event may complete: up to INGESTING_MEDIA → WRITING. */
@@ -372,11 +383,23 @@ export async function applyEvent(db: D1Database, run: ImportRun, item: ItemRow, 
       break;
     }
     case 'resume': {
-      const to = stageAfter(item.last_completed_stage);
+      // A merge VERIFY failed after its write is written again (merge.ts rewritesOnResume; migration 0199 admits the
+      // edge), its write no longer recorded as done, so a retry inside the new write resumes at WRITING too. The
+      // event says so: `rewrite` in its detail, the blocker it clears as its code.
+      const rewrite = resumeRewrites(item);
+      const to = rewrite ? 'WRITING' : stageAfter(item.last_completed_stage);
       if ((old !== 'RETRYING' && old !== 'BLOCKED') || !to || body.state !== to) throw new OpsRefusal(409, 'IMPORT_ILLEGAL_TRANSITION', [item.id]);
       next = to;
       eventStage = to;
-      const transition = set("processing_state = ?, blocker_code = '', resume_instruction = '', retry_at = ''", to);
+      if (rewrite) {
+        lastCompleted = 'INGESTING_MEDIA';
+        stageAttempts = 0;
+      }
+      const detail = rewrite ? { ...body.detail, rewrite: true } : body.detail;
+      const code = rewrite ? item.blocker_code : body.code;
+      const transition = rewrite
+        ? set("processing_state = 'WRITING', last_completed_stage = 'INGESTING_MEDIA', stage_attempts = 0, blocker_code = '', resume_instruction = '', retry_at = ''")
+        : set("processing_state = ?, blocker_code = '', resume_instruction = '', retry_at = ''", to);
       if (to === 'VERIFYING_LIVE' && Number(item.unpublished_on_block) === 1 && item.levonis_product_id) {
         // Its /publish-finish already ran: the product the import hid comes back before verification (§A.10).
         const r = republishStatements(db, {
@@ -384,12 +407,12 @@ export async function applyEvent(db: D1Database, run: ImportRun, item: ItemRow, 
           itemId: item.id,
           leaseToken: lease,
           productId: item.levonis_product_id,
-          extra: [runState(db, run, 'running'), transition, eventInsert(db, run, item, to, 'resume', body.code, body.detail, lease)],
+          extra: [runState(db, run, 'running'), transition, eventInsert(db, run, item, to, 'resume', code, detail, lease)],
         });
         statements.push(fenceIn, ...r.statements, fenceOut);
         republishAt = 1 + r.changedAt;
       } else {
-        statements.push(fenceIn, runState(db, run, 'running'), transition, eventInsert(db, run, item, to, 'resume', body.code, body.detail, lease), fenceOut);
+        statements.push(fenceIn, runState(db, run, 'running'), transition, eventInsert(db, run, item, to, 'resume', code, detail, lease), fenceOut);
       }
       break;
     }

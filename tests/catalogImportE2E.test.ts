@@ -43,6 +43,7 @@ import * as mirror from './fixtures/opsClientMirror';
 import { projectionFingerprint, projectionFromPayload, projectionFromSite, type Projection } from '../packages/catalog/src/bambuImport/fingerprint';
 import type { ImportPayload } from '../packages/catalog/src/bambuImport/payload';
 import { specKey } from '../packages/catalog/src/bambuImport/registry/specKeys';
+import { rewritesOnResume } from '../packages/catalog/src/bambuImport/merge';
 import { reviewedBundleDigest, type ReviewedTexts } from '../worker/lib/catalogImport/reviewed';
 import { edgeEvidence, modelCodesOf, publicBrandSweep, Site, SWEEP_PAGE, verifyPublic, type VerifyContext, type VerifyOutcome } from '../scripts/bambu-import/verify';
 import { HostFetcher } from '../scripts/bambu-import/fetch';
@@ -821,6 +822,61 @@ test('a MERGE through the real door, verified by the runner: an existing, unpric
 
 test('a merge_publish through the real door, verified by the runner: the owner-hidden existing product, named otherwise, is published by the merge, verified and COMPLETE', async () => {
   await mergeVerifiedByRunner('merge_publish', 'hidden');
+});
+
+test('a MERGE blocked VERIFY_FAILED_PERSISTENT after its write is WRITTEN AGAIN on resume (0199): what the first write missed lands, the protected fields stay, and it completes', async () => {
+  const w = opsWorld();
+  await existingA1(w.raw, 'active');
+  const f = a1Merge('merge');
+  const texts = textsFor([f.row], [f.match]);
+  setBundle(texts);
+  openRun(w.raw);
+  installCdnDouble(w);
+  try {
+    const client = await clientFor(w);
+    await client.hello();
+    await client.manifest([manifestRequestRow(f.row, new Date().toISOString())]);
+    await client.prepareTaxonomy();
+    const first = await writeThroughDoor(client, f);
+    const ids = () => (w.raw.prepare('SELECT COUNT(*) AS n FROM product_external_ids WHERE product_id = ?').get(EXISTING_A1.id) as { n: number }).n;
+    const stored = ids();
+    assert.ok(stored > 0, 'the merge stores ids (else this proves nothing)');
+    // What an older writer left on the live PLA Basic: rows the write should have stored and did not.
+    w.raw.prepare('DELETE FROM product_external_ids WHERE product_id = ?').run(EXISTING_A1.id);
+    // Another block of the written merge resumes at VERIFY, as before…
+    await client.event(f.sid, first.t, { state: 'BLOCKED', outcome: 'blocked', code: 'PROTECTED_FIELDS_CHANGED' });
+    let l = await client.lease(f.sid);
+    await assert.rejects(() => client.event(f.sid, l.lease_token, { state: 'WRITING', outcome: 'resume' }), (e: unknown) => (e as { code?: string }).code === 'IMPORT_ILLEGAL_TRANSITION');
+    assert.equal((await client.event(f.sid, l.lease_token, { state: 'VERIFYING_LIVE', outcome: 'resume' })).state, 'VERIFYING_LIVE');
+    // …a VERIFY failure is written again: WRITING, the write no longer recorded as done, the event saying why.
+    await client.event(f.sid, l.lease_token, { state: 'BLOCKED', outcome: 'blocked', code: 'VERIFY_FAILED_PERSISTENT' });
+    l = await client.lease(f.sid);
+    assert.equal(rewritesOnResume({ blocker_code: l.blocker_code, last_completed_stage: l.last_completed_stage, merge: true, product_id: l.levonis_product_id }), true, 'the runner decides as the Worker does');
+    await assert.rejects(() => client.event(f.sid, l.lease_token, { state: 'VERIFYING_LIVE', outcome: 'resume' }), (e: unknown) => (e as { code?: string }).code === 'IMPORT_ILLEGAL_TRANSITION');
+    const resumed = await client.event(f.sid, l.lease_token, { state: 'WRITING', outcome: 'resume' });
+    assert.deepEqual({ state: resumed.state, last: resumed.last_completed_stage }, { state: 'WRITING', last: 'INGESTING_MEDIA' });
+    const ev = w.raw.prepare("SELECT stage, code, detail FROM catalog_import_events WHERE outcome = 'resume' ORDER BY seq DESC LIMIT 1").get() as { stage: string; code: string; detail: string };
+    assert.deepEqual({ stage: ev.stage, code: ev.code, rewrite: (JSON.parse(ev.detail) as { rewrite?: boolean }).rewrite }, { stage: 'WRITING', code: 'VERIFY_FAILED_PERSISTENT', rewrite: true });
+    // The WRITING stage as run.ts runs it: stage, media, write, publish-finish — then the runner's VERIFY and /complete.
+    const t = l.lease_token;
+    const checks = documentChecks(f.payload);
+    const staged = await client.stage(f.sid, t, f.payload, checks);
+    const media = await ingest(client, f.sid, t, f.payload);
+    const written = await client.write(f.sid, t, staged.payload_sha256, f.payload, checks);
+    assert.equal(written.before_fp_equal, true, 'the protected fields proven unchanged by the second write too');
+    assert.equal(ids(), stored, 'the rows the first write missed are written');
+    assert.equal((await client.publishFinish(f.sid, t)).state, 'VERIFYING_LIVE');
+    const rows = (writeAnswers.get(f.sid)?.images ?? []) as WrittenImage[];
+    assert.deepEqual(rows.map((r) => r.id).sort(), first.rows.map((r) => r.id).sort(), 'it appends nothing, and answers the import\'s rows as they stand');
+    const outcome = await verifyByRunner(w, client, f, texts, [f.payload.product.title_en], { t, checks, media, written, rows }, { documentChecks: checks as unknown as RunnerDocumentCheck[] });
+    for (const [name, c] of Object.entries(outcome.checks)) assert.ok(c.ok || !c.hard, `${name} ${JSON.stringify({ status: c.status, counts: c.counts, detail: c.detail })}`);
+    const browser = { ok: true, checks: { image_decodes: true, image_contain: true, selection_images: true }, counts: { values_checked: 1 }, selections: [], not_applicable: { ...NOT_APPLICABLE } };
+    const liveUrl = `https://levonis-iq.com/product/${written.slug}`;
+    const done = await client.complete(f.sid, t, liveUrl, edgeEvidence(outcome, browser, liveUrl, f.payload, 1));
+    assert.equal(done.state, 'COMPLETE', JSON.stringify(done.d1_checks));
+  } finally {
+    restoreFetch();
+  }
 });
 
 // ---------------------------------------------------------------- the close sweep over the real v1 list

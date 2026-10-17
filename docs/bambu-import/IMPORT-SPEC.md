@@ -283,6 +283,7 @@ If one ever is, the fix is a separate, reviewed **append-only image stage**: pla
 
 - **The durable state is D1:** `catalog_import_items` (state, `last_completed_stage`, `stage_data`, `attempts`, `stage_attempts`, `retry_at`, lease) and `catalog_import_media`. The runner keeps nothing it cannot rebuild.
 - **On lease** the server answers with `last_completed_stage`; the runner resumes at the next stage, re-fetching the page if EXTRACT's fingerprint is older than 24 h.
+- **A merge BLOCKED `VERIFY_FAILED*` after its write** resumes at WRITING, not VERIFYING_LIVE (migration 0199; `rewritesOnResume` in `packages/catalog/src/bambuImport/merge.ts`, used by the Worker and the runner): its `last_completed_stage` goes back to INGESTING_MEDIA and the resume event carries the cleared blocker as its code and `rewrite: true`. A merge write is idempotent and proves its protected fields unchanged, so writing it again applies a writer fix to an item already written. A create still resumes at VERIFYING_LIVE.
 - **Media already `stored`** (R2 HEAD confirmed) is never re-fetched; a vanished object is re-ingested.
 - **An ambiguous write failure** (timeout after send): `/lease` reports `levonis_product_id` when the checkpoint committed, and the runner continues at `publish-finish`. Otherwise deterministic ids make the re-send idempotent. A duplicate create is impossible: the `product_source_refs` primary key `(source, source_product_id)` aborts the batch.
 - **Leases** last 15 min and every call renews them.
@@ -1771,7 +1772,7 @@ The public v1 product DTO has no option-value or group ids, no variant `combo_ke
 4. **Search:**
    - `GET /api/public/v1/search?q=<exact title>` → the slug is present (hard);
    - each registry model code: the slug in the first 24 (hard when the code is unique to the product, soft otherwise);
-   - each searchable external id (colour code, part code, SKU code): present (hard).
+   - each searchable external id (colour code, part code, SKU code) the write stores: present (hard). A merge stores its own ids and those of the variants and values the reviewed `value_map` merges (at product scope where no single row stands for them, e.g. a `product_colors` colour), never an unmerged variant's (`storedExternalIds` in `merge.ts`, one rule for the writer and VERIFY).
 5. **Not sellable, and the request door works:**
    - `POST /api/products/<slug>/quote` (anonymous, a valid selection) → 409 `PRICE_NOT_AVAILABLE`;
    - `POST /api/price-requests` without a session → 401 (a smoke check only: it proves nothing about the product);

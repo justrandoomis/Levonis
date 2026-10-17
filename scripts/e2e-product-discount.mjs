@@ -462,7 +462,7 @@ try {
   const PERSIST = join(OUT, 'persist');
   dbFile = initLocalD1(PERSIST);
   const applied = await seed(dbFile);
-  check('the local database goes through every migration, 0197 last', applied.at(-1) === '0197_offer_usd_prices.sql', applied.at(-1));
+  check('the local database goes through every migration, 0197 included', applied.includes('0197_offer_usd_prices.sql'), applied.at(-1));
   await seedPictures(PERSIST);
   const before = rows("SELECT combo_key, channel, final_price_iqd, usd_iqd_rate FROM pricing_v2_sku_results WHERE product_id = ? ORDER BY combo_key, channel", A.id);
   check('the printer is V2-published by the real writer at U 1,500: 900,000 / 825,000 and 1,125,000 / 1,050,000', JSON.stringify(before.map((r) => r.final_price_iqd).sort((x, y) => x - y)) === JSON.stringify([825000, 900000, 1050000, 1125000]), before);
