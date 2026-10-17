@@ -68,10 +68,12 @@ test('V2 rows count while their result says the price; o:* is the product itself
   assert.ok(v1.sku_prices!.length > 0, 'the V1 product has SKU rows');
   assert.ok(v1.sku_prices!.every((r) => !('v2' in r)), 'a V1 row never carries the V2 flag');
   assert.equal(v1.sku_strict, undefined);
+  // A V2 row carries the rate of its own result (docs/ux/PRODUCT-DISCOUNT.md §4.3) — server-side only.
   assert.deepEqual(v2.sku_prices, [
-    { combo_key: '', channel: 'direct_sale', regular_price_iqd: 800_000, v2: true },
-    { combo_key: '', channel: 'pre_order_land', regular_price_iqd: 760_000, v2: true },
+    { combo_key: '', channel: 'direct_sale', regular_price_iqd: 800_000, v2: true, usd_iqd_rate: '1600' },
+    { combo_key: '', channel: 'pre_order_land', regular_price_iqd: 760_000, v2: true, usd_iqd_rate: '1600' },
   ]);
+  assert.ok(v1.sku_prices!.every((r) => !('usd_iqd_rate' in r)), 'a V1 row never carries a rate');
   assert.equal(v2.sku_strict, true);
   assert.deepEqual(views.get(AMS)!.sku_prices, [], 'a manual product: present, no row');
   assert.equal(views.get(AMS)!.sku_strict, undefined);
@@ -82,7 +84,7 @@ test('V2 rows count while their result says the price; o:* is the product itself
   assert.equal(doc.sku_prices?.length, 2);
   // The public projection carries none of it.
   const pub = JSON.stringify(projectPublic(doc));
-  for (const key of ['sku_strict', 'sku_prices', '"v2"', 'usd_ceil6', 'exact_iqd', 'discount_usd', 'deltas_usd', 'anchor']) assert.ok(!pub.includes(key), `the public projection carries no ${key}`);
+  for (const key of ['sku_strict', 'sku_prices', '"v2"', 'usd_ceil6', 'exact_iqd', 'discount_usd', 'deltas_usd', 'anchor', 'usd_iqd_rate']) assert.ok(!pub.includes(key), `the public projection carries no ${key}`);
 
   // A V2 row whose result price no longer matches is inert — and strict refuses the channel, never the ladder.
   w.raw.exec(`INSERT INTO ops_guards (id, ok) VALUES ('engine-price:${OL}', 1);

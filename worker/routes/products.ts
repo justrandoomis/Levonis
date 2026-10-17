@@ -32,7 +32,7 @@ import { getSetting, getSettings, PUBLIC_SETTING_KEYS, projectPublicSettings, pu
 import { getPublicDisplayRate } from '../lib/fx/displayRate';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
 import { DIMENSION_FIELDS, parseProductRow, projectPublic, projectAdmin } from '../lib/productModel';
-import { customerAvailability, customerLinePrice } from '../lib/customerPricing';
+import { customerAvailability, customerLinePrice, offerFigures, offerLabelTier } from '../lib/customerPricing';
 import type { ProductDoc } from '../lib/productModel';
 import { resolveUnitPrice, proPolicyFrom, DEFAULT_PRO_POLICY, type MemberFallback } from '../lib/pricing';
 import type { Tier, ProPricingPolicy, ResolvedPrice } from '../lib/pricing';
@@ -109,9 +109,10 @@ import {
 } from '../lib/bundleCart';
 import { publicMysteryBlock, resolveMysteryLines, type MysteryContext } from '../lib/mysteryLine';
 import { activePoolProductIds } from '../lib/mysteryDraw';
-import { applyOfferToResolved, loadOffers, offerEligible, offerKey, scheduleState, subjectOf, type OfferView } from '../lib/offers';
+import { applyOfferToResolved, loadOffers, OFFER_NOT_SUSPENDED_SQL, offerEligible, offerKey, scheduleState, subjectOf, type OfferView } from '../lib/offers';
+import { offerSavingPercent } from '../lib/offerUsd';
 import { isPrinterProduct } from '../lib/printerIdentity';
-import { skuLevelResolveInput, skuLevelSelections, type SkuLevelSelection } from '../lib/skuLevels';
+import { skuLevelResolveInput, skuLevelSelections, skuPreorderTwins, type SkuLevelSelection } from '../lib/skuLevels';
 import { activeFitsFor, MAINTENANCE_ROOT_ID, maintenanceFor, printerFitsInstalled, type FitPrinter } from '../lib/printerFits';
 import { resolveSiteMedia } from '../lib/siteMedia';
 import { normalizeHomeBento } from '../lib/homeBento';
@@ -361,7 +362,27 @@ const TYPED_TIER_DISCOUNT =
  * sharper test would have to be per product, which is the N+1 this design
  * exists to avoid.
  */
-export function discountedWhere(ctx: PricingCtx): { sql: string; params: string[] } {
+/**
+ * A live, active, priced, unsuspended special-offer window on the product (F7). Two bindings: the
+ * request's instant, twice. `offer_windows` (0060) predates every database this Worker supports.
+ */
+const LIVE_PRICED_OFFER = `EXISTS (SELECT 1 FROM offer_windows w
+        WHERE w.subject_type = 'product' AND w.subject_id = products.id
+          AND w.active = 1 AND w.offer_price_mode <> ''
+          AND (w.starts_at IS NULL OR w.starts_at <= ?)
+          AND (w.ends_at IS NULL OR w.ends_at >= ?)
+          AND ${OFFER_NOT_SUSPENDED_SQL})`;
+
+export function discountedWhere(
+  ctx: PricingCtx,
+  /**
+   * F7 (docs/ux/PRODUCT-DISCOUNT.md §8.8): with `offersAt` (the request's instant), a product with a
+   * LIVE, active, PRICED, unsuspended special-offer window is discounted too — the flash board's «عرض
+   * الكل» listed membership discounts and never a live offer. A members-only window lists the product;
+   * its card shows the lock to whoever is not eligible, as the flash board already does.
+   */
+  opts: { offersAt?: string } = {}
+): { sql: string; params: string[] } {
   const rules = shelfDiscountRules(ctx);
   /**
    * A GLOBAL RULE REACHES EVERY PRODUCT, so the predicate is simply true and
@@ -383,6 +404,10 @@ export function discountedWhere(ctx: PricingCtx): { sql: string; params: string[
 
   const parts = [TYPED_TIER_DISCOUNT];
   const params: string[] = [];
+  if (opts.offersAt) {
+    parts.push(LIVE_PRICED_OFFER);
+    params.push(opts.offersAt, opts.offersAt);
+  }
   if (productIds.length > 0) {
     parts.push('products.id IN (SELECT value FROM json_each(?))');
     params.push(JSON.stringify(productIds));
@@ -2074,7 +2099,7 @@ export function withLiveOffer(
   now: number
 ): ResolvedPrice {
   if (!offer || (doc.composition ?? '') !== '' || !offerEligible(ctx.tierStatus, offer, now).ok) return r;
-  return applyOfferToResolved(r, offer, ctx.tier, ctx.tierActive, now).resolved;
+  return applyOfferToResolved(r, offer, ctx.tier, ctx.tierActive, now, doc).resolved;
 }
 
 /**
@@ -2286,6 +2311,12 @@ export interface PriceLevel {
   unit_subtotal_iqd: number;
   /** Which rung won — the page's PRO/PRIME badge, never inferred in the browser. */
   applied_tier: ResolvedPrice['applied_tier'];
+  /**
+   * A live offer lowered this level for this viewer (docs/ux/PRODUCT-DISCOUNT.md §8.1): the struck
+   * published price and its «−N٪». Present only then — an absent pair reads as null.
+   */
+  offer_before_iqd?: number | null;
+  offer_saving_percent?: number | null;
 }
 
 export interface PriceLevels {
@@ -2344,11 +2375,14 @@ export function levelPrice(
     memberFallback: benefitFallbackFor(ctx, doc),
   });
   r = withLiveOffer(r, doc, ctx, offer, now);
+  const figures = offerFigures(r.offer_before_iqd, r.applied_iqd);
   return {
     applied_iqd: r.applied_iqd,
     regular_iqd: r.regular_iqd,
     unit_subtotal_iqd: r.unit_subtotal_iqd,
-    applied_tier: r.applied_tier,
+    // The F5 label (display only, §9.4); `r.applied_tier` stays the price class.
+    applied_tier: offerLabelTier(r),
+    ...(figures.offer_before_iqd !== null ? figures : {}),
   };
 }
 
@@ -2708,7 +2742,7 @@ export function publicWithDisplayPrice(
     coarseStock
   );
   if (directStock !== null) out.direct_stock_available = directStock;
-  const levels: Array<{ optionId?: string; colorId?: string; sku?: SkuLevelSelection }> = [{}];
+  const levels: Array<{ optionId?: string; colorId?: string; sku?: SkuLevelSelection; twin?: true }> = [{}];
   const skuLevels = skuLevelSelections(doc, view);
   /**
    * PER SKU (DECISIONS row 240): on a V2 product whose engine priced some SKUs
@@ -2726,15 +2760,31 @@ export function publicWithDisplayPrice(
   // product priced per colour or variant is shown «from» its lowest SKU — an option or a colour alone
   // reads the ladder beneath the rung, which holds each model's HIGHEST SKU.
   for (const sku of skuLevels) levels.push({ sku });
-  let best: ResolvedPrice | null = null;
-  let maxApplied = 0;
-  let primeMin: number | null = null;
-  let proMin: number | null = null;
+  /**
+   * A SCHEDULED SPECIAL OFFER IS APPLIED PER LEVEL (docs/ux/PRODUCT-DISCOUNT.md §8.2, F2), exactly as
+   * the cart applies it to the line it prices: a percent is monotone and gives today's numbers, but a
+   * dollar sale price is per model — applying it to the cheapest level alone would show one model's
+   * sale on another's price.
+   *
+   * ELIGIBILITY GATES THE PRICE, not only the purchase. Showing an ineligible viewer the members-only
+   * offer price and then refusing them at the door is exactly the page/cart/door disagreement §15.4
+   * case 9 exists to prevent — so an ungated window prices for everyone, guests included, and a gated
+   * one prices only for whoever may actually buy it.
+   */
+  const offerNow = Date.now();
+  const offerOn = !!offer && (doc.composition ?? '') === '';
+  const offerCheck = offerOn ? offerEligible(ctx.tierStatus, offer!, offerNow) : null;
+  const priceWithOffer = offerOn && offerCheck!.ok;
+  // A dollar sale reads each direct SKU on its cheapest pre-order route too (`skuPreorderTwins`): the
+  // basis «يبدأ من» has from the option and base levels, which a dollar sale leaves out (below).
+  const usdWindow = priceWithOffer && offer!.window?.offer_price_mode === 'fixed_usd';
+  if (usdWindow) for (const sku of skuPreorderTwins(doc, skuLevels)) levels.push({ sku, twin: true });
+  const results: Array<{ r: ResolvedPrice; base: ResolvedPrice; sku: boolean; twin: boolean; source: 'ladder' | 'offer'; plus: number | null }> = [];
   for (const sel of levels) {
     // Selection-validity errors (a colour linked to an unchosen option, a
     // pre-order product with no transport picked) do not disturb the price
     // arithmetic — only the numbers are read here, never the errors.
-    const r = resolveUnitPrice({
+    const base = resolveUnitPrice({
       product: doc,
       ...(sel.sku ? skuLevelResolveInput(sel.sku) : { optionId: sel.optionId ?? null, colorId: sel.colorId ?? null }),
       tier: ctx.tier,
@@ -2743,47 +2793,71 @@ export function publicWithDisplayPrice(
       transportDefaults: ctx.transportDefaults,
       memberFallback: benefitFallbackFor(ctx, doc),
     });
-    if (!best || r.applied_iqd < best.applied_iqd) best = r;
+    const applied = priceWithOffer
+      ? applyOfferToResolved(base, offer!, ctx.tier, ctx.tierActive, offerNow, doc)
+      : { resolved: base, source: 'ladder' as const, plus_iqd: null };
+    results.push({ r: applied.resolved, base, sku: !!sel.sku, twin: !!sel.twin, source: applied.source, plus: applied.plus_iqd });
+  }
+  /**
+   * When a dollar sale priced at least one SKU level, the non-SKU levels (base, option-only,
+   * colour-only) leave «يبدأ من» and its range: they read the rollback ladder and name no purchasable
+   * SKU, so the dollar price never reaches them, and counting them would claim a spread that does not
+   * exist (§8.2). The SKU levels are then read on their direct line AND their cheapest pre-order route
+   * (the twins), so «يبدأ من» keeps the pre-order basis it has without the sale. Otherwise the twins
+   * are left out and the card is exactly today's.
+   */
+  const usdPriced = usdWindow && results.some((x) => x.sku && x.source === 'offer');
+  const counted = usdPriced ? results.filter((x) => x.sku) : results.filter((x) => !x.twin);
+  let bestLevel: (typeof results)[number] | null = null;
+  let maxApplied = 0;
+  let primeMin: number | null = null;
+  let proMin: number | null = null;
+  // THE STRIKE'S BASIS: the card's «from» regular price before the sale and after it, over the SAME
+  // levels (review of §8.2, O4) — never one level's own before price beside another level's figure.
+  let preRegular: number | null = null;
+  let postRegular: number | null = null;
+  for (const x of counted) {
+    const r = x.r;
+    if (!bestLevel || r.applied_iqd < bestLevel.r.applied_iqd) bestLevel = x;
     if (r.applied_iqd > maxApplied) maxApplied = r.applied_iqd;
     if (r.prime_iqd !== null) primeMin = primeMin === null ? r.prime_iqd : Math.min(primeMin, r.prime_iqd);
     if (r.pro_iqd !== null) proMin = proMin === null ? r.pro_iqd : Math.min(proMin, r.pro_iqd);
+    preRegular = preRegular === null ? x.base.regular_iqd : Math.min(preRegular, x.base.regular_iqd);
+    postRegular = postRegular === null ? r.regular_iqd : Math.min(postRegular, r.regular_iqd);
   }
-  let resolved = best!;
-  /** A LIVE OFFER REPLACED THE LADDER — read by the membership teaser below. */
-  let offerPriced = false;
-  if (offer && (doc.composition ?? '') === '') {
-    // ELIGIBILITY GATES THE PRICE, not only the purchase. Showing an
-    // ineligible viewer the members-only offer price and then refusing them
-    // at the door is exactly the page/cart/door disagreement §15.4 case 9
-    // exists to prevent — so an ungated window prices for everyone, guests
-    // included, and a gated one prices only for whoever may actually buy it.
-    const check = offerEligible(ctx.tierStatus, offer, Date.now());
-    const applied = check.ok
-      ? applyOfferToResolved(resolved, offer, ctx.tier, ctx.tierActive, Date.now())
-      : { resolved, source: 'ladder' as const, offer_id: offer.window?.id ?? null, plus_iqd: null };
-    if (applied.source === 'offer') {
-      offerPriced = true;
-      // The rungs move together, so the "from" comparison below stays honest:
-      // every level is discounted by the same rule.
-      const delta = resolved.applied_iqd - applied.resolved.applied_iqd;
-      maxApplied = Math.max(0, maxApplied - delta);
-      primeMin = applied.resolved.prime_iqd;
-      proMin = applied.resolved.pro_iqd;
-    }
-    resolved = applied.resolved;
-    const w = offer.window;
+  const resolved = bestLevel!.r;
+  /**
+   * THE SALE LOWERED THE CARD'S OWN «FROM» (O4): a level the window priced, and the card's regular
+   * «from» after the sale strictly below the one before it. Then — and only then — the card strikes
+   * the pre-sale «from» and badges the two numbers it prints. A sale on a model dearer than the card's
+   * «from» (a Combo-only sale that stays above the P1S's pre-order price) strikes nothing and
+   * counts down nothing here; the product page shows it on the Combo.
+   */
+  const offerLowered =
+    priceWithOffer &&
+    counted.some((x) => x.source === 'offer') &&
+    preRegular !== null &&
+    postRegular !== null &&
+    postRegular < preRegular &&
+    resolved.applied_iqd < preRegular;
+  /** A LIVE OFFER PRICED THE CARD'S OWN FIGURE — read by the membership teaser below. */
+  const offerPriced = bestLevel!.source === 'offer';
+  if (offerOn) {
+    const w = offer!.window;
     if (w) {
       out.offer = {
         offer_id: w.id,
         required_tiers: w.required_tiers,
         starts_at: w.starts_at,
         ends_at: w.ends_at,
-        schedule_state: scheduleState(w.starts_at, w.ends_at, Date.now()),
-        price_source: applied.source,
+        schedule_state: scheduleState(w.starts_at, w.ends_at, offerNow),
+        price_source: offerLowered ? 'offer' : 'ladder',
+        /** The window carries a price (§8.2): a priced window that lowers nothing here shows no clock. */
+        priced: w.offer_price_mode !== '',
         /** The card badges the gate; the door re-checks it independently. */
-        locked: !check.ok && check.reason === 'MEMBERSHIP_REQUIRED',
+        locked: !offerCheck!.ok && offerCheck!.reason === 'MEMBERSHIP_REQUIRED',
       };
-      if (applied.plus_iqd !== null) out.display_plus_iqd = applied.plus_iqd;
+      if (offerLowered && offerPriced && bestLevel!.plus !== null) out.display_plus_iqd = bestLevel!.plus;
     }
   }
   /**
@@ -2880,10 +2954,17 @@ export function publicWithDisplayPrice(
   }
   out.price_status = 'priced';
   out.display_price_iqd = resolved.applied_iqd;
-  out.display_applied_tier = resolved.applied_tier;
+  // The F5 label (display only, §9.4): a member clamped up to the offer reads «سعر العرض».
+  out.display_applied_tier = offerLabelTier(resolved);
   // §4: no compare-at. The regular price is exposed so a member can see what
   // their membership saved — a real comparison, not a fabricated one.
   out.display_regular_iqd = resolved.regular_iqd;
+  // THE STRUCK PRICE OF A LIVE OFFER (docs/ux/PRODUCT-DISCOUNT.md §8.1, F1): the card's regular «from»
+  // before the sale, over the same levels as the figure printed beside it, and the «−N٪» of those two
+  // numbers (D9). Null unless the live window lowered this viewer's «from».
+  const offerBefore = offerLowered ? preRegular : null;
+  out.display_offer_before_iqd = offerBefore;
+  out.display_offer_saving_percent = offerSavingPercent(offerBefore, resolved.applied_iqd);
   // The card's faint member teasers: never PREMIUM (it carries no discount
   // since 0145), and no PRO while PRO is paused — «إخفاء السعر البرو في بطاقة
   // المنتجات».
@@ -3108,6 +3189,9 @@ const CARD_FIELDS = [
   'direct_stock_available',
   // Set alongside `offer` when a live window has a PLUS rung.
   'display_plus_iqd',
+  // A live offer's struck before price and its «−N٪» (docs/ux/PRODUCT-DISCOUNT.md §8.1): IQD only.
+  'display_offer_before_iqd',
+  'display_offer_saving_percent',
   // The countdown and the members-only lock chip.
   'offer',
   /**
@@ -3275,14 +3359,26 @@ function listingItemOf(
     : Array.isArray(card.sale_types)
       ? (card.sale_types as unknown[]).map(String)
       : safeParse<unknown[]>(String(row.sale_types ?? '[]'), []).map(String);
-  const offer = card.offer as { schedule_state?: string } | null | undefined;
+  const offer = card.offer as { schedule_state?: string; priced?: boolean; price_source?: string; locked?: boolean } | null | undefined;
+  /**
+   * A LIVE, PRICED WINDOW THAT LOWERS NOTHING HERE IS NOT A SCHEDULED OFFER (docs/ux/PRODUCT-DISCOUNT.md
+   * §8.8): a dollar sale on a model this card does not show, or one that rounds to the current price,
+   * neither strikes nor counts down. An upcoming window, an unpriced (countdown-only) window and an
+   * older card without `priced` keep today's answer — and so does a members-only window this viewer is
+   * locked out of (`locked`): it prices nothing for them, but it is an offer on the product, its card
+   * wears the lock and keeps its clock, exactly as before the dollar sale.
+   */
+  const liveButNotLowering =
+    !!offer && offer.schedule_state === 'live' && offer.priced === true && offer.price_source !== 'offer' && offer.locked !== true;
   const specs = safeParse<Record<string, unknown>>(String(row.spec_fields ?? '{}'), {});
   return {
     id: String(row.id),
     card,
     name: String(card.name ?? row.name ?? ''),
     price,
-    regular: price === null ? null : numOrNull(card.display_regular_iqd) ?? price,
+    // A live offer's struck price is the regular one here, so «عليها عرض» (`onOffer`) sees the sale
+    // through `price < regular` (§8.8).
+    regular: price === null ? null : numOrNull(card.display_offer_before_iqd) ?? numOrNull(card.display_regular_iqd) ?? price,
     prime: price === null ? null : numOrNull(card.display_prime_iqd),
     pro: price === null ? null : numOrNull(card.display_pro_iqd),
     available: unpriced ? 0 : Math.max(0, numOrNull(card.direct_stock_available) ?? 0),
@@ -3293,7 +3389,7 @@ function listingItemOf(
     fits,
     createdAt: String(row.created_at ?? ''),
     rank,
-    scheduledOffer: !!offer && (offer.schedule_state === 'live' || offer.schedule_state === 'upcoming'),
+    scheduledOffer: !!offer && (offer.schedule_state === 'live' || offer.schedule_state === 'upcoming') && !liveButNotLowering,
     specs: specs && typeof specs === 'object' && !Array.isArray(specs) ? specs : {},
   };
 }
@@ -3672,7 +3768,7 @@ export async function listCatalogProducts(
    * الكل» cannot drift apart again.
    */
   if (type === 'discounted') {
-    const reach = discountedWhere(await ctxPromise);
+    const reach = discountedWhere(await ctxPromise, { offersAt: new Date().toISOString() });
     sql += ` AND ${reach.sql}`;
     params.push(...reach.params);
   }
@@ -4771,7 +4867,7 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
      * predicate" above stays a fact rather than a hope.
      */
     ctxPromise.then((ready) => {
-      const reach = discountedWhere(ready);
+      const reach = discountedWhere(ready, { offersAt: new Date().toISOString() });
       return runListed(
         db,
         `SELECT * FROM products

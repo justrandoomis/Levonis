@@ -84,6 +84,8 @@ import type {
   ProductDimensionsV2,
 } from '../lib/productTypes';
 import { tierLabel } from '../components/subscription/tierMeta';
+import { OfferSaving, SALE_PRICE } from '../components/ui/OfferBadge';
+import Countdown from '../components/ui/Countdown';
 import ConditionPanel from '../components/product/ConditionPanel';
 import StockAlertPanel from '../components/product/StockAlertPanel';
 import { UNPRICED_TEXT } from '../lib/priceStatus';
@@ -602,7 +604,15 @@ interface ProductDetail {
    * `publicWithDisplayPrice`). Carried for the record; the page prices
    * nothing from it — every figure already includes a live window.
    */
-  offer?: { schedule_state?: string; price_source?: 'ladder' | 'offer'; locked?: boolean } | null;
+  offer?: {
+    schedule_state?: string;
+    price_source?: 'ladder' | 'offer';
+    locked?: boolean;
+    /** The schedule the clock reads (docs/ux/PRODUCT-DISCOUNT.md §8.3, F8). */
+    starts_at?: string | null;
+    ends_at?: string | null;
+    priced?: boolean;
+  } | null;
 }
 
 /** The relational structure (worker publicRelations): per-level sellable
@@ -708,6 +718,9 @@ interface Quote {
     total_months?: number | null; base_months?: number | null;
   } | null;
   unit_subtotal_iqd: number; errors: string[]; qty: number; line_total_iqd: number;
+  /** A live offer lowered this selection (docs/ux/PRODUCT-DISCOUNT.md §8.3): the struck price and its percent. */
+  offer_before_iqd?: number | null;
+  offer_saving_percent?: number | null;
 }
 
 /**
@@ -750,6 +763,9 @@ interface PriceLevel {
   regular_iqd: number;
   unit_subtotal_iqd: number;
   applied_tier: 'regular' | 'pro' | 'prime';
+  /** Present only when a live offer lowered this level (§8.1). */
+  offer_before_iqd?: number | null;
+  offer_saving_percent?: number | null;
 }
 
 interface PriceLevels {
@@ -2756,7 +2772,16 @@ export default function Product() {
    * price behind a loading flag — was the whole of the "stuck on updating
    * price" report.
    */
-  const shownPrice: { unit: number; regular: number; applied: number; tier: 'regular' | 'pro' | 'prime'; settled: boolean } | null =
+  const shownPrice: {
+    unit: number;
+    regular: number;
+    applied: number;
+    tier: 'regular' | 'pro' | 'prime';
+    settled: boolean;
+    /** The struck price of a live offer for THIS selection, and its percent (docs/ux/PRODUCT-DISCOUNT.md §8.3). */
+    before: number | null;
+    savingPercent: number | null;
+  } | null =
     quoteFresh && quoteErrors.length === 0
       ? {
           unit: quote!.unit_subtotal_iqd,
@@ -2764,6 +2789,8 @@ export default function Product() {
           applied: quote!.applied_iqd,
           tier: quote!.applied_tier,
           settled: true,
+          before: quote!.offer_before_iqd ?? null,
+          savingPercent: quote!.offer_saving_percent ?? null,
         }
       : levelPrice
         ? {
@@ -2772,8 +2799,12 @@ export default function Product() {
             applied: levelPrice.applied_iqd,
             tier: levelPrice.applied_tier,
             settled: levelIsFinal && !quoteLoading && quoteErrors.length === 0,
+            before: levelPrice.offer_before_iqd ?? null,
+            savingPercent: levelPrice.offer_saving_percent ?? null,
           }
         : null;
+  /** A live offer lowered what is on screen: the struck line, the «سعر العرض» label and the clock (§8.3). */
+  const offerBefore = shownPrice && typeof shownPrice.before === 'number' && shownPrice.before > shownPrice.applied ? shownPrice.before : null;
   /** A figure is on screen but the server has not confirmed THIS selection. */
   const priceIsPending = !!shownPrice && !shownPrice.settled;
 
@@ -3132,16 +3163,45 @@ export default function Product() {
                 )}
                 {s.appliedPriceOf(appliedMemberLabel)}
               </span>
+            ) : offerBefore !== null ? (
+              /* A live offer set this price (§8.3): «سعر العرض», never the plain «السعر». */
+              <span data-testid="product-sale-label" className="text-text-secondary text-[12px] font-bold">
+                {lang === 'en' ? SALE_PRICE.en : lang === 'ckb' ? SALE_PRICE.ckb : SALE_PRICE.ar}
+              </span>
             ) : (
               <span className="text-text-secondary text-[12px] font-bold">{s.regularPrice}</span>
             )}
           </div>
+          {/* A LIVE OFFER (docs/ux/PRODUCT-DISCOUNT.md §8.3, F1, F8): the published price it replaced,
+              struck, its «−N٪», and the clock while it runs — then what a membership took off the offer
+              price, in dinars, exactly as below. */}
+          {offerBefore !== null ? (
+            <div data-testid="product-offer-saving" className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <OfferSaving beforeIqd={offerBefore} percent={shownPrice.savingPercent} />
+              {product.offer?.ends_at && product.offer.schedule_state !== 'upcoming' ? (
+                <Countdown target={product.offer.ends_at} kind="ends" className="text-[11.5px] text-text-secondary" />
+              ) : null}
+              {memberSavingIqd !== null ? (
+                <span
+                  data-testid="product-member-saving"
+                  className={`${appliedMemberTier === 'pro' ? 'text-coral' : 'text-gold'} text-[12.5px] font-bold tabular-nums`}
+                >
+                  {s.savedWithTier(money(memberSavingIqd), appliedMemberLabel)}
+                </span>
+              ) : null}
+            </div>
+          ) : product.offer?.schedule_state === 'upcoming' && product.offer.starts_at ? (
+            /* An offer that has not opened: when, never a price it has not set yet. */
+            <div className="mt-1">
+              <Countdown target={product.offer.starts_at} kind="opens" className="text-[11.5px] text-text-secondary" />
+            </div>
+          ) : null}
           {/* §4: no compare-at. The regular price is struck through only when
               the member's own resolved price is genuinely lower.
               §8: and when a MEMBERSHIP is the reason, the page says so in
               dinars, here, rather than leaving the customer to subtract two
               numbers or to discover the benefit at checkout. */}
-          {shownPrice.applied < shownPrice.regular ? (
+          {offerBefore === null && shownPrice.applied < shownPrice.regular ? (
             <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
               <span className="text-text-muted text-[12px] line-through tabular-nums">{money(shownPrice.regular)}</span>
               {memberSavingIqd !== null ? (

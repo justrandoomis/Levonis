@@ -308,6 +308,20 @@ export function useMoney(): CurrencyContextValue {
   return context;
 }
 
+/**
+ * THE TWO HALVES OF WHAT `money()` WRITES: «1,575,000 د.ع» → ['1,575,000', 'د.ع'], so a card can draw the
+ * amount at 15 px and the unit at 10.5 px — and so an amount can be an LTR island while its unit follows
+ * the sentence's direction (an Arabic or Sorani line with Latin digits keeps the unit where the main price
+ * has it). Anything else (a USD reading, «$1,050.00») comes back whole with no unit.
+ *
+ * It lives here, in the module that writes the string and that the first paint already loads, rather than
+ * in a file of its own: a module that small becomes a sub-1 KB chunk of its own (tests/motionLazy.test.ts).
+ */
+export function splitMoney(text: string): [string, string] {
+  const m = /^(.*[\d\u0660-\u0669\u06F0-\u06F9])\s+(د\.ع|IQD)$/.exec(text);
+  return m ? [m[1], m[2]] : [text, ''];
+}
+
 /** The same value, or undefined outside a CurrencyProvider (a control that renders in both). */
 export function useOptionalMoney(): CurrencyContextValue | undefined {
   return useContext(CurrencyContext);

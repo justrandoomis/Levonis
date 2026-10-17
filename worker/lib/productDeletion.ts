@@ -255,6 +255,8 @@ export const OWNED_TABLES: OwnedTable[] = [
   // for the registry scanner to discover. Product-scoped rows still belong to
   // the product and must not survive deletion or later id reuse.
   { table: 'offer_limits', by: { sql: "subject_type = 'product' AND subject_id = ?1" } },
+  // A dollar sale price's rows (0197, docs/ux/PRODUCT-DISCOUNT.md §5.4); skipped where 0197 is absent.
+  { table: 'offer_usd_prices', by: { sql: "subject_type = 'product' AND subject_id = ?1" } },
   { table: 'offer_windows', by: { sql: "subject_type = 'product' AND subject_id = ?1" } },
   { table: 'mystery_offer_secrets', by: { column: 'product_id' } },
   { table: 'mystery_offers', by: { column: 'product_id' } },

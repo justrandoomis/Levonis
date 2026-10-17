@@ -874,7 +874,12 @@ function resolvePricing(
     .filter((c) => c.included)
     .reduce((sum, c) => sum + Math.max(0, Math.trunc(c.unit.applied_iqd)) * c.qty_per_bundle, 0);
 
-  const windowPrices = !!window && window.active && window.offer_price_mode !== '';
+  // A dollar sale price ('fixed_usd', 0197) is refused on a composition at the door
+  // (docs/ux/PRODUCT-DISCOUNT.md §4.7, §5.3): a stray row is inert here — no price, no conflict.
+  const windowPrices =
+    !!window &&
+    window.active &&
+    (window.offer_price_mode === 'fixed' || window.offer_price_mode === 'discount_percent' || window.offer_price_mode === 'discount_iqd');
   const derived = config.price_mode !== 'fixed';
   if (windowPrices && derived) {
     return {

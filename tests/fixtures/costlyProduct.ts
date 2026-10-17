@@ -198,7 +198,10 @@ export function arithmeticLeaks(value: unknown, opts: { allow?: readonly RegExp[
           (banned.has(k) &&
             !(k === 'components' && Array.isArray(x)) &&
             !(k === 'price_source' && parentKey === 'offer')) ||
-          (warrantyOnly.has(k) && parentKey === 'warranty');
+          (warrantyOnly.has(k) && parentKey === 'warranty') ||
+          // The resolver's SKU identity (`ResolvedPrice.sku`, docs/ux/PRODUCT-DISCOUNT.md §11) is an OBJECT;
+          // a product's own `sku` code is text and is not arithmetic.
+          (k === 'sku' && !!x && typeof x === 'object');
         if (flagged && !allow.some((re) => re.test(at.replace(/\[\d+\]/g, '[n]')))) {
           out.push(`${at} = ${JSON.stringify(x)?.slice(0, 60)}`);
         }

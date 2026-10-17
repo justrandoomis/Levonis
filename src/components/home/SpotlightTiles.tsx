@@ -102,7 +102,8 @@ const MAX_PAGES = 2;
 function PricePlate({ p }: { p: ApiProduct }) {
   const { money } = useMoney();
   const display = p.display_price_iqd ?? p.price_iqd;
-  const regular = p.display_regular_iqd ?? p.price_iqd;
+  // A live offer strikes the published price it replaced (docs/ux/PRODUCT-DISCOUNT.md §8.2).
+  const regular = p.display_offer_before_iqd ?? p.display_regular_iqd ?? p.price_iqd;
   // Commercial tiles are SELLABLE-only (rule R4, rows 239-240); a null price is never drawn as 0.
   if (display == null || isUnpriced(p)) return null;
   const discounted = display < (regular ?? display);

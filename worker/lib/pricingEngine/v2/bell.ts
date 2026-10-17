@@ -75,3 +75,59 @@ export async function belowMinProfitBell(env: Pick<Env, 'DB' | 'INITIAL_ADMIN_EM
   });
   return [stmt];
 }
+
+/* ------------------------------------------------- a sale below cost (D6) -- */
+
+/**
+ * A SALE BELOW COST, SAVED BY A PRICE EDITOR (docs/ux/PRODUCT-DISCOUNT.md §5.7, D6). A sale price
+ * below cost is never refused, never moved and never lifted (row 222 Q1/Q3: refusing it would make
+ * the editor's save a cost oracle). The owner's own preview flags it; an editor's save rings the
+ * verified owner's bell once per product and save — the product id and name only, never a figure.
+ */
+export const OFFER_BELOW_COST_EVENT = 'pricing.offer.below_cost';
+
+export const OFFER_BELOW_COST_NOTICE = {
+  title: {
+    ar: 'تخفيض تحت التكلفة',
+    en: 'A sale below cost',
+    ckb: 'داشکاندنێک لە خوار تێچوو',
+  },
+  body: {
+    ar: 'حُفظ تخفيض يبيع منتجًا تحت تكلفته. التخفيض محفوظ ومعروض للزبائن؛ راجعه في قسم «الأسعار».',
+    en: 'A sale that sells a product below its cost was saved. It is saved and on sale; review it in the Prices section.',
+    ckb: 'داشکاندنێک پاشەکەوت کرا کە بەرهەمێک لە خوار تێچووەکەی دەفرۆشێت. پاشەکەوت کراوە و بۆ کڕیاران دیارە؛ لە بەشی «نرخەکان» پێیدا بچۆرەوە.',
+  },
+} as const;
+
+/** The bell's statement for an editor's sale save that sells below cost — none for the owner's own save. */
+export async function offerBelowCostBell(
+  env: Pick<Env, 'DB' | 'INITIAL_ADMIN_EMAIL'>,
+  viewer: V2Viewer,
+  productId: string,
+  name: string | null,
+  savedAt: string
+): Promise<D1PreparedStatement[]> {
+  if (viewer !== 'editor') return [];
+  const ownerId = await verifiedOwnerId(env);
+  if (!ownerId) return [];
+  const { stmt } = notifyStatement(env.DB, {
+    userId: ownerId,
+    kind: 'fx_attention',
+    title_ar: OFFER_BELOW_COST_NOTICE.title.ar,
+    title_en: OFFER_BELOW_COST_NOTICE.title.en,
+    body_ar: OFFER_BELOW_COST_NOTICE.body.ar,
+    body_en: OFFER_BELOW_COST_NOTICE.body.en,
+    link: `/admin?tab=products&edit=${encodeURIComponent(productId)}&section=3`,
+    entity_type: 'product',
+    entity_id: productId,
+    meta: {
+      title_ckb: OFFER_BELOW_COST_NOTICE.title.ckb,
+      body_ckb: OFFER_BELOW_COST_NOTICE.body.ckb,
+      reason: OFFER_BELOW_COST_EVENT,
+      product_id: productId,
+      ...(name ? { product_name: name } : {}),
+    },
+    eventKey: `${OFFER_BELOW_COST_EVENT}:${productId}:${savedAt}`,
+  });
+  return [stmt];
+}

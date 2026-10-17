@@ -37,6 +37,7 @@ import {
 import MerchantCartView from '../components/merchant/MerchantCartView';
 import { isPaidTier, tierLabel } from '../components/subscription/tierMeta';
 import { useMoney } from '../CurrencyContext';
+import OfferBadge, { StruckMoney, offerPercentSr, offerPercentText } from '../components/ui/OfferBadge';
 import VariantImg from '../components/ui/VariantImg';
 import { cartEmptyText } from '../lib/cartEmptyText';
 import { groupCartLines } from '../lib/cartGroups';
@@ -1480,11 +1481,13 @@ export default function Cart() {
     if (item.kind === 'gift') return giftRow(item, item.gift ?? { level: 0, value_iqd: 0 });
     const hasVariants = (item.options ?? []).length > 0 || (item.colors ?? []).length > 0;
     const hasShippingOptions = (item.shipping_methods ?? []).length > 0;
-    const regularUnit = item.breakdown?.regular_iqd ?? null;
+    // A LIVE OFFER strikes the published price it replaced (docs/ux/PRODUCT-DISCOUNT.md §8.4) — the
+    // server's `offer_before_iqd` and its percent; a membership saving keeps today's comparison.
+    const regularUnit = item.breakdown?.offer_before_iqd ?? item.breakdown?.regular_iqd ?? null;
     const appliedUnit = item.breakdown?.applied_iqd ?? null;
     const hasSale = regularUnit !== null && appliedUnit !== null && appliedUnit < regularUnit;
     const discountPct = hasSale
-      ? Math.round((1 - (appliedUnit as number) / (regularUnit as number)) * 100)
+      ? item.breakdown?.offer_saving_percent ?? Math.round((1 - (appliedUnit as number) / (regularUnit as number)) * 100)
       : 0;
     /**
      * WHAT THE MEMBERSHIP TOOK OFF THIS LINE — the server's figure for
@@ -1650,8 +1653,15 @@ export default function Cart() {
             <span className="max-w-full text-text-primary font-semibold text-[15px] sm:text-[17px] tabular-nums">{money(item.unit_price_iqd)}</span>
             {hasSale && (
               <>
-                <span className="text-text-muted text-[12px] line-through">{(regularUnit as number).toLocaleString()}</span>
-                <span className="text-gold text-[12px] font-bold tabular-nums">−{discountPct}%</span>
+                <span className="sr-only">{loc('بدل', 'instead of', 'لە جیاتی')} </span>
+                {/* Only the figure is LTR; «د.ع» sits where the unit price's does (review, bidi). */}
+                <StruckMoney iqd={regularUnit as number} className="text-text-muted text-[12px]" />
+                {discountPct >= 1 ? (
+                  <OfferBadge tone="saving">
+                    <bdi dir="ltr" aria-hidden>{offerPercentText(discountPct, lang === 'en' || lang === 'ckb' ? lang : 'ar')}</bdi>
+                    <span className="sr-only">{offerPercentSr(discountPct, lang === 'en' || lang === 'ckb' ? lang : 'ar')}</span>
+                  </OfferBadge>
+                ) : null}
               </>
             )}
           </div>

@@ -386,7 +386,8 @@ export function Toggle({
       // A row that holds a switch is flush clay (the rim alone, on the fill of its
       // parent): the switch is
       // the state, so the row does not tint or outline itself a second time.
-      className="flex items-center justify-between gap-3 w-full min-w-0 h-10 px-2.5 rounded-md border border-border-subtle shadow-xs text-[13px] text-text-primary text-start transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+      // `lv-hit`: the 40 px row still takes a 44 px tap (docs/ux/PRODUCT-DISCOUNT.md §6.7).
+      className="lv-hit relative flex items-center justify-between gap-3 w-full min-w-0 h-10 px-2.5 rounded-md border border-border-subtle shadow-xs text-[13px] text-text-primary text-start transition-colors disabled:cursor-not-allowed disabled:opacity-60"
     >
       <span className="min-w-0 truncate">
         {label}

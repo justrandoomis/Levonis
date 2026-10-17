@@ -87,6 +87,29 @@ export function skuLevelSelections(doc: SkuLevelDoc, relations?: RelationOrder):
   return out;
 }
 
+/**
+ * THE PRE-ORDER TWIN OF EACH DIRECT SKU LEVEL (docs/ux/PRODUCT-DISCOUNT.md §8.2, review): a SKU level
+ * that sells direct is read on its direct line, so the card's SKU levels alone never see the cheaper
+ * pre-order route the option and base levels carry («يبدأ من» on a pre-order price). When a dollar sale
+ * drops those non-SKU levels, each direct SKU is read on its cheapest pre-order route as well — the very
+ * line the cart prices for it — so «يبدأ من» keeps its basis, before and after the sale.
+ */
+export function skuPreorderTwins(doc: { sku_prices?: readonly SkuPriceRow[] | null }, levels: readonly SkuLevelSelection[]): SkuLevelSelection[] {
+  const rows = doc.sku_prices ?? [];
+  const out: SkuLevelSelection[] = [];
+  for (const level of levels) {
+    if (level.transport_method !== null) continue;
+    let best: { route: PreorderRoute; price: number } | null = null;
+    for (const r of rows) {
+      if (r.combo_key !== level.combo_key || !isSkuChannel(r.channel)) continue;
+      const route = routeOfChannel(r.channel);
+      if (route && (!best || r.regular_price_iqd < best.price)) best = { route, price: r.regular_price_iqd };
+    }
+    if (best) out.push({ ...level, transport_method: best.route });
+  }
+  return out;
+}
+
 /** The resolver's selection fields for one SKU level (the cart's own call for that line). */
 export function skuLevelResolveInput(s: SkuLevelSelection): {
   optionId: string | null;

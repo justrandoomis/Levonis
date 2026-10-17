@@ -177,18 +177,6 @@ export function compareTypeOf(p: CardExtras & { product_slug?: string }): string
   return (COMPARABLE_TYPES as readonly string[]).includes(t) ? t : null;
 }
 
-// ------------------------------------------------------------------ money
-
-/**
- * «1,575,000 د.ع» → ['1,575,000', 'د.ع'], so the card can draw the amount at
- * 15 px and the unit at 10.5 px. Anything else (a USD reading, «$1,050.00»)
- * comes back whole with no unit.
- */
-export function splitMoney(text: string): [string, string] {
-  const m = /^(.*[\d\u0660-\u0669\u06F0-\u06F9])\s+(د\.ع|IQD)$/.exec(text);
-  return m ? [m[1], m[2]] : [text, ''];
-}
-
 /**
  * THE CARD'S DESTINATION. A composition row links to where it can be bought
  * (§10, `/bundles/<slug>`); everything else to its product page.

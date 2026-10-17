@@ -183,7 +183,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'order_item_inventory_allocations',
     // The one promotion model (§1.8): entity-attached windows, limits and
     // redemptions, beside the code-entry mechanism `coupons` already here.
-    'offer_windows', 'offer_limits', 'offer_redemptions',
+    'offer_windows', 'offer_limits', 'offer_redemptions', 'offer_usd_prices',
     // What one order actually drew, frozen, and the candidate list it drew
     // against — per-order facts, written in the order's own batch (§1.9).
     'mystery_allocations', 'mystery_draw_audits',

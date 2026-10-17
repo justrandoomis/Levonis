@@ -11,7 +11,8 @@ import { useId, type ReactNode } from 'react';
 import { useOptionalLanguage } from '../../../../LanguageContext';
 import { PRICING_CHANNEL_LABELS } from '../../../../../packages/contracts/src/pricingFieldLabels';
 import { TextInput } from '../formUi';
-import { typingUsd, type V2Channel, type V2Lang } from './v2Model';
+import type { V2Channel, V2Lang } from './v2Model';
+import { typingUsd } from './usdTyping';
 import { v2Strings, type V2Strings } from './v2Strings';
 
 /** The reader's language, narrowed to the three the pricing strings carry. */

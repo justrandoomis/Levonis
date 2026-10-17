@@ -492,7 +492,7 @@ export function resolveCartLine(
   }
   const withOffer =
     offer && offer.eligible && (doc.composition ?? '') === ''
-      ? applyOfferToResolved(resolved, offer.view, tier, tierActive, offer.nowMs)
+      ? applyOfferToResolved(resolved, offer.view, tier, tierActive, offer.nowMs, doc)
       : { resolved, offer_id: offer?.view?.window?.id ?? null, source: 'ladder' as const, plus_iqd: null };
 
   return {
@@ -1072,6 +1072,8 @@ async function loadCart(c: Context<AppContext>) {
       // live offer beats one, and a rule that did not set this price must not
       // be reported as having saved anything.
       applied_rule_id: tier === 'pro' ? resolved.member_rule.pro : resolved.member_rule.prime,
+      // D10: a line-applied rule is worked out on the price before a live offer, never on top of it.
+      offer_before_unit_iqd: typeof resolved.offer_before_iqd === 'number' ? resolved.offer_before_iqd : null,
       qty: Number(row.qty) || 0,
     });
     // Would cash on delivery change THIS line's price? Only when the product

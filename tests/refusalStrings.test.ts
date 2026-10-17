@@ -244,6 +244,10 @@ test('every code the table translates is one the server can actually emit', () =
     'worker/routes/admin.ts',
     // The deception layer (row 206): a blocked browser's every API answer (ACCESS_BLOCKED).
     'worker/lib/deception/strings.ts',
+    // The special-offers door and the product form's discount card (docs/ux/PRODUCT-DISCOUNT.md §5.8):
+    // the dollar sale price's refusals, the lost update and the two warnings the card renders.
+    'worker/routes/offers.ts',
+    'worker/lib/offerDiscount.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');

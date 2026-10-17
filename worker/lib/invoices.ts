@@ -3,6 +3,7 @@ import { localeToApi, safeParse } from './types';
 import { newId } from './crypto';
 import { isStamped } from './emailStamp';
 import { membershipDiscountAtLine } from './orderMembership';
+import { offerFigures } from './customerPricing';
 import { enqueue, processOutbox } from './outbox';
 import {
   renderOrderInvoiceEmail,
@@ -203,7 +204,13 @@ function lineFromItem(it: OrderItemRow, lang: InvoiceLang = 'ar'): InvoiceSnapsh
   const pricing = safeParse<{
     direct?: { surcharge_iqd?: number; waived?: boolean } | null;
     gift?: { gift_id?: unknown; value_iqd?: unknown } | null;
+    applied_iqd?: unknown;
+    offer_before_iqd?: unknown;
   } | null>(it.pricing_snapshot, null);
+  // A LIVE OFFER (docs/ux/PRODUCT-DISCOUNT.md §8.7): the before price frozen on the line's own snapshot,
+  // and the percent of it and the frozen applied price — never re-read from a window that may have moved.
+  const offer =
+    pricing && typeof pricing.applied_iqd === 'number' ? offerFigures(pricing.offer_before_iqd, pricing.applied_iqd) : null;
   const direct = pricing?.direct ?? null;
   const effectiveDirect = direct && direct.waived !== true ? Number(direct.surcharge_iqd) || 0 : 0;
   // Read from the line's own frozen snapshot, never a 0175 column, so an
@@ -226,6 +233,9 @@ function lineFromItem(it: OrderItemRow, lang: InvoiceLang = 'ar'): InvoiceSnapsh
     // The plan's own title, as frozen at checkout — Arabic first, the English
     // title when the plan was authored without one.
     warranty_label: warranty?.title_ar || warranty?.title_en || '',
+    ...(offer && offer.offer_before_iqd !== null && offer.offer_saving_percent !== null
+      ? { offer_before_iqd: offer.offer_before_iqd, offer_saving_percent: offer.offer_saving_percent }
+      : {}),
   };
 }
 

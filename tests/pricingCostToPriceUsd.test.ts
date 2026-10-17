@@ -425,10 +425,31 @@ test('the storefront never recomputes: only the owner pricing router, the engine
     const imported = /import\s*\{([^}]*)\}\s*from\s*['"]\.\/pricingEngine\/legacy['"]/.exec(src)![1]!.split(',').map((x) => x.trim()).filter(Boolean);
     assert.deepEqual(imported, [...names], `${f} reads the structure only`);
   }
+  // The product discount (docs/ux/PRODUCT-DISCOUNT.md §4.4, §5): a dollar sale price is converted with the
+  // SAME rounding Pricing V2 publishes with — `ceilStep` and `ROUNDING_STEP_IQD`, nothing else of the
+  // engine — at the SKU's own STORED rate (no price chain, no rate reader). The admin door's read model
+  // (an admin router, never a customer path) reads the stored product, its structure and the V2 role rule
+  // through the engine's own loaders, and its below-cost bell is V2's. The door itself reads the same V2
+  // role rule (`v2ViewerOf`, nothing else of that module) to tell the «العروض الخاصة» tab whether an editor
+  // may type a dollar price on a cost-first product (D7). Each pinned here, import by import.
+  const PRODUCT_DISCOUNT: Readonly<Record<string, readonly string[]>> = {
+    'worker/lib/offerUsd.ts': ['@levonis/pricing/costToPrice'],
+    'worker/lib/offerDiscount.ts': ['./pricingEngine/legacy', './pricingEngine/load', './pricingEngine/v2/api'],
+    'worker/routes/offers.ts': ['../lib/pricingEngine/v2/api', '../lib/pricingEngine/v2/bell'],
+  };
+  for (const [f, modules] of Object.entries(PRODUCT_DISCOUNT)) {
+    const src = files.find((x) => x.f === f)!.src;
+    const engine = [...src.matchAll(/from\s+['"]([^'"]*(?:\/pricingEngine\/[^'"]+|\/costToPrice|\/fxChain))['"]/g)].map((m) => m[1]).sort();
+    assert.deepEqual(engine, [...modules].sort(), f);
+  }
+  const offersRole = /import\s*\{([^}]*)\}\s*from\s*['"]\.\.\/lib\/pricingEngine\/v2\/api['"]/.exec(files.find((x) => x.f === 'worker/routes/offers.ts')!.src)![1]!;
+  assert.deepEqual(offersRole.split(',').map((x) => x.trim()).filter(Boolean), ['v2ViewerOf'], 'the offers door reads the role rule and nothing else of the V2 api');
+  const offerUsdCost = /import\s*\{([^}]*)\}\s*from\s*['"]@levonis\/pricing\/costToPrice['"]/.exec(files.find((x) => x.f === 'worker/lib/offerUsd.ts')!.src)![1]!;
+  assert.deepEqual(offerUsdCost.split(',').map((x) => x.trim()).filter(Boolean).sort(), ['ROUNDING_STEP_IQD', 'ceilStep'], 'the dollar sale price reads the rounding and nothing else');
   const approvedRate = files.find((x) => x.f === 'worker/lib/pricingEngine/approvedRate.ts')!.src;
   assert.deepEqual([...approvedRate.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1]), ['./rates'], 'the approved-rate helper imports the engine\'s rate reader and nothing else');
   for (const f of ['worker/routes/products.ts', 'worker/routes/cart.ts', 'worker/routes/orders.ts', 'worker/routes/catalog.ts', 'worker/routes/compare.ts', 'worker/routes/seo.ts', 'worker/lib/listing.ts', 'worker/lib/publicApi/resources/products.ts']) {
     assert.doesNotMatch(files.find((x) => x.f === f)!.src, /from\s+['"][^'"]*\/adminProducts['"]/, `${f} reaches no admin product router`);
   }
-  assert.deepEqual(importers.filter((f) => !allowed(f) && !(f in DECISION6) && !(f in V2_PRODUCT_SAVE) && !(f in CLEAN_START_DOORS) && !(f in PURCHASE_RATE) && !(f in TRADE_IN_RATE) && !(f in CATALOG_ONLY_STRUCTURE) && !OWNER_TOOLS.includes(f)), []);
+  assert.deepEqual(importers.filter((f) => !allowed(f) && !(f in DECISION6) && !(f in V2_PRODUCT_SAVE) && !(f in CLEAN_START_DOORS) && !(f in PURCHASE_RATE) && !(f in TRADE_IN_RATE) && !(f in CATALOG_ONLY_STRUCTURE) && !(f in PRODUCT_DISCOUNT) && !OWNER_TOOLS.includes(f)), []);
 });

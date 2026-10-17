@@ -25,7 +25,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { ROOT } from './fixtures/d1';
 import { AuthContext } from '../src/AuthContext';
 import { WalletProvider } from '../src/WalletContext';
-import { CurrencyProvider } from '../src/CurrencyContext';
+import { CurrencyProvider, splitMoney } from '../src/CurrencyContext';
 import { LanguageProvider } from '../src/LanguageContext';
 import ProductCard from '../src/components/home/ProductCard';
 import {
@@ -35,7 +35,6 @@ import {
   cardName,
   compareTypeOf,
   memberLine,
-  splitMoney,
   type CardProduct,
 } from '../src/lib/productCard';
 

@@ -26,7 +26,19 @@ import { productRoutes } from '../worker/routes/products';
 // `price_status` (DECISIONS row 240): every card says whether it is priced; the snapshot predates it.
 // `section_name` and `key_specs` (the Bambu import spec §G.5): the card's knowledge line, from the row and the
 // taxonomy the listing already holds — asserted in the test below and in tests/productCardKnowledge.test.ts.
-const NEW_CARD_FIELDS = ['sale_types', 'created_at', 'compare_type', 'price_status', 'section_name', 'key_specs'];
+// `display_offer_before_iqd` and `display_offer_saving_percent` (docs/ux/PRODUCT-DISCOUNT.md §8.1): the struck
+// price of a live offer and its «−N٪» — null on every card here, since the live catalogue has no offer window
+// (asserted below before they are set aside).
+const NEW_CARD_FIELDS = [
+  'sale_types',
+  'created_at',
+  'compare_type',
+  'price_status',
+  'section_name',
+  'key_specs',
+  'display_offer_before_iqd',
+  'display_offer_saving_percent',
+];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function withoutNewFields(body: Record<string, any>) {
@@ -99,6 +111,9 @@ test('every plain listing request answers what it answered before, minus the new
   assert.ok(Object.keys(baseline).length >= 6);
   for (const [path, expected] of Object.entries(baseline)) {
     const body = await json(await get(app, path));
+    for (const p of (body.products ?? []) as Array<Record<string, unknown>>) {
+      assert.deepEqual([p.display_offer_before_iqd, p.display_offer_saving_percent], [null, null], `${path} ${String(p.id)}: no offer, no strike`);
+    }
     assert.deepEqual(withoutNewFields(body), asCleanStart(withoutPremiumTeasers(expected)), path);
   }
 });

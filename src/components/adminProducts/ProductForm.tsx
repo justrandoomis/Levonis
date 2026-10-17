@@ -116,6 +116,7 @@ import ImportStockCard, { importStockMissing, importStockText } from './form/Imp
 import OwnerCostVerifyCard, { CostOpensAfterSave } from '../auth/OwnerCostVerifyCard';
 import PricePreview from './PricePreview';
 import MembershipDiscountSection from './form/MembershipDiscountSection';
+import ProductDiscountCard from './form/ProductDiscountCard';
 import { useProPaused } from '../../lib/proPause';
 import { SpecMultiPick } from './form/SpecMultiPick';
 import PrinterFitsSection from './form/PrinterFitsSection';
@@ -1520,6 +1521,11 @@ export default function ProductForm({
         {/* The real cost layers behind the stock (the owner's batches): renders nothing
             for a product with no batches, or for an admin whose payload carries no costs. */}
         {canSeeCost && doc.id && <InventorySummary productId={doc.id} />}
+
+        {/* «تخفيض السعر» (docs/ux/PRODUCT-DISCOUNT.md §6): the price AFTER a discount, in dollars or a
+            percent, on the published price. It saves through the special-offers door — the same row
+            the «العروض الخاصة» tab edits — with its own button, never with this form's «حفظ». */}
+        <ProductDiscountCard productId={doc.id || null} />
 
         {/* §18 — THE MEMBERSHIP DISCOUNT RULE FOR THIS ONE PRODUCT. A membership
             benefit, not a typed price (typed member prices are retired with the old

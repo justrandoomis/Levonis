@@ -22,6 +22,7 @@ import {
   isUnitExpressible,
   orderLineBenefits,
   SCOPE_RANK,
+  unitDiscountIqd,
   selectRule,
   shippingAfterBenefit,
   shippingBenefit,
@@ -527,6 +528,15 @@ export interface BenefitLineInput {
    * instead, which is the same answer wherever there is one to check.
    */
   applied_rule_id?: string | null;
+  /**
+   * A LIVE OFFER LOWERED THIS LINE (docs/ux/PRODUCT-DISCOUNT.md D10): the line's regular price
+   * immediately before the window replaced it (`ResolvedPrice.offer_before_iqd`); `regular_unit_iqd`
+   * is then the OFFER price. A rule applied in the unit price is already clamped to the offer by the
+   * resolver; a rule applied at the LINE (`isUnitExpressible` false) is worked out on this pre-offer
+   * price instead, and the member is charged the lower of the two — the discounts never stack.
+   * Absent or null: no offer lowered the line.
+   */
+  offer_before_unit_iqd?: number | null;
 }
 
 export interface ResolvedBenefits {
@@ -593,11 +603,41 @@ export function resolveProductBenefits(input: {
       merchandise
     )
   );
+  /**
+   * D10 FOR A LINE-APPLIED RULE ON A LINE A LIVE OFFER LOWERED (docs/ux/PRODUCT-DISCOUNT.md D10, §9).
+   *
+   * `clampMemberLadder` gives a unit-applied rule min(member, offer). A line-applied rule never meets
+   * that clamp, and computing it on `regular_unit_iqd` — which is already the offer price — took the
+   * membership's percent off the sale price: the two discounts stacked. So such a rule is worked out on
+   * the line's PRE-OFFER regular price (the same basis it has without the sale), and only what it takes
+   * BEYOND the offer's own saving on the units it covers is subtracted from the line. A rule that cannot
+   * beat the sale on any unit is left out of the order's shared budget (`max_quantity`, a per-order
+   * cap), so another line can still spend it.
+   */
+  const offerSavingOf = input.lines.map((line, i) => {
+    const rule = ruleOf[i] ?? null;
+    const before = line.offer_before_unit_iqd;
+    if (!rule || isUnitExpressible(rule) || typeof before !== 'number' || !Number.isFinite(before)) return 0;
+    return Math.max(0, Math.trunc(before) - Math.trunc(line.regular_unit_iqd));
+  });
   const computedOf = orderLineBenefits(
-    input.lines.map((line, i) => ({ regularUnitIqd: line.regular_unit_iqd, qty: line.qty, rule: ruleOf[i] ?? null }))
+    input.lines.map((line, i) => {
+      const rule = ruleOf[i] ?? null;
+      const saving = offerSavingOf[i]!;
+      if (saving <= 0) return { regularUnitIqd: line.regular_unit_iqd, qty: line.qty, rule };
+      const before = Math.trunc(line.offer_before_unit_iqd as number);
+      return { regularUnitIqd: before, qty: line.qty, rule: unitDiscountIqd(before, rule) > saving ? rule : null };
+    })
   );
   const lines = input.lines.map((line, i) => {
     const computed = computedOf[i]!;
+    const offerSaving = offerSavingOf[i]!;
+    if (computed.applied_at === 'line' && offerSaving > 0) {
+      // The member pays the lower of the rule's price and the offer's on each covered unit.
+      const total = Math.max(0, computed.total_iqd - computed.eligible_qty * offerSaving);
+      if (total <= 0) return { product_id: line.product_id, ...NO_LINE_BENEFIT, applied_at: 'line' as const };
+      return { product_id: line.product_id, ...computed, per_unit_iqd: Math.max(0, computed.per_unit_iqd - offerSaving), total_iqd: total };
+    }
 
     /**
      * A LINE IS ONLY CREDITED WITH WHAT ITS PRICE ACTUALLY MOVED.
