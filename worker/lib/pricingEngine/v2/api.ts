@@ -111,17 +111,18 @@ export interface V2Read {
 export async function loadV2Read(db: D1Database, productId: string, draft?: LoadedProduct): Promise<V2Read | null> {
   const loaded = draft ?? (await loadProducts(db, [productId])).get(productId) ?? null;
   if (!loaded) return null;
-  // The stores' batches and the rates' batch one after another (never two batches at once); the settings
-  // and the price image beside them — every save, preview and apply waits on this read (round trips
-  // measured by tests/adminSaveRoundTrips.test.ts).
-  const [{ stored, v2, control, rates }, ctx, image] = await Promise.all([
+  // The stores' batches and the rates' batch one after another (never two batches at once); the settings,
+  // the price image and the shelf (row 244, one statement) beside them — every save, preview and apply
+  // waits on this read (round trips measured by tests/adminSaveRoundTrips.test.ts).
+  const [{ stored, v2, control, rates }, ctx, image, shelves] = await Promise.all([
     loadV2Stores(db, [productId]).then(async (s) => ({ ...s, rates: await loadPricingRates(db) })),
     loadPreviewContext(db),
     priceImageOf(db, productId),
+    loadShelves(db, [productId]),
   ]);
   const own = stored.get(productId)!;
   const review = storedMethodOf({ stored: own }) ? null : await pendingReviewOf(db, productId);
-  const shelf = (await loadShelves(db, [productId])).get(productId) ?? null;
+  const shelf = shelves.get(productId) ?? null;
   return { loaded, stored: own, v2: v2.get(productId) ?? null, ctx, rates, control, image, review, shelf };
 }
 
