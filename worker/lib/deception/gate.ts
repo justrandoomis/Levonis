@@ -67,6 +67,7 @@ import { NETWORK_BLOCK_HOURS, NETWORK_SCORE_BLOCK_HOURS, countHit, openIncident,
 import { ALWAYS_LINKABLE, LINKABLE_CAP, THRESHOLD, WEIGHTS, authBucket, bumpScore, idorPath, injectionIn, priceFieldsIn, tamperParams, watchedBody, type SignalCode } from './signals';
 import { blockedResponse } from './strings';
 import { decoyFor } from './decoys';
+import { isEdgeRefresh } from '../edgePolicy';
 
 /** Never checked: the static and machine paths (no person behind them to block, and speed matters). */
 const SKIP_EXACT = new Set(['/manifest.webmanifest', '/robots.txt', '/sitemap.xml', '/api/health']);
@@ -541,6 +542,13 @@ async function observe(c: Context<AppContext>, s: GateState): Promise<void> {
 export const deceptionGate: MiddlewareHandler<AppContext> = async (c, next) => {
   const path = c.req.path;
   if (skipsGate(path) || c.req.method === 'OPTIONS') return next();
+  // THE EDGE'S OWN BACKGROUND REFRESH (worker/lib/edgePolicy.ts `isEdgeRefresh`): a
+  // guest's request replayed by this isolate after the answer has left, with no
+  // Sec-Fetch-* header and no address. The visitor's request that caused it passed this
+  // gate already; the replay is nobody's — scanned, it would read as a TOOL presenting a
+  // planted link's trap data and block the visitor's network (NEVER FRAMED). Untouched:
+  // no canary scan, no block check, no observation.
+  if (isEdgeRefresh(c.req.raw)) return next();
   let s: GateState | null = null;
   try {
     const nowMs = Date.now();

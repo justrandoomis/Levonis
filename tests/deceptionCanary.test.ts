@@ -27,7 +27,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { json } from './fixtures/app';
-import { CLICKED, INDUCED, KEYED, OPENED, OTHER_IP, SCRIPT, TOOL, TYPED, blocks, deceptionEvents, deceptionWorld, ownerBells, setCookieValue, type World } from './fixtures/deception';
+import { CLICKED, INDUCED, KEYED, OPENED, OTHER_IP, SCRIPT, TOOL, TYPED, blocks, deceptionEvents, deceptionWorld, drain, ownerBells, setCookieValue, type World } from './fixtures/deception';
+import { PURGE_MARKER_CACHE, STORED_AT_HEADER } from '../worker/lib/edgePolicy';
 import { MAX_STRONG_CANDIDATES, findCanaries, mintBatch } from '../worker/lib/deception/canary';
 import { batchShape } from '../worker/lib/deception/decoys';
 import { newId } from '../worker/lib/crypto';
@@ -242,6 +243,73 @@ test('NEVER FRAMED: a victim handed a link carrying trap data — opened from an
   assert.ok(score(w, 'u:usr_cust') > 0 && score(w, 'u:usr_cust') < 100);
   // Still nothing after it all: the customer browses on.
   assert.equal((await w.call('/api/products', { as: 'customer', ip: V, headers: SCRIPT })).status, 200);
+});
+
+/** A Cache API store that drops an entry at the `s-maxage` it was put with, as the live one does. */
+function expiringCache() {
+  const store = new Map<string, { res: Response; until: number }>();
+  return {
+    store,
+    async match(req: Request) {
+      const e = store.get(req.url);
+      if (!e) return undefined;
+      if (Date.now() > e.until) {
+        store.delete(req.url);
+        return undefined;
+      }
+      return e.res.clone();
+    },
+    async put(req: Request, res: Response) {
+      const cc = res.headers.get('Cache-Control') ?? '';
+      const s = Number(/s-maxage=(\d+)/.exec(cc)?.[1] ?? /max-age=(\d+)/.exec(cc)?.[1] ?? 0);
+      store.set(req.url, { res: new Response(await res.arrayBuffer(), res), until: Date.now() + s * 1000 });
+    },
+    async delete(req: Request) {
+      return store.delete(req.url);
+    },
+  };
+}
+
+test("NEVER FRAMED, WITH THE EDGE CACHE: the background refresh of a copy a planted link put there blocks nobody — it is the Worker's own request (speed lane review)", async () => {
+  let now = Date.parse('2026-10-16T09:00:00.000Z');
+  const realNow = Date.now;
+  Date.now = () => now;
+  const scope = globalThis as { caches?: unknown };
+  const answers = expiringCache();
+  const markers = expiringCache();
+  scope.caches = {
+    default: answers,
+    async open(name: string) {
+      assert.equal(name, PURGE_MARKER_CACHE);
+      return markers;
+    },
+  };
+  try {
+    const w = await deceptionWorld();
+    const t = await stolen(w);
+    const V = '198.51.100.77';
+    const link = `/api/products?search=${t.key}&limit=50`;
+    // The app's own echo of a planted link: recorded as linked, and its answer is kept at the edge.
+    assert.equal(await isBlocked(await w.call(link, { ip: V, headers: SCRIPT })), false);
+    assert.equal(answers.store.size, 1, 'the answer is kept at the edge');
+    const bellsBefore = ownerBells(w.raw).length;
+    // 90 s later (past half of s-maxage) the next visitor in that colo gets the copy, and the
+    // Worker replays the canonical URL behind it — with no Sec-Fetch-* header at all.
+    now += 90_000;
+    const again = await w.call(link, { ip: V, headers: SCRIPT });
+    assert.equal(again.status, 200);
+    assert.equal(again.headers.get('Age'), '90', 'served from the edge copy');
+    await drain();
+    assert.equal(blocks(w.raw).filter((b) => b.reason === 'canary_used').length, 0, 'NEVER FRAMED: nobody is blocked by a link');
+    assert.equal([...answers.store.values()][0]!.res.headers.get(STORED_AT_HEADER), String(now), 'the refresh ran, and stored a new copy');
+    assert.equal(ownerBells(w.raw).length, bellsBefore, 'and the owner is not called for it');
+    assert.ok(deceptionEvents(w.raw, 'CANARY_USED').every((e) => JSON.parse(String(e.detail)).ex === 'linked'), "only the visitors' own requests are recorded, as linked");
+    // The visitor's network browses on — a tool from it too (a later refresh, a document's inline resolve).
+    assert.equal((await w.call('/api/home', { ip: V, headers: TOOL })).status, 200);
+  } finally {
+    Date.now = realNow;
+    delete scope.caches;
+  }
 });
 
 test('INDUCED: a canary in an image, a frame or a cross-site fetch is recorded only — a header canary always counts', async () => {
